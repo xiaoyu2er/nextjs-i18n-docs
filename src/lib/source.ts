@@ -14,5 +14,12 @@ export const source = loader({
     
     return url;
   },
+  // https://fumadocs.dev/docs/headless/source-api#page-tree-1
+  pageTree: {
+    attachFile(node, file) {
+      node.name = file?.data.data.nav_title || node.name;
+      return node;
+    },
+  },
 
 });
