@@ -2,7 +2,6 @@ import { source } from "@/lib/source";
 import {
   DocsPage,
   DocsBody,
-  DocsDescription,
   DocsTitle,
 } from "fumadocs-ui/page";
 import { notFound } from "next/navigation";
@@ -10,7 +9,6 @@ import { createRelativeLink } from "fumadocs-ui/mdx";
 import { getMDXComponents } from "@/mdx-components";
 import { Identity } from "@/mdx/Identity";
 import { Void } from "@/mdx/Void";
-import { get } from "http";
 
 export function getDocsUrl(slug: string[] | string | undefined) {
   if (typeof slug === "string") {
@@ -53,7 +51,6 @@ export default async function Page(props: {
       breadcrumb={{ includePage: true }}
     >
       <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
         <MDXContent
           components={getMDXComponents({
