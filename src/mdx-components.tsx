@@ -1,4 +1,5 @@
 import defaultMdxComponents from "fumadocs-ui/mdx";
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 import { Image } from "./mdx/Image";
 import { Check, Cross } from "./mdx/Check";
@@ -11,6 +12,8 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     Image,
     Cross,
     Check,
+    Tab,
+    Tabs,
     ...components,
   };
 }
