@@ -8,6 +8,8 @@ import { Void } from "@/mdx/Void";
 import { Card, Cards } from "fumadocs-ui/components/card";
 import { getPageTreePeers } from "@/lib/pageTree";
 
+type Page = NonNullable<ReturnType<typeof source.getPage>>;
+
 export function getDocsUrl(slug: string[] | string | undefined) {
   if (typeof slug === "string") {
     return `/docs/${slug}`;
@@ -15,13 +17,13 @@ export function getDocsUrl(slug: string[] | string | undefined) {
   return `/docs/${(slug || []).join("/")}`;
 }
 
-export function getPage(url: string) {
+export function getPage(url: string): Page | undefined {
   const pages = source.getPages();
   const page = pages.find((page) => page.url === url);
   return page;
 }
 
-export default async function Page(props: {
+export default async function Docs(props: {
   params: Promise<{ slug?: string[] }>;
 }) {
   const params = await props.params;
@@ -41,6 +43,9 @@ export default async function Page(props: {
     MDXContent = refPage.data.body;
   }
 
+  const hasRelated = page.data.related;
+  const isIndex = page.file.name === "index";
+
   return (
     <DocsPage
       toc={page.data.toc}
@@ -57,7 +62,8 @@ export default async function Page(props: {
             PagesOnly: isPagesDocs ? Identity : Void,
           })}
         />
-        {page.file.name === "index" ? <DocsCategory url={page.url} /> : null}
+        {hasRelated ? <DocsRelated page={page} /> : null}
+        {!hasRelated && isIndex ? <DocsCategory url={page.url} /> : null}
       </DocsBody>
     </DocsPage>
   );
@@ -73,6 +79,30 @@ function DocsCategory({ url }: { url: string }) {
           {peer.description}
         </Card>
       ))}
+    </Cards>
+  );
+}
+
+function DocsRelated({ page }: { page: Page }) {
+  const relatedLinks = page.data.related?.links || [];
+  const pages = relatedLinks
+    .map((link) => {
+      return getPage(getDocsUrl(link));
+    })
+    .filter(Boolean) as Page[];
+  return (
+    <Cards>
+      {pages.map((page) => {
+        return (
+          <Card
+            key={page.url}
+            title={page.data.nav_title || page.data.title}
+            href={page.url}
+          >
+            {page.data.description}
+          </Card>
+        );
+      })}
     </Cards>
   );
 }
