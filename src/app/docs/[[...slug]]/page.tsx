@@ -1,14 +1,12 @@
 import { source } from "@/lib/source";
-import {
-  DocsPage,
-  DocsBody,
-  DocsTitle,
-} from "fumadocs-ui/page";
+import { DocsPage, DocsBody, DocsTitle } from "fumadocs-ui/page";
 import { notFound } from "next/navigation";
 import { createRelativeLink } from "fumadocs-ui/mdx";
 import { getMDXComponents } from "@/mdx-components";
 import { Identity } from "@/mdx/Identity";
 import { Void } from "@/mdx/Void";
+import { Card, Cards } from "fumadocs-ui/components/card";
+import { getPageTreePeers } from "@/lib/pageTree";
 
 export function getDocsUrl(slug: string[] | string | undefined) {
   if (typeof slug === "string") {
@@ -20,7 +18,6 @@ export function getDocsUrl(slug: string[] | string | undefined) {
 export function getPage(url: string) {
   const pages = source.getPages();
   const page = pages.find((page) => page.url === url);
-  console.log("getPage", page);
   return page;
 }
 
@@ -60,8 +57,23 @@ export default async function Page(props: {
             PagesOnly: isPagesDocs ? Identity : Void,
           })}
         />
+        {page.file.name === "index" ? <DocsCategory url={page.url} /> : null}
       </DocsBody>
     </DocsPage>
+  );
+}
+
+function DocsCategory({ url }: { url: string }) {
+  const peers = getPageTreePeers(source.pageTree, url);
+
+  return (
+    <Cards>
+      {peers.map((peer) => (
+        <Card key={peer.url} title={peer.name} href={peer.url}>
+          {peer.description}
+        </Card>
+      ))}
+    </Cards>
   );
 }
 
