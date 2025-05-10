@@ -1,13 +1,6 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 
-/**
- * Shared layout configurations
- *
- * you can customise layouts individually from:
- * Home Layout: app/(home)/layout.tsx
- * Docs Layout: app/docs/layout.tsx
- */
-export const baseOptions = ({title, doc}: {title: string, doc: string}) => ({
+export const baseOptions = ({title}: {title: string}) => ({
   nav: {
     title: (
       <>
@@ -23,11 +16,4 @@ export const baseOptions = ({title, doc}: {title: string, doc: string}) => ({
       </>
     ),
   },
-  links: [
-    {
-      text: doc,
-      url: '/docs',
-      active: 'nested-url',
-    },
-  ],
 }) as BaseLayoutProps;
