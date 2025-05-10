@@ -16,7 +16,7 @@ export function convertCodeMeta() {
   return (tree: Root) => {
     visit(tree, "code", (node: Code) => {
       // Convert language to bash
-      if (BASH_LANGUAGES.includes(node.lang)) {
+      if (node.lang && BASH_LANGUAGES.includes(node.lang)) {
         node.lang = "bash";
       }
       // Check if node has meta with filename
