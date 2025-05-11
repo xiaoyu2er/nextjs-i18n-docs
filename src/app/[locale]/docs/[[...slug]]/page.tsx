@@ -1,14 +1,16 @@
 import { getPageTreePeers } from '@/lib/pageTree';
 import { source } from '@/lib/source';
+import { useSource } from '@/lib/useSource';
 import { getMDXComponents } from '@/mdx-components';
 import { Identity } from '@/mdx/Identity';
 import { Void } from '@/mdx/Void';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/page';
+import { type Locale, useLocale } from 'next-intl';
 import { notFound } from 'next/navigation';
 
-type Page = NonNullable<ReturnType<typeof source.getPage>>;
+type Page = NonNullable<ReturnType<typeof source.en.getPage>>;
 
 function getDocsUrl(slug: string[] | string | undefined) {
   if (typeof slug === 'string') {
@@ -17,19 +19,20 @@ function getDocsUrl(slug: string[] | string | undefined) {
   return `/docs/${(slug || []).join('/')}`;
 }
 
-function getPage(url: string): Page | undefined {
-  const pages = source.getPages();
+function getPage(locale: Locale, url: string): Page | undefined {
+  const pages = source[locale].getPages();
   const page = pages.find((page) => page.url === url);
   return page;
 }
 
 export default async function Docs(props: {
-  params: Promise<{ slug?: string[] }>;
+  params: Promise<{ locale: Locale; slug?: string[] }>;
 }) {
   const params = await props.params;
   const slug = params.slug || [];
+  const locale = params.locale;
   const docsUrl = getDocsUrl(slug);
-  const page = getPage(docsUrl);
+  const page = getPage(locale, docsUrl);
   if (!page) notFound();
   let MDXContent = page.data.body;
   let toc = page.data.toc;
@@ -39,7 +42,7 @@ export default async function Docs(props: {
   const ref = page.data.source;
   if (ref) {
     const refUrl = getDocsUrl(ref);
-    const refPage = getPage(refUrl);
+    const refPage = getPage(locale, refUrl);
     if (!refPage) notFound();
     MDXContent = refPage.data.body;
     toc = refPage.data.toc;
@@ -59,7 +62,7 @@ export default async function Docs(props: {
         <MDXContent
           components={getMDXComponents({
             // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, page),
+            a: createRelativeLink(source[locale], page),
             AppOnly: isAppDocs ? Identity : Void,
             PagesOnly: isPagesDocs ? Identity : Void,
           })}
@@ -72,6 +75,7 @@ export default async function Docs(props: {
 }
 
 function DocsCategory({ url }: { url: string }) {
+  const source = useSource();
   const peers = getPageTreePeers(source.pageTree, url);
 
   return (
@@ -86,10 +90,11 @@ function DocsCategory({ url }: { url: string }) {
 }
 
 function DocsRelated({ page }: { page: Page }) {
+  const locale = useLocale();
   const relatedLinks = page.data.related?.links || [];
   const pages = relatedLinks
     .map((link) => {
-      return getPage(getDocsUrl(link));
+      return getPage(locale, getDocsUrl(link));
     })
     .filter(Boolean) as Page[];
   return (
@@ -110,15 +115,23 @@ function DocsRelated({ page }: { page: Page }) {
 }
 
 export async function generateStaticParams() {
-  return source.generateParams();
+  const staticParams = ['en', 'zh-Hans'].flatMap((locale) => {
+    return source[locale].generateParams().map((params) => {
+      return {
+        locale,
+        ...params,
+      };
+    });
+  });
+  return staticParams;
 }
 
 export async function generateMetadata(props: {
-  params: Promise<{ slug?: string[] }>;
+  params: Promise<{ slug?: string[]; locale: Locale }>;
 }) {
   const params = await props.params;
   const url = getDocsUrl(params.slug);
-  const page = getPage(url);
+  const page = getPage(params.locale, url);
   if (!page) notFound();
 
   return {

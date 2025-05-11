@@ -1,4 +1,5 @@
-import './global.css';
+import { NextIntlClientProvider } from 'next-intl';
+import '../global.css';
 import { RootProvider } from 'fumadocs-ui/provider';
 import { getLocale } from 'next-intl/server';
 import { Inter } from 'next/font/google';
@@ -14,7 +15,9 @@ export default async function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang={locale} className={inter.className} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
-        <RootProvider>{children}</RootProvider>
+        <NextIntlClientProvider>
+          <RootProvider>{children}</RootProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
