@@ -32,6 +32,7 @@ export default async function Docs(props: {
   const page = getPage(docsUrl);
   if (!page) notFound();
   let MDXContent = page.data.body;
+  let toc = page.data.toc;
   const isAppDocs = slug[0] === "app";
   const isPagesDocs = slug[0] === "pages";
   // source: app/getting-started/installation
@@ -41,6 +42,7 @@ export default async function Docs(props: {
     const refPage = getPage(refUrl);
     if (!refPage) notFound();
     MDXContent = refPage.data.body;
+    toc = refPage.data.toc;
   }
 
   const hasRelated = page.data.related;
@@ -48,9 +50,9 @@ export default async function Docs(props: {
 
   return (
     <DocsPage
-      toc={page.data.toc}
+      toc={toc}
       full={page.data.full}
-      breadcrumb={{ includePage: true }}
+      breadcrumb={{ includePage: true, includeRoot: true }}
     >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsBody>
