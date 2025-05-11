@@ -1,23 +1,23 @@
-import { source } from "@/lib/source";
-import { DocsPage, DocsBody, DocsTitle } from "fumadocs-ui/page";
-import { notFound } from "next/navigation";
-import { createRelativeLink } from "fumadocs-ui/mdx";
-import { getMDXComponents } from "@/mdx-components";
-import { Identity } from "@/mdx/Identity";
-import { Void } from "@/mdx/Void";
-import { Card, Cards } from "fumadocs-ui/components/card";
-import { getPageTreePeers } from "@/lib/pageTree";
+import { getPageTreePeers } from '@/lib/pageTree';
+import { source } from '@/lib/source';
+import { getMDXComponents } from '@/mdx-components';
+import { Identity } from '@/mdx/Identity';
+import { Void } from '@/mdx/Void';
+import { Card, Cards } from 'fumadocs-ui/components/card';
+import { createRelativeLink } from 'fumadocs-ui/mdx';
+import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/page';
+import { notFound } from 'next/navigation';
 
 type Page = NonNullable<ReturnType<typeof source.getPage>>;
 
-export function getDocsUrl(slug: string[] | string | undefined) {
-  if (typeof slug === "string") {
+function getDocsUrl(slug: string[] | string | undefined) {
+  if (typeof slug === 'string') {
     return `/docs/${slug}`;
   }
-  return `/docs/${(slug || []).join("/")}`;
+  return `/docs/${(slug || []).join('/')}`;
 }
 
-export function getPage(url: string): Page | undefined {
+function getPage(url: string): Page | undefined {
   const pages = source.getPages();
   const page = pages.find((page) => page.url === url);
   return page;
@@ -33,8 +33,8 @@ export default async function Docs(props: {
   if (!page) notFound();
   let MDXContent = page.data.body;
   let toc = page.data.toc;
-  const isAppDocs = slug[0] === "app";
-  const isPagesDocs = slug[0] === "pages";
+  const isAppDocs = slug[0] === 'app';
+  const isPagesDocs = slug[0] === 'pages';
   // source: app/getting-started/installation
   const ref = page.data.source;
   if (ref) {
@@ -46,7 +46,7 @@ export default async function Docs(props: {
   }
 
   const hasRelated = page.data.related;
-  const isIndex = page.file.name === "index";
+  const isIndex = page.file.name === 'index';
 
   return (
     <DocsPage

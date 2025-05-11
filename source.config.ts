@@ -3,15 +3,15 @@ import {
   defineDocs,
   frontmatterSchema,
   metaSchema,
-} from "fumadocs-mdx/config";
-import { z } from "zod";
+} from 'fumadocs-mdx/config';
+import { z } from 'zod';
 
-import { addMdxContent, convertCodeMeta } from "./src/lib/remarkPlugin";
+import { addMdxContent, convertCodeMeta } from './src/lib/remarkPlugin';
 
 // You can customise Zod schemas for frontmatter and `meta.json` here
 // see https://fumadocs.vercel.app/docs/mdx/collections#define-docs
 export const docs = defineDocs({
-  dir: `content/${process.env.LANGUAGE_CODE!.toLowerCase()}/docs`,
+  dir: `content/${(process.env.LANGUAGE_CODE || 'en').toLowerCase()}/docs`,
   docs: {
     schema: frontmatterSchema.extend({
       nav_title: z.string().optional(),

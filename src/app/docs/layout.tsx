@@ -1,13 +1,13 @@
-import { DocsLayout, DocsLayoutProps } from "fumadocs-ui/layouts/docs";
-import type { ReactNode } from "react";
-import { baseOptions } from "@/app/layout.config";
-import { source } from "@/lib/source";
-import { useTranslations } from "next-intl";
+import { baseOptions } from '@/app/layout.config';
+import { source } from '@/lib/source';
+import { DocsLayout, type DocsLayoutProps } from 'fumadocs-ui/layouts/docs';
+import { useTranslations } from 'next-intl';
+import type { ReactNode } from 'react';
 
 export default function Layout({ children }: { children: ReactNode }) {
-  const t = useTranslations("baseOptions");
+  const t = useTranslations('baseOptions');
   const docsLayout: DocsLayoutProps = {
-    ...baseOptions({ title: t("title") }),
+    ...baseOptions({ title: t('title') }),
     tree: source.pageTree,
   };
 
