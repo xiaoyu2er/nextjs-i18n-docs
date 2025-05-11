@@ -1,3 +1,4 @@
+import { routing } from '@/i18n/routing';
 import { getPageTreePeers } from '@/lib/pageTree';
 import { source } from '@/lib/source';
 import { useSource } from '@/lib/useSource';
@@ -115,7 +116,7 @@ function DocsRelated({ page }: { page: Page }) {
 }
 
 export async function generateStaticParams() {
-  const staticParams = ['en', 'zh-Hans'].flatMap((locale) => {
+  const staticParams = routing.locales.flatMap((locale) => {
     return source[locale].generateParams().map((params) => {
       return {
         locale,

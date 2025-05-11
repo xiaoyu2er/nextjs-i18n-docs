@@ -1,11 +1,13 @@
+import { hasLocale } from 'next-intl';
 import { getRequestConfig } from 'next-intl/server';
-import { headers } from 'next/headers';
+import { routing } from './routing';
 
-export default getRequestConfig(async () => {
-  const headersList = await headers();
-  const host =
-    headersList.get('host') || headersList.get('x-forwarded-host') || '';
-  const locale = /zh-hans/.test(host) ? 'zh-Hans' : 'en';
+export default getRequestConfig(async ({ requestLocale }) => {
+  // Typically corresponds to the `[locale]` segment
+  const requested = await requestLocale;
+  const locale = hasLocale(routing.locales, requested)
+    ? requested
+    : routing.defaultLocale;
 
   return {
     locale,
