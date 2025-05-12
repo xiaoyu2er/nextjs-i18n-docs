@@ -1,7 +1,11 @@
 import type { Code, Heading, Paragraph, Root } from 'mdast';
 import { visit } from 'unist-util-visit';
 
-const BASH_LANGUAGES = ['.env'];
+const LANGUAGE_MAP: Record<string, string> = {
+  '.env': 'bash',
+  terminal: 'bash',
+  mjs: 'javascript',
+};
 
 /**
  * Remark plugin that enhances code blocks in the following ways:
@@ -15,8 +19,8 @@ export function convertCodeMeta() {
   return (tree: Root) => {
     visit(tree, 'code', (node: Code) => {
       // Convert language to bash
-      if (node.lang && BASH_LANGUAGES.includes(node.lang)) {
-        node.lang = 'bash';
+      if (node.lang && LANGUAGE_MAP[node.lang]) {
+        node.lang = LANGUAGE_MAP[node.lang];
       }
       // Check if node has meta with filename
       if (node.meta && typeof node.meta === 'string') {
