@@ -1,5 +1,6 @@
+import { DocsLayout } from '@/components/layout';
 import { routing } from '@/i18n/routing';
-import { getPageTreePeers } from '@/lib/pageTree';
+import { getDocsLayoutTree, getPageTreePeers } from '@/lib/pageTree';
 import { source } from '@/lib/source';
 import { useSource } from '@/lib/useSource';
 import { getMDXComponents } from '@/mdx-components';
@@ -53,25 +54,27 @@ export default async function Docs(props: {
   const isIndex = page.file.name === 'index';
 
   return (
-    <DocsPage
-      toc={toc}
-      full={page.data.full}
-      breadcrumb={{ includePage: true, includeRoot: true }}
-    >
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsBody>
-        <MDXContent
-          components={getMDXComponents({
-            // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source[locale], page),
-            AppOnly: isAppDocs ? Identity : Void,
-            PagesOnly: isPagesDocs ? Identity : Void,
-          })}
-        />
-        {hasRelated ? <DocsRelated page={page} /> : null}
-        {!hasRelated && isIndex ? <DocsCategory url={page.url} /> : null}
-      </DocsBody>
-    </DocsPage>
+    <DocsLayout pageTree={getDocsLayoutTree(source[locale].pageTree, slug)}>
+      <DocsPage
+        toc={toc}
+        full={page.data.full}
+        breadcrumb={{ includePage: true, includeRoot: true }}
+      >
+        <DocsTitle>{page.data.title}</DocsTitle>
+        <DocsBody>
+          <MDXContent
+            components={getMDXComponents({
+              // this allows you to link to other pages with relative file paths
+              a: createRelativeLink(source[locale], page),
+              AppOnly: isAppDocs ? Identity : Void,
+              PagesOnly: isPagesDocs ? Identity : Void,
+            })}
+          />
+          {hasRelated ? <DocsRelated page={page} /> : null}
+          {!hasRelated && isIndex ? <DocsCategory url={page.url} /> : null}
+        </DocsBody>
+      </DocsPage>
+    </DocsLayout>
   );
 }
 
