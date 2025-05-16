@@ -1,8 +1,8 @@
 import { DocsLayout } from '@/components/layout';
-import { routing } from '@/i18n/routing';
+import { getPage } from '@/lib/page';
 import { getDocsLayoutTree, getPageTreePeers } from '@/lib/pageTree';
-import { source } from '@/lib/source';
-import { useSource } from '@/lib/useSource';
+import { type Page, type Source, sourceMap } from '@/lib/source';
+import { getDocsUrl, isAppDoc, isPagesDoc } from '@/lib/utils';
 import { getMDXComponents } from '@/mdx-components';
 import { Identity } from '@/mdx/Identity';
 import { Void } from '@/mdx/Void';
@@ -12,49 +12,40 @@ import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import { type Locale, useLocale } from 'next-intl';
 import { notFound } from 'next/navigation';
 
-type Page = NonNullable<ReturnType<typeof source.en.getPage>>;
-
-function getDocsUrl(slug: string[] | string | undefined) {
-  if (typeof slug === 'string') {
-    return `/docs/${slug}`;
-  }
-  return `/docs/${(slug || []).join('/')}`;
-}
-
-function getPage(locale: Locale, url: string): Page | undefined {
-  const pages = source[locale].getPages();
-  const page = pages.find((page) => page.url === url);
-  return page;
-}
-
 export default async function Docs(props: {
   params: Promise<{ locale: Locale; slug?: string[] }>;
 }) {
   const params = await props.params;
   const slug = params.slug || [];
   const locale = params.locale;
+  const source = sourceMap[locale];
   const docsUrl = getDocsUrl(slug);
+  const id = `${locale}${docsUrl}`;
   const page = getPage(locale, docsUrl);
   if (!page) notFound();
-  let MDXContent = page.data.body;
-  let toc = page.data.toc;
-  const isAppDocs = slug[0] === 'app';
-  const isPagesDocs = slug[0] === 'pages';
+
+  // Markdown content requires await
+  let { body: MdxContent, toc } = await page.data.load();
+
+  const isAppDocs = isAppDoc(id);
+  const isPagesDocs = isPagesDoc(id);
   // source: app/getting-started/installation
   const ref = page.data.source;
   if (ref) {
     const refUrl = getDocsUrl(ref);
     const refPage = getPage(locale, refUrl);
     if (!refPage) notFound();
-    MDXContent = refPage.data.body;
-    toc = refPage.data.toc;
+    const { body: MdxContent2, toc: toc2 } = await refPage.data.load();
+
+    MdxContent = MdxContent2;
+    toc = toc2;
   }
 
   const hasRelated = page.data.related;
   const isIndex = page.file.name === 'index';
 
   return (
-    <DocsLayout pageTree={getDocsLayoutTree(source[locale].pageTree, slug)}>
+    <DocsLayout pageTree={getDocsLayoutTree(source.pageTree, slug)}>
       <DocsPage
         toc={toc}
         full={page.data.full}
@@ -62,24 +53,25 @@ export default async function Docs(props: {
       >
         <DocsTitle>{page.data.title}</DocsTitle>
         <DocsBody>
-          <MDXContent
+          <MdxContent
             components={getMDXComponents({
               // this allows you to link to other pages with relative file paths
-              a: createRelativeLink(source[locale], page),
+              a: createRelativeLink(source, page),
               AppOnly: isAppDocs ? Identity : Void,
               PagesOnly: isPagesDocs ? Identity : Void,
             })}
           />
           {hasRelated ? <DocsRelated page={page} /> : null}
-          {!hasRelated && isIndex ? <DocsCategory url={page.url} /> : null}
+          {!hasRelated && isIndex ? (
+            <DocsCategory url={page.url} source={source} />
+          ) : null}
         </DocsBody>
       </DocsPage>
     </DocsLayout>
   );
 }
 
-function DocsCategory({ url }: { url: string }) {
-  const source = useSource();
+function DocsCategory({ url, source }: { url: string; source: Source }) {
   const peers = getPageTreePeers(source.pageTree, url);
 
   return (
@@ -118,17 +110,17 @@ function DocsRelated({ page }: { page: Page }) {
   );
 }
 
-export async function generateStaticParams() {
-  const staticParams = routing.locales.flatMap((locale) => {
-    return source[locale].generateParams().map((params) => {
-      return {
-        locale,
-        ...params,
-      };
-    });
-  });
-  return staticParams;
-}
+// export async function generateStaticParams() {
+//   const staticParams = routing.locales.flatMap((locale) => {
+//     return sourceMap[locale].generateParams().map((params) => {
+//       return {
+//         locale,
+//         ...params,
+//       };
+//     });
+//   });
+//   return staticParams;
+// }
 
 export async function generateMetadata(props: {
   params: Promise<{ slug?: string[]; locale: Locale }>;

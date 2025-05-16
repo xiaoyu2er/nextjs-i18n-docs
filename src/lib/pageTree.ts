@@ -130,6 +130,44 @@ export function getDocsLayoutTree(tree: PageTree.Root, slug: string[]) {
         }
       }
     }
+
+    if (isV14 && node.$id === '14' && node.type === 'folder') {
+      const children = node.children;
+      const isApp = slug[1] === 'app';
+      const isPages = slug[1] === 'pages';
+      for (const child of children) {
+        const expandChildren = ['14/02-app', '14/03-pages'];
+        if (
+          child.$id &&
+          child.type === 'folder' &&
+          expandChildren.includes(child.$id)
+        ) {
+          for (const item of child.children) {
+            if (item.type === 'folder') item.defaultOpen = true;
+          }
+        }
+        if (isApp && child.$id === '14/02-app' && child.type === 'folder') {
+          root.children.push(...child.children);
+        }
+        if (isPages && child.$id === '14/03-pages' && child.type === 'folder') {
+          root.children.push(...child.children);
+        }
+        if (!isApp && !isPages && child.type === 'folder' && child.$id) {
+          root.children.push(child);
+        }
+        if (
+          (isApp || isPages) &&
+          child.$id &&
+          !['14/02-app', '14/03-pages'].includes(child.$id) &&
+          child.type === 'folder'
+        ) {
+          if (child.$id === '14/01-getting-started') {
+            child.defaultOpen = true;
+          }
+          root.children.push(child);
+        }
+      }
+    }
   }
   return root;
 }

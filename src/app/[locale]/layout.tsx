@@ -1,11 +1,11 @@
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
-import '../global.css';
+import './global.css';
+import { Provider } from '@/app/[locale]/provider';
 import { routing } from '@/i18n/routing';
-import { RootProvider } from 'fumadocs-ui/provider';
-import { getLocale } from 'next-intl/server';
+
+import { setRequestLocale } from 'next-intl/server';
 import { Inter } from 'next/font/google';
 import { notFound } from 'next/navigation';
-import type { ReactNode } from 'react';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -23,12 +23,14 @@ export default async function Layout({
   if (!hasLocale(routing.locales, locale)) {
     notFound();
   }
+  // Enable static rendering
+  setRequestLocale(locale);
 
   return (
     <html lang={locale} className={inter.className} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
         <NextIntlClientProvider>
-          <RootProvider>{children}</RootProvider>
+          <Provider>{children}</Provider>
         </NextIntlClientProvider>
       </body>
     </html>

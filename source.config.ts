@@ -6,9 +6,12 @@ import {
 } from 'fumadocs-mdx/config';
 import { z } from 'zod';
 
-import { addMdxContent, convertCodeMeta } from './src/lib/remarkPlugin';
+import { addMdxContent } from '@/lib/remark-plugins/remark-add-content';
+import { convertCodeMeta } from '@/lib/remark-plugins/remark-convert-code-meta';
+
 const defaultDocsOptions = {
   docs: {
+    async: true,
     schema: frontmatterSchema.extend({
       nav_title: z.string().optional(),
       source: z.string().optional(),
@@ -40,6 +43,7 @@ export const docs_zh_hans = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
+    remarkStructureOptions: false,
     remarkPlugins: (v) => [convertCodeMeta, addMdxContent, ...v],
   },
 });

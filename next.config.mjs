@@ -1,5 +1,9 @@
+import createBundleAnalyzer from '@next/bundle-analyzer';
 import { createMDX } from 'fumadocs-mdx/next';
 import createNextIntlPlugin from 'next-intl/plugin';
+const withAnalyzer = createBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+});
 
 const withMDX = createMDX();
 
@@ -9,4 +13,4 @@ const config = {
 };
 const withNextIntl = createNextIntlPlugin();
 
-export default withNextIntl(withMDX(config));
+export default withAnalyzer(withNextIntl(withMDX(config)));

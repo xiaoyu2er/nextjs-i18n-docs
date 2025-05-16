@@ -1,4 +1,3 @@
-import { routing } from '@/i18n/routing';
 import { type Locale, useTranslations } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
@@ -24,9 +23,9 @@ export default function HomePage() {
   );
 }
 
-export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }));
-}
+// export function generateStaticParams() {
+//   return routing.locales.map((locale) => ({ locale }));
+// }
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: Locale }>;

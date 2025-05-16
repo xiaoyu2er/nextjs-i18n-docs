@@ -59,7 +59,10 @@ const source_zh_hans = loader({
   },
 });
 
-export const source: Record<Locale, typeof source_en> = {
+export const sourceMap: Record<Locale, typeof source_en> = {
   en: source_en,
   'zh-Hans': source_zh_hans,
 };
+
+export type Source = typeof source_en;
+export type Page = NonNullable<ReturnType<typeof source_en.getPage>>;

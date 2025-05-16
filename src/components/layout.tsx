@@ -1,6 +1,6 @@
 'use client';
 
-import { baseOptions } from '@/app/layout.config';
+import { baseOptions } from '@/app/[locale]/layout.config';
 import type { PageTree } from 'fumadocs-core/server';
 import {
   type DocsLayoutProps,
