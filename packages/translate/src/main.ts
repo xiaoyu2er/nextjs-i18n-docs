@@ -3,16 +3,11 @@ import * as path from 'node:path';
 import micromatch from 'micromatch';
 import { executeInBatches } from './batch';
 import { logger } from './logger';
-import { $translateConfig } from './openai';
 import type { MainConfig } from './types';
 import {
-  copyDoc,
-  extractPathToLabelMap,
   findDocFiles,
   getDocUpdateStatus,
-  getTranslatedConfig,
   normalizePatterns,
-  shouldTranslateConfig,
   translateDoc,
 } from './utils';
 
@@ -150,7 +145,7 @@ export async function main({
 
       // Check if this path should be copied without translation
 
-      const [shouldUpdate, reason] = await getDocUpdateStatus({
+      const { shouldUpdate, reason, chunks } = await getDocUpdateStatus({
         sourcePath,
         targetPath,
       });
@@ -159,6 +154,7 @@ export async function main({
         Source: sourcePath,
         Target: targetPath,
         'Should update?': shouldUpdate ? '✅ Yes' : '❌ No',
+        Chunks: chunks,
         Reason: reason,
       });
 

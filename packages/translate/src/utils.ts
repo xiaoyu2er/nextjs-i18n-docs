@@ -3,6 +3,7 @@ import * as fs$ from 'node:fs/promises';
 import path from 'node:path';
 import { glob } from 'glob';
 import matter from 'gray-matter';
+import { needsChunking, splitIntoChunks } from './chunk';
 import { logger } from './logger';
 import { $translateDocument } from './openai';
 
@@ -57,17 +58,24 @@ export function getLastModifiedTimeFromGit(filePath: string): Date {
 export async function getDocUpdateStatus({
   sourcePath,
   targetPath,
-}: CheckFileUpdateParams): Promise<[boolean, string]> {
+}: CheckFileUpdateParams): Promise<{
+  shouldUpdate: boolean;
+  chunks: 'N/A' | number;
+  reason: string;
+}> {
   try {
     await fs$.access(sourcePath);
   } catch (error) {
     logger.error(
       `Source file not found: ${sourcePath}, don't need updating, consider removing it`,
     );
-    return [false, 'Source not found'];
+    return { shouldUpdate: false, chunks: 'N/A', reason: 'Source not found' };
   }
 
   const sourceContent = await fs$.readFile(sourcePath, 'utf8');
+  const chunks = needsChunking(sourceContent)
+    ? splitIntoChunks(sourceContent).length
+    : 1;
   const sourceParsed = matter(sourceContent);
 
   let sourceLastModifiedDate = getLastModifiedTimeFromGit(sourcePath);
@@ -78,7 +86,11 @@ export async function getDocUpdateStatus({
       logger.error(
         `Referenced file not found: ${sourceParsed.data.ref}, don't need updating, consider REMOVING it`,
       );
-      return [false, 'Referenced file not found'];
+      return {
+        shouldUpdate: false,
+        reason: 'Referenced file not found',
+        chunks,
+      };
     }
 
     const refLastModifiedDate = getLastModifiedTimeFromGit(
@@ -93,7 +105,7 @@ export async function getDocUpdateStatus({
     await fs$.access(targetPath);
   } catch (error) {
     logger.debug(`Target file not found: ${targetPath}, needs updating`);
-    return [true, 'Target not found.'];
+    return { shouldUpdate: true, reason: 'Target not found.', chunks };
   }
 
   // Read target file and parse frontmatter
@@ -112,16 +124,28 @@ export async function getDocUpdateStatus({
       logger.debug(
         `Source file ${sourcePath} has been updated since last translation, needs updating`,
       );
-      return [true, 'Source has been modified. '];
+      return {
+        shouldUpdate: true,
+        reason: 'Source has been modified. ',
+        chunks,
+      };
     }
-    return [false, 'Source has not been modified.'];
+    return {
+      shouldUpdate: false,
+      reason: 'Source has not been modified.',
+      chunks,
+    };
   }
 
   // If there's no source-updated-at in target, it needs to be updated
   logger.debug(
     `Target file ${targetPath} has no source-updated-at metadata, needs updating`,
   );
-  return [true, 'Target no source-updated-at metadata, needs updating.'];
+  return {
+    shouldUpdate: true,
+    reason: 'Target no source-updated-at metadata, needs updating.',
+    chunks,
+  };
 }
 
 // New helper function to extract context from overview files
@@ -191,19 +215,12 @@ export async function translateDoc({
   const sourceUpdatedAt = getLastModifiedTimeFromGit(sourcePath).toISOString();
   const translationUpdatedAt = new Date().toISOString();
 
-  const parsed = matter(translatedContent);
-
-  // Create frontmatter data object
-  const frontmatterData = {
-    'source-updated-at': sourceUpdatedAt,
-    'translation-updated-at': translationUpdatedAt,
-    ...parsed.data,
-  };
-
-  logger.debug(
-    `Writing translated content, ${JSON.stringify(frontmatterData)}`,
+  const newContent = translatedContent.replace(
+    '---',
+    `---
+source-updated-at: ${sourceUpdatedAt}
+translation-updated-at: ${translationUpdatedAt}`,
   );
-  const newContent = matter.stringify(parsed.content, frontmatterData);
 
   logger.debug(`Writing translated content to ${targetPath}`);
   await fs$.writeFile(targetPath, newContent, 'utf8');
