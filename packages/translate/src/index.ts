@@ -33,6 +33,10 @@ program
     '-t, --target-language <language>',
     'Specify the target language code for translation (e.g., "zh-CN", "fr", "es")',
   )
+  .option(
+    '--max <number>',
+    'Maximum number of files to process in one batch (per language) (default: unlimited)',
+  )
   .action(
     async (options: {
       config?: string;
@@ -41,6 +45,7 @@ program
       docsPath?: string;
       listOnly?: boolean;
       targetLanguage?: string;
+      max?: number;
     }) => {
       if (options.verbose) {
         logger.setVerbose(true);
@@ -54,6 +59,7 @@ program
           ...config,
           ...(options.pattern ? { pattern: options.pattern } : {}),
           ...(options.docsPath ? { docsPath: options.docsPath } : {}),
+          ...(options.max ? { max: options.max } : {}),
           listOnly: options.listOnly,
           targetLanguage: options.targetLanguage,
         });

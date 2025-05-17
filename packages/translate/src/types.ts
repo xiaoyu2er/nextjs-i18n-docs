@@ -24,6 +24,7 @@ export interface MainConfig {
   docsContext?: string;
   pattern?: string | string[];
   docsPath?: string | string[];
+  max?: number;
   listOnly?: boolean;
   targetLanguage?: string;
 }

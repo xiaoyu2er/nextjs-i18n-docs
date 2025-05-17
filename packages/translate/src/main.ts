@@ -4,6 +4,7 @@ import micromatch from 'micromatch';
 import { executeInBatches } from './batch';
 import { logger } from './logger';
 import type { MainConfig } from './types';
+import { GlobalUsage } from './usage';
 import {
   findDocFiles,
   getDocUpdateStatus,
@@ -19,6 +20,7 @@ export async function main({
   outputRoot = 'content',
   docsPath = ['**/*.mdx'],
   listOnly,
+  max = Number.POSITIVE_INFINITY,
   targetLanguage,
 }: MainConfig): Promise<void> {
   // Filter languages based on targetLanguage if specified
@@ -74,6 +76,10 @@ export async function main({
   }
   if (processedPatterns.length > 0) {
     logger.info(`Using patterns: ${processedPatterns.join(', ')}`);
+  }
+
+  if (max !== Number.POSITIVE_INFINITY) {
+    logger.info(`Limiting to ${max} files per language to process`);
   }
 
   // Process each language
@@ -135,7 +141,7 @@ export async function main({
     );
 
     // Build tasks list and document status table
-    const tasks = [];
+    let tasks = [];
     const tableData = [];
 
     for (const docPath of filteredPaths) {
@@ -174,6 +180,12 @@ export async function main({
     logger.info(
       `Found ${tasks.length}/${filteredPaths.length} documents to update`,
     );
+    if (tasks.length > max) {
+      logger.warn(
+        `Limiting to ${max} files to process. You can increase this limit with the --max option.`,
+      );
+      tasks = tasks.slice(0, max);
+    }
 
     // Process tasks if not in list-only mode
     if (!listOnly) {
@@ -207,4 +219,7 @@ export async function main({
   }
 
   logger.divider();
+  logger.info(
+    `Usage statistics for the completion request:\n${JSON.stringify(GlobalUsage, null, 2)}`,
+  );
 }

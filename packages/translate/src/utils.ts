@@ -76,30 +76,6 @@ export async function getDocUpdateStatus({
   const chunks = needsChunking(sourceContent)
     ? splitIntoChunks(sourceContent).length
     : 1;
-  const sourceParsed = matter(sourceContent);
-
-  let sourceLastModifiedDate = getLastModifiedTimeFromGit(sourcePath);
-  if (sourceParsed.data.ref) {
-    try {
-      await fs$.access(sourceParsed.data.ref);
-    } catch (error) {
-      logger.error(
-        `Referenced file not found: ${sourceParsed.data.ref}, don't need updating, consider REMOVING it`,
-      );
-      return {
-        shouldUpdate: false,
-        reason: 'Referenced file not found',
-        chunks,
-      };
-    }
-
-    const refLastModifiedDate = getLastModifiedTimeFromGit(
-      sourceParsed.data.ref,
-    );
-    if (refLastModifiedDate > sourceLastModifiedDate) {
-      sourceLastModifiedDate = refLastModifiedDate;
-    }
-  }
 
   try {
     await fs$.access(targetPath);
@@ -107,7 +83,7 @@ export async function getDocUpdateStatus({
     logger.debug(`Target file not found: ${targetPath}, needs updating`);
     return { shouldUpdate: true, reason: 'Target not found.', chunks };
   }
-
+  const sourceLastModifiedDate = getLastModifiedTimeFromGit(sourcePath);
   // Read target file and parse frontmatter
   const targetContent = await fs$.readFile(targetPath, 'utf8');
   const targetParsed = matter(targetContent);
@@ -126,13 +102,13 @@ export async function getDocUpdateStatus({
       );
       return {
         shouldUpdate: true,
-        reason: 'Source has been modified. ',
+        reason: 'Source modified.',
         chunks,
       };
     }
     return {
       shouldUpdate: false,
-      reason: 'Source has not been modified.',
+      reason: 'Source not modified.',
       chunks,
     };
   }
@@ -143,7 +119,7 @@ export async function getDocUpdateStatus({
   );
   return {
     shouldUpdate: true,
-    reason: 'Target no source-updated-at metadata, needs updating.',
+    reason: 'Target has no source-updated-at metadata.',
     chunks,
   };
 }

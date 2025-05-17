@@ -7,6 +7,7 @@ import {
   splitIntoChunks,
 } from './chunk';
 import { logger } from './logger';
+import { type Usage, addUsage } from './usage';
 
 interface LangConfig {
   name: string;
@@ -95,6 +96,7 @@ HERE IS THE TEXT TO TRANSLATE:
   });
 
   logger.debug(`response.usage:\n${JSON.stringify(response.usage, null, 2)}`);
+  addUsage(response.usage as Usage);
   const message = response.choices?.[0]?.message;
 
   if (!message?.content) {
