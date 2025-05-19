@@ -1,0 +1,88 @@
+name: Update Next.js English Documentation
+
+on:
+  workflow_dispatch: # Manual trigger
+  schedule:
+    # 8 AM Los Angeles (Pacific) time - corresponds to UTC-7 (PDT) or UTC-8 (PST)
+    # This cron format is in UTC, so 15:00 UTC during PDT, 16:00 UTC during PST
+    - cron: "0 15 * * *"
+
+# Add permissions needed for creating PRs
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-docs:
+    name: Update Next.js Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if PR branch exists
+        id: check_branch
+        run: |
+          if git ls-remote --heads origin "docs-update-nextjs-documentation" | grep -q "docs-update-nextjs-documentation"; then
+            echo "Branch already exists, skipping update"
+            echo "branch_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Branch does not exist, proceeding with update"
+            echo "branch_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Clone Next.js repository (canary)
+        if: steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          git clone --depth 1 --branch canary --single-branch https://github.com/vercel/next.js.git nextjs-canary
+          mkdir -p apps/docs/content/en/docs
+          rsync -av --delete nextjs-canary/docs/ apps/docs/content/en/docs/ --exclude="13" --exclude="14"
+          rm -rf nextjs-canary
+
+      - name: Clone Next.js repository (v14.2.28)
+        if: steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          git clone --depth 1 --branch v14.2.28 --single-branch https://github.com/vercel/next.js.git nextjs-v14
+          mkdir -p apps/docs/content/en/docs/14
+          rsync -av --delete nextjs-v14/docs/ apps/docs/content/en/docs/14/
+          rm -rf nextjs-v14
+
+      - name: Clone Next.js repository (v13.5.11)
+        if: steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          git clone --depth 1 --branch v13.5.11 --single-branch https://github.com/vercel/next.js.git nextjs-v13
+          mkdir -p apps/docs/content/en/docs/13
+          rsync -av --delete nextjs-v13/docs/ apps/docs/content/en/docs/13/
+          rm -rf nextjs-v13
+
+      - name: Check for modifications
+        if: steps.check_branch.outputs.branch_exists == 'false'
+        id: check_changes
+        run: |
+          if [[ $(git status --porcelain | grep -E "apps/docs/content/en/docs" | wc -l) -gt 0 ]]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected. Will proceed with PR."
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected in docs. Skipping PR."
+          fi
+
+      - name: Create Pull Request
+        if: steps.check_branch.outputs.branch_exists == 'false' && steps.check_changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs: update nextjs documentation"
+          title: "docs: update nextjs documentation"
+          body: |
+            This PR updates the Next.js English documentation from the official Next.js repository.
+            - Updates from `canary` branch to `apps/docs/content/en/docs`
+            - Updates from `v14.2.28` branch to `apps/docs/content/en/docs/14`
+            - Updates from `v13.5.11` branch to `apps/docs/content/en/docs/13`
+          branch: docs-update-nextjs-documentation
+          delete-branch: true
+          base: main
+          add-paths: |
+            apps/docs/content/en/docs
