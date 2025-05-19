@@ -65,6 +65,15 @@ jobs:
           LOCALES=$(find . -maxdepth 1 -type d | grep -v "^.$" | grep -v "/en$" | sed 's|^\./||')
           echo "Available translation locales: $LOCALES"
           echo "locales=$LOCALES" >> $GITHUB_OUTPUT
+      
+      - name: Stage changes to detect renames
+        if: steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          # Stage all changes so Git can detect renames
+          git add .
+          # Show what Git sees after staging
+          echo "Git status after staging:"
+          git status --porcelain
 
       - name: Process file renames and deletions
         if: steps.check_branch.outputs.branch_exists == 'false'
@@ -74,6 +83,10 @@ jobs:
           
           # Get list of deleted files from git status
           DELETES=$(git status --porcelain | grep -E "^D[[:space:]]+apps/docs/content/en/docs" | sed 's/^D[[:space:]]*//')
+          
+          # Generate current timestamp in ISO format
+          CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+          echo "Current timestamp: $CURRENT_TIMESTAMP"
           
           # Process renames
           if [ -n "$RENAMES" ]; then
@@ -89,6 +102,15 @@ jobs:
                 SOURCE=$(echo "$LINE" | awk '{print $1}')
                 DEST=$(echo "$LINE" | awk '{print $2}')
                 
+                # Check if there are actual content changes using git diff
+                # --numstat gives us numeric stats: added lines, removed lines, filename
+                # If the file was only renamed with no content changes, it will show 0 0
+                GIT_DIFF=$(git diff --cached --numstat "$SOURCE" "$DEST")
+                ADDED_LINES=$(echo "$GIT_DIFF" | awk '{print $1}')
+                REMOVED_LINES=$(echo "$GIT_DIFF" | awk '{print $2}')
+                
+                echo "Git diff for $SOURCE → $DEST: $ADDED_LINES lines added, $REMOVED_LINES lines removed"
+                
                 # Replace 'en' with current locale in paths
                 SOURCE_LOCALE=${SOURCE/content\/en/content\/$LOCALE}
                 DEST_LOCALE=${DEST/content\/en/content\/$LOCALE}
@@ -98,8 +120,23 @@ jobs:
                   echo "Renaming $SOURCE_LOCALE to $DEST_LOCALE"
                   # Create directory if it doesn't exist
                   mkdir -p $(dirname "$DEST_LOCALE")
+                  
                   # Move the file
                   mv "$SOURCE_LOCALE" "$DEST_LOCALE"
+                  
+                  # If the content is identical (just a rename, not a modification)
+                  # then update the timestamps in the translation file
+                  # Git diff showing 0 added and 0 removed lines means identical content
+                  if [ "$ADDED_LINES" = "0" ] && [ "$REMOVED_LINES" = "0" ]; then
+                    echo "Content unchanged, updating timestamps in $DEST_LOCALE"
+                    
+                    # Update source-updated-at and translation-updated-at in the file
+                    # Using portable sed syntax that works on both Linux and macOS
+                    perl -i -pe "s/source-updated-at: .*/source-updated-at: '$CURRENT_TIMESTAMP'/" "$DEST_LOCALE"
+                    perl -i -pe "s/translation-updated-at: .*/translation-updated-at: '$CURRENT_TIMESTAMP'/" "$DEST_LOCALE"
+                  else
+                    echo "Content changed, keeping original timestamps for translation to detect changes"
+                  fi
                 fi
               done
             done
@@ -142,7 +179,7 @@ jobs:
         if: steps.check_branch.outputs.branch_exists == 'false'
         id: check_changes
         run: |
-          if [[ $(git status --porcelain | grep -E "apps/docs/content/.*/docs" | wc -l) -gt 0 ]]; then
+          if [[ $(git status --porcelain | grep -E "apps/docs/content/" | wc -l) -gt 0 ]]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
             echo "Changes detected. Will proceed with PR."
           else
@@ -166,4 +203,4 @@ jobs:
           delete-branch: true
           base: main
           add-paths: |
-            apps/docs/content/*/docs
+            apps/docs/content/
