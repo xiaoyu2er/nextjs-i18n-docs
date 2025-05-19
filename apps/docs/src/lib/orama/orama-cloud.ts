@@ -31,7 +31,10 @@ export async function sync(
     );
     await index.insert(chunk);
   }
-  if (autoDeploy) await index.deploy();
+  if (autoDeploy) {
+    console.log('Deploying index...');
+    await index.deploy();
+  }
   console.log('All operations completed');
 }
 

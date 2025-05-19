@@ -8,8 +8,11 @@ import { sync } from '../src/lib/orama/orama-cloud';
 export async function updateSearchIndexes(): Promise<void> {
   for (const item of ORAMA_CONFIGS) {
     const { locale, privateKey, index } = item;
+    if (!privateKey) {
+      console.error(`No private key found for locale: ${locale}`);
+      continue;
+    }
     const manager = new CloudManager({ api_key: privateKey });
-
     // Get all .body files in the static directory
     const staticDir = path.join(`.next/server/app/${locale}/static`);
     let allRecords: OramaDocument[] = [];
