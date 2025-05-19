@@ -95,10 +95,14 @@ export async function getDocUpdateStatus({
     );
 
     logger.debug(
-      `${sourcePath}: sourceLastModifiedDate ${sourceLastModifiedDate.toISOString()}, meta[translation-updated-at] ${metadataTranslationUpdatedAt.toISOString()}`,
+      `${sourcePath}: source's lastModifiedDate ${sourceLastModifiedDate.toISOString()}, target.meta[translation-updated-at] ${metadataTranslationUpdatedAt.toISOString()}`,
     );
-    // If the source file has been updated since the last translation
-    if (sourceLastModifiedDate > metadataTranslationUpdatedAt) {
+    // If the source file has been updated since the last translation plus 5 minutes
+    // (to account for any potential delays in git log updates), it needs to be updated
+    if (
+      sourceLastModifiedDate.getTime() >
+      metadataTranslationUpdatedAt.getTime() + 5 * 60 * 1000
+    ) {
       logger.debug(
         `Source file ${sourcePath} has been updated since last translation, needs updating`,
       );
