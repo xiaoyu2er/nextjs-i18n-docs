@@ -94,7 +94,9 @@ export async function getDocUpdateStatus({
       targetParsed.data['translation-updated-at'],
     );
 
-    // console.log('sourceLastModifiedDate', sourceLastModifiedDate, 'metadataTranslationUpdatedAt', metadataTranslationUpdatedAt);
+    logger.debug(
+      `${sourcePath}: sourceLastModifiedDate ${sourceLastModifiedDate.toISOString()}, meta[translation-updated-at] ${metadataTranslationUpdatedAt.toISOString()}`,
+    );
     // If the source file has been updated since the last translation
     if (sourceLastModifiedDate > metadataTranslationUpdatedAt) {
       logger.debug(
