@@ -57,11 +57,92 @@ jobs:
           rsync -av --delete nextjs-v13/docs/ apps/docs/content/en/docs/13/
           rm -rf nextjs-v13
 
+      - name: Find available translation locales
+        if: steps.check_branch.outputs.branch_exists == 'false'
+        id: find_locales
+        run: |
+          cd apps/docs/content
+          LOCALES=$(find . -maxdepth 1 -type d | grep -v "^.$" | grep -v "/en$" | sed 's|^\./||')
+          echo "Available translation locales: $LOCALES"
+          echo "locales=$LOCALES" >> $GITHUB_OUTPUT
+
+      - name: Process file renames and deletions
+        if: steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          # Get list of renamed files from git status
+          RENAMES=$(git status --porcelain | grep -E "^R[[:space:]]+apps/docs/content/en/docs" | sed 's/^R[[:space:]]*//')
+          
+          # Get list of deleted files from git status
+          DELETES=$(git status --porcelain | grep -E "^D[[:space:]]+apps/docs/content/en/docs" | sed 's/^D[[:space:]]*//')
+          
+          # Process renames
+          if [ -n "$RENAMES" ]; then
+            echo "File renames detected in English docs. Processing for other languages..."
+            
+            # For each locale
+            for LOCALE in ${{ steps.find_locales.outputs.locales }}; do
+              echo "Processing renames for locale: $LOCALE"
+              
+              # For each renamed file
+              echo "$RENAMES" | while read -r LINE; do
+                # Split the line into source and destination
+                SOURCE=$(echo "$LINE" | awk '{print $1}')
+                DEST=$(echo "$LINE" | awk '{print $2}')
+                
+                # Replace 'en' with current locale in paths
+                SOURCE_LOCALE=${SOURCE/content\/en/content\/$LOCALE}
+                DEST_LOCALE=${DEST/content\/en/content\/$LOCALE}
+                
+                # Check if source file exists in this locale
+                if [ -f "$SOURCE_LOCALE" ]; then
+                  echo "Renaming $SOURCE_LOCALE to $DEST_LOCALE"
+                  # Create directory if it doesn't exist
+                  mkdir -p $(dirname "$DEST_LOCALE")
+                  # Move the file
+                  mv "$SOURCE_LOCALE" "$DEST_LOCALE"
+                fi
+              done
+            done
+          else
+            echo "No file renames detected in English docs."
+          fi
+          
+          # Process deletions
+          if [ -n "$DELETES" ]; then
+            echo "File deletions detected in English docs. Processing for other languages..."
+            
+            # For each locale
+            for LOCALE in ${{ steps.find_locales.outputs.locales }}; do
+              echo "Processing deletions for locale: $LOCALE"
+              
+              # For each deleted file
+              echo "$DELETES" | while read -r FILE; do
+                # Replace 'en' with current locale in paths
+                FILE_LOCALE=${FILE/content\/en/content\/$LOCALE}
+                
+                # Check if file exists in this locale
+                if [ -f "$FILE_LOCALE" ]; then
+                  echo "Deleting $FILE_LOCALE"
+                  rm -f "$FILE_LOCALE"
+                  
+                  # Check if parent directory is empty and remove it if it is
+                  DIR=$(dirname "$FILE_LOCALE")
+                  if [ -d "$DIR" ] && [ -z "$(ls -A $DIR)" ]; then
+                    echo "Removing empty directory: $DIR"
+                    rmdir "$DIR"
+                  fi
+                fi
+              done
+            done
+          else
+            echo "No file deletions detected in English docs."
+          fi
+
       - name: Check for modifications
         if: steps.check_branch.outputs.branch_exists == 'false'
         id: check_changes
         run: |
-          if [[ $(git status --porcelain | grep -E "apps/docs/content/en/docs" | wc -l) -gt 0 ]]; then
+          if [[ $(git status --porcelain | grep -E "apps/docs/content/.*/docs" | wc -l) -gt 0 ]]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
             echo "Changes detected. Will proceed with PR."
           else
@@ -85,4 +166,4 @@ jobs:
           delete-branch: true
           base: main
           add-paths: |
-            apps/docs/content/en/docs
+            apps/docs/content/*/docs
