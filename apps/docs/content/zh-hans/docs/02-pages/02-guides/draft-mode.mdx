@@ -1,0 +1,183 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-19T23:00:19.130Z
+title: 如何在 Next.js 中使用草稿模式预览内容
+nav_title: 草稿模式
+description: Next.js 提供了草稿模式，用于在静态页面与动态页面之间切换。您可以了解它如何与 Pages Router 协同工作。
+---
+
+在 [Pages 文档](/docs/pages/building-your-application/routing/pages-and-layouts) 和 [数据获取文档](/docs/pages/building-your-application/data-fetching) 中，我们讨论了如何使用 `getStaticProps` 和 `getStaticPaths` 在构建时预渲染页面（**静态生成 (Static Generation)**）。
+
+当您的页面从无头 CMS (headless CMS) 获取数据时，静态生成非常有用。然而，当您在无头 CMS 上撰写草稿并希望立即在页面上查看时，这种方式并不理想。此时您会希望 Next.js 在 **请求时 (request time)** 而非构建时渲染这些页面，并获取草稿内容而非已发布内容。您会希望 Next.js 仅在此特定情况下绕过静态生成。
+
+Next.js 的 **草稿模式 (Draft Mode)** 功能可以解决这个问题。以下是使用指南。
+
+## 步骤 1：创建并访问 API 路由
+
+> 如果您不熟悉 Next.js 的 API 路由，请先查阅 [API 路由文档](/docs/pages/building-your-application/routing/api-routes)。
+
+首先创建 **API 路由**。它可以任意命名，例如 `pages/api/draft.ts`。
+
+在此 API 路由中，您需要在响应对象上调用 `setDraftMode`。
+
+```js
+export default function handler(req, res) {
+  // ...
+  res.setDraftMode({ enable: true })
+  // ...
+}
+```
+
+这将设置一个 **Cookie** 以启用草稿模式。后续携带此 Cookie 的请求将触发 **草稿模式 (Draft Mode)**，从而改变静态生成页面的行为（稍后会详细说明）。
+
+您可以通过手动创建如下 API 路由并从浏览器访问来进行测试：
+
+```ts filename="pages/api/draft.ts"
+// 用于从浏览器手动测试的简单示例
+export default function handler(req, res) {
+  res.setDraftMode({ enable: true })
+  res.end('草稿模式已启用')
+}
+```
+
+如果您打开浏览器的开发者工具并访问 `/api/draft`，会注意到响应头中有一个 `Set-Cookie` 字段，其 Cookie 名为 `__prerender_bypass`。
+
+### 从无头 CMS 安全访问
+
+实际应用中，您需要从无头 CMS **安全地** 调用此 API 路由。具体步骤因使用的无头 CMS 而异，但以下是通用的操作流程。
+
+这些步骤假设您使用的无头 CMS 支持设置 **自定义草稿 URL**。如果不支持，您仍可使用此方法保护草稿 URL，但需要手动构建并访问草稿 URL。
+
+**首先**，使用您选择的令牌生成器创建一个 **密钥令牌字符串 (secret token string)**。该密钥仅由您的 Next.js 应用和无头 CMS 知晓，可防止无 CMS 访问权限的人获取草稿 URL。
+
+**其次**，如果无头 CMS 支持设置自定义草稿 URL，请将以下内容指定为草稿 URL。此处假设您的草稿 API 路由位于 `pages/api/draft.ts`。
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+- `<your-site>` 应替换为您的部署域名
+- `<token>` 应替换为您生成的密钥令牌
+- `<path>` 应替换为您希望预览的页面路径。例如要预览 `/posts/foo`，则应使用 `&slug=/posts/foo`
+
+您的无头 CMS 可能允许在草稿 URL 中包含变量，从而能基于 CMS 数据动态设置 `<path>`，例如：`&slug=/posts/{entry.fields.slug}`
+
+**最后**，在草稿 API 路由中：
+
+- 检查密钥是否匹配以及 `slug` 参数是否存在（否则请求应失败）
+- 调用 `res.setDraftMode`
+- 然后将浏览器重定向到 `slug` 指定的路径（以下示例使用 [307 重定向](https://developer.mozilla.org/docs/Web/HTTP/Status/307)）
+
+```js
+export default async (req, res) => {
+  // 检查密钥和必要参数
+  // 该密钥应仅由此 API 路由和 CMS 知晓
+  if (req.query.secret !== 'MY_SECRET_TOKEN' || !req.query.slug) {
+    return res.status(401).json({ message: '无效令牌' })
+  }
+
+  // 查询无头 CMS 以验证提供的 `slug` 是否存在
+  // getPostBySlug 需实现从无头 CMS 获取数据的逻辑
+  const post = await getPostBySlug(req.query.slug)
+
+  // 如果 slug 不存在，则阻止启用草稿模式
+  if (!post) {
+    return res.status(401).json({ message: '无效 slug' })
+  }
+
+  // 通过设置 Cookie 启用草稿模式
+  res.setDraftMode({ enable: true })
+
+  // 重定向到从查询结果获取的路径
+  // 不直接重定向到 req.query.slug 以防止开放重定向漏洞
+  res.redirect(post.slug)
+}
+```
+
+如果成功，浏览器将被重定向到您希望预览的路径，并携带草稿模式 Cookie。
+
+## 步骤 2：更新 `getStaticProps`
+
+下一步是更新 `getStaticProps` 以支持草稿模式。
+
+如果请求的页面包含 `getStaticProps` 且已设置 Cookie（通过 `res.setDraftMode`），则 `getStaticProps` 将在 **请求时 (request time)**（而非构建时）被调用。
+
+此外，它将被调用时接收一个 `context` 对象，其中 `context.draftMode` 为 `true`。
+
+```js
+export async function getStaticProps(context) {
+  if (context.draftMode) {
+    // 获取动态数据
+  }
+}
+```
+
+由于我们在草稿 API 路由中使用了 `res.setDraftMode`，因此 `context.draftMode` 将为 `true`。
+
+如果同时使用 `getStaticPaths`，则 `context.params` 也将可用。
+
+### 获取草稿数据
+
+您可以根据 `context.draftMode` 修改 `getStaticProps` 以获取不同的数据。
+
+例如，您的无头 CMS 可能为草稿文章提供了不同的 API 端点。如果是这样，您可以按如下方式修改 API 端点 URL：
+
+```js
+export async function getStaticProps(context) {
+  const url = context.draftMode
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+  const res = await fetch(url)
+  // ...
+}
+```
+
+就是这样！如果您从无头 CMS 或手动访问草稿 API 路由（携带 `secret` 和 `slug`），现在应该能看到草稿内容。当您更新草稿但未发布时，也能查看草稿。
+
+将此 URL 设置为无头 CMS 的草稿 URL 或手动访问，即可查看草稿：
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+## 更多细节
+
+### 清除草稿模式 Cookie
+
+默认情况下，草稿模式会话会在浏览器关闭时结束。
+
+要手动清除草稿模式 Cookie，可创建一个调用 `setDraftMode({ enable: false })` 的 API 路由：
+
+```ts filename="pages/api/disable-draft.ts"
+export default function handler(req, res) {
+  res.setDraftMode({ enable: false })
+}
+```
+
+然后向 `/api/disable-draft` 发送请求以调用该 API 路由。如果使用 [`next/link`](/docs/pages/api-reference/components/link) 调用此路由，必须传递 `prefetch={false}` 以防止预取时意外删除 Cookie。
+
+### 与 `getServerSideProps` 协同工作
+
+草稿模式可与 `getServerSideProps` 配合使用，并通过 [`context`](/docs/pages/api-reference/functions/get-server-side-props#context-parameter) 对象中的 `draftMode` 键提供。
+
+> **须知**：使用草稿模式时不应设置 `Cache-Control` 标头，因为它无法被绕过。我们建议改用 [ISR (增量静态再生)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)。
+
+### 与 API 路由协同工作
+
+API 路由可以通过请求对象访问 `draftMode`。例如：
+
+```js
+export default function myApiRoute(req, res) {
+  if (req.draftMode) {
+    // 获取草稿数据
+  }
+}
+```
+
+### 每次 `next build` 生成唯一值
+
+每次运行 `next build` 时都会生成新的绕过 Cookie 值。
+
+这确保了绕过 Cookie 无法被猜测。
+
+> **须知**：要通过 HTTP 在本地测试草稿模式，您的浏览器需要允许第三方 Cookie 和本地存储访问。

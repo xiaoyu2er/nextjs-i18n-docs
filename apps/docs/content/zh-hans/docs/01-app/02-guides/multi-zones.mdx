@@ -1,0 +1,143 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-19T23:02:54.260Z
+title: 如何使用多区域 (Multi-zones) 和 Next.js 构建微前端
+nav_title: 多区域 (Multi-zones)
+description: 学习如何利用 Next.js 的多区域功能构建微前端，实现在单一域名下部署多个 Next.js 应用。
+
+{/* 本文档内容在应用路由和页面路由间共享。如需添加仅适用于页面路由 (Pages Router) 的内容，可使用 `<PagesOnly>内容</PagesOnly>` 组件。所有共享内容不应包裹在任何组件中。*/}
+
+<details open>
+  <summary>示例</summary>
+
+- [多区域示例](https://github.com/vercel/next.js/tree/canary/examples/with-zones)
+
+</details>
+
+多区域 (Multi-Zones) 是一种微前端实现方案，它将大型应用按路径拆分为多个独立的 Next.js 应用。当应用中存在功能独立的页面集合时，这种方案尤为有用。通过将这些页面移至独立区域（即独立应用），可以减小每个应用的体积，从而提升构建速度并移除仅特定区域需要的代码。由于应用彼此解耦，多区域方案还允许域名下的其他应用使用不同的技术框架。
+
+例如，假设您有以下需要拆分的页面集合：
+
+- `/blog/*` 所有博客文章
+- `/dashboard/*` 用户登录后的仪表盘页面
+- `/*` 其他未被划分到特定区域的网站页面
+
+借助多区域功能，您可以创建三个应用，它们运行在相同域名下且对用户呈现统一外观，但每个应用均可独立开发和部署。
+
+<Image
+  alt="三个区域示意图：A、B、C。展示不同区域间路由的硬导航 (hard navigation)，以及同一区域内路由的软导航 (soft navigation)"
+  srcLight="/docs/light/multi-zones.png"
+  srcDark="/docs/dark/multi-zones.png"
+  width="1600"
+  height="750"
+/>
+
+在同一区域内导航时会执行软导航 (soft navigation)，即无需重新加载页面的导航方式。例如图中从 `/` 跳转到 `/products` 就属于软导航。
+
+而从某个区域的页面跳转至另一区域的页面（如从 `/` 到 `/dashboard`）则会执行硬导航 (hard navigation)，卸载当前页面资源并加载新页面资源。频繁互访的页面应置于同一区域以避免硬导航。
+
+## 如何定义区域
+
+一个区域就是标准的 Next.js 应用，但需配置 [assetPrefix](/docs/app/api-reference/config/next-config-js/assetPrefix) 以避免与其他区域的页面和静态文件冲突。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+}
+```
+
+Next.js 资源（如 JavaScript 和 CSS）会添加 `assetPrefix` 前缀，确保不与其他区域的资源冲突。这些资源将通过 `/assetPrefix/_next/...` 路径提供服务。
+
+处理所有未分配路径的默认应用无需设置 `assetPrefix`。
+
+在 Next.js 15 之前的版本中，可能还需要额外重写规则来处理静态资源。Next.js 15 中已无需此配置。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/blog-static/_next/:path+',
+          destination: '/_next/:path+',
+        },
+      ],
+    }
+  },
+}
+```
+
+## 如何将请求路由至正确区域
+
+配置多区域后，需要通过 HTTP 代理将路径路由至对应应用。虽然可使用任何 HTTP 代理，但也可使用某个 Next.js 应用来路由整个域名的请求。
+
+使用 Next.js 应用路由时，可通过 [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites) 实现。为每个由不同区域处理的路径添加重写规则，同时还需重写静态资源请求。例如：
+
+```js filename="next.config.js"
+async rewrites() {
+    return [
+        {
+            source: '/blog',
+            destination: `${process.env.BLOG_DOMAIN}/blog`,
+        },
+        {
+            source: '/blog/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog/:path+`,
+        },
+        {
+            source: '/blog-static/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog-static/:path+`,
+        }
+    ];
+}
+```
+
+`destination` 应为区域服务的完整 URL（包含协议和域名）。生产环境应指向区域的生产域名，但本地开发时也可用于路由至 `localhost`。
+
+> **须知**：URL 路径应在区域内保持唯一。例如两个区域同时处理 `/blog` 会导致路由冲突。
+
+### 使用中间件路由请求
+
+虽然推荐使用 [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites) 来最小化请求延迟，但在需要动态路由决策时（如迁移期间使用功能标志决定路由目标）可使用中间件。
+
+```js filename="middleware.js"
+export async function middleware(request) {
+  const { pathname, search } = req.nextUrl;
+  if (pathname === '/your-path' && myFeatureFlag.isEnabled()) {
+    return NextResponse.rewrite(`${rewriteDomain}${pathname}${search});
+  }
+}
+```
+
+## 跨区域链接
+
+跨区域链接应使用 `a` 标签而非 Next.js [`<Link>`](/docs/pages/api-reference/components/link) 组件。因为 Next.js 会尝试预取和软导航 `<Link>` 中的相对路径，这在跨区域时无效。
+
+## 代码共享
+
+组成不同区域的 Next.js 应用可存放在任意代码库中。但通常建议采用 [单体仓库 (monorepo)](https://en.wikipedia.org/wiki/Monorepo) 以便代码共享。对于不同仓库的区域，也可通过公共或私有 NPM 包共享代码。
+
+由于不同区域的页面可能分开发布，功能标志 (feature flags) 可用于协调各区域功能的统一启用/禁用。
+
+<AppOnly>
+
+## 服务端操作 (Server Actions)
+
+在多区域中使用 [服务端操作 (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) 时，必须显式允许用户访问的源域名，因为您的用户域名可能服务多个应用。在 `next.config.js` 中添加以下配置：
+
+```js filename="next.config.js"
+const nextConfig = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['your-production-domain.com'],
+    },
+  },
+}
+```
+
+详见 [`serverActions.allowedOrigins`](/docs/app/api-reference/config/next-config-js/serverActions#allowedorigins) 文档。
+
+</AppOnly>

@@ -1,0 +1,298 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-19T23:05:10.935Z
+title: 如何为 Next.js 应用设置内容安全策略 (CSP)
+nav_title: 内容安全策略
+description: 了解如何为您的 Next.js 应用设置内容安全策略 (CSP)。
+related:
+  links:
+    - app/building-your-application/routing/middleware
+    - app/api-reference/functions/headers
+---
+
+{/* 本文档内容在 App Router 和 Pages Router 之间共享。您可以使用 `<PagesOnly>内容</PagesOnly>` 组件添加特定于 Pages Router 的内容。任何共享内容不应包裹在组件中。 */}
+
+[内容安全策略 (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP) 对于防范跨站脚本 (XSS)、点击劫持和其他代码注入攻击等安全威胁至关重要。
+
+通过使用 CSP，开发者可以指定哪些来源允许加载内容、脚本、样式表、图片、字体、对象、媒体（音频、视频）、iframe 等。
+
+<details>
+  <summary>示例</summary>
+
+- [严格 CSP](https://github.com/vercel/next.js/tree/canary/examples/with-strict-csp)
+
+</details>
+
+## Nonce 随机数
+
+[Nonce](https://developer.mozilla.org/docs/Web/HTML/Global_attributes/nonce) 是一个一次性使用的唯一随机字符串。它与 CSP 结合使用，可以绕过严格的 CSP 指令，选择性地允许某些内联脚本或样式执行。
+
+### 为什么使用 Nonce？
+
+尽管 CSP 旨在阻止恶意脚本，但在某些合法场景中内联脚本是必要的。此时，Nonce 提供了一种方式：只有携带正确 Nonce 的脚本才能执行。
+
+### 通过中间件添加 Nonce
+
+[中间件](/docs/app/building-your-application/routing/middleware) 允许您在页面渲染前添加头部并生成 Nonce。
+
+每次页面被访问时都应生成一个新的 Nonce。这意味着 **必须使用动态渲染来添加 Nonce**。
+
+例如：
+
+```ts filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // 替换换行符和空格
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // 替换换行符和空格
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+默认情况下，中间件会处理所有请求。您可以通过 [`matcher`](/docs/app/building-your-application/routing/middleware#matcher) 筛选中间件仅在特定路径上运行。
+
+建议忽略来自 `next/link` 的预取请求和不需要 CSP 头部的静态资源。
+
+```ts filename="middleware.ts" switcher
+export const config = {
+  matcher: [
+    /*
+     * 匹配所有请求路径，除了以下开头的路径：
+     * - api (API 路由)
+     * - _next/static (静态文件)
+     * - _next/image (图片优化文件)
+     * - favicon.ico (网站图标文件)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+```js filename="middleware.js" switcher
+export const config = {
+  matcher: [
+    /*
+     * 匹配所有请求路径，除了以下开头的路径：
+     * - api (API 路由)
+     * - _next/static (静态文件)
+     * - _next/image (图片优化文件)
+     * - favicon.ico (网站图标文件)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+### 读取 Nonce
+
+<PagesOnly>
+  您可以通过 [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) 将 Nonce 传递给页面：
+
+```tsx filename="pages/index.tsx" switcher
+import Script from 'next/script'
+
+import type { GetServerSideProps } from 'next'
+
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+import Script from 'next/script'
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export async function getServerSideProps({ req }) {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+您可以通过 [`headers`](/docs/app/api-reference/functions/headers) 在 [服务器组件](/docs/app/getting-started/server-and-client-components) 中读取 Nonce：
+
+```tsx filename="app/page.tsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+</AppOnly>
+
+## 不使用 Nonce 的情况
+
+对于不需要 Nonce 的应用，可以直接在 [`next.config.js`](/docs/app/api-reference/config/next-config-js) 文件中设置 CSP 头部：
+
+```js filename="next.config.js"
+const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-eval' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## 版本历史
+
+建议使用 `v13.4.20+` 版本的 Next.js 以正确处理和应用 Nonce。
