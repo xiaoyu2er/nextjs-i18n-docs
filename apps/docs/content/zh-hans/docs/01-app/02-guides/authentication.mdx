@@ -1,0 +1,1653 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-19T23:12:24.557Z
+title: 如何在 Next.js 中实现身份验证
+nav_title: 身份验证
+description: 学习如何在您的 Next.js 应用中实现身份验证功能。
+---
+
+理解身份验证机制对保护应用数据至关重要。本文将指导您使用 React 和 Next.js 的哪些特性来实现身份验证。
+
+开始之前，建议将流程分解为三个核心概念：
+
+1. **[身份验证 (Authentication)](#authentication)**：验证用户是否为其声称的身份。要求用户通过用户名密码等凭证证明身份。
+2. **[会话管理 (Session Management)](#session-management)**：跨请求跟踪用户的认证状态。
+3. **[授权 (Authorization)](#authorization)**：决定用户可访问的路由和数据。
+
+下图展示了使用 React 和 Next.js 特性的身份验证流程：
+
+<Image
+  alt="展示 React 和 Next.js 身份验证流程的示意图"
+  srcLight="/docs/light/authentication-overview.png"
+  srcDark="/docs/dark/authentication-overview.png"
+  width="1600"
+  height="1383"
+/>
+
+本文示例出于教学目的演示基础的用户名密码验证。虽然您可以实现自定义方案，但为了安全性和简便性，我们推荐使用身份验证库。这些库提供开箱即用的解决方案，涵盖身份验证、会话管理、授权功能，以及社交登录、多因素认证、基于角色的访问控制等特性。您可以在[身份验证库](#auth-libraries)章节查看推荐列表。
+
+## 身份验证
+
+<AppOnly>
+
+### 注册与登录功能
+
+您可以使用 [`<form>`](https://react.dev/reference/react-dom/components/form) 元素配合 React 的[服务端操作 (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) 和 `useActionState` 来捕获用户凭证、验证表单字段并调用身份验证提供商的 API 或数据库。
+
+由于服务端操作始终在服务器执行，这为处理身份验证逻辑提供了安全环境。
+
+以下是实现注册/登录功能的步骤：
+
+#### 1. 捕获用户凭证
+
+创建提交时触发服务端操作的表单。例如接收用户名、邮箱和密码的注册表单：
+
+```tsx filename="app/ui/signup-form.tsx" switcher
+import { signup } from '@/app/actions/auth'
+
+export function SignupForm() {
+  return (
+    <form action={signup}>
+      <div>
+        <label htmlFor="name">姓名</label>
+        <input id="name" name="name" placeholder="姓名" />
+      </div>
+      <div>
+        <label htmlFor="email">邮箱</label>
+        <input id="email" name="email" type="email" placeholder="邮箱" />
+      </div>
+      <div>
+        <label htmlFor="password">密码</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      <button type="submit">注册</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup-form.js" switcher
+import { signup } from '@/app/actions/auth'
+
+export function SignupForm() {
+  return (
+    <form action={signup}>
+      <div>
+        <label htmlFor="name">姓名</label>
+        <input id="name" name="name" placeholder="姓名" />
+      </div>
+      <div>
+        <label htmlFor="email">邮箱</label>
+        <input id="email" name="email" type="email" placeholder="邮箱" />
+      </div>
+      <div>
+        <label htmlFor="password">密码</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      <button type="submit">注册</button>
+    </form>
+  )
+}
+```
+
+```tsx filename="app/actions/auth.ts" switcher
+export async function signup(formData: FormData) {}
+```
+
+```jsx filename="app/actions/auth.js" switcher
+export async function signup(formData) {}
+```
+
+#### 2. 服务端表单验证
+
+在服务端操作中使用验证库如 [Zod](https://zod.dev/) 或 [Yup](https://github.com/jquense/yup) 验证表单字段。
+
+以 Zod 为例，定义带错误提示的表单结构：
+
+```ts filename="app/lib/definitions.ts" switcher
+import { z } from 'zod'
+
+export const SignupFormSchema = z.object({
+  name: z
+    .string()
+    .min(2, { message: '姓名至少需要 2 个字符' })
+    .trim(),
+  email: z.string().email({ message: '请输入有效邮箱地址' }).trim(),
+  password: z
+    .string()
+    .min(8, { message: '至少 8 个字符长度' })
+    .regex(/[a-zA-Z]/, { message: '至少包含一个字母' })
+    .regex(/[0-9]/, { message: '至少包含一个数字' })
+    .regex(/[^a-zA-Z0-9]/, {
+      message: '至少包含一个特殊字符',
+    })
+    .trim(),
+})
+
+export type FormState =
+  | {
+      errors?: {
+        name?: string[]
+        email?: string[]
+        password?: string[]
+      }
+      message?: string
+    }
+  | undefined
+```
+
+```js filename="app/lib/definitions.js" switcher
+import { z } from 'zod'
+
+export const SignupFormSchema = z.object({
+  name: z
+    .string()
+    .min(2, { message: '姓名至少需要 2 个字符' })
+    .trim(),
+  email: z.string().email({ message: '请输入有效邮箱地址' }).trim(),
+  password: z
+    .string()
+    .min(8, { message: '至少 8 个字符长度' })
+    .regex(/[a-zA-Z]/, { message: '至少包含一个字母' })
+    .regex(/[0-9]/, { message: '至少包含一个数字' })
+    .regex(/[^a-zA-Z0-9]/, {
+      message: '至少包含一个特殊字符',
+    })
+    .trim(),
+})
+```
+
+若表单验证失败，可提前终止流程避免调用身份验证接口：
+
+```ts filename="app/actions/auth.ts" switcher
+import { SignupFormSchema, FormState } from '@/app/lib/definitions'
+
+export async function signup(state: FormState, formData: FormData) {
+  // 验证表单字段
+  const validatedFields = SignupFormSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+  })
+
+  // 若验证失败则提前返回
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // 调用提供商接口创建用户...
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { SignupFormSchema } from '@/app/lib/definitions'
+
+export async function signup(state, formData) {
+  // 验证表单字段
+  const validatedFields = SignupFormSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+  })
+
+  // 若验证失败则提前返回
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // 调用提供商接口创建用户...
+}
+```
+
+在 `<SignupForm />` 中使用 React 的 `useActionState` 钩子展示验证错误：
+
+```tsx filename="app/ui/signup-form.tsx" switcher highlight={7,15,21,27-36}
+'use client'
+
+import { signup } from '@/app/actions/auth'
+import { useActionState } from 'react'
+
+export default function SignupForm() {
+  const [state, action, pending] = useActionState(signup, undefined)
+
+  return (
+    <form action={action}>
+      <div>
+        <label htmlFor="name">姓名</label>
+        <input id="name" name="name" placeholder="姓名" />
+      </div>
+      {state?.errors?.name && <p>{state.errors.name}</p>}
+
+      <div>
+        <label htmlFor="email">邮箱</label>
+        <input id="email" name="email" placeholder="邮箱" />
+      </div>
+      {state?.errors?.email && <p>{state.errors.email}</p>}
+
+      <div>
+        <label htmlFor="password">密码</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      {state?.errors?.password && (
+        <div>
+          <p>密码必须：</p>
+          <ul>
+            {state.errors.password.map((error) => (
+              <li key={error}>- {error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button disabled={pending} type="submit">
+        注册
+      </button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup-form.js" switcher highlight={7,15,21,27-36}
+'use client'
+
+import { signup } from '@/app/actions/auth'
+import { useActionState } from 'react'
+
+export default function SignupForm() {
+  const [state, action, pending] = useActionState(signup, undefined)
+
+  return (
+    <form action={action}>
+      <div>
+        <label htmlFor="name">姓名</label>
+        <input id="name" name="name" placeholder="姓名" />
+      </div>
+      {state?.errors?.name && <p>{state.errors.name}</p>}
+
+      <div>
+        <label htmlFor="email">邮箱</label>
+        <input id="email" name="email" placeholder="邮箱" />
+      </div>
+      {state?.errors?.email && <p>{state.errors.email}</p>}
+
+      <div>
+        <label htmlFor="password">密码</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      {state?.errors?.password && (
+        <div>
+          <p>密码必须：</p>
+          <ul>
+            {state.errors.password.map((error) => (
+              <li key={error}>- {error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button disabled={pending} type="submit">
+        注册
+      </button>
+    </form>
+  )
+}
+```
+
+> **须知：**
+>
+> - 在 React 19 中，`useFormStatus` 返回对象包含 data、method、action 等额外字段。若未使用 React 19，则仅有 `pending` 字段可用。
+> - 执行数据变更前，应始终验证用户权限。详见[身份验证与授权](#authorization)。
+
+#### 3. 创建用户或验证用户凭据
+
+验证表单字段后，您可以通过调用认证提供商的 API 或数据库来创建新用户账户或检查用户是否存在。
+
+继续之前的示例：
+
+```tsx filename="app/actions/auth.tsx" switcher
+export async function signup(state: FormState, formData: FormData) {
+  // 1. 验证表单字段
+  // ...
+
+  // 2. 准备插入数据库的数据
+  const { name, email, password } = validatedFields.data
+  // 例如：存储前对用户密码进行哈希处理
+  const hashedPassword = await bcrypt.hash(password, 10)
+
+  // 3. 将用户插入数据库或调用认证库的 API
+  const data = await db
+    .insert(users)
+    .values({
+      name,
+      email,
+      password: hashedPassword,
+    })
+    .returning({ id: users.id })
+
+  const user = data[0]
+
+  if (!user) {
+    return {
+      message: '创建账户时发生错误。',
+    }
+  }
+
+  // 待办事项：
+  // 4. 创建用户会话
+  // 5. 重定向用户
+}
+```
+
+```jsx filename="app/actions/auth.js" switcher
+export async function signup(state, formData) {
+  // 1. 验证表单字段
+  // ...
+
+  // 2. 准备插入数据库的数据
+  const { name, email, password } = validatedFields.data
+  // 例如：存储前对用户密码进行哈希处理
+  const hashedPassword = await bcrypt.hash(password, 10)
+
+  // 3. 将用户插入数据库或调用库的 API
+  const data = await db
+    .insert(users)
+    .values({
+      name,
+      email,
+      password: hashedPassword,
+    })
+    .returning({ id: users.id })
+
+  const user = data[0]
+
+  if (!user) {
+    return {
+      message: '创建账户时发生错误。',
+    }
+  }
+
+  // 待办事项：
+  // 4. 创建用户会话
+  // 5. 重定向用户
+}
+```
+
+成功创建用户账户或验证用户凭据后，您可以创建一个会话来管理用户的认证状态。根据您的会话管理策略，会话可以存储在 cookie 或数据库中，或两者兼有。继续阅读[会话管理](#session-management)部分以了解更多。
+
+> **提示：**
+>
+> - 上述示例较为详细，目的是为了教学而分解了认证步骤。这突显了实现自己的安全解决方案可能很快变得复杂。考虑使用[认证库](#auth-libraries)来简化流程。
+> - 为了提升用户体验，您可能希望在注册流程的早期检查重复的电子邮件或用户名。例如，当用户输入用户名或输入框失去焦点时。这可以帮助避免不必要的表单提交，并向用户提供即时反馈。您可以使用诸如 [use-debounce](https://www.npmjs.com/package/use-debounce) 这样的库来防抖请求，以管理这些检查的频率。
+
+</AppOnly>
+
+<PagesOnly>
+
+以下是实现注册和/或登录表单的步骤：
+
+1. 用户通过表单提交凭据。
+2. 表单发送一个由 API 路由处理的请求。
+3. 验证成功后，流程完成，表示用户已成功认证。
+4. 如果验证失败，则显示错误消息。
+
+考虑一个用户可以输入凭据的登录表单：
+
+```tsx filename="pages/login.tsx" switcher
+import { FormEvent } from 'react'
+import { useRouter } from 'next/router'
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (response.ok) {
+      router.push('/profile')
+    } else {
+      // 处理错误
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Password" required />
+      <button type="submit">登录</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="pages/login.jsx" switcher
+import { FormEvent } from 'react'
+import { useRouter } from 'next/router'
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (response.ok) {
+      router.push('/profile')
+    } else {
+      // 处理错误
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Password" required />
+      <button type="submit">登录</button>
+    </form>
+  )
+}
+```
+
+上述表单有两个输入字段，用于捕获用户的电子邮件和密码。提交时，它会触发一个函数，向 API 路由 (`/api/auth/login`) 发送 POST 请求。
+
+然后，您可以在 API 路由中调用认证提供商的 API 来处理认证：
+
+```ts filename="pages/api/auth/login.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { signIn } from '@/auth'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    const { email, password } = req.body
+    await signIn('credentials', { email, password })
+
+    res.status(200).json({ success: true })
+  } catch (error) {
+    if (error.type === 'CredentialsSignin') {
+      res.status(401).json({ error: '无效凭据。' })
+    } else {
+      res.status(500).json({ error: '出错了。' })
+    }
+  }
+}
+```
+
+```js filename="pages/api/auth/login.js" switcher
+import { signIn } from '@/auth'
+
+export default async function handler(req, res) {
+  try {
+    const { email, password } = req.body
+    await signIn('credentials', { email, password })
+
+    res.status(200).json({ success: true })
+  } catch (error) {
+    if (error.type === 'CredentialsSignin') {
+      res.status(401).json({ error: '无效凭据。' })
+    } else {
+      res.status(500).json({ error: '出错了。' })
+    }
+  }
+}
+```
+
+</PagesOnly>
+
+## 会话管理
+
+会话管理确保用户的认证状态在多个请求之间保持。它涉及创建、存储、刷新和删除会话或令牌。
+
+有两种类型的会话：
+
+1. [**无状态会话 (Stateless)**](#stateless-sessions)：会话数据（或令牌）存储在浏览器的 cookie 中。每次请求时都会发送该 cookie，允许在服务器上验证会话。这种方法更简单，但如果实现不当可能不太安全。
+2. [**数据库会话 (Database)**](#database-sessions)：会话数据存储在数据库中，用户的浏览器仅接收加密的会话 ID。这种方法更安全，但可能更复杂且占用更多服务器资源。
+
+> **须知：** 虽然您可以使用其中一种方法或两者兼用，但我们建议使用会话管理库，如 [iron-session](https://github.com/vvo/iron-session) 或 [Jose](https://github.com/panva/jose)。
+
+### 无状态会话 (Stateless Sessions)
+
+<AppOnly>
+
+要创建和管理无状态会话，您需要遵循以下步骤：
+
+1. 生成一个密钥，用于签名您的会话，并将其存储为[环境变量](/docs/app/guides/environment-variables)。
+2. 使用会话管理库编写加密/解密会话数据的逻辑。
+3. 使用 Next.js [`cookies`](/docs/app/api-reference/functions/cookies) API 管理 cookie。
+
+除了上述内容，还可以考虑添加功能以在用户返回应用程序时[更新（或刷新）](#updating-or-refreshing-sessions)会话，并在用户注销时[删除](#deleting-the-session)会话。
+
+> **须知：** 检查您的[认证库](#auth-libraries)是否包含会话管理功能。
+
+#### 1. 生成密钥
+
+您可以通过几种方式生成用于签名会话的密钥。例如，您可以选择在终端中使用 `openssl` 命令：
+
+```bash filename="terminal"
+openssl rand -base64 32
+```
+
+此命令生成一个 32 字符的随机字符串，您可以用作密钥并存储在[环境变量文件](/docs/app/guides/environment-variables)中：
+
+```bash filename=".env"
+SESSION_SECRET=your_secret_key
+```
+
+然后，您可以在会话管理逻辑中引用此密钥：
+
+```js filename="app/lib/session.js"
+const secretKey = process.env.SESSION_SECRET
+```
+
+#### 2. 加密和解密会话
+
+接下来，您可以使用您首选的[会话管理库](#session-management-libraries)来加密和解密会话。继续之前的示例，我们将使用 [Jose](https://www.npmjs.com/package/jose)（兼容 [Edge Runtime](/docs/app/api-reference/edge)）和 React 的 [`server-only`](https://www.npmjs.com/package/server-only) 包，以确保您的会话管理逻辑仅在服务器上执行。
+
+```tsx filename="app/lib/session.ts" switcher
+import 'server-only'
+import { SignJWT, jwtVerify } from 'jose'
+import { SessionPayload } from '@/app/lib/definitions'
+
+const secretKey = process.env.SESSION_SECRET
+const encodedKey = new TextEncoder().encode(secretKey)
+
+export async function encrypt(payload: SessionPayload) {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(encodedKey)
+}
+
+export async function decrypt(session: string | undefined = '') {
+  try {
+    const { payload } = await jwtVerify(session, encodedKey, {
+      algorithms: ['HS256'],
+    })
+    return payload
+  } catch (error) {
+    console.log('验证会话失败')
+  }
+}
+```
+
+```jsx filename="app/lib/session.js" switcher
+import 'server-only'
+import { SignJWT, jwtVerify } from 'jose'
+
+const secretKey = process.env.SESSION_SECRET
+const encodedKey = new TextEncoder().encode(secretKey)
+
+export async function encrypt(payload) {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(encodedKey)
+}
+
+export async function decrypt(session) {
+  try {
+    const { payload } = await jwtVerify(session, encodedKey, {
+      algorithms: ['HS256'],
+    })
+    return payload
+  } catch (error) {
+    console.log('验证会话失败')
+  }
+}
+```
+
+> **提示：**
+>
+> - 载荷应包含在后续请求中使用的**最小**、唯一的用户数据，例如用户 ID、角色等。不应包含个人身份信息，如电话号码、电子邮件地址、信用卡信息等，或敏感数据如密码。
+
+#### 3. 设置 cookie（推荐选项）
+
+要将会话存储在 cookie 中，请使用 Next.js [`cookies`](/docs/app/api-reference/functions/cookies) API。Cookie 应在服务器上设置，并包括以下推荐选项：
+
+- **HttpOnly**：防止客户端 JavaScript 访问 cookie。
+- **Secure**：使用 https 发送 cookie。
+- **SameSite**：指定 cookie 是否可以与跨站点请求一起发送。
+- **Max-Age 或 Expires**：在一定时间后删除 cookie。
+- **Path**：定义 cookie 的 URL 路径。
+
+请参阅 [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies) 以获取有关这些选项的更多信息。
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function createSession(userId: string) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const session = await encrypt({ userId, expiresAt })
+  const cookieStore = await cookies()
+
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function createSession(userId) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const session = await encrypt({ userId, expiresAt })
+  const cookieStore = await cookies()
+
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+回到您的服务器操作中，您可以调用 `createSession()` 函数，并使用 [`redirect()`](/docs/app/building-your-application/routing/redirecting) API 将用户重定向到适当的页面：
+
+```ts filename="app/actions/auth.ts" switcher
+import { createSession } from '@/app/lib/session'
+
+export async function signup(state: FormState, formData: FormData) {
+  // 之前的步骤：
+  // 1. 验证表单字段
+  // 2. 准备插入数据库的数据
+  // 3. 将用户插入数据库或调用库的 API
+
+  // 当前步骤：
+  // 4. 创建用户会话
+  await createSession(user.id)
+  // 5. 重定向用户
+  redirect('/profile')
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { createSession } from '@/app/lib/session'
+
+export async function signup(state, formData) {
+  // 之前的步骤：
+  // 1. 验证表单字段
+  // 2. 准备插入数据库的数据
+  // 3. 将用户插入数据库或调用库的 API
+
+  // 当前步骤：
+  // 4. 创建用户会话
+  await createSession(user.id)
+  // 5. 重定向用户
+  redirect('/profile')
+}
+```
+
+> **提示：**
+>
+> - **Cookie 应在服务器上设置**以防止客户端篡改。
+> - 🎥 观看：了解更多关于无状态会话和 Next.js 认证的内容 → [YouTube (11 分钟)](https://www.youtube.com/watch?v=DJvM2lSPn6w)。
+
+#### 更新（或刷新）会话
+
+您还可以延长会话的过期时间。这对于用户在再次访问应用程序时保持登录状态非常有用。例如：
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export async function updateSession() {
+  const session = (await cookies()).get('session')?.value
+  const payload = await decrypt(session)
+
+  if (!session || !payload) {
+    return null
+  }
+
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expires,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export async function updateSession() {
+  const session = (await cookies()).get('session')?.value
+  const payload = await decrypt(session)
+
+  if (!session || !payload) {
+    return null
+  }
+
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)(
+    await cookies()
+  ).set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expires,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+> **提示：** 检查您的认证库是否支持刷新令牌，可用于延长用户的会话。
+
+#### 删除会话
+
+要删除会话，可以删除对应的 cookie：
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function deleteSession() {
+  const cookieStore = await cookies()
+  cookieStore.delete('session')
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function deleteSession() {
+  const cookieStore = await cookies()
+  cookieStore.delete('session')
+}
+```
+
+然后你可以在应用中复用 `deleteSession()` 函数，例如在登出时：
+
+```ts filename="app/actions/auth.ts" switcher
+import { cookies } from 'next/headers'
+import { deleteSession } from '@/app/lib/session'
+
+export async function logout() {
+  await deleteSession()
+  redirect('/login')
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { cookies } from 'next/headers'
+import { deleteSession } from '@/app/lib/session'
+
+export async function logout() {
+  await deleteSession()
+  redirect('/login')
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+#### 设置和删除 Cookie
+
+你可以使用 [API 路由 (API Routes)](/docs/pages/building-your-application/routing/api-routes) 在服务端将会话设置为 cookie：
+
+```ts filename="pages/api/login.ts" switcher
+import { serialize } from 'cookie'
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { encrypt } from '@/app/lib/session'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const sessionData = req.body
+  const encryptedSessionData = encrypt(sessionData)
+
+  const cookie = serialize('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // 一周
+    path: '/',
+  })
+  res.setHeader('Set-Cookie', cookie)
+  res.status(200).json({ message: 'Successfully set cookie!' })
+}
+```
+
+```js filename="pages/api/login.js" switcher
+import { serialize } from 'cookie'
+import { encrypt } from '@/app/lib/session'
+
+export default function handler(req, res) {
+  const sessionData = req.body
+  const encryptedSessionData = encrypt(sessionData)
+
+  const cookie = serialize('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // 一周
+    path: '/',
+  })
+  res.setHeader('Set-Cookie', cookie)
+  res.status(200).json({ message: 'Successfully set cookie!' })
+}
+```
+
+</PagesOnly>
+
+### 数据库会话
+
+要创建和管理数据库会话，你需要遵循以下步骤：
+
+1. 在数据库中创建表来存储会话和数据（或检查你的认证库是否已处理此功能）。
+2. 实现插入、更新和删除会话的功能。
+3. 将会话 ID 加密后再存储到用户的浏览器中，并确保数据库和 cookie 保持同步（此步骤可选，但建议用于 [中间件](#optimistic-checks-with-middleware-optional) 中的乐观认证检查）。
+
+<AppOnly>
+
+例如：
+
+```ts filename="app/lib/session.ts" switcher
+import cookies from 'next/headers'
+import { db } from '@/app/lib/db'
+import { encrypt } from '@/app/lib/session'
+
+export async function createSession(id: number) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  // 1. 在数据库中创建会话
+  const data = await db
+    .insert(sessions)
+    .values({
+      userId: id,
+      expiresAt,
+    })
+    // 返回会话 ID
+    .returning({ id: sessions.id })
+
+  const sessionId = data[0].id
+
+  // 2. 加密会话 ID
+  const session = await encrypt({ sessionId, expiresAt })
+
+  // 3. 将会话存储在 cookie 中以便进行乐观认证检查
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import cookies from 'next/headers'
+import { db } from '@/app/lib/db'
+import { encrypt } from '@/app/lib/session'
+
+export async function createSession(id) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  // 1. 在数据库中创建会话
+  const data = await db
+    .insert(sessions)
+    .values({
+      userId: id,
+      expiresAt,
+    })
+    // 返回会话 ID
+    .returning({ id: sessions.id })
+
+  const sessionId = data[0].id
+
+  // 2. 加密会话 ID
+  const session = await encrypt({ sessionId, expiresAt })
+
+  // 3. 将会话存储在 cookie 中以便进行乐观认证检查
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+> **提示**：
+>
+> - 为了更快的访问速度，你可以考虑为会话的生命周期添加服务端缓存。你也可以将会话数据保留在主数据库中，并合并数据请求以减少查询次数。
+> - 对于更高级的用例，例如跟踪用户上次登录时间、活动设备数量或允许用户从所有设备登出，你可以选择使用数据库会话。
+
+在实现会话管理后，你需要添加授权逻辑来控制用户在应用中可以访问和执行的内容。继续阅读 [授权](#authorization) 部分以了解更多。
+
+</AppOnly>
+
+<PagesOnly>
+
+**在服务端创建会话**：
+
+```ts filename="pages/api/create-session.ts" switcher
+import db from '../../lib/db'
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    const user = req.body
+    const sessionId = generateSessionId()
+    await db.insertSession({
+      sessionId,
+      userId: user.id,
+      createdAt: new Date(),
+    })
+
+    res.status(200).json({ sessionId })
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
+}
+```
+
+```js filename="pages/api/create-session.js" switcher
+import db from '../../lib/db'
+
+export default async function handler(req, res) {
+  try {
+    const user = req.body
+    const sessionId = generateSessionId()
+    await db.insertSession({
+      sessionId,
+      userId: user.id,
+      createdAt: new Date(),
+    })
+
+    res.status(200).json({ sessionId })
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
+}
+```
+
+</PagesOnly>
+
+## 授权
+
+一旦用户通过认证并创建了会话，你可以实现授权逻辑来控制用户在应用中可以访问和执行的内容。
+
+授权检查主要有两种类型：
+
+1. **乐观检查**：使用存储在 cookie 中的会话数据检查用户是否有权访问路由或执行操作。这些检查适用于快速操作，例如根据权限或角色显示/隐藏 UI 元素或重定向用户。
+2. **安全检查**：使用存储在数据库中的会话数据检查用户是否有权访问路由或执行操作。这些检查更安全，适用于需要访问敏感数据或执行敏感操作的场景。
+
+对于这两种情况，我们建议：
+
+- 创建一个 [数据访问层 (DAL)](#creating-a-data-access-layer-dal) 来集中管理授权逻辑。
+- 使用 [数据传输对象 (DTO)](#using-data-transfer-objects-dto) 仅返回必要的数据。
+- 可选地使用 [中间件](#optimistic-checks-with-middleware-optional) 执行乐观检查。
+
+### 使用中间件进行乐观检查（可选）
+
+在某些情况下，你可能希望使用 [中间件 (Middleware)](/docs/app/building-your-application/routing/middleware) 并根据权限重定向用户：
+
+- 执行乐观检查。由于中间件在每个路由上运行，因此它是集中重定向逻辑和预过滤未授权用户的好方法。
+- 保护在用户之间共享数据的静态路由（例如付费内容）。
+
+然而，由于中间件在每个路由上运行，包括 [预取 (prefetched)](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching) 的路由，因此重要的是仅从 cookie 中读取会话（乐观检查），并避免数据库检查以防止性能问题。
+
+例如：
+
+```tsx filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+import { decrypt } from '@/app/lib/session'
+import { cookies } from 'next/headers'
+
+// 1. 指定受保护和公开的路由
+const protectedRoutes = ['/dashboard']
+const publicRoutes = ['/login', '/signup', '/']
+
+export default async function middleware(req: NextRequest) {
+  // 2. 检查当前路由是受保护还是公开的
+  const path = req.nextUrl.pathname
+  const isProtectedRoute = protectedRoutes.includes(path)
+  const isPublicRoute = publicRoutes.includes(path)
+
+  // 3. 从 cookie 中解密会话
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  // 4. 如果用户未认证，则重定向到 /login
+  if (isProtectedRoute && !session?.userId) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl))
+  }
+
+  // 5. 如果用户已认证，则重定向到 /dashboard
+  if (
+    isPublicRoute &&
+    session?.userId &&
+    !req.nextUrl.pathname.startsWith('/dashboard')
+  ) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
+  }
+
+  return NextResponse.next()
+}
+
+// 中间件不应运行的路由
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { decrypt } from '@/app/lib/session'
+import { cookies } from 'next/headers'
+
+// 1. 指定受保护和公开的路由
+const protectedRoutes = ['/dashboard']
+const publicRoutes = ['/login', '/signup', '/']
+
+export default async function middleware(req) {
+  // 2. 检查当前路由是受保护还是公开的
+  const path = req.nextUrl.pathname
+  const isProtectedRoute = protectedRoutes.includes(path)
+  const isPublicRoute = publicRoutes.includes(path)
+
+  // 3. 从 cookie 中解密会话
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  // 5. 如果用户未认证，则重定向到 /login
+  if (isProtectedRoute && !session?.userId) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl))
+  }
+
+  // 6. 如果用户已认证，则重定向到 /dashboard
+  if (
+    isPublicRoute &&
+    session?.userId &&
+    !req.nextUrl.pathname.startsWith('/dashboard')
+  ) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
+  }
+
+  return NextResponse.next()
+}
+
+// 中间件不应运行的路由
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+}
+```
+
+虽然中间件对于初始检查很有用，但它不应该是保护数据的唯一防线。大多数安全检查应尽可能靠近数据源执行，更多信息请参阅 [数据访问层](#creating-a-data-access-layer-dal)。
+
+> **提示**：
+>
+> - 在中间件中，你也可以使用 `req.cookies.get('session').value` 读取 cookie。
+> - 中间件使用 [边缘运行时 (Edge Runtime)](/docs/app/api-reference/edge)，请检查你的认证库和会话管理库是否兼容。
+> - 你可以使用中间件中的 `matcher` 属性指定中间件应运行的路由。但对于认证，建议中间件在所有路由上运行。
+
+<AppOnly>
+
+### 创建数据访问层 (DAL)
+
+我们建议创建一个 DAL 来集中管理数据请求和授权逻辑。
+
+DAL 应包含一个函数，用于在用户与应用交互时验证用户的会话。至少，该函数应检查会话是否有效，然后重定向或返回用户信息以进行进一步的请求。
+
+例如，为你的 DAL 创建一个单独的文件，其中包含 `verifySession()` 函数。然后使用 React 的 [cache](https://react.dev/reference/react/cache) API 在 React 渲染过程中记忆函数的返回值：
+
+```tsx filename="app/lib/dal.ts" switcher
+import 'server-only'
+
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export const verifySession = cache(async () => {
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  if (!session?.userId) {
+    redirect('/login')
+  }
+
+  return { isAuth: true, userId: session.userId }
+})
+```
+
+```js filename="app/lib/dal.js" switcher
+import 'server-only'
+
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export const verifySession = cache(async () => {
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  if (!session.userId) {
+    redirect('/login')
+  }
+
+  return { isAuth: true, userId: session.userId }
+})
+```
+
+然后你可以在数据请求、服务端操作 (Server Actions)、路由处理器 (Route Handlers) 中调用 `verifySession()` 函数：
+
+```tsx filename="app/lib/dal.ts" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  try {
+    const data = await db.query.users.findMany({
+      where: eq(users.id, session.userId),
+      // 显式返回你需要的列，而不是整个用户对象
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    })
+
+    const user = data[0]
+
+    return user
+  } catch (error) {
+    console.log('Failed to fetch user')
+    return null
+  }
+})
+```
+
+```jsx filename="app/lib/dal.js" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  try {
+    const data = await db.query.users.findMany({
+      where: eq(users.id, session.userId),
+      // 显式返回你需要的列，而不是整个用户对象
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    })
+
+    const user = data[0]
+
+    return user
+  } catch (error) {
+    console.log('Failed to fetch user')
+    return null
+  }
+})
+```
+
+> **提示**：
+>
+> - DAL 可用于保护在请求时获取的数据。然而，对于在用户之间共享数据的静态路由，数据将在构建时获取，而不是在请求时获取。使用 [中间件](#optimistic-checks-with-middleware-optional) 来保护静态路由。
+> - 对于安全检查，你可以通过将会话 ID 与数据库进行比较来检查会话是否有效。使用 React 的 [cache](https://react.dev/reference/react/cache) 函数避免在渲染过程中重复请求数据库。
+> - 你可能希望将相关的数据请求整合到一个 JavaScript 类中，该类在任何方法之前运行 `verifySession()`。
+
+</AppOnly>
+
+### 使用数据传输对象 (DTO)
+
+在检索数据时，建议仅返回应用程序中需要使用的必要数据，而非整个对象。例如，获取用户数据时，可以只返回用户 ID 和姓名，而不是包含密码、电话号码等敏感信息的完整用户对象。
+
+但如果无法控制返回的数据结构，或团队协作中需要避免完整对象传递到客户端，可以采用以下策略：明确指定哪些字段可以安全暴露给客户端。
+
+```tsx filename="app/lib/dto.ts" switcher
+import 'server-only'
+import { getUser } from '@/app/lib/dal'
+
+function canSeeUsername(viewer: User) {
+  return true
+}
+
+function canSeePhoneNumber(viewer: User, team: string) {
+  return viewer.isAdmin || team === viewer.team
+}
+
+export async function getProfileDTO(slug: string) {
+  const data = await db.query.users.findMany({
+    where: eq(users.slug, slug),
+    // 在此处返回特定列
+  })
+  const user = data[0]
+
+  const currentUser = await getUser(user.id)
+
+  // 或在此处仅返回查询相关的数据
+  return {
+    username: canSeeUsername(currentUser) ? user.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, user.team)
+      ? user.phonenumber
+      : null,
+  }
+}
+```
+
+```js filename="app/lib/dto.js" switcher
+import 'server-only'
+import { getUser } from '@/app/lib/dal'
+
+function canSeeUsername(viewer) {
+  return true
+}
+
+function canSeePhoneNumber(viewer, team) {
+  return viewer.isAdmin || team === viewer.team
+}
+
+export async function getProfileDTO(slug) {
+  const data = await db.query.users.findMany({
+    where: eq(users.slug, slug),
+    // 在此处返回特定列
+  })
+  const user = data[0]
+
+  const currentUser = await getUser(user.id)
+
+  // 或在此处仅返回查询相关的数据
+  return {
+    username: canSeeUsername(currentUser) ? user.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, user.team)
+      ? user.phonenumber
+      : null,
+  }
+}
+```
+
+通过在数据访问层 (DAL) 集中管理数据请求和授权逻辑，并使用 DTO，可以确保所有数据请求的安全性和一致性，从而更易于维护、审计和调试，适应应用程序的扩展需求。
+
+> **须知**：
+>
+> - 定义 DTO 有几种不同方式：使用 `toJSON()`、如示例中的独立函数或 JS 类。由于这些是 JavaScript 模式而非 React 或 Next.js 特性，建议研究最适合您应用的方案。
+> - 了解更多安全最佳实践，请参阅 [Next.js 安全指南](/blog/security-nextjs-server-components-actions)。
+
+### 服务端组件 (Server Components)
+
+在[服务端组件](/docs/app/getting-started/server-and-client-components)中进行权限检查适用于基于角色的访问控制。例如，根据用户角色条件渲染组件：
+
+```tsx filename="app/dashboard/page.tsx" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export default function Dashboard() {
+  const session = await verifySession()
+  const userRole = session?.user?.role // 假设 'role' 是会话对象的一部分
+
+  if (userRole === 'admin') {
+    return <AdminDashboard />
+  } else if (userRole === 'user') {
+    return <UserDashboard />
+  } else {
+    redirect('/login')
+  }
+}
+```
+
+```jsx filename="app/dashboard/page.jsx" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export default function Dashboard() {
+  const session = await verifySession()
+  const userRole = session.role // 假设 'role' 是会话对象的一部分
+
+  if (userRole === 'admin') {
+    return <AdminDashboard />
+  } else if (userRole === 'user') {
+    return <UserDashboard />
+  } else {
+    redirect('/login')
+  }
+}
+```
+
+示例中，我们使用 DAL 的 `verifySession()` 函数检查 'admin'、'user' 和未授权角色。这种模式确保每个用户仅访问与其角色匹配的组件。
+
+### 布局与权限检查
+
+由于[部分渲染 (Partial Rendering)](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering)，在[布局 (Layouts)](/docs/app/building-your-application/routing/layouts-and-templates) 中进行检查需谨慎，因为导航时布局不会重新渲染，意味着每次路由变更时不会检查用户会话。
+
+应将检查逻辑放在靠近数据源或条件渲染组件的位置。例如，共享布局获取用户数据并在导航栏显示用户头像时，应在布局中获取用户数据 (`getUser()`)，而在 DAL 中进行权限检查。
+
+这确保无论 `getUser()` 在应用何处调用，都会执行权限检查，避免开发者忘记验证用户是否有权访问数据。
+
+```tsx filename="app/layout.tsx" switcher
+export default async function Layout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await getUser();
+
+  return (
+    // ...
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default async function Layout({ children }) {
+  const user = await getUser();
+
+  return (
+    // ...
+  )
+}
+```
+
+```ts filename="app/lib/dal.ts" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  // 从会话获取用户 ID 并获取数据
+})
+```
+
+```js filename="app/lib/dal.js" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  // 从会话获取用户 ID 并获取数据
+})
+```
+
+> **须知**：
+>
+> - 单页应用 (SPA) 中常见的模式是在布局或顶层组件中 `return null` 以拒绝未授权用户。**不推荐**此模式，因为 Next.js 应用有多个入口点，无法阻止嵌套路由段和服务端操作 (Server Actions) 被访问。
+
+### 服务端操作 (Server Actions)
+
+对待[服务端操作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations)需与对外 API 端点相同的安全考量，验证用户是否有权执行操作。
+
+以下示例在执行操作前检查用户角色：
+
+```ts filename="app/lib/actions.ts" switcher
+'use server'
+import { verifySession } from '@/app/lib/dal'
+
+export async function serverAction(formData: FormData) {
+  const session = await verifySession()
+  const userRole = session?.user?.role
+
+  // 如果用户无权执行操作，则提前返回
+  if (userRole !== 'admin') {
+    return null
+  }
+
+  // 为授权用户继续执行操作
+}
+```
+
+```js filename="app/lib/actions.js" switcher
+'use server'
+import { verifySession } from '@/app/lib/dal'
+
+export async function serverAction() {
+  const session = await verifySession()
+  const userRole = session.user.role
+
+  // 如果用户无权执行操作，则提前返回
+  if (userRole !== 'admin') {
+    return null
+  }
+
+  // 为授权用户继续执行操作
+}
+```
+
+### 路由处理器 (Route Handlers)
+
+对待[路由处理器](/docs/app/building-your-application/routing/route-handlers)需与对外 API 端点相同的安全考量，验证用户是否有权访问路由处理器。
+
+例如：
+
+```ts filename="app/api/route.ts" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export async function GET() {
+  // 用户认证和角色验证
+  const session = await verifySession()
+
+  // 检查用户是否已认证
+  if (!session) {
+    // 用户未认证
+    return new Response(null, { status: 401 })
+  }
+
+  // 检查用户是否为 'admin' 角色
+  if (session.user.role !== 'admin') {
+    // 用户已认证但无权限
+    return new Response(null, { status: 403 })
+  }
+
+  // 为授权用户继续执行
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export async function GET() {
+  // 用户认证和角色验证
+  const session = await verifySession()
+
+  // 检查用户是否已认证
+  if (!session) {
+    // 用户未认证
+    return new Response(null, { status: 401 })
+  }
+
+  // 检查用户是否为 'admin' 角色
+  if (session.user.role !== 'admin') {
+    // 用户已认证但无权限
+    return new Response(null, { status: 403 })
+  }
+
+  // 为授权用户继续执行
+}
+```
+
+上述示例展示了具有双重安全检查的路由处理器：首先检查有效会话，然后验证登录用户是否为 'admin'。
+
+## 上下文提供器 (Context Providers)
+
+由于[交错渲染 (interleaving)](/docs/app/getting-started/server-and-client-components#examples#interleaving-server-and-client-components)，上下文提供器可用于认证。但 React `context` 不支持服务端组件，仅适用于客户端组件。
+
+这种方式有效，但任何子服务端组件会先在服务端渲染，无法访问上下文提供器的会话数据：
+
+```tsx filename="app/layout.ts" switcher
+import { ContextProvider } from 'auth-lib'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <ContextProvider>{children}</ContextProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```tsx filename="app/ui/profile.ts switcher
+'use client';
+
+import { useSession } from "auth-lib";
+
+export default function Profile() {
+  const { userId } = useSession();
+  const { data } = useSWR(`/api/user/${userId}`, fetcher)
+
+  return (
+    // ...
+  );
+}
+```
+
+```jsx filename="app/ui/profile.js switcher
+'use client';
+
+import { useSession } from "auth-lib";
+
+export default function Profile() {
+  const { userId } = useSession();
+  const { data } = useSWR(`/api/user/${userId}`, fetcher)
+
+  return (
+    // ...
+  );
+}
+```
+
+如果客户端组件需要会话数据（如客户端数据获取），使用 React 的 [`taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) API 防止敏感会话数据暴露给客户端。
+
+</AppOnly>
+
+<PagesOnly>
+
+### 创建数据访问层 (DAL)
+
+#### 保护 API 路由
+
+Next.js 中的 API 路由对处理服务端逻辑和数据管理至关重要。需确保仅授权用户能访问特定功能，通常包括验证用户认证状态和基于角色的权限。
+
+以下是保护 API 路由的示例：
+
+```ts filename="pages/api/route.ts" switcher
+import { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const session = await getSession(req)
+
+  // 检查用户是否已认证
+  if (!session) {
+    res.status(401).json({
+      error: '用户未认证',
+    })
+    return
+  }
+
+  // 检查用户是否为 'admin' 角色
+  if (session.user.role !== 'admin') {
+    res.status(401).json({
+      error: '未授权访问：用户无管理员权限。',
+    })
+    return
+  }
+
+  // 为授权用户继续执行路由
+  // ... API 路由的实现
+}
+```
+
+```js filename="pages/api/route.js" switcher
+export default async function handler(req, res) {
+  const session = await getSession(req)
+
+  // 检查用户是否已认证
+  if (!session) {
+    res.status(401).json({
+      error: '用户未认证',
+    })
+    return
+  }
+
+  // 检查用户是否为 'admin' 角色
+  if (session.user.role !== 'admin') {
+    res.status(401).json({
+      error: '未授权访问：用户无管理员权限。',
+    })
+    return
+  }
+
+  // 为授权用户继续执行路由
+  // ... API 路由的实现
+}
+```
+
+此示例展示了具有双重安全检查的 API 路由：认证和授权。首先检查有效会话，然后验证登录用户是否为 'admin'，确保仅限认证和授权用户安全访问，保持请求处理的强安全性。
+
+</PagesOnly>
+
+## 资源
+
+了解 Next.js 认证后，以下是与 Next.js 兼容的库和资源，帮助实现安全的认证和会话管理：
+
+### 认证库
+
+- [Auth0](https://auth0.com/docs/quickstart/webapp/nextjs/01-login)
+- [Better Auth](https://www.better-auth.com/docs/integrations/next)
+- [Clerk](https://clerk.com/docs/quickstarts/nextjs)
+- [Kinde](https://kinde.com/docs/developer-tools/nextjs-sdk)
+- [Logto](https://docs.logto.io/quick-starts/next-app-router)
+- [NextAuth.js](https://authjs.dev/getting-started/installation?framework=next.js)
+- [Ory](https://www.ory.sh/docs/getting-started/integrate-auth/nextjs)
+- [Stack Auth](https://docs.stack-auth.com/getting-started/setup)
+- [Supabase](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs)
+- [Stytch](https://stytch.com/docs/guides/quickstarts/nextjs)
+- [WorkOS](https://workos.com/docs/user-management/nextjs)
+
+### 会话管理库
+
+- [Iron Session](https://github.com/vvo/iron-session)
+- [Jose](https://github.com/panva/jose)
+
+## 延伸阅读
+
+继续学习认证和安全相关资源：
+
+- [Next.js 安全思考](/blog/security-nextjs-server-components-actions)
+- [理解 XSS 攻击](https://vercel.com/guides/understanding-xss-attacks)
+- [理解 CSRF 攻击](https://vercel.com/guides/understanding-csrf-attacks)
+- [The Copenhagen Book](https://thecopenhagenbook.com/)

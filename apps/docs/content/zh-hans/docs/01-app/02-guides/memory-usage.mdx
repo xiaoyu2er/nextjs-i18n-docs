@@ -1,0 +1,132 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-19T23:03:16.407Z
+title: 如何优化内存使用
+nav_title: 内存优化
+description: 优化开发与生产环境中应用程序的内存占用。
+---
+
+随着应用功能日益丰富，在本地开发或构建生产版本时可能会消耗更多资源。
+
+下面我们将探讨 Next.js 中优化内存和解决常见内存问题的策略与技巧。
+
+## 减少依赖项数量
+
+依赖项较多的应用会占用更多内存。
+
+通过 [打包分析工具 (Bundle Analyzer)](/docs/app/guides/package-bundling) 可以检查应用中是否存在可移除的大型依赖项，从而提升性能和内存使用效率。
+
+## 尝试 `experimental.webpackMemoryOptimizations`
+
+从 `v15.0.0` 开始，您可以在 `next.config.js` 文件中添加 `experimental.webpackMemoryOptimizations: true` 来调整 Webpack 行为，这将降低最大内存占用，但可能会轻微增加编译时间。
+
+> **须知**：该功能目前处于实验阶段以收集更多项目测试数据，但被认为风险较低。
+
+## 使用 `--experimental-debug-memory-usage` 运行 `next build`
+
+从 `14.2.0` 开始，您可以运行 `next build --experimental-debug-memory-usage` 进入调试模式，Next.js 将在构建过程中持续输出内存使用信息（如堆内存使用情况和垃圾回收统计）。当内存使用接近配置上限时还会自动生成堆快照。
+
+> **须知**：此功能与 Webpack 构建工作线程选项不兼容（除非您使用自定义 webpack 配置，否则该选项默认启用）。
+
+## 记录堆内存分析
+
+为排查内存问题，您可以记录 Node.js 的堆内存分析文件，并在 Chrome DevTools 中加载以识别潜在内存泄漏源。
+
+在终端中启动 Next.js 构建时添加 `--heap-prof` 参数：
+
+```sh
+node --heap-prof node_modules/next/dist/bin/next build
+```
+
+构建结束后，Node.js 会生成 `.heapprofile` 文件。
+
+在 Chrome DevTools 的 Memory 标签页中点击 "Load Profile" 按钮即可可视化分析该文件。
+
+## 分析堆内存快照
+
+您可以使用调试工具分析应用的内存使用情况。
+
+运行 `next build` 或 `next dev` 命令时，在命令前添加 `NODE_OPTIONS=--inspect` 参数。这将在默认端口启动调试代理。若需在用户代码执行前中断，可使用 `--inspect-brk` 替代。当进程运行时，可通过 Chrome DevTools 等工具连接调试端口，记录并分析堆内存快照以查看内存占用情况。
+
+从 `14.2.0` 开始，您也可以使用 `--experimental-debug-memory-usage` 标志运行 `next build` 来简化堆快照获取流程。
+
+在此模式下运行时，您可以随时向进程发送 `SIGUSR2` 信号，进程将立即生成堆快照。
+
+快照会保存在 Next.js 应用的项目根目录，可用 Chrome DevTools 等堆内存分析工具加载查看内存保留情况。此模式目前暂不支持 Webpack 构建工作线程。
+
+更多信息请参阅 [如何记录和分析堆快照](https://developer.chrome.com/docs/devtools/memory-problems/heap-snapshots)。
+
+## Webpack 构建工作线程
+
+Webpack 构建工作线程允许在独立的 Node.js 工作线程中运行 Webpack 编译，从而降低构建时的内存占用。
+
+从 `v14.1.0` 开始，若应用未使用自定义 Webpack 配置，该选项默认启用。
+
+如果您使用旧版 Next.js 或有自定义 Webpack 配置，可通过在 `next.config.js` 中设置 `experimental.webpackBuildWorker: true` 启用此功能。
+
+> **须知**：该功能可能与部分自定义 Webpack 插件不兼容。
+
+## 禁用 Webpack 缓存
+
+[Webpack 缓存](https://webpack.js.org/configuration/cache/) 会将生成的 Webpack 模块保存在内存或磁盘中以加速构建。虽然能提升性能，但存储缓存数据也会增加应用内存占用。
+
+您可以通过添加 [自定义 Webpack 配置](/docs/app/api-reference/config/next-config-js/webpack) 来禁用此行为：
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  webpack: (
+    config,
+    { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack }
+  ) => {
+    if (config.cache && !dev) {
+      config.cache = Object.freeze({
+        type: 'memory',
+      })
+    }
+    // 重要：必须返回修改后的配置
+    return config
+  },
+}
+
+export default nextConfig
+```
+
+## 禁用静态分析
+
+类型检查和代码检查可能在大型项目中消耗大量内存。但大多数项目已有专门的 CI 流程处理这些任务。当构建在 "Linting and checking validity of types" 步骤出现内存不足问题时，可以在构建时禁用这些任务：
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  eslint: {
+    // 警告：即使项目存在 ESLint 错误，也允许构建完成
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // !! 警告 !!
+    // 即使项目存在类型错误，也允许构建完成
+    // !! 警告 !!
+    ignoreBuildErrors: true,
+  },
+}
+
+export default nextConfig
+```
+
+- [忽略 TypeScript 错误](/docs/app/api-reference/config/typescript#disabling-typescript-errors-in-production)
+- [Next.js 配置中的 ESLint](/docs/pages/api-reference/config/next-config-js/eslint)
+
+请注意这可能导致因类型错误或代码问题产生有缺陷的部署。我们强烈建议仅在静态分析完成后才将构建推送到生产环境。如果您部署到 Vercel，可参阅 [预发布部署指南](https://vercel.com/docs/deployments/managing-deployments#staging-and-promoting-a-production-deployment) 了解如何在自定义任务成功后发布生产构建。
+
+## 禁用 Source Maps
+
+生成 source maps 会额外消耗构建过程的内存。
+
+您可以通过在 Next.js 配置中添加 `productionBrowserSourceMaps: false` 和 `experimental.serverSourceMaps: false` 来禁用 source map 生成。
+
+> **须知**：某些插件可能会启用 source maps，可能需要额外配置才能禁用。
+
+## Edge 运行时内存问题
+
+Next.js `v14.1.3` 修复了使用 Edge 运行时时的内存问题。请升级至该版本（或更高版本）以确认是否解决您的问题。

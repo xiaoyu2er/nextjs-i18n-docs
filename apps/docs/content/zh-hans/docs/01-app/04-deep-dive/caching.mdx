@@ -1,0 +1,592 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-19T23:04:19.913Z
+title: Next.js 中的缓存机制
+nav_title: 缓存
+description: Next.js 缓存机制概述
+---
+
+Next.js 通过缓存渲染工作和数据请求来提升应用性能并降低成本。本页深入探讨 Next.js 的缓存机制、可配置的 API 及其相互作用方式。
+
+> **须知**：本页内容帮助您理解 Next.js 底层工作原理，但并非高效使用 Next.js 的必备知识。大多数缓存策略由您的 API 使用方式决定，并默认提供最佳性能且无需或仅需极少配置。如需直接查看示例，请[从此开始](/docs/app/building-your-application/data-fetching/fetching)。
+
+## 概览
+
+以下是不同缓存机制及其用途的高级概览：
+
+| 机制                                   | 内容                       | 位置  | 用途                                         | 持续时间                        |
+| ------------------------------------------- | -------------------------- | ------ | ----------------------------------------------- | ------------------------------- |
+| [请求记忆化 (Request Memoization)](#request-memoization) | 函数返回值 | 服务端 | 在 React 组件树中复用数据           | 单次请求生命周期           |
+| [数据缓存 (Data Cache)](#data-cache)                   | 数据                       | 服务端 | 跨用户请求和部署存储数据 | 持久化（可重新验证） |
+| [全路由缓存 (Full Route Cache)](#full-route-cache)       | HTML 和 RSC 负载       | 服务端 | 降低渲染成本并提升性能   | 持久化（可重新验证） |
+| [路由缓存 (Router Cache)](#client-side-router-cache)   | RSC 负载                | 客户端 | 减少导航时的服务端请求            | 用户会话或基于时间      |
+
+默认情况下，Next.js 会尽可能缓存以提升性能并降低成本。这意味着路由会**静态渲染**且数据请求会被**缓存**，除非您明确退出。下图展示了默认缓存行为：构建时静态渲染的路由以及首次访问静态路由时的情况。
+
+<Image
+  alt="图表展示 Next.js 中四种机制的默认缓存行为，包含构建时和首次访问路由时的 HIT、MISS 和 SET 状态"
+  srcLight="/docs/light/caching-overview.png"
+  srcDark="/docs/dark/caching-overview.png"
+  width="1600"
+  height="1179"
+/>
+
+缓存行为会根据路由是静态还是动态渲染、数据是否缓存以及请求是首次访问还是后续导航而变化。根据您的用例，可以为单个路由和数据请求配置缓存行为。
+
+## 请求记忆化 (Request Memoization)
+
+Next.js 扩展了 [`fetch` API](#fetch)，自动**记忆化**具有相同 URL 和选项的请求。这意味着您可以在 React 组件树的多个位置调用相同数据的 fetch 函数，而仅执行一次。
+
+<Image
+  alt="去重化的 Fetch 请求"
+  srcLight="/docs/light/deduplicated-fetch-requests.png"
+  srcDark="/docs/dark/deduplicated-fetch-requests.png"
+  width="1600"
+  height="857"
+/>
+
+例如，如果您需要在路由中跨组件使用相同数据（如在布局、页面和多个组件中），无需在树顶部获取数据并通过组件传递 props。相反，您可以在需要数据的组件中直接获取，而无需担心因网络重复请求相同数据带来的性能影响。
+
+```tsx filename="app/example.tsx" switcher
+async function getItem() {
+  // `fetch` 函数会自动记忆化且结果被缓存
+  const res = await fetch('https://.../item/1')
+  return res.json()
+}
+
+// 此函数被调用两次，但仅首次执行
+const item = await getItem() // cache MISS
+
+// 第二次调用可位于路由任意位置
+const item = await getItem() // cache HIT
+```
+
+```jsx filename="app/example.js" switcher
+async function getItem() {
+  // `fetch` 函数会自动记忆化且结果被缓存
+  const res = await fetch('https://.../item/1')
+  return res.json()
+}
+
+// 此函数被调用两次，但仅首次执行
+const item = await getItem() // cache MISS
+
+// 第二次调用可位于路由任意位置
+const item = await getItem() // cache HIT
+```
+
+**请求记忆化工作原理**
+
+<Image
+  alt="图表展示 React 渲染期间 fetch 记忆化的工作方式"
+  srcLight="/docs/light/request-memoization.png"
+  srcDark="/docs/dark/request-memoization.png"
+  width="1600"
+  height="742"
+/>
+
+- 渲染路由时，首次调用特定请求时结果不在内存中，为缓存 `MISS`。
+- 因此函数将被执行，从外部源获取数据，结果存入内存。
+- 同一渲染过程中后续调用该请求将为缓存 `HIT`，直接从内存返回数据而无需执行函数。
+- 路由渲染完成且渲染过程结束后，内存被"重置"，所有请求记忆化条目被清除。
+
+> **须知**：
+>
+> - 请求记忆化是 React 特性而非 Next.js 特性。此处提及是为展示其与其他缓存机制的交互。
+> - 记忆化仅适用于 `fetch` 请求的 `GET` 方法。
+> - 记忆化仅适用于 React 组件树，这意味着：
+>   - 适用于 `generateMetadata`、`generateStaticParams`、布局、页面和其他服务端组件中的 `fetch` 请求。
+>   - 不适用于路由处理器中的 `fetch` 请求，因其不属于 React 组件树。
+> - 若不适用 `fetch`（如某些数据库客户端、CMS 客户端或 GraphQL 客户端），可使用 [React `cache` 函数](#react-cache-function) 记忆化函数。
+
+### 持续时间
+
+缓存持续至服务端请求生命周期结束，即 React 组件树完成渲染。
+
+### 重新验证
+
+由于记忆化不跨服务端请求共享且仅在渲染期间有效，无需重新验证。
+
+### 退出机制
+
+记忆化仅适用于 `fetch` 请求的 `GET` 方法，其他方法如 `POST` 和 `DELETE` 不会被记忆化。此默认行为是 React 的优化，不建议退出。
+
+如需管理单个请求，可使用 [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController) 的 [`signal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController/signal) 属性。但这不会退出记忆化，而是中止进行中的请求。
+
+```js filename="app/example.js"
+const { signal } = new AbortController()
+fetch(url, { signal })
+```
+
+## 数据缓存 (Data Cache)
+
+Next.js 内置数据缓存可**持久化**数据获取结果，跨**服务端请求**和**部署**。这是通过扩展原生 `fetch` API 实现的，允许每个服务端请求设置自己的持久缓存语义。
+
+> **须知**：在浏览器中，`fetch` 的 `cache` 选项表示请求如何与浏览器 HTTP 缓存交互；在 Next.js 中，该选项表示服务端请求如何与服务器数据缓存交互。
+
+您可以使用 `fetch` 的 [`cache`](#fetch-optionscache) 和 [`next.revalidate`](#fetch-optionsnextrevalidate) 选项配置缓存行为。
+
+**数据缓存工作原理**
+
+<Image
+  alt="图表展示缓存与非缓存 fetch 请求如何与数据缓存交互。缓存请求存入数据缓存并被记忆化，非缓存请求从数据源获取、不存入数据缓存但被记忆化"
+  srcLight="/docs/light/data-cache.png"
+  srcDark="/docs/dark/data-cache.png"
+  width="1600"
+  height="661"
+/>
+
+- 渲染期间首次调用带 `'force-cache'` 选项的 `fetch` 请求时，Next.js 检查数据缓存中的响应。
+- 若找到缓存响应，立即返回并[记忆化](#request-memoization)。
+- 若未找到，向数据源发起请求，结果存入数据缓存并记忆化。
+- 对于非缓存数据（如未定义 `cache` 选项或使用 `{ cache: 'no-store' }`），始终从数据源获取并记忆化。
+- 无论数据是否缓存，请求都会被记忆化以避免 React 渲染过程中重复请求相同数据。
+
+> **数据缓存与请求记忆化的区别**
+>
+> 两种机制都通过复用缓存数据提升性能，但数据缓存跨请求和部署持久化，而记忆化仅持续单次请求生命周期。
+
+### 持续时间
+
+数据缓存跨请求和部署持久化，除非重新验证或退出。
+
+### 重新验证
+
+可通过两种方式重新验证缓存数据：
+
+- **基于时间的重新验证**：在指定时间间隔后重新验证数据。适用于变化不频繁且实时性要求不高的数据。
+- **按需重新验证**：基于事件（如表单提交）重新验证数据。可按标签或路径一次性重新验证数据组。适用于需要尽快展示最新数据的场景（如无头 CMS 内容更新时）。
+
+#### 基于时间的重新验证
+
+使用 `fetch` 的 `next.revalidate` 选项设置资源缓存生命周期（秒）：
+
+```js
+// 最多每小时重新验证
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+或使用[路由段配置选项](#segment-config-options)配置段内所有 `fetch` 请求，或在不适用 `fetch` 时使用。
+
+**基于时间重新验证工作原理**
+
+<Image
+  alt="图表展示基于时间重新验证的工作方式，重新验证期后首次请求返回陈旧数据，随后数据被重新验证"
+  srcLight="/docs/light/time-based-revalidation.png"
+  srcDark="/docs/dark/time-based-revalidation.png"
+  width="1600"
+  height="1252"
+/>
+
+- 首次调用带 `revalidate` 的 `fetch` 请求时，从外部数据源获取数据并存入数据缓存。
+- 指定时间范围内（如 60 秒）的请求返回缓存数据。
+- 时间范围后的首次请求仍返回缓存（此时已陈旧）数据。
+  - Next.js 在后台触发数据重新验证。
+  - 获取成功后更新数据缓存为新数据。
+  - 若后台重新验证失败，则保留原数据不变。
+
+此行为类似于 [**stale-while-revalidate**](https://web.dev/articles/stale-while-revalidate) 模式。
+
+#### 按需重新验证
+
+可通过路径 ([`revalidatePath`](#revalidatepath)) 或缓存标签 ([`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag)) 按需重新验证数据。
+
+**按需重新验证工作原理**
+
+<Image
+  alt="图表展示按需重新验证的工作方式，重新验证请求后数据缓存更新为新数据"
+  srcLight="/docs/light/on-demand-revalidation.png"
+  srcDark="/docs/dark/on-demand-revalidation.png"
+  width="1600"
+  height="1082"
+/>
+
+- 首次调用 `fetch` 请求时，从外部数据源获取数据并存入数据缓存。
+- 触发按需重新验证时，相关缓存条目将从缓存清除。
+  - 这与基于时间重新验证不同，后者在获取新数据前保留陈旧数据。
+- 下次请求时将再次为缓存 `MISS`，从外部数据源获取数据并存入缓存。
+
+### 退出机制
+
+若不希望缓存 `fetch` 响应，可执行以下操作：
+
+```js
+let data = await fetch('https://api.vercel.app/blog', { cache: 'no-store' })
+```
+
+## 全路由缓存 (Full Route Cache)
+
+> **相关术语**：
+>
+> 您可能看到**自动静态优化**、**静态站点生成**或**静态渲染**等术语互换使用，均指在构建时渲染和缓存应用路由的过程。
+
+Next.js 在构建时自动渲染并缓存路由。此优化允许直接提供缓存路由而非每次请求时在服务端渲染，从而加快页面加载。
+
+理解全路由缓存的工作原理需了解 React 如何处理渲染及 Next.js 如何缓存结果：
+
+### 1. 服务端 React 渲染
+
+在服务端，Next.js 使用 React API 协调渲染。渲染工作被拆分为块：按独立路由段和 Suspense 边界。
+
+每个块的渲染分两步：
+
+1. React 将服务端组件渲染为专为流式传输优化的特殊数据格式，称为 **React 服务端组件负载 (RSC Payload)**。
+2. Next.js 使用 RSC Payload 和客户端组件 JavaScript 指令在服务端渲染 **HTML**。
+
+这意味着我们无需等待所有内容渲染完成即可缓存工作或发送响应，而是可以边完成边流式传输响应。
+
+> **什么是 React 服务端组件负载？**
+>
+> RSC Payload 是渲染后的 React 服务端组件树的紧凑二进制表示。React 在客户端使用它更新浏览器 DOM。RSC Payload 包含：
+>
+> - 服务端组件的渲染结果
+> - 客户端组件应渲染位置的占位符及其 JavaScript 文件引用
+> - 从服务端组件传递给客户端组件的任何 props
+>
+> 了解更多请参阅[服务端组件](/docs/app/getting-started/server-and-client-components)文档。
+
+### 2. Next.js 服务端缓存（全路由缓存）
+
+<Image
+  alt="全路由缓存的默认行为，展示静态渲染路由的 RSC Payload 和 HTML 如何在服务端缓存"
+  srcLight="/docs/light/full-route-cache.png"
+  srcDark="/docs/dark/full-route-cache.png"
+  width="1600"
+  height="888"
+/>
+
+Next.js 默认会在服务端缓存路由的渲染结果（RSC Payload 和 HTML）。这适用于构建时静态渲染的路由或重新验证期间的路由。
+
+### 3. 客户端 React 水合与协调
+
+在客户端的请求时：
+
+1. 使用 HTML 快速展示客户端和服务端组件的非交互式初始预览。
+2. 使用 RSC Payload 协调客户端和已渲染服务端组件树，并更新 DOM。
+3. 使用 JavaScript 指令[水合](https://react.dev/reference/react-dom/client/hydrateRoot)客户端组件并使应用可交互。
+
+### 4. Next.js 客户端缓存（路由缓存）
+
+RSC Payload 存储在客户端[路由缓存](#client-side-router-cache)中——这是一个按独立路由段分割的内存缓存。路由缓存通过存储先前访问的路由和预取未来路由来提升导航体验。
+
+### 5. 后续导航
+
+在后续导航或预取时，Next.js 会检查 RSC Payload 是否在路由缓存中。若存在则跳过向服务端发送新请求。
+
+若路由段不在缓存中，Next.js 会从服务端获取 RSC Payload 并填充客户端路由缓存。
+
+### 静态与动态渲染
+
+路由是否在构建时被缓存取决于其采用静态渲染还是动态渲染。静态路由默认会被缓存，而动态路由则在请求时渲染且不会被缓存。
+
+下图展示了静态与动态渲染路由的区别，以及缓存与非缓存数据的差异：
+
+<Image
+  alt="静态与动态渲染对全路由缓存的影响。静态路由在构建时或数据重新验证后被缓存，而动态路由从不缓存"
+  srcLight="/docs/light/static-and-dynamic-routes.png"
+  srcDark="/docs/dark/static-and-dynamic-routes.png"
+  width="1600"
+  height="1314"
+/>
+
+了解更多关于[静态与动态渲染](/docs/app/getting-started/partial-prerendering#static-rendering)的内容。
+
+### 持续时间
+
+默认情况下，全路由缓存是持久化的。这意味着渲染输出会在用户请求间被缓存。
+
+### 失效机制
+
+有两种方式可以使全路由缓存失效：
+
+- **[重新验证数据](/docs/app/deep-dive/caching#revalidating)**：重新验证[数据缓存](#data-cache)会触发服务端组件重新渲染，并缓存新的渲染输出，从而使路由缓存失效。
+- **重新部署**：与跨部署持久化的数据缓存不同，全路由缓存会在新部署时被清除。
+
+### 退出机制
+
+您可以通过以下方式退出全路由缓存（即针对每个传入请求动态渲染组件）：
+
+- **使用[动态 API](#dynamic-apis)**：这将使路由退出全路由缓存，并在请求时动态渲染。数据缓存仍可被使用。
+- **使用路由段配置选项 `dynamic = 'force-dynamic'` 或 `revalidate = 0`**：这将跳过全路由缓存和数据缓存。意味着每次传入请求时都会在服务端重新渲染组件并获取数据。客户端缓存（路由缓存）仍然适用。
+- **退出[数据缓存](#data-cache)**：如果路由包含未被缓存的 `fetch` 请求，则该路由会退出全路由缓存。针对特定 `fetch` 请求的数据将在每次传入请求时重新获取。其他未退出缓存的 `fetch` 请求仍会被缓存在数据缓存中。这实现了缓存与非缓存数据的混合使用。
+
+## 客户端路由缓存
+
+Next.js 提供了一个内存中的客户端路由缓存，用于存储按布局、加载状态和页面分割的路由段的 RSC 负载。
+
+当用户在路由间导航时，Next.js 会缓存访问过的路由段，并[预取](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching)用户可能访问的路由。这实现了即时前进/后退导航、导航间无需整页刷新，并保留了 React 状态和浏览器状态。
+
+路由缓存的作用：
+
+- **布局**在导航时被缓存并复用（[部分渲染](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering)）。
+- **加载状态**在导航时被缓存并复用，以实现[即时导航](/docs/app/building-your-application/routing/loading-ui-and-streaming#instant-loading-states)。
+- **页面**默认不缓存，但在浏览器前进/后退导航时会被复用。您可以通过实验性的 [`staleTimes`](/docs/app/api-reference/config/next-config-js/staleTimes) 配置选项为页面段启用缓存。
+
+{/* TODO: 更新图表以匹配 v15 行为 */}
+
+> **须知**：此缓存专属于 Next.js 和服务端组件，与浏览器的 [bfcache](https://web.dev/bfcache/) 不同，尽管效果相似。
+
+### 持续时间
+
+缓存存储在浏览器的临时内存中。路由缓存的持续时间由两个因素决定：
+
+- **会话**：缓存在导航间持续存在，但页面刷新时会清除。
+- **自动失效周期**：布局和加载状态的缓存会在特定时间后自动失效。持续时间取决于资源的[预取方式](/docs/app/api-reference/components/link#prefetch)以及资源是否[静态生成](/docs/app/getting-started/partial-prerendering#static-rendering)：
+  - **默认预取**（`prefetch={null}` 或未指定）：动态页面不缓存，静态页面缓存 5 分钟。
+  - **完全预取**（`prefetch={true}` 或 `router.prefetch`）：静态和动态页面均缓存 5 分钟。
+
+页面刷新会清除**所有**缓存段，而自动失效周期仅影响从预取时间开始的单个段。
+
+> **须知**：可通过实验性的 [`staleTimes`](/docs/app/api-reference/config/next-config-js/staleTimes) 配置选项调整上述自动失效时间。
+
+### 失效机制
+
+有两种方式可以使路由缓存失效：
+
+- 在**服务端操作**中：
+  - 按路径（[`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)）或缓存标签（[`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)）按需重新验证数据。
+  - 使用 [`cookies.set`](/docs/app/api-reference/functions/cookies#setting-a-cookie) 或 [`cookies.delete`](/docs/app/api-reference/functions/cookies#deleting-cookies) 会使路由缓存失效，防止使用 cookie 的路由过时（例如认证）。
+- 调用 [`router.refresh`](/docs/app/api-reference/functions/use-router) 会使路由缓存失效，并为当前路由向服务端发起新请求。
+
+### 退出机制
+
+从 Next.js 15 开始，页面段默认退出缓存。
+
+> **须知**：您还可以通过将 `<Link>` 组件的 `prefetch` 属性设为 `false` 来[退出预取](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching)。
+
+## 缓存交互
+
+在配置不同的缓存机制时，理解它们之间的交互方式非常重要：
+
+### 数据缓存与全路由缓存
+
+- 重新验证或退出数据缓存**会**使全路由缓存失效，因为渲染输出依赖于数据。
+- 使全路由缓存失效或退出全路由缓存**不会**影响数据缓存。您可以动态渲染一个同时包含缓存和非缓存数据的路由。这在页面大部分使用缓存数据，但少量组件依赖需实时获取的数据时非常有用。您可以动态渲染，而无需担心重新获取所有数据对性能的影响。
+
+### 数据缓存与客户端路由缓存
+
+- 要立即使数据缓存和路由缓存失效，可以在[服务端操作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations)中使用 [`revalidatePath`](#revalidatepath) 或 [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag)。
+- 在[路由处理器](/docs/app/building-your-application/routing/route-handlers)中重新验证数据缓存**不会**立即使路由缓存失效，因为路由处理器不与特定路由绑定。这意味着路由缓存将继续提供先前的负载，直到强制刷新或自动失效周期结束。
+
+## API 参考
+
+下表概述了不同 Next.js API 对缓存的影响：
+
+| API                                                                     | 路由缓存               | 全路由缓存          | 数据缓存            | React 缓存 |
+| ----------------------------------------------------------------------- | ---------------------- | ------------------- | ------------------- | ---------- |
+| [`<Link prefetch>`](#link)                                              | 缓存                   |                     |                     |            |
+| [`router.prefetch`](#routerprefetch)                                    | 缓存                   |                     |                     |            |
+| [`router.refresh`](#routerrefresh)                                      | 重新验证               |                     |                     |            |
+| [`fetch`](#fetch)                                                       |                        |                     | 缓存                | 缓存       |
+| [`fetch` `options.cache`](#fetch-optionscache)                          |                        |                     | 缓存或退出          |            |
+| [`fetch` `options.next.revalidate`](#fetch-optionsnextrevalidate)       |                        | 重新验证            | 重新验证            |            |
+| [`fetch` `options.next.tags`](#fetch-optionsnexttags-and-revalidatetag) |                        | 缓存                | 缓存                |            |
+| [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag)             | 重新验证（服务端操作） | 重新验证            | 重新验证            |            |
+| [`revalidatePath`](#revalidatepath)                                     | 重新验证（服务端操作） | 重新验证            | 重新验证            |            |
+| [`const revalidate`](#segment-config-options)                           |                        | 重新验证或退出      | 重新验证或退出      |            |
+| [`const dynamic`](#segment-config-options)                              |                        | 缓存或退出          | 缓存或退出          |            |
+| [`cookies`](#cookies)                                                   | 重新验证（服务端操作） | 退出                |                     |            |
+| [`headers`, `searchParams`](#dynamic-apis)                              |                        | 退出                |                     |            |
+| [`generateStaticParams`](#generatestaticparams)                         |                        | 缓存                |                     |            |
+| [`React.cache`](#react-cache-function)                                  |                        |                     |                     | 缓存       |
+| [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache)    |                        |                     | 缓存                |            |
+
+### `<Link>`
+
+默认情况下，`<Link>` 组件会自动从全路由缓存预取路由，并将 React 服务端组件负载添加到路由缓存中。
+
+要禁用预取，可以将 `prefetch` 属性设为 `false`。但这不会永久跳过缓存，用户访问路由时仍会在客户端缓存路由段。
+
+了解更多关于 [`<Link>` 组件](/docs/app/api-reference/components/link)的内容。
+
+### `router.prefetch`
+
+`useRouter` 钩子的 `prefetch` 选项可用于手动预取路由。这会将 React 服务端组件负载添加到路由缓存中。
+
+参见 [`useRouter` 钩子](/docs/app/api-reference/functions/use-router) API 参考。
+
+### `router.refresh`
+
+`useRouter` 钩子的 `refresh` 选项可用于手动刷新路由。这会完全清除路由缓存，并为当前路由向服务端发起新请求。`refresh` 不会影响数据缓存或全路由缓存。
+
+渲染结果将在客户端协调，同时保留 React 状态和浏览器状态。
+
+参见 [`useRouter` 钩子](/docs/app/api-reference/functions/use-router) API 参考。
+
+### `fetch`
+
+从 `fetch` 返回的数据**不会**自动缓存在数据缓存中。
+
+`fetch` 的默认缓存行为（例如未指定 `cache` 选项时）等同于将 `cache` 选项设为 `no-store`：
+
+```js
+let data = await fetch('https://api.vercel.app/blog', { cache: 'no-store' })
+```
+
+参见 [`fetch` API 参考](/docs/app/api-reference/functions/fetch) 获取更多选项。
+
+### `fetch options.cache`
+
+您可以通过将 `cache` 选项设为 `force-cache` 来让单个 `fetch` 请求加入缓存：
+
+```jsx
+// 加入缓存
+fetch(`https://...`, { cache: 'force-cache' })
+```
+
+参见 [`fetch` API 参考](/docs/app/api-reference/functions/fetch) 获取更多选项。
+
+### `fetch options.next.revalidate`
+
+您可以使用 `fetch` 的 `next.revalidate` 选项设置单个 `fetch` 请求的重新验证周期（以秒为单位）。这将重新验证数据缓存，进而重新验证全路由缓存。将获取新数据，并在服务端重新渲染组件。
+
+```jsx
+// 最多 1 小时后重新验证
+fetch(`https://...`, { next: { revalidate: 3600 } })
+```
+
+参见 [`fetch` API 参考](/docs/app/api-reference/functions/fetch) 获取更多选项。
+
+### `fetch options.next.tags` 与 `revalidateTag`
+
+Next.js 提供了一个缓存标签系统，用于细粒度的数据缓存和重新验证。
+
+1. 使用 `fetch` 或 [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache) 时，可以选择用一个或多个标签标记缓存条目。
+2. 然后，可以调用 `revalidateTag` 清除与该标签关联的缓存条目。
+
+例如，可以在获取数据时设置标签：
+
+```jsx
+// 使用标签缓存数据
+fetch(`https://...`, { next: { tags: ['a', 'b', 'c'] } })
+```
+
+然后，调用 `revalidateTag` 并传入标签以清除缓存条目：
+
+```jsx
+// 重新验证带有特定标签的条目
+revalidateTag('a')
+```
+
+根据目标不同，可以在两个地方使用 `revalidateTag`：
+
+1. [路由处理器](/docs/app/building-your-application/routing/route-handlers) - 在第三方事件（如 webhook）响应中重新验证数据。这不会立即使路由缓存失效，因为路由处理器不与特定路由绑定。
+2. [服务端操作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) - 在用户操作（如表单提交）后重新验证数据。这将使关联路由的路由缓存失效。
+
+### `revalidatePath`
+
+`revalidatePath` 允许您手动重新验证数据**并**在单次操作中重新渲染特定路径下的路由段。调用 `revalidatePath` 方法会重新验证数据缓存，进而使全路由缓存失效。
+
+```jsx
+revalidatePath('/')
+```
+
+根据目标不同，可以在两个地方使用 `revalidatePath`：
+
+1. [路由处理器](/docs/app/building-your-application/routing/route-handlers) - 在第三方事件（如 webhook）响应中重新验证数据。
+2. [服务端操作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) - 在用户交互（如表单提交、点击按钮）后重新验证数据。
+
+参见 [`revalidatePath` API 参考](/docs/app/api-reference/functions/revalidatePath) 获取更多信息。
+
+> **`revalidatePath`** 对比 **`router.refresh`**：
+>
+> 调用 `router.refresh` 会清除路由缓存，并在服务端重新渲染路由段，但不会使数据缓存或全路由缓存失效。
+>
+> 区别在于 `revalidatePath` 会清除数据缓存和全路由缓存，而 `router.refresh()` 不会改变数据缓存和全路由缓存，因为它是客户端 API。
+
+### 动态 API
+
+`cookies` 和 `headers` 等动态 API，以及页面中的 `searchParams` 属性，依赖于运行时传入的请求信息。使用它们会使路由退出全路由缓存，即路由将被动态渲染。
+
+#### `cookies`
+
+在服务端操作中使用 `cookies.set` 或 `cookies.delete` 会使路由缓存失效，防止使用 cookie 的路由过时（例如反映认证变更）。
+
+参见 [`cookies`](/docs/app/api-reference/functions/cookies) API 参考。
+
+### 路由段配置选项
+
+路由段配置 (Route Segment Config) 选项可用于覆盖路由段的默认设置，或在无法使用 `fetch` API 时（例如使用数据库客户端或第三方库）进行配置。
+
+以下路由段配置选项将退出全路由缓存 (Full Route Cache)：
+
+- `const dynamic = 'force-dynamic'`
+
+此配置选项将使所有数据请求退出数据缓存 (Data Cache)（即 `no-store` 模式）：
+
+- `const fetchCache = 'default-no-store'`
+
+查看 [`fetchCache`](/docs/app/api-reference/file-conventions/route-segment-config#fetchcache) 了解更多高级选项。
+
+更多配置选项请参阅 [路由段配置](/docs/app/api-reference/file-conventions/route-segment-config) 文档。
+
+### `generateStaticParams`
+
+对于 [动态段 (dynamic segments)](/docs/app/building-your-application/routing/dynamic-routes)（例如 `app/blog/[slug]/page.js`），`generateStaticParams` 提供的路径会在构建时缓存到全路由缓存中。在请求时，Next.js 还会在首次访问时缓存构建时未知的路径。
+
+若要在构建时静态渲染所有路径，需向 `generateStaticParams` 提供完整的路径列表：
+
+```jsx filename="app/blog/[slug]/page.js"
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+若要在构建时静态渲染部分路径，并在运行时首次访问时渲染其余路径，可返回部分路径列表：
+
+```jsx filename="app/blog/[slug]/page.js"
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  // 在构建时渲染前 10 篇文章
+  return posts.slice(0, 10).map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+若要在首次访问时静态渲染所有路径，可返回空数组（构建时不渲染任何路径）或使用 [`export const dynamic = 'force-static'`](/docs/app/api-reference/file-conventions/route-segment-config#dynamic)：
+
+```jsx filename="app/blog/[slug]/page.js"
+export async function generateStaticParams() {
+  return []
+}
+```
+
+> **须知：** 即使返回空数组，也必须从 `generateStaticParams` 返回一个数组，否则该路由将动态渲染。
+
+```jsx filename="app/changelog/[slug]/page.js"
+export const dynamic = 'force-static'
+```
+
+若要禁用请求时的缓存，可在路由段中添加 `export const dynamicParams = false` 选项。使用此配置后，仅会提供 `generateStaticParams` 返回的路径，其他路由将返回 404 或匹配（对于 [全捕获路由 (catch-all routes)](/docs/app/building-your-application/routing/dynamic-routes#catch-all-segments)）。
+
+### React `cache` 函数
+
+React `cache` 函数允许对函数的返回值进行记忆化 (memoize)，从而在多次调用同一函数时仅执行一次。
+
+由于 `fetch` 请求会自动记忆化，因此无需使用 React `cache` 进行包裹。但对于不适用 `fetch` API 的场景（如某些数据库客户端、CMS 客户端或 GraphQL 客户端），可使用 `cache` 手动记忆化数据请求。
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import db from '@/lib/db'
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import db from '@/lib/db'
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
