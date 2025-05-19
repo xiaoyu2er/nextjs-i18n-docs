@@ -1,0 +1,357 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-19T22:47:44.732Z
+title: Next.js 编译器
+description: Next.js 编译器采用 Rust 编写，用于转换和压缩 Next.js 应用。
+---
+
+Next.js 编译器基于 [SWC](https://swc.rs/) 并使用 Rust 编写，能够为生产环境转换和压缩 JavaScript 代码。它取代了 Babel 的单文件转换功能以及 Terser 的代码压缩功能。
+
+自 Next.js 12 版本起，该编译器的编译速度比 Babel 快 17 倍且默认启用。若您已有 Babel 配置或正在使用[不支持的功能](#不支持的功能)，应用将自动回退至 Babel 编译。
+
+## 为什么选择 SWC？
+
+[SWC](https://swc.rs/) 是一个基于 Rust 的可扩展平台，旨在为下一代高效开发者工具提供支持。
+
+SWC 可用于编译、压缩、打包等场景，其设计支持功能扩展。您可以通过调用它来执行代码转换（内置或自定义）。这些转换操作通常由 Next.js 等高层工具触发。
+
+选择 SWC 的核心理由包括：
+
+- **可扩展性**：SWC 可作为 Crate 直接集成到 Next.js 中，无需分叉代码库或规避设计限制
+- **性能优势**：迁移至 SWC 后，Next.js 实现了快 3 倍的热更新 (Fast Refresh) 和快 5 倍的构建速度，且仍有优化空间
+- **WebAssembly 支持**：Rust 对 WASM 的原生支持使得 Next.js 能覆盖全平台开发需求
+- **社区生态**：Rust 社区及其生态系统充满活力且持续壮大
+
+## 支持的功能
+
+### Styled Components
+
+我们正在将 `babel-plugin-styled-components` 移植到 Next.js 编译器。
+
+首先升级至最新版 Next.js：`npm install next@latest`，然后更新 `next.config.js` 文件：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    styledComponents: true,
+  },
+}
+```
+
+高级用户可配置 styled-components 的独立编译参数：
+
+> 注意：在 Next.js 中使用 `styled-components` 主要依赖 `ssr` 和 `displayName` 转换功能
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // 配置选项详见 https://styled-components.com/docs/tooling#babel-plugin
+    styledComponents: {
+      // 开发环境默认启用，生产环境默认禁用以减少文件体积
+      // 此设置将覆盖所有环境的默认值
+      displayName?: boolean,
+      // 默认启用
+      ssr?: boolean,
+      // 默认启用
+      fileName?: boolean,
+      // 默认为空
+      topLevelImportPaths?: string[],
+      // 默认为 ["index"]
+      meaninglessFileNames?: string[],
+      // 默认启用
+      minify?: boolean,
+      // 默认启用
+      transpileTemplateLiterals?: boolean,
+      // 默认为空
+      namespace?: string,
+      // 默认禁用
+      pure?: boolean,
+      // 默认启用
+      cssProp?: boolean,
+    },
+  },
+}
+```
+
+### Jest
+
+Next.js 编译器可转译测试代码，并简化 Jest 与 Next.js 的联合配置，包括：
+
+- 自动模拟 `.css`、`.module.css`（及其 `.scss` 变体）和图片导入
+- 使用 SWC 自动配置 `transform`
+- 将 `.env`（及其所有变体）加载到 `process.env`
+- 从测试解析和转换中排除 `node_modules`
+- 从测试解析中忽略 `.next` 目录
+- 读取 `next.config.js` 中的实验性 SWC 转换标志
+
+首先升级至最新版 Next.js：`npm install next@latest`，然后更新 `jest.config.js` 文件：
+
+```js filename="jest.config.js"
+const nextJest = require('next/jest')
+
+// 提供 Next.js 应用路径以加载 next.config.js 和 .env 文件
+const createJestConfig = nextJest({ dir: './' })
+
+// 传递给 Jest 的自定义配置
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+}
+
+// 通过此方式导出确保 next/jest 能异步加载 Next.js 配置
+module.exports = createJestConfig(customJestConfig)
+```
+
+### Relay
+
+启用 [Relay](https://relay.dev/) 支持：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    relay: {
+      // 需与 relay.config.js 保持一致
+      src: './',
+      artifactDirectory: './__generated__',
+      language: 'typescript',
+      eagerEsModules: false,
+    },
+  },
+}
+```
+
+> **须知**：在 Next.js 中，`pages` 目录下所有 JavaScript 文件均被视为路由。因此需为 `relay-compiler` 指定 `artifactDirectory` 配置到 `pages` 目录外，否则生成的文件会被识别为路由导致生产构建失败。
+
+### 移除 React 属性
+
+用于移除 JSX 属性（常用于测试场景），功能类似 `babel-plugin-react-remove-properties`。
+
+移除匹配默认正则表达式 `^data-test` 的属性：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    reactRemoveProperties: true,
+  },
+}
+```
+
+移除自定义属性：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // 此处的正则表达式由 Rust 处理，语法与 JavaScript 的 `RegExp` 不同
+    // 详见 https://docs.rs/regex
+    reactRemoveProperties: { properties: ['^data-custom$'] },
+  },
+}
+```
+
+### 移除控制台输出
+
+此转换可移除应用代码（不含 `node_modules`）中所有 `console.*` 调用，功能类似 `babel-plugin-transform-remove-console`。
+
+移除所有 `console.*` 调用：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: true,
+  },
+}
+```
+
+仅保留 `console.error` 输出：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: {
+      exclude: ['error'],
+    },
+  },
+}
+```
+
+### 传统装饰器
+
+Next.js 会自动检测 `jsconfig.json` 或 `tsconfig.json` 中的 `experimentalDecorators` 配置。传统装饰器常见于 `mobx` 等库的旧版本。
+
+此功能仅为兼容现有应用保留，新项目不建议使用传统装饰器。
+
+首先升级至最新版 Next.js：`npm install next@latest`，然后更新配置文件：
+
+```js
+{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}
+```
+
+### importSource
+
+Next.js 会自动应用 `jsconfig.json` 或 `tsconfig.json` 中的 `jsxImportSource` 配置，常用于 [Theme UI](https://theme-ui.com) 等库。
+
+首先升级至最新版 Next.js：`npm install next@latest`，然后更新配置文件：
+
+```js
+{
+  "compilerOptions": {
+    "jsxImportSource": "theme-ui"
+  }
+}
+```
+
+### Emotion
+
+我们正在将 `@emotion/babel-plugin` 移植到 Next.js 编译器。
+
+首先升级至最新版 Next.js：`npm install next@latest`，然后更新 `next.config.js`：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    emotion: boolean | {
+      // 默认 true，生产构建时自动禁用
+      sourceMap?: boolean,
+      // 默认为 'dev-only'
+      autoLabel?: 'never' | 'dev-only' | 'always',
+      // 默认为 '[local]'
+      // 可选值：`[local]`、`[filename]` 和 `[dirname]`
+      // 仅在 autoLabel 为 'dev-only' 或 'always' 时生效
+      // 用于定义标签格式，方括号 [] 内为变量占位符
+      // 例如 labelFormat: "my-classname--[local]"，其中 [local] 会被替换为变量名
+      labelFormat?: string,
+      // 默认为 undefined
+      // 用于指定编译器需要分析的导入路径
+      // 当您重新导出 Emotion 的内容时仍可使用转换功能
+      importMap?: {
+        [packageName: string]: {
+          [exportName: string]: {
+            canonicalImport?: [string, string],
+            styledBaseImport?: [string, string],
+          }
+        }
+      },
+    },
+  },
+}
+```
+
+### 代码压缩
+
+自 v13 起，Next.js 默认使用 SWC 编译器进行代码压缩，速度比 Terser 快 7 倍。
+
+> **须知**：从 v15 开始，无法通过 `next.config.js` 自定义压缩配置，`swcMinify` 标志已被移除。
+
+### 模块转译
+
+Next.js 可自动转译并打包本地包（如 monorepo）或外部依赖（`node_modules`）的代码，取代了 `next-transpile-modules` 包的功能。
+
+```js filename="next.config.js"
+module.exports = {
+  transpilePackages: ['@acme/ui', 'lodash-es'],
+}
+```
+
+### 模块化导入
+
+此功能在 Next.js 13.5 中已被 [`optimizePackageImports`](/docs/app/api-reference/config/next-config-js/optimizePackageImports) 取代。建议升级使用无需手动配置导入路径的新方案。
+
+### Define（构建时变量替换）
+
+`define` 选项允许在构建时静态替换代码中的变量。该选项接收键值对对象，键为待替换变量，值为替换内容。
+
+在 `next.config.js` 中使用 `compiler.define` 定义全环境（服务端、边缘和客户端）变量，或使用 `compiler.defineServer` 仅定义服务端（含边缘）变量：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    define: {
+      MY_VARIABLE: 'my-string',
+      'process.env.MY_ENV_VAR': 'my-env-var',
+    },
+    defineServer: {
+      MY_SERVER_VARIABLE: 'my-server-var',
+    },
+  },
+}
+```
+
+### 构建生命周期钩子
+
+Next.js 编译器支持在构建过程特定节点执行自定义代码的生命周期钩子。当前支持的钩子：
+
+#### runAfterProductionCompile
+
+生产构建编译完成后（类型检查和静态页面生成等后续任务前）执行的钩子函数，可访问项目目录和构建输出目录等元数据，适用于第三方工具收集源码映射等构建产物。
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    runAfterProductionCompile: async ({ distDir, projectDir }) => {
+      // 在此处添加自定义代码
+    },
+  },
+}
+```
+
+钩子接收包含以下属性的对象：
+
+- `distDir`：构建输出目录（默认为 `.next`）
+- `projectDir`：项目根目录
+
+## 实验性功能
+
+### SWC 性能分析
+
+可生成符合 Chromium [trace event 格式](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview?mode=html#%21=)的 SWC 内部转换轨迹。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcTraceProfiling: true,
+  },
+}
+```
+
+启用后，SWC 会在 `.next/` 目录下生成名为 `swc-trace-profile-${timestamp}.json` 的轨迹文件。可通过 Chromium 的 trace viewer（chrome://tracing/、https://ui.perfetto.dev/）或兼容的火焰图工具（https://www.speedscope.app/）查看。
+
+### SWC 插件（实验性）
+
+可通过 WASM 编写的实验性 SWC 插件来自定义转换行为。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcPlugins: [
+      [
+        'plugin',
+        {
+          ...pluginOptions,
+        },
+      ],
+    ],
+  },
+}
+```
+
+`swcPlugins` 接受插件配置元组数组。每个元组包含插件路径（npm 包名或 .wasm 二进制文件绝对路径）和配置对象。
+
+## 不支持的功能
+
+当应用存在 `.babelrc` 文件时，Next.js 将自动回退使用 Babel 进行文件转换，确保与现有自定义 Babel 插件应用的兼容性。
+
+如果您正在使用自定义 Babel 配置，[请分享您的配置](https://github.com/vercel/next.js/discussions/30174)。我们正在移植常用 Babel 转换功能，并计划未来支持插件系统。
+
+## 版本历史
+
+| 版本       | 变更说明                                                                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.1.0`  | [模块转译](https://nextjs.org/blog/next-13-1#built-in-module-transpilation-stable) 和 [模块化导入](https://nextjs.org/blog/next-13-1#import-resolution-for-smaller-bundles) 功能稳定化                                                                 |
+| `v13.0.0`  | 默认启用 SWC 压缩器                                                                                                                                                                                     |
+| `v12.3.0`  | SWC 压缩器[稳定化](https://nextjs.org/blog/next-12-3#swc-minifier-stable)                                                                                                                               |
+| `v12.2.0`  | 新增 [SWC 插件](#swc-插件实验性) 实验性支持                                                                                                                                                            |
+| `v12.1.0`  | 新增 Styled Components、Jest、Relay、移除 React 属性、传统装饰器、移除控制台输出和 jsxImportSource 支持                                                                                                 |
+| `v12.0.0`  | 正式推出 [Next.js 编译器](https://nextjs.org/blog/next-12)                                                                                                                                              |
