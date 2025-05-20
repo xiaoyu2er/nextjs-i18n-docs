@@ -1,0 +1,648 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-20T22:54:44.729Z
+title: 重定向
+description: 了解在 Next.js 中处理重定向的不同方法。
+related:
+  links:
+    - app/api-reference/functions/redirect
+    - app/api-reference/functions/permanentRedirect
+    - app/building-your-application/routing/middleware
+    - app/api-reference/config/next-config-js/redirects
+---
+
+在 Next.js 中有几种处理重定向的方式。本文将介绍每种可用选项、使用场景以及如何管理大量重定向规则。
+
+<AppOnly>
+
+| API                                                            | 用途                                           | 适用场景                                             | 状态码                            |
+| -------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------- | ---------------------------------- |
+| [`redirect`](#redirect-function)                               | 在数据变更或事件后重定向用户           | 服务端组件 (Server Components)、服务端操作 (Server Actions)、路由处理器 (Route Handlers) | 307 (临时) 或 303 (服务端操作) |
+| [`permanentRedirect`](#permanentredirect-function)             | 在数据变更或事件后永久重定向用户           | 服务端组件、服务端操作、路由处理器 | 308 (永久)                        |
+| [`useRouter`](#userouter-hook)                                 | 执行客户端导航                  | 客户端组件 (Client Components) 的事件处理器               | 不适用                                    |
+| [`redirects` in `next.config.js`](#redirects-in-nextconfigjs)  | 根据路径重定向传入请求      | `next.config.js` 文件                             | 307 (临时) 或 308 (永久)     |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | 根据条件重定向传入请求 | 中间件 (Middleware)                                        | 任意状态码                                    |
+
+</AppOnly>
+
+<PagesOnly>
+
+| API                                                            | 用途                                           | 适用场景                 | 状态码                        |
+| -------------------------------------------------------------- | --------------------------------------------- | --------------------- | ---------------------------------- |
+| [`useRouter`](#userouter-hook)                                 | 执行客户端导航                  | 组件            | 不适用                                |
+| [`redirects` in `next.config.js`](#redirects-in-nextconfigjs)  | 根据路径重定向传入请求      | `next.config.js` 文件 | 307 (临时) 或 308 (永久) |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | 根据条件重定向传入请求 | 中间件            | 任意状态码                                |
+
+</PagesOnly>
+
+<AppOnly>
+
+## `redirect` 函数
+
+`redirect` 函数允许你将用户重定向到另一个 URL。你可以在[服务端组件](/docs/app/getting-started/server-and-client-components)、[路由处理器](/docs/app/building-your-application/routing/route-handlers)和[服务端操作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations)中调用此函数。
+
+`redirect` 通常用于数据变更或事件之后。例如创建文章的场景：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id: string) {
+  try {
+    // 调用数据库
+  } catch (error) {
+    // 处理错误
+  }
+
+  revalidatePath('/posts') // 更新缓存的文章列表
+  redirect(`/post/${id}`) // 跳转到新文章页面
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id) {
+  try {
+    // 调用数据库
+  } catch (error) {
+    // 处理错误
+  }
+
+  revalidatePath('/posts') // 更新缓存的文章列表
+  redirect(`/post/${id}`) // 跳转到新文章页面
+}
+```
+
+> **须知**:
+>
+> - `redirect` 默认返回 307 (临时重定向) 状态码。在服务端操作中使用时，会返回 303 (参见其他)，通常用于 POST 请求后跳转到成功页面。
+> - `redirect` 内部会抛出错误，因此应在 `try/catch` 块外部调用。
+> - `redirect` 可以在客户端组件 (Client Components) 的渲染过程中调用，但不能在事件处理器中使用。此时应改用 [`useRouter` 钩子](#userouter-hook)。
+> - `redirect` 也接受绝对 URL，可用于跳转到外部链接。
+> - 如果需要在渲染前重定向，请使用 [`next.config.js`](#redirects-in-nextconfigjs) 或[中间件](#nextresponseredirect-in-middleware)。
+
+更多信息请参阅 [`redirect` API 参考文档](/docs/app/api-reference/functions/redirect)。
+
+## `permanentRedirect` 函数
+
+`permanentRedirect` 函数允许你将用户**永久**重定向到另一个 URL。你可以在[服务端组件](/docs/app/getting-started/server-and-client-components)、[路由处理器](/docs/app/building-your-application/routing/route-handlers)和[服务端操作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations)中调用此函数。
+
+`permanentRedirect` 通常用于会改变实体规范 URL 的数据变更或事件，例如用户修改用户名后更新其个人资料 URL：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username: string, formData: FormData) {
+  try {
+    // 调用数据库
+  } catch (error) {
+    // 处理错误
+  }
+
+  revalidateTag('username') // 更新所有对用户名的引用
+  permanentRedirect(`/profile/${username}`) // 跳转到新用户资料页
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username, formData) {
+  try {
+    // 调用数据库
+  } catch (error) {
+    // 处理错误
+  }
+
+  revalidateTag('username') // 更新所有对用户名的引用
+  permanentRedirect(`/profile/${username}`) // 跳转到新用户资料页
+}
+```
+
+> **须知**:
+>
+> - `permanentRedirect` 默认返回 308 (永久重定向) 状态码。
+> - `permanentRedirect` 也接受绝对 URL，可用于跳转到外部链接。
+> - 如果需要在渲染前重定向，请使用 [`next.config.js`](#redirects-in-nextconfigjs) 或[中间件](#nextresponseredirect-in-middleware)。
+
+更多信息请参阅 [`permanentRedirect` API 参考文档](/docs/app/api-reference/functions/permanentRedirect)。
+
+</AppOnly>
+
+## `useRouter()` 钩子
+
+<AppOnly>
+
+如果需要在客户端组件 (Client Components) 的事件处理器中执行重定向，可以使用 `useRouter` 钩子的 `push` 方法。例如：
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      仪表盘
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      仪表盘
+    </button>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+如果需要在组件中执行重定向，可以使用 `useRouter` 钩子的 `push` 方法。例如：
+
+```tsx filename="app/page.tsx" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      仪表盘
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      仪表盘
+    </button>
+  )
+}
+```
+
+</PagesOnly>
+
+> **须知**:
+>
+> - 如果不需要以编程方式导航用户，应使用 [`<Link>`](/docs/app/api-reference/components/link) 组件。
+
+<AppOnly>
+
+更多信息请参阅 [`useRouter` API 参考文档](/docs/app/api-reference/functions/use-router)。
+
+</AppOnly>
+
+<PagesOnly>
+
+更多信息请参阅 [`useRouter` API 参考文档](/docs/pages/api-reference/functions/use-router)。
+
+</PagesOnly>
+
+## `next.config.js` 中的 `redirects` 配置
+
+`next.config.js` 文件中的 `redirects` 选项允许你将传入请求路径重定向到不同的目标路径。这在修改页面 URL 结构或需要预先定义重定向规则时非常有用。
+
+`redirects` 支持[路径匹配](/docs/app/api-reference/config/next-config-js/redirects#path-matching)、[请求头、Cookie 和查询参数匹配](/docs/app/api-reference/config/next-config-js/redirects#header-cookie-and-query-matching)，让你能根据传入请求灵活地重定向用户。
+
+要使用 `redirects`，请将其添加到 `next.config.js` 文件中：
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      // 基础重定向
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // 通配符路径匹配
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  async redirects() {
+    return [
+      // 基础重定向
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // 通配符路径匹配
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+更多信息请参阅 [`redirects` API 参考文档](/docs/app/api-reference/config/next-config-js/redirects)。
+
+> **须知**:
+>
+> - `redirects` 可以通过 `permanent` 选项返回 307 (临时重定向) 或 308 (永久重定向) 状态码。
+> - 在某些平台上 `redirects` 可能有数量限制。例如在 Vercel 上最多支持 1,024 条重定向规则。如需管理大量重定向 (1000+)，可考虑使用[中间件](/docs/app/building-your-application/routing/middleware)创建自定义解决方案。详见[大规模重定向管理](#managing-redirects-at-scale-advanced)。
+> - `redirects` 会在**中间件之前**执行。
+
+## 中间件中的 `NextResponse.redirect`
+
+中间件允许你在请求完成前运行代码。然后根据传入请求，使用 `NextResponse.redirect` 重定向到不同 URL。这在需要基于条件 (如认证、会话管理等) 重定向用户或需要[管理大量重定向](#managing-redirects-at-scale-advanced)时非常有用。
+
+例如，如果用户未认证则重定向到 `/login` 页面：
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request: NextRequest) {
+  const isAuthenticated = authenticate(request)
+
+  // 如果用户已认证，继续正常流程
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // 未认证则跳转到登录页
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request) {
+  const isAuthenticated = authenticate(request)
+
+  // 如果用户已认证，继续正常流程
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // 未认证则跳转到登录页
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+> **须知**:
+>
+> - 中间件会在 `next.config.js` 的 `redirects` **之后**执行，但在页面渲染**之前**运行。
+
+更多信息请参阅[中间件文档](/docs/app/building-your-application/routing/middleware)。
+
+## 大规模重定向管理 (高级)
+
+要管理大量重定向规则 (1000+)，可考虑使用中间件创建自定义解决方案。这样无需重新部署应用即可通过编程方式处理重定向。
+
+实现时需要考虑：
+
+1. 创建并存储重定向映射表
+2. 优化数据查询性能
+
+> **Next.js 示例**：关于以下建议的实现，请参阅我们的[使用布隆过滤器的中间件](https://redirects-bloom-filter.vercel.app/)示例。
+
+### 1. 创建并存储重定向映射表
+
+重定向映射表是可以存储在数据库 (通常是键值存储) 或 JSON 文件中的重定向规则列表。
+
+考虑以下数据结构：
+
+```json
+{
+  "/old": {
+    "destination": "/new",
+    "permanent": true
+  },
+  "/blog/post-old": {
+    "destination": "/blog/post-new",
+    "permanent": true
+  }
+}
+```
+
+在[中间件](/docs/app/building-your-application/routing/middleware)中，可以从 Vercel 的[Edge Config](https://vercel.com/docs/edge-config/get-started) 或 [Redis](https://vercel.com/docs/redis) 等数据库读取数据，并根据传入请求重定向用户：
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData && typeof redirectData === 'string') {
+    const redirectEntry: RedirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // 未找到重定向规则，继续正常流程
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+export async function middleware(request) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData) {
+    const redirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // 未找到重定向规则，继续正常流程
+  return NextResponse.next()
+}
+```
+
+### 2. 优化数据查询性能
+
+为每个传入请求读取大型数据集可能会导致性能低下且资源消耗大。您可以通过以下两种方式优化数据查询性能：
+
+- 使用针对快速读取优化的数据库
+- 采用如 [布隆过滤器 (Bloom filter)](https://en.wikipedia.org/wiki/Bloom_filter) 的数据查询策略，在读取大型重定向文件或数据库**之前**高效检查重定向是否存在
+
+延续之前的示例，您可以将生成的布隆过滤器文件导入中间件，然后检查传入请求的路径是否存在于布隆过滤器中。
+
+如果存在，则将请求转发至 <AppOnly>[路由处理器 (Route Handler)](/docs/app/building-your-application/routing/route-handlers)</AppOnly> <PagesOnly>[API 路由 (API Routes)](/docs/pages/building-your-application/routing/api-routes)</PagesOnly>，由它检查实际文件并将用户重定向到对应 URL。这样可以避免将大型重定向文件导入中间件，从而防止拖慢每个传入请求的处理速度。
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+// 从生成的 JSON 文件初始化布隆过滤器
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter as any)
+
+export async function middleware(request: NextRequest) {
+  // 获取传入请求的路径
+  const pathname = request.nextUrl.pathname
+
+  // 检查路径是否存在于布隆过滤器中
+  if (bloomFilter.has(pathname)) {
+    // 将路径转发至路由处理器
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // 从路由处理器获取重定向数据
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry: RedirectEntry | undefined =
+          await redirectData.json()
+
+        if (redirectEntry) {
+          // 确定状态码
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // 重定向至目标地址
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // 未找到重定向，继续处理请求而不重定向
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+// 从生成的 JSON 文件初始化布隆过滤器
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter)
+
+export async function middleware(request) {
+  // 获取传入请求的路径
+  const pathname = request.nextUrl.pathname
+
+  // 检查路径是否存在于布隆过滤器中
+  if (bloomFilter.has(pathname)) {
+    // 将路径转发至路由处理器
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // 从路由处理器获取重定向数据
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry = await redirectData.json()
+
+        if (redirectEntry) {
+          // 确定状态码
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // 重定向至目标地址
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // 未找到重定向，继续处理请求而不重定向
+  return NextResponse.next()
+}
+```
+
+<AppOnly>
+
+然后在路由处理器中：
+
+```ts filename="app/api/redirects/route.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export function GET(request: NextRequest) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // 从 redirects.json 文件获取重定向条目
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // 处理布隆过滤器的误判情况
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // 返回重定向条目
+  return NextResponse.json(redirect)
+}
+```
+
+```js filename="app/api/redirects/route.js" switcher
+import { NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+export function GET(request) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // 从 redirects.json 文件获取重定向条目
+  const redirect = redirects[pathname]
+
+  // 处理布隆过滤器的误判情况
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // 返回重定向条目
+  return NextResponse.json(redirect)
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+然后在 API 路由中：
+
+```ts filename="pages/api/redirects.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // 从 redirects.json 文件获取重定向条目
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // 处理布隆过滤器的误判情况
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // 返回重定向条目
+  return res.json(redirect)
+}
+```
+
+```js filename="pages/api/redirects.js" switcher
+import redirects from '@/app/redirects/redirects.json'
+
+export default function handler(req, res) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // 从 redirects.json 文件获取重定向条目
+  const redirect = redirects[pathname]
+
+  // 处理布隆过滤器的误判情况
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // 返回重定向条目
+  return res.json(redirect)
+}
+```
+
+</PagesOnly>
+
+> **须知：**
+>
+> - 生成布隆过滤器可使用 [`bloom-filters`](https://www.npmjs.com/package/bloom-filters) 等库
+> - 应验证发往路由处理器的请求以防止恶意请求

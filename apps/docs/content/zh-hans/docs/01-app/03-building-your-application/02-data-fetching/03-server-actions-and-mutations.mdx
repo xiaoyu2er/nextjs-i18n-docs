@@ -1,0 +1,1018 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-20T22:53:04.090Z
+title: 服务端操作与数据变更
+nav_title: 服务端操作与数据变更
+description: 学习如何使用 Next.js 处理表单提交和数据变更。
+related:
+  description: 了解如何在 Next.js 中配置服务端操作
+  links:
+    - app/api-reference/config/next-config-js/serverActions
+---
+
+[服务端操作 (Server Actions)](https://react.dev/reference/rsc/server-actions) 是**异步函数**，在服务端执行。它们可以在服务端和客户端组件中调用，用于处理 Next.js 应用中的表单提交和数据变更。
+
+> **🎥 观看视频：** 了解更多关于服务端操作的数据变更 → [YouTube (10分钟)](https://youtu.be/dDpZfOQBMaU?si=cJZHlUu_jFhCzHUg)。
+
+## 约定
+
+可以使用 React 的 [`"use server"`](https://react.dev/reference/react/use-server) 指令定义服务端操作。你可以将指令放在 `async` 函数的顶部，将该函数标记为服务端操作，或者放在单独文件的顶部，将该文件的所有导出标记为服务端操作。
+
+### 服务端组件
+
+服务端组件可以使用内联函数级别或模块级别的 `"use server"` 指令。要内联服务端操作，请在函数体顶部添加 `"use server"`：
+
+```tsx filename="app/page.tsx" switcher
+export default function Page() {
+  // 服务端操作
+  async function create() {
+    'use server'
+    // 变更数据
+  }
+
+  return '...'
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default function Page() {
+  // 服务端操作
+  async function create() {
+    'use server'
+    // 变更数据
+  }
+
+  return '...'
+}
+```
+
+### 客户端组件
+
+要在客户端组件中调用服务端操作，创建一个新文件并在其顶部添加 `"use server"` 指令。文件中的所有导出函数将被标记为服务端操作，可以在客户端和服务端组件中复用：
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+
+export async function create() {}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function create() {}
+```
+
+```tsx filename="app/button.tsx" switcher
+'use client'
+
+import { create } from './actions'
+
+export function Button() {
+  return <button onClick={() => create()}>创建</button>
+}
+```
+
+```jsx filename="app/button.js" switcher
+'use client'
+
+import { create } from './actions'
+
+export function Button() {
+  return <button onClick={() => create()}>创建</button>
+}
+```
+
+### 将操作作为属性传递
+
+你也可以将服务端操作作为属性传递给客户端组件：
+
+```jsx
+<ClientComponent updateItemAction={updateItem} />
+```
+
+```tsx filename="app/client-component.tsx" switcher
+'use client'
+
+export default function ClientComponent({
+  updateItemAction,
+}: {
+  updateItemAction: (formData: FormData) => void
+}) {
+  return <form action={updateItemAction}>{/* ... */}</form>
+}
+```
+
+```jsx filename="app/client-component.js" switcher
+'use client'
+
+export default function ClientComponent({ updateItemAction }) {
+  return <form action={updateItemAction}>{/* ... */}</form>
+}
+```
+
+通常，Next.js 的 TypeScript 插件会标记 `client-component.tsx` 中的 `updateItemAction`，因为它是一个通常无法跨客户端-服务端边界序列化的函数。然而，名为 `action` 或以 `Action` 结尾的属性被假定为接收服务端操作。这只是一个启发式规则，因为 TypeScript 插件实际上并不知道它接收的是服务端操作还是普通函数。运行时类型检查仍会确保你不会意外地将函数传递给客户端组件。
+
+## 行为
+
+- 可以使用 [`<form>` 元素](#forms) 的 `action` 属性调用服务端操作：
+  - 服务端组件默认支持渐进增强，这意味着即使 JavaScript 尚未加载或已禁用，表单也会提交。
+  - 在客户端组件中，调用服务端操作的表单会在 JavaScript 未加载时排队提交，优先进行客户端水合。
+  - 水合后，浏览器不会在表单提交时刷新。
+- 服务端操作不仅限于 `<form>`，可以从事件处理程序、`useEffect`、第三方库和其他表单元素（如 `<button>`）调用。
+- 服务端操作与 Next.js 的[缓存和重新验证](/docs/app/deep-dive/caching)架构集成。当操作被调用时，Next.js 可以在一次服务器往返中返回更新的 UI 和新数据。
+- 在底层，操作使用 `POST` 方法，只有这种 HTTP 方法可以调用它们。
+- 服务端操作的参数和返回值必须可被 React 序列化。有关可序列化参数和值的列表，请参阅 React 文档。
+- 服务端操作是函数，这意味着它们可以在应用程序的任何地方复用。
+- 服务端操作继承它们所在页面或布局的运行时。
+- 服务端操作继承它们所在页面或布局的[路由段配置](/docs/app/api-reference/file-conventions/route-segment-config)，包括 `maxDuration` 等字段。
+
+## 示例
+
+### 表单
+
+React 扩展了 HTML [`<form>`](https://developer.mozilla.org/docs/Web/HTML/Element/form) 元素，允许使用 `action` 属性调用服务端操作。
+
+在表单中调用时，操作会自动接收 [`FormData`](https://developer.mozilla.org/docs/Web/API/FormData/FormData) 对象。你不需要使用 React 的 `useState` 来管理字段，而是可以使用原生的 [`FormData` 方法](https://developer.mozilla.org/en-US/docs/Web/API/FormData#instance_methods)提取数据：
+
+```tsx filename="app/invoices/page.tsx" switcher
+export default function Page() {
+  async function createInvoice(formData: FormData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // 变更数据
+    // 重新验证缓存
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+```jsx filename="app/invoices/page.js" switcher
+export default function Page() {
+  async function createInvoice(formData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // 变更数据
+    // 重新验证缓存
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+> **须知：**
+>
+> - 示例：[带有加载和错误状态的表单](https://github.com/vercel/next.js/tree/canary/examples/next-forms)
+> - 处理具有多个字段的表单时，可以考虑使用 JavaScript 的 [`Object.fromEntries()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/fromEntries) 与 [`entries()`](https://developer.mozilla.org/en-US/docs/Web/API/FormData/entries) 方法。例如：`const rawFormData = Object.fromEntries(formData)`。需要注意的是，`formData` 将包含额外的 `$ACTION_` 属性。
+> - 参阅 [React `<form>` 文档](https://react.dev/reference/react-dom/components/form#handle-form-submission-with-a-server-action) 了解更多信息。
+
+### 传递额外参数
+
+可以使用 JavaScript 的 `bind` 方法向服务端操作传递额外参数。
+
+```tsx filename="app/client-component.tsx" highlight={6} switcher
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }: { userId: string }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">更新用户名</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" highlight={6} switcher
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">更新用户名</button>
+    </form>
+  )
+}
+```
+
+服务端操作将接收 `userId` 参数以及表单数据：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function updateUser(userId: string, formData: FormData) {}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function updateUser(userId, formData) {}
+```
+
+> **须知：**
+>
+> - 另一种方法是将参数作为表单中的隐藏输入字段传递（例如 `<input type="hidden" name="userId" value={userId} />`）。然而，该值将成为渲染 HTML 的一部分，并且不会被编码。
+> - `.bind` 在服务端和客户端组件中都有效。它还支持渐进增强。
+
+### 嵌套表单元素
+
+你也可以在 `<form>` 内的嵌套元素（如 `<button>`、`<input type="submit">` 和 `<input type="image">`）中调用服务端操作。这些元素接受 `formAction` 属性或[事件处理程序](#event-handlers)。
+
+这在需要在表单中调用多个服务端操作时非常有用。例如，除了发布帖子外，还可以为保存帖子草稿创建一个特定的 `<button>` 元素。更多信息请参阅 [React `<form>` 文档](https://react.dev/reference/react-dom/components/form#handling-multiple-submission-types)。
+
+### 编程式表单提交
+
+可以使用 [`requestSubmit()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/requestSubmit) 方法以编程方式触发表单提交。例如，当用户使用 `⌘` + `Enter` 键盘快捷键提交表单时，可以监听 `onKeyDown` 事件：
+
+```tsx filename="app/entry.tsx" switcher
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'Enter' || e.key === 'NumpadEnter')
+    ) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/entry.js" switcher
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'Enter' || e.key === 'NumpadEnter')
+    ) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```
+
+这将触发最近的 `<form>` 祖先的提交，从而调用服务端操作。
+
+### 服务端表单验证
+
+可以使用 HTML 属性（如 `required` 和 `type="email"`）进行基本的客户端表单验证。
+
+对于更高级的服务端验证，可以使用 [zod](https://zod.dev/) 等库在变更数据之前验证表单字段：
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({
+    invalid_type_error: '无效的邮箱',
+  }),
+})
+
+export default async function createUser(formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  // 如果表单数据无效，提前返回
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // 变更数据
+}
+```
+
+```jsx filename="app/actions.js" switcher
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({
+    invalid_type_error: '无效的邮箱',
+  }),
+})
+
+export default async function createsUser(formData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  // 如果表单数据无效，提前返回
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // 变更数据
+}
+```
+
+在服务端验证字段后，可以在操作中返回一个可序列化的对象，并使用 React 的 `useActionState` 钩子向用户显示消息。
+
+- 通过将操作传递给 `useActionState`，操作的函数签名会更改，接收一个新的 `prevState` 或 `initialState` 参数作为其第一个参数。
+- `useActionState` 是一个 React 钩子，因此必须在客户端组件中使用。
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+
+export async function createUser(prevState: any, formData: FormData) {
+  const res = await fetch('https://...')
+  const json = await res.json()
+
+  if (!res.ok) {
+    return { message: '请输入有效的邮箱' }
+  }
+
+  redirect('/dashboard')
+}
+```
+
+```jsx filename="app/actions.js" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+
+export async function createUser(prevState, formData) {
+  const res = await fetch('https://...')
+  const json = await res.json()
+
+  if (!res.ok) {
+    return { message: '请输入有效的邮箱' }
+  }
+
+  redirect('/dashboard')
+}
+```
+
+然后，可以将操作传递给 `useActionState` 钩子，并使用返回的 `state` 显示错误消息。
+
+```tsx filename="app/ui/signup.tsx" highlight={11,18-20} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">邮箱</label>
+      <input type="text" id="email" name="email" required />
+      {/* ... */}
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>注册</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" highlight={11,18-20} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">邮箱</label>
+      <input type="text" id="email" name="email" required />
+      {/* ... */}
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>注册</button>
+    </form>
+  )
+}
+```
+
+### 等待状态
+
+[`useActionState`](https://react.dev/reference/react/useActionState) 钩子暴露了一个 `pending` 布尔值，可用于在操作执行时显示加载指示器。
+
+或者，可以使用 [`useFormStatus`](https://react.dev/reference/react-dom/hooks/useFormStatus) 钩子在操作执行时显示加载指示器。使用此钩子时，需要创建一个单独的组件来渲染加载指示器。例如，在操作等待时禁用按钮：
+
+```tsx filename="app/ui/button.tsx" highlight={6} switcher
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      注册
+    </button>
+  )
+}
+```
+
+```jsx filename="app/ui/button.js" highlight={6} switcher
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      注册
+    </button>
+  )
+}
+```
+
+然后可以将 `SubmitButton` 组件嵌套在表单中：
+
+```tsx filename="app/ui/signup.tsx" switcher
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* 其他表单元素 */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" switcher
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* 其他表单元素 */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+> **须知：** 在 React 19 中，`useFormStatus` 包含返回对象上的其他键，如 data、method 和 action。如果未使用 React 19，则只有 `pending` 键可用。
+
+### 乐观更新
+
+您可以使用 React 的 [`useOptimistic`](https://react.dev/reference/react/useOptimistic) 钩子，在服务器操作完成执行前乐观地更新 UI，而无需等待响应：
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+type Message = {
+  message: string
+}
+
+export function Thread({ messages }: { messages: Message[] }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<
+    Message[],
+    string
+  >(messages, (state, newMessage) => [...state, { message: newMessage }])
+
+  const formAction = async (formData: FormData) => {
+    const message = formData.get('message') as string
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m, i) => (
+        <div key={i}>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+export function Thread({ messages }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state, newMessage) => [...state, { message: newMessage }]
+  )
+
+  const formAction = async (formData) => {
+    const message = formData.get('message')
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m) => (
+        <div>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  )
+}
+```
+
+### 事件处理程序
+
+虽然通常在 `<form>` 元素中使用服务器操作，但它们也可以通过事件处理程序（如 `onClick`）调用。例如，增加点赞数：
+
+```tsx filename="app/like-button.tsx" switcher
+'use client'
+
+import { incrementLike } from './actions'
+import { useState } from 'react'
+
+export default function LikeButton({ initialLikes }: { initialLikes: number }) {
+  const [likes, setLikes] = useState(initialLikes)
+
+  return (
+    <>
+      <p>Total Likes: {likes}</p>
+      <button
+        onClick={async () => {
+          const updatedLikes = await incrementLike()
+          setLikes(updatedLikes)
+        }}
+      >
+        Like
+      </button>
+    </>
+  )
+}
+```
+
+```jsx filename="app/like-button.js" switcher
+'use client'
+
+import { incrementLike } from './actions'
+import { useState } from 'react'
+
+export default function LikeButton({ initialLikes }) {
+  const [likes, setLikes] = useState(initialLikes)
+
+  return (
+    <>
+      <p>Total Likes: {likes}</p>
+      <button
+        onClick={async () => {
+          const updatedLikes = await incrementLike()
+          setLikes(updatedLikes)
+        }}
+      >
+        Like
+      </button>
+    </>
+  )
+}
+```
+
+您还可以为表单元素添加事件处理程序，例如在 `onChange` 时保存表单字段：
+
+```tsx filename="app/ui/edit-post.tsx"
+'use client'
+
+import { publishPost, saveDraft } from './actions'
+
+export default function EditPost() {
+  return (
+    <form action={publishPost}>
+      <textarea
+        name="content"
+        onChange={async (e) => {
+          await saveDraft(e.target.value)
+        }}
+      />
+      <button type="submit">Publish</button>
+    </form>
+  )
+}
+```
+
+对于这种情况，如果多个事件可能快速连续触发，我们建议使用**防抖**来避免不必要的服务器操作调用。
+
+### `useEffect`
+
+您可以使用 React 的 [`useEffect`](https://react.dev/reference/react/useEffect) 钩子在组件挂载或依赖项变化时调用服务器操作。这对于依赖于全局事件或需要自动触发的变更非常有用。例如，`onKeyDown` 用于应用快捷键、交叉观察器钩子用于无限滚动，或在组件挂载时更新视图计数：
+
+```tsx filename="app/view-count.tsx" switcher
+'use client'
+
+import { incrementViews } from './actions'
+import { useState, useEffect } from 'react'
+
+export default function ViewCount({ initialViews }: { initialViews: number }) {
+  const [views, setViews] = useState(initialViews)
+
+  useEffect(() => {
+    const updateViews = async () => {
+      const updatedViews = await incrementViews()
+      setViews(updatedViews)
+    }
+
+    updateViews()
+  }, [])
+
+  return <p>Total Views: {views}</p>
+}
+```
+
+```jsx filename="app/view-count.js" switcher
+'use client'
+
+import { incrementViews } from './actions'
+import { useState, useEffect } from 'react'
+
+export default function ViewCount({ initialViews }: { initialViews: number }) {
+  const [views, setViews] = useState(initialViews)
+
+  useEffect(() => {
+    const updateViews = async () => {
+      const updatedViews = await incrementViews()
+      setViews(updatedViews)
+    }
+
+    updateViews()
+  }, [])
+
+  return <p>Total Views: {views}</p>
+}
+```
+
+请记住考虑 [`useEffect` 的行为和注意事项](https://react.dev/reference/react/useEffect#caveats)。
+
+### 错误处理
+
+当抛出错误时，它会被客户端最近的 `error.js` 或 `<Suspense>` 边界捕获。更多信息请参阅[错误处理](/docs/app/building-your-application/routing/error-handling)。
+
+> **须知：**
+>
+> - 除了抛出错误外，您还可以返回一个对象供 `useActionState` 处理。请参阅[服务器端验证和错误处理](#server-side-form-validation)。
+
+### 重新验证数据
+
+您可以在服务器操作中使用 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) API 重新验证 [Next.js 缓存](/docs/app/deep-dive/caching)：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost() {
+  try {
+    // ...
+  } catch (error) {
+    // ...
+  }
+
+  revalidatePath('/posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost() {
+  try {
+    // ...
+  } catch (error) {
+    // ...
+  }
+
+  revalidatePath('/posts')
+}
+```
+
+或者使用 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) 通过缓存标签使特定数据获取失效：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function createPost() {
+  try {
+    // ...
+  } catch (error) {
+    // ...
+  }
+
+  revalidateTag('posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function createPost() {
+  try {
+    // ...
+  } catch (error) {
+    // ...
+  }
+
+  revalidateTag('posts')
+}
+```
+
+### 重定向
+
+如果您希望在服务器操作完成后将用户重定向到不同的路由，可以使用 [`redirect`](/docs/app/api-reference/functions/redirect) API。`redirect` 需要在 `try/catch` 块外部调用：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function createPost(id: string) {
+  try {
+    // ...
+  } catch (error) {
+    // ...
+  }
+
+  revalidateTag('posts') // 更新缓存的帖子
+  redirect(`/post/${id}`) // 导航到新帖子页面
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function createPost(id) {
+  try {
+    // ...
+  } catch (error) {
+    // ...
+  }
+
+  revalidateTag('posts') // 更新缓存的帖子
+  redirect(`/post/${id}`) // 导航到新帖子页面
+}
+```
+
+### Cookies
+
+您可以使用 [`cookies`](/docs/app/api-reference/functions/cookies) API 在服务器操作中 `get`、`set` 和 `delete` cookies：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function exampleAction() {
+  const cookieStore = await cookies()
+
+  // 获取 cookie
+  cookieStore.get('name')?.value
+
+  // 设置 cookie
+  cookieStore.set('name', 'Delba')
+
+  // 删除 cookie
+  cookieStore.delete('name')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function exampleAction() {
+  // 获取 cookie
+  const cookieStore = await cookies()
+
+  // 获取 cookie
+  cookieStore.get('name')?.value
+
+  // 设置 cookie
+  cookieStore.set('name', 'Delba')
+
+  // 删除 cookie
+  cookieStore.delete('name')
+}
+```
+
+更多示例请参阅[删除服务器操作中的 cookies](/docs/app/api-reference/functions/cookies#deleting-cookies)。
+
+## 安全性
+
+默认情况下，当创建并导出一个服务器操作时，它会创建一个公共 HTTP 端点，并应遵循相同的安全假设和授权检查。这意味着，即使服务器操作或实用函数未在代码的其他地方导入，它仍然是公开可访问的。
+
+为了提高安全性，Next.js 具有以下内置功能：
+
+- **安全的操作 ID**：Next.js 创建加密的、非确定性的 ID，允许客户端引用和调用服务器操作。这些 ID 在构建之间定期重新计算以增强安全性。
+- **死代码消除**：未使用的服务器操作（通过其 ID 引用）会从客户端包中移除，以避免第三方公开访问。
+
+> **须知**：
+>
+> ID 在编译期间创建，并缓存最多 14 天。它们将在新构建启动或构建缓存失效时重新生成。
+> 这种安全改进在缺少身份验证层的情况下降低了风险。但是，您仍应将服务器操作视为公共 HTTP 端点。
+
+```jsx
+// app/actions.js
+'use server'
+
+// 此操作**用于**我们的应用程序，因此 Next.js
+// 将创建一个安全 ID 以允许客户端引用
+// 并调用服务器操作。
+export async function updateUserAction(formData) {}
+
+// 此操作**未用于**我们的应用程序，因此 Next.js
+// 将在 `next build` 期间自动移除此代码
+// 并且不会创建公共端点。
+export async function deleteUserAction(formData) {}
+```
+
+### 身份验证和授权
+
+您应确保用户有权执行操作。例如：
+
+```tsx filename="app/actions.ts"
+'use server'
+
+import { auth } from './lib'
+
+export function addItem() {
+  const { user } = auth()
+  if (!user) {
+    throw new Error('You must be signed in to perform this action')
+  }
+
+  // ...
+}
+```
+
+### 闭包和加密
+
+在组件内定义服务器操作会创建一个[闭包](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures)，其中操作可以访问外部函数的作用域。例如，`publish` 操作可以访问 `publishVersion` 变量：
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const publishVersion = await getLatestVersion();
+
+  async function publish() {
+    "use server";
+    if (publishVersion !== await getLatestVersion()) {
+      throw new Error('The version has changed since pressing publish');
+    }
+    ...
+  }
+
+  return (
+    <form>
+      <button formAction={publish}>Publish</button>
+    </form>
+  );
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const publishVersion = await getLatestVersion();
+
+  async function publish() {
+    "use server";
+    if (publishVersion !== await getLatestVersion()) {
+      throw new Error('The version has changed since pressing publish');
+    }
+    ...
+  }
+
+  return (
+    <form>
+      <button formAction={publish}>Publish</button>
+    </form>
+  );
+}
+```
+
+闭包在需要捕获数据的**快照**（例如 `publishVersion`）以便在操作调用时使用非常有用。
+
+然而，为了实现这一点，捕获的变量会发送到客户端并在操作调用时返回服务器。为了防止敏感数据暴露给客户端，Next.js 会自动加密闭包变量。每次构建 Next.js 应用程序时，都会为每个操作生成一个新的私钥。这意味着操作只能针对特定构建调用。
+
+> **须知**：我们不建议仅依赖加密来防止敏感值暴露在客户端。相反，您应使用 [React taint APIs](/docs/app/building-your-application/data-fetching/fetching#preventing-sensitive-data-from-being-exposed-to-the-client) 主动阻止特定数据发送到客户端。
+
+### 覆盖加密密钥（高级）
+
+当自托管 Next.js 应用程序到多个服务器时，每个服务器实例可能最终使用不同的加密密钥，从而导致潜在的不一致。
+
+为了缓解这种情况，您可以使用 `process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` 环境变量覆盖加密密钥。指定此变量可确保您的加密密钥在构建之间保持一致，并且所有服务器实例使用相同的密钥。此变量**必须**是 AES-GCM 加密的。
+
+这是一个高级用例，其中跨多个部署的一致加密行为对您的应用程序至关重要。您应考虑标准的安全实践，例如密钥轮换和签名。
+
+> **须知**：部署到 Vercel 的 Next.js 应用程序会自动处理此问题。
+
+### 允许的来源（高级）
+
+由于服务器操作可以在 `<form>` 元素中调用，因此它们容易受到 [CSRF 攻击](https://developer.mozilla.org/en-US/docs/Glossary/CSRF)。
+
+在幕后，服务器操作使用 `POST` 方法，并且仅允许此 HTTP 方法调用它们。这可以防止现代浏览器中的大多数 CSRF 漏洞，特别是默认情况下使用 [SameSite cookies](https://web.dev/articles/samesite-cookies-explained)。
+
+作为额外的保护，Next.js 中的服务器操作还会比较 [Origin 标头](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin) 和 [Host 标头](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Host)（或 `X-Forwarded-Host`）。如果这些不匹配，请求将被中止。换句话说，服务器操作只能在托管它的页面所在的同一主机上调用。
+
+对于使用反向代理或多层后端架构（其中服务器 API 与生产域不同）的大型应用程序，建议使用配置选项 [`serverActions.allowedOrigins`](/docs/app/api-reference/config/next-config-js/serverActions) 指定安全来源列表。该选项接受字符串数组。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+module.exports = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['my-proxy.com', '*.my-proxy.com'],
+    },
+  },
+}
+```
+
+了解更多关于 [安全性和服务器操作](https://nextjs.org/blog/security-nextjs-server-components-actions)。
+
+## 其他资源
+
+更多信息，请查看以下 React 文档：
+
+- [服务器操作](https://react.dev/reference/rsc/server-actions)
+- [`"use server"`](https://react.dev/reference/react/use-server)
+- [`<form>`](https://react.dev/reference/react-dom/components/form)
+- [`useFormStatus`](https://react.dev/reference/react-dom/hooks/useFormStatus)
+- [`useActionState`](https://react.dev/reference/react/useActionState)
+- [`useOptimistic`](https://react.dev/reference/react/useOptimistic)

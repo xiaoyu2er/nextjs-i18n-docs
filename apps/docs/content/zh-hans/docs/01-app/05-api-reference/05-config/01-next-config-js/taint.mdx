@@ -1,0 +1,228 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-20T22:57:12.098Z
+title: taint
+description: 启用对象和值的污染 (taint) 功能。
+version: experimental
+---
+
+## 使用方法
+
+`taint` 选项支持实验性的 React API 来污染对象和值。此功能有助于防止敏感数据意外传递到客户端。启用后，您可以使用：
+
+- [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) 污染对象引用。
+- [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) 污染唯一值。
+
+> **须知**：启用此标志同时会为 `app` 目录激活 React 的 `experimental` 通道。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **警告**：不要依赖污染 API 作为防止敏感数据暴露给客户端的唯一机制。请参阅我们的 [安全建议](/blog/security-nextjs-server-components-actions)。
+
+污染 API 允许您通过声明式和显式标记不允许通过服务端-客户端边界的数据来进行防御。当对象或值试图通过该边界时，React 会抛出错误。
+
+这在以下情况下特别有用：
+
+- 数据读取方法不受您控制时
+- 需要处理非您定义的敏感数据结构时
+- 服务端组件渲染期间访问敏感数据时
+
+建议对数据和 API 进行建模，确保敏感数据不会返回到不需要的上下文中。
+
+## 注意事项
+
+- 污染只能通过引用跟踪对象。复制对象会创建未污染的版本，从而失去 API 提供的所有保证。您需要对副本也进行污染。
+- 污染无法跟踪从污染值派生的数据。派生值也需要单独污染。
+- 值在其生命周期引用处于作用域内时保持污染状态。详见 [`experimental_taintUniqueValue` 参数参考](https://react.dev/reference/react/experimental_taintUniqueValue#parameters)。
+
+## 示例
+
+### 污染对象引用
+
+此例中，`getUserDetails` 函数返回特定用户的数据。我们污染用户对象引用，防止其跨越服务端-客户端边界。假设 `UserCard` 是客户端组件。
+
+```ts switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id: string): UserDetails {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    '不要使用整个用户信息对象。请仅选择需要的字段。',
+    user
+  )
+
+  return user
+}
+```
+
+```js switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id) {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    '不要使用整个用户信息对象。请仅选择需要的字段。',
+    user
+  )
+
+  return user
+}
+```
+
+我们仍可以访问被污染 `userDetails` 对象的单个字段。
+
+```tsx filename="app/contact/page.tsx" switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+```jsx filename="app/contact/page.js" switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+现在，将整个对象传递给客户端组件会抛出错误。
+
+```tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const userDetails = await getUserDetails(id)
+
+  // 抛出错误
+  return <UserCard user={userDetails} />
+}
+```
+
+```jsx switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  // 抛出错误
+  return <UserCard user={userDetails} />
+}
+```
+
+### 污染唯一值
+
+此例中，我们可以通过调用 `config.getConfigDetails` 获取服务器配置。但系统配置包含不应暴露给客户端的 `SERVICE_API_KEY`。
+
+我们可以污染 `config.SERVICE_API_KEY` 值。
+
+```ts switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig(): SystemConfig {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    '不要将配置令牌传递给客户端',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+```js switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig() {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    '不要将配置令牌传递给客户端',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+我们仍可以访问 `systemConfig` 对象的其他属性。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+
+  return <ClientDashboard version={systemConfig.SERVICE_API_VERSION} />
+}
+```
+
+但传递 `SERVICE_API_KEY` 给 `ClientDashboard` 会抛出错误。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // 有人在 PR 中犯了错误
+  const version = systemConfig.SERVICE_API_KEY
+
+  return <ClientDashboard version={version} />
+}
+```
+
+注意，即使将 `systemConfig.SERVICE_API_KEY` 重新赋值给新变量，传递给客户端组件仍会抛出错误。
+
+而从污染唯一值派生的值会被暴露给客户端。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // 有人在 PR 中犯了错误
+  const version = `version::${systemConfig.SERVICE_API_KEY}`
+
+  return <ClientDashboard version={version} />
+}
+```
+
+更好的方法是从 `getSystemConfig` 返回的数据中移除 `SERVICE_API_KEY`。
