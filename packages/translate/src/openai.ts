@@ -54,13 +54,32 @@ async function translateChunk(
   const textLength = chunk.length;
   const prompt = `
 Translate the following documentation from English to ${langConfig.name}.
-The document being translated is of MDX file type, which means there are components in the text. Please ensure component closing tags are not missing, for example:
-\`<AppOnly> </AppOnly>\` and \`<PagesOnly> </PagesOnly>\`.
-Keep all code blocks, markdown formatting, HTML tags, and variables unchanged.
-Do not translate text within \`\`\` code blocks or inline \`code\`.
-Do not translate URLs or file paths.
-Maintain the original paragraph structure and heading levels.
-Provide only the translated content without any introduction, prefixes, or meta-explanations about the translation. Output just the translation itself.
+
+General rules:
+• The document is MDX format - ensure all component tags are properly closed (e.g., \`<AppOnly> </AppOnly>\` \`<PagesOnly> </PagesOnly>\` )
+• Keep unchanged:
+  - All code blocks
+  - Markdown formatting
+  - HTML tags
+  - Variables
+  - Text within \`\`\` code blocks or inline \`code\`
+  - URLs and file paths
+• Maintain the original paragraph structure and heading levels
+
+MDX Frontmatter rules:
+• For sections between --- marks, do not start a value with inline code
+• Example:
+  - Original: 
+    description: API reference for \`getStaticProps\`. Learn how to use \`getStaticProps\` to generate static pages with Next.js.
+  - INCORRECT translation:
+    description: \`getStaticProps\` API 参考文档。了解如何使用 \`getStaticProps\` 在 Next.js 中生成静态页面。
+  - CORRECT translation:
+    description: API \`getStaticProps\` 参考文档。了解如何使用 \`getStaticProps\` 在 Next.js 中生成静态页面。
+
+Output format:
+• Provide only the translated content
+• No introduction, prefixes, or meta-explanations
+• Just the translation itself
 
 ${context}
 
