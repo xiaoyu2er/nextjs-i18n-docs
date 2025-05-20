@@ -66,11 +66,13 @@ General rules:
   - URLs and file paths
 • Maintain the original paragraph structure and heading levels
 
-⚠️ CRITICAL MDX FRONTMATTER RULE ⚠️
+⚠️ CRITICAL MDX FRONTMATTER RULES ⚠️
 • NEVER start a frontmatter value with inline code (text between \`backticks\`)
 • This applies to ALL inline code including \`<Component>\` tags, \`functions\`, variables, etc.
 • In frontmatter (sections between --- marks), ALWAYS rearrange sentences so inline code appears AFTER some text
-• This is ABSOLUTELY REQUIRED for proper rendering of the documentation
+• ALWAYS preserve both the opening and closing frontmatter delimiters (---) - never omit the closing delimiter
+• Maintain the exact structure of frontmatter - beginning with ---, followed by key-value pairs, and ending with ---
+• These rules are ABSOLUTELY REQUIRED for proper rendering of the documentation
 
 Examples of MDX Frontmatter Translation:
 
@@ -100,8 +102,33 @@ Examples of MDX Frontmatter Translation:
   Translation:
     description: \`<Link>\` 组件的 API 参考文档。
 
-This rule applies ONLY to frontmatter (between --- marks) and is CRITICAL for proper document rendering.
-REMEMBER: You must NEVER start with inline code in frontmatter values.
+# Example 3: Frontmatter Structure
+✓ CORRECT (Always do this):
+  Original:
+    ---
+    title: Link
+    description: API reference for the \`<Link>\` component.
+    ---
+  Translation:
+    ---
+    title: Link
+    description: 关于 \`<Link>\` 组件的 API 参考文档。
+    ---
+
+✗ INCORRECT (Never do this):
+  Original:
+    ---
+    title: Link
+    description: API reference for the \`<Link>\` component.
+    ---
+  Translation:
+    ---
+    title: Link
+    description: 关于 \`<Link>\` 组件的 API 参考文档。
+    (missing closing delimiter)
+
+These rules apply ONLY to frontmatter (between --- marks) and are CRITICAL for proper document rendering.
+REMEMBER: You must NEVER start with inline code in frontmatter values and ALWAYS include both opening and closing --- delimiters.
 
 Output format:
 • Provide only the translated content
