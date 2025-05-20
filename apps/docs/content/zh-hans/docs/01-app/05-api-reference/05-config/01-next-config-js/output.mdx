@@ -1,0 +1,136 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-20T22:58:19.650Z
+title: output
+description: Next.js 会自动追踪每个页面所需的文件，以便轻松部署应用程序。了解其工作原理。
+---
+
+{/* 本文档内容在应用路由和页面路由之间共享。您可以使用 `<PagesOnly>内容</PagesOnly>` 组件添加特定于页面路由的内容。任何共享内容不应包裹在组件中。 */}
+
+在构建过程中，Next.js 会自动追踪每个页面及其依赖项，以确定部署生产版本应用程序所需的所有文件。
+
+该特性可大幅减少部署体积。以前使用 Docker 部署时，需要安装包中 `dependencies` 的所有文件才能运行 `next start`。从 Next.js 12 开始，您可以利用 `.next/` 目录中的输出文件追踪功能，仅包含必要的文件。
+
+此外，这消除了对已弃用的 `serverless` 目标的需求，该目标可能导致各种问题并造成不必要的重复。
+
+## 工作原理
+
+在 `next build` 过程中，Next.js 会使用 [`@vercel/nft`](https://github.com/vercel/nft) 静态分析 `import`、`require` 和 `fs` 的使用情况，以确定页面可能加载的所有文件。
+
+Next.js 生产服务器也会被追踪其所需文件，并输出到 `.next/next-server.js.nft.json`，可在生产环境中使用。
+
+要利用输出到 `.next` 目录的 `.nft.json` 文件，您可以读取每个追踪中相对于 `.nft.json` 文件的文件列表，然后将它们复制到部署位置。
+
+## 自动复制追踪文件
+
+Next.js 可以自动创建一个 `standalone` 文件夹，仅复制生产部署所需的文件，包括 `node_modules` 中的选定文件。
+
+要启用此自动复制功能，可在 `next.config.js` 中配置：
+
+```js filename="next.config.js"
+module.exports = {
+  output: 'standalone',
+}
+```
+
+这将在 `.next/standalone` 创建一个文件夹，无需安装 `node_modules` 即可独立部署。
+
+此外，还会输出一个最小化的 `server.js` 文件，可用于替代 `next start`。默认情况下，该最小化服务器不会复制 `public` 或 `.next/static` 文件夹，因为这些文件最好由 CDN 处理，不过可以手动将这些文件夹复制到 `standalone/public` 和 `standalone/.next/static` 目录，之后 `server.js` 文件将自动提供这些资源。
+
+要手动复制这些文件，可以在执行 `next build` 后使用 `cp` 命令行工具：
+
+```bash filename="Terminal"
+cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+```
+
+要在本地启动最小化的 `server.js` 文件，运行以下命令：
+
+```bash filename="Terminal"
+node .next/standalone/server.js
+```
+
+<AppOnly>
+
+> **须知**:
+>
+> - 如果项目需要监听特定端口或主机名，可以在运行 `server.js` 前定义 `PORT` 或 `HOSTNAME` 环境变量。例如，运行 `PORT=8080 HOSTNAME=0.0.0.0 node server.js` 将在 `http://0.0.0.0:8080` 启动服务器。
+
+</AppOnly>
+
+<PagesOnly>
+
+> **须知**:
+>
+> - `next.config.js` 会在 `next build` 时被读取并序列化到 `server.js` 输出文件中。如果使用了旧版的 [`serverRuntimeConfig` 或 `publicRuntimeConfig` 选项](/docs/pages/api-reference/config/next-config-js/runtime-configuration)，其值将固定为构建时的值。
+> - 如果项目需要监听特定端口或主机名，可以在运行 `server.js` 前定义 `PORT` 或 `HOSTNAME` 环境变量。例如，运行 `PORT=8080 HOSTNAME=0.0.0.0 node server.js` 将在 `http://0.0.0.0:8080` 启动服务器。
+
+</PagesOnly>
+
+## 注意事项
+
+- 在 monorepo 设置中进行追踪时，默认使用项目目录作为追踪根目录。对于 `next build packages/web-app`，`packages/web-app` 将成为追踪根目录，该文件夹外的任何文件都不会被包含。要包含此文件夹外的文件，可以在 `next.config.js` 中设置 `outputFileTracingRoot`。
+
+```js filename="packages/web-app/next.config.js"
+module.exports = {
+  // 这将包含来自 monorepo 根目录向上两级目录的文件
+  outputFileTracingRoot: path.join(__dirname, '../../'),
+}
+```
+
+- 在某些情况下，Next.js 可能无法包含必需文件，或错误地包含未使用的文件。此时，可以分别在 `next.config.js` 中使用 `outputFileTracingExcludes` 和 `outputFileTracingIncludes` 进行配置。每个配置接受一个对象，其键为匹配特定页面的 [minimatch globs](https://www.npmjs.com/package/minimatch)，值为相对于项目根目录的 globs 数组，用于在追踪中包含或排除文件。
+
+```js filename="next.config.js"
+module.exports = {
+  outputFileTracingExcludes: {
+    '/api/hello': ['./un-necessary-folder/**/*'],
+  },
+  outputFileTracingIncludes: {
+    '/api/another': ['./necessary-folder/**/*'],
+    '/api/login/\\[\\[\\.\\.\\.slug\\]\\]': [
+      './node_modules/aws-crt/dist/bin/**/*',
+    ],
+  },
+}
+```
+
+**注意：** `outputFileTracingIncludes`/`outputFileTracingExcludes` 的键是一个 [glob](https://www.npmjs.com/package/picomatch#basic-globbing)，因此需要转义特殊字符。
+
+## 实验性 `turbotrace`
+
+依赖追踪可能很慢，因为它需要非常复杂的计算和分析。我们用 Rust 创建了 `turbotrace`，作为 JavaScript 实现的更快、更智能的替代方案。
+
+要启用它，可以在 `next.config.js` 中添加以下配置：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    turbotrace: {
+      // 控制 turbotrace 的日志级别，默认为 `error`
+      logLevel?:
+      | 'bug'
+      | 'fatal'
+      | 'error'
+      | 'warning'
+      | 'hint'
+      | 'note'
+      | 'suggestions'
+      | 'info',
+      // 控制 turbotrace 的日志是否包含分析详情，默认为 `false`
+      logDetail?: boolean
+      // 显示所有日志消息（无限制）
+      // turbotrace 默认每个类别仅显示 1 条日志消息
+      logAll?: boolean
+      // 控制 turbotrace 的上下文目录
+      // 上下文目录外的文件不会被追踪
+      // 设置 `outputFileTracingRoot` 有相同效果
+      // 如果同时设置了 `outputFileTracingRoot` 和此选项，将使用 `experimental.turbotrace.contextDirectory`
+      contextDirectory?: string
+      // 如果代码中有 `process.cwd()` 表达式，可以设置此选项告知 `turbotrace` 追踪时的 `process.cwd()` 值
+      // 例如 require(process.cwd() + '/package.json') 将被追踪为 require('/path/to/cwd/package.json')
+      processCwd?: string
+      // 控制 `turbotrace` 的最大内存使用量，单位为 `MB`，默认为 `6000`
+      memoryLimit?: number
+    },
+  },
+}
+```
