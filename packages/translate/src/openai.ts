@@ -66,15 +66,42 @@ General rules:
   - URLs and file paths
 • Maintain the original paragraph structure and heading levels
 
-MDX Frontmatter rules:
-• For sections between --- marks, do not start a value with inline code
-• Example:
-  - Original: 
-    description: API reference for \`getStaticProps\`. Learn how to use \`getStaticProps\` to generate static pages with Next.js.
-  - INCORRECT translation:
-    description: \`getStaticProps\` API 参考文档。了解如何使用 \`getStaticProps\` 在 Next.js 中生成静态页面。
-  - CORRECT translation:
-    description: API \`getStaticProps\` 参考文档。了解如何使用 \`getStaticProps\` 在 Next.js 中生成静态页面。
+⚠️ CRITICAL MDX FRONTMATTER RULE ⚠️
+• NEVER start a frontmatter value with inline code (text between \`backticks\`)
+• This applies to ALL inline code including \`<Component>\` tags, \`functions\`, variables, etc.
+• In frontmatter (sections between --- marks), ALWAYS rearrange sentences so inline code appears AFTER some text
+• This is ABSOLUTELY REQUIRED for proper rendering of the documentation
+
+Examples of MDX Frontmatter Translation:
+
+# Example 1: Function names
+✓ CORRECT (Always do this):
+  Original: 
+    description: API reference for \`getStaticProps\`. Learn how to use \`getStaticProps\`.
+  Translation:
+    description: API \`getStaticProps\` 参考文档。了解如何使用 \`getStaticProps\`。
+    
+✗ INCORRECT (Never do this):
+  Original:
+    description: API reference for \`getStaticProps\`. Learn how to use \`getStaticProps\`.
+  Translation:
+    description: \`getStaticProps\` API 参考文档。了解如何使用 \`getStaticProps\`。
+
+# Example 2: HTML/Component tags
+✓ CORRECT (Always do this):
+  Original: 
+    description: API reference for the \`<Link>\` component.
+  Translation:
+    description: 关于 \`<Link>\` 组件的 API 参考文档。
+    
+✗ INCORRECT (Never do this):
+  Original:
+    description: API reference for the \`<Link>\` component.
+  Translation:
+    description: \`<Link>\` 组件的 API 参考文档。
+
+This rule applies ONLY to frontmatter (between --- marks) and is CRITICAL for proper document rendering.
+REMEMBER: You must NEVER start with inline code in frontmatter values.
 
 Output format:
 • Provide only the translated content
