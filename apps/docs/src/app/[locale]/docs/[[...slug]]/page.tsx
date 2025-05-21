@@ -2,7 +2,7 @@ import { DocsLayout } from '@/components/layout';
 import { getPage } from '@/lib/page';
 import { getDocsLayoutTree, getPageTreePeers } from '@/lib/pageTree';
 import { type Page, type Source, sourceMap } from '@/lib/source';
-import { getDocsUrl, isAppDoc, isPagesDoc } from '@/lib/utils';
+import { getDocId, getDocUrl, parseDocId } from '@/lib/utils';
 import { getMDXComponents } from '@/mdx-components';
 import { Identity } from '@/mdx/Identity';
 import { Void } from '@/mdx/Void';
@@ -19,20 +19,18 @@ export default async function Docs(props: {
   const slug = params.slug || [];
   const locale = params.locale;
   const source = sourceMap[locale];
-  const docsUrl = getDocsUrl(slug);
-  const id = `${locale}${docsUrl}`;
-  const page = getPage(locale, docsUrl);
+  const docUrl = getDocUrl(slug);
+  const docId = getDocId(locale, docUrl);
+  const page = getPage(locale, docUrl);
   if (!page) notFound();
-
+  const { isApp, isPages } = parseDocId(docId);
   // Markdown content requires await
   let { body: MdxContent, toc } = await page.data.load();
 
-  const isAppDocs = isAppDoc(id);
-  const isPagesDocs = isPagesDoc(id);
   // source: app/getting-started/installation
   const ref = page.data.source;
   if (ref) {
-    const refUrl = getDocsUrl(ref);
+    const refUrl = getDocUrl(ref);
     const refPage = getPage(locale, refUrl);
     if (!refPage) notFound();
     const { body: MdxContent2, toc: toc2 } = await refPage.data.load();
@@ -45,7 +43,10 @@ export default async function Docs(props: {
   const isIndex = page.file.name === 'index';
 
   return (
-    <DocsLayout pageTree={getDocsLayoutTree(source.pageTree, slug)}>
+    <DocsLayout
+      docId={docId}
+      pageTree={getDocsLayoutTree(source.pageTree, slug)}
+    >
       <DocsPage
         toc={toc}
         full={page.data.full}
@@ -57,8 +58,8 @@ export default async function Docs(props: {
             components={getMDXComponents({
               // this allows you to link to other pages with relative file paths
               a: createRelativeLink(source, page),
-              AppOnly: isAppDocs ? Identity : Void,
-              PagesOnly: isPagesDocs ? Identity : Void,
+              AppOnly: isApp ? Identity : Void,
+              PagesOnly: isPages ? Identity : Void,
             })}
           />
           {hasRelated ? <DocsRelated page={page} /> : null}
@@ -90,7 +91,7 @@ function DocsRelated({ page }: { page: Page }) {
   const relatedLinks = page.data.related?.links || [];
   const pages = relatedLinks
     .map((link) => {
-      return getPage(locale, getDocsUrl(link));
+      return getPage(locale, getDocUrl(link));
     })
     .filter(Boolean) as Page[];
   return (
@@ -126,7 +127,7 @@ export async function generateMetadata(props: {
   params: Promise<{ slug?: string[]; locale: Locale }>;
 }) {
   const params = await props.params;
-  const url = getDocsUrl(params.slug);
+  const url = getDocUrl(params.slug);
   const page = getPage(params.locale, url);
   if (!page) notFound();
 

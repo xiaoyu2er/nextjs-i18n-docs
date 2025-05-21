@@ -1,7 +1,7 @@
 'use client';
 
 import { ORAMA_CONFIGS_MAP } from '@/lib/orama/config';
-import { getDocTag, getDocTags } from '@/lib/utils';
+import { getDocId, parseDocId } from '@/lib/utils';
 import { OramaClient } from '@oramacloud/client';
 import type { SharedProps } from 'fumadocs-ui/components/dialog/search';
 import { useLocale } from 'next-intl';
@@ -22,23 +22,13 @@ export default function CustomSearchDialog(props: SharedProps) {
       }),
     [config],
   );
-  const id = `${locale}${pathname}`;
-  const tag = getDocTag(id);
-  const tags = getDocTags(id);
-  const isV13 = tags.includes('13');
-  const isV14 = tags.includes('14');
-  const version = isV13 ? '13' : isV14 ? '14' : '';
-  const appTag =
-    isV13 || isV14 ? `${locale}/docs/${version}/app` : `${locale}/docs/app`;
-  const pagesTag =
-    isV13 || isV14 ? `${locale}/docs/${version}/pages` : `${locale}/docs/pages`;
-  const whereTag =
-    isV13 || isV14 ? `${locale}/docs/${version}` : `${locale}/docs`;
+  const docId = getDocId(locale, pathname);
+  const { isPages, appTag, pagesTag, whereTag } = parseDocId(docId);
 
   return (
     <SearchOrama
       {...props}
-      defaultTag={tag}
+      defaultTag={isPages ? pagesTag : appTag}
       whereTag={whereTag}
       allowClear
       tags={[

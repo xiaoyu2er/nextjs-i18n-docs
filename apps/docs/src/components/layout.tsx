@@ -11,9 +11,11 @@ import type { ReactNode } from 'react';
 export function DocsLayout({
   children,
   pageTree,
+  docId,
 }: {
   children: ReactNode;
   pageTree: PageTree.Root;
+  docId: string;
 }) {
   const baseOptions = useBaseOptions();
   const docsLayout: DocsLayoutProps = {

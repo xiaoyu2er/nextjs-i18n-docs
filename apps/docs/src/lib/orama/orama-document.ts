@@ -1,26 +1,25 @@
 import type { OramaDocument } from 'fumadocs-core/search/orama-cloud';
+import type { Locale } from 'next-intl';
 import { structure } from '../remark-plugins/remark-structure';
 import type { Source } from '../source';
-import { getDocTag, isAppDoc, isPagesDoc } from '../utils';
-import { getDocsUrl } from '../utils';
+import { getDocId, getDocUrl, parseDocId } from '../utils';
 
 export async function getOramaDocuments(
   source: Source,
-  lang: string,
+  lang: Locale,
   i: number,
 ) {
   const results: OramaDocument[] = [];
   const pages = source.getPages();
   for (const page of pages.slice(i * 20, (i + 1) * 20)) {
-    const id = `${lang}${page.url}`;
-    const isApp = isAppDoc(id);
-    const isPages = isPagesDoc(id);
+    const id = getDocId(lang, page.url);
+    const { isApp, isPages } = parseDocId(id);
     const ref = page.data.source;
     let content = page.data.content;
 
     if (ref) {
       // If the page has a reference, we need to get the content from the referenced page
-      const url = getDocsUrl(ref);
+      const url = getDocUrl(ref);
       const refPage = pages.find((p) => p.url === url);
       if (!refPage) continue;
       content = refPage.data.content;
@@ -47,7 +46,7 @@ export async function getOramaDocuments(
       url: page.url,
       title: page.data.title,
       description: page.data.description,
-      tag: getDocTag(id),
+      tag: parseDocId(id).docTag,
     };
 
     results.push(result);
