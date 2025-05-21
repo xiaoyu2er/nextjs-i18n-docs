@@ -1,0 +1,514 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:57:44.764Z
+title: headers
+description: 为你的 Next.js 应用添加自定义 HTTP 标头。
+---
+
+{/* 本文档内容在应用路由和页面路由间共享。你可以使用 `<PagesOnly>内容</PagesOnly>` 组件添加仅适用于页面路由的内容。任何共享内容不应包裹在组件中。 */}
+
+标头允许你在给定路径的请求响应中设置自定义 HTTP 标头。
+
+要设置自定义 HTTP 标头，你可以在 `next.config.js` 中使用 `headers` 键：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/about',
+        headers: [
+          {
+            key: 'x-custom-header',
+            value: '我的自定义标头值',
+          },
+          {
+            key: 'x-another-custom-header',
+            value: '我的其他自定义标头值',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+`headers` 是一个异步函数，期望返回一个包含具有 `source` 和 `headers` 属性的对象数组：
+
+- `source`：传入请求的路径模式
+- `headers`：响应标头对象数组，包含 `key` 和 `value` 属性
+- `basePath`：`false` 或 `undefined` - 如果为 false，则匹配时不包含 basePath，仅用于外部重写
+- `locale`：`false` 或 `undefined` - 匹配时是否不包含语言环境
+- `has`：包含 `type`、`key` 和 `value` 属性的 [has 对象](#header-cookie-and-query-matching)数组
+- `missing`：包含 `type`、`key` 和 `value` 属性的 [missing 对象](#header-cookie-and-query-matching)数组
+
+标头检查优先于文件系统（包括页面和 `/public` 文件）。
+
+## 标头覆盖行为
+
+如果两个标头匹配相同路径并设置相同的标头键，后一个标头键将覆盖前一个。使用以下标头配置，路径 `/hello` 将导致标头 `x-hello` 的值为 `world`，因为最后设置的标头值是 `world`。
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'there',
+          },
+        ],
+      },
+      {
+        source: '/hello',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## 路径匹配
+
+支持路径匹配，例如 `/blog/:slug` 将匹配 `/blog/hello-world`（不支持嵌套路径）：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug', // 匹配的参数可用于值中
+          },
+          {
+            key: 'x-slug-:slug', // 匹配的参数可用于键中
+            value: '我的其他自定义标头值',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### 通配符路径匹配
+
+要匹配通配符路径，可以在参数后使用 `*`，例如 `/blog/:slug*` 将匹配 `/blog/a/b/c/d/hello-world`：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug*',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug*', // 匹配的参数可用于值中
+          },
+          {
+            key: 'x-slug-:slug*', // 匹配的参数可用于键中
+            value: '我的其他自定义标头值',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### 正则表达式路径匹配
+
+要匹配正则表达式路径，可以将正则表达式包裹在参数后的括号中，例如 `/blog/:slug(\\d{1,})` 将匹配 `/blog/123` 但不匹配 `/blog/abc`：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:post(\\d{1,})',
+        headers: [
+          {
+            key: 'x-post',
+            value: ':post',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+以下字符 `(`、`)`、`{`、`}`、`:`、`*`、`+`、`?` 用于正则表达式路径匹配，因此当在 `source` 中作为非特殊值使用时，必须通过在它们前面添加 `\\` 进行转义：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        // 这将匹配请求的 `/english(default)/something`
+        source: '/english\\(default\\)/:slug',
+        headers: [
+          {
+            key: 'x-header',
+            value: 'value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## 标头、Cookie 和查询匹配
+
+要仅在标头、cookie 或查询值也匹配 `has` 字段或不匹配 `missing` 字段时应用标头，可以使用这些字段。必须同时匹配 `source` 和所有 `has` 项，并且所有 `missing` 项都不匹配，才会应用标头。
+
+`has` 和 `missing` 项可以包含以下字段：
+
+- `type`：`String` - 必须是 `header`、`cookie`、`host` 或 `query` 之一
+- `key`：`String` - 要匹配的选定类型的键
+- `value`：`String` 或 `undefined` - 要检查的值，如果未定义则匹配任何值。可以使用类似正则表达式的字符串捕获值的特定部分，例如如果对 `first-second` 使用值 `first-(?<paramName>.*)`，则可以在目标中使用 `:paramName` 来引用 `second`
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      // 如果存在标头 `x-add-header`，
+      // 将应用 `x-another-header` 标头
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-add-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // 如果不存在标头 `x-no-header`，
+      // 将应用 `x-another-header` 标头
+      {
+        source: '/:path*',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-no-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // 如果匹配了源、查询和 cookie，
+      // 将应用 `x-authorized` 标头
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // 由于提供了值且未使用命名捕获组（例如 (?<page>home)），
+            // 页面值将不可用于标头键/值
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-authorized',
+            value: ':authorized',
+          },
+        ],
+      },
+      // 如果存在标头 `x-authorized` 且包含匹配值，
+      // 将应用 `x-another-header` 标头
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+      // 如果主机是 `example.com`，
+      // 将应用此标头
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## 支持 basePath 的标头
+
+当与标头一起使用 [`basePath` 支持](/docs/app/api-reference/next-config-js/basePath) 时，除非你在标头中添加 `basePath: false`，否则每个 `source` 都会自动添加 `basePath` 前缀：
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async headers() {
+    return [
+      {
+        source: '/with-basePath', // 变为 /docs/with-basePath
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        source: '/without-basePath', // 由于设置了 basePath: false，不会被修改
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+        basePath: false,
+      },
+    ]
+  },
+}
+```
+
+## 支持 i18n 的标头
+
+<AppOnly>
+
+当与标头一起使用 [`i18n` 支持](/docs/app/building-your-application/routing/internationalization) 时，除非你在标头中添加 `locale: false`，否则每个 `source` 都会自动添加前缀以处理配置的 `locales`。如果使用 `locale: false`，则必须在 `source` 前添加语言环境才能正确匹配。
+
+</AppOnly>
+
+<PagesOnly>
+
+当与标头一起使用 [`i18n` 支持](/docs/pages/building-your-application/routing/internationalization) 时，除非你在标头中添加 `locale: false`，否则每个 `source` 都会自动添加前缀以处理配置的 `locales`。如果使用 `locale: false`，则必须在 `source` 前添加语言环境才能正确匹配。
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async headers() {
+    return [
+      {
+        source: '/with-locale', // 自动处理所有语言环境
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // 由于设置了 locale: false，不会自动处理语言环境
+        source: '/nl/with-locale-manual',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // 这将匹配 '/'，因为 `en` 是 defaultLocale
+        source: '/en',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // 这将转换为 /(en|fr|de)/(.*)，因此不会像 /:path* 那样匹配顶级 `/` 或 `/fr` 路由
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Cache-Control
+
+你无法在 `next.config.js` 中为页面或资源设置 `Cache-Control` 标头，因为这些标头在生产环境中会被覆盖，以确保响应和静态资源被有效缓存。
+
+<AppOnly>
+
+了解有关使用应用路由器的 [缓存](/docs/app/building-your-application/caching) 的更多信息。
+
+</AppOnly>
+
+<PagesOnly>
+
+如果你需要重新验证已 [静态生成](/docs/pages/building-your-application/rendering/static-site-generation) 的页面的缓存，可以通过在页面的 [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) 函数中设置 `revalidate` 属性来实现。
+
+你可以使用 `res.setHeader` 方法在 [API 路由](/docs/pages/building-your-application/routing/api-routes) 中设置 `Cache-Control` 标头：
+
+```ts filename="pages/api/hello.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+type ResponseData = {
+  message: string
+}
+
+export default function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ResponseData>
+) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+```js filename="pages/api/hello.js" switcher
+export default function handler(req, res) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+</PagesOnly>
+
+## 选项
+
+### X-DNS-Prefetch-Control
+
+[此标头](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-DNS-Prefetch-Control) 控制 DNS 预取，允许浏览器主动对外部链接、图像、CSS、JavaScript 等执行域名解析。此预取在后台执行，因此在需要引用项时更有可能已解析 [DNS](https://developer.mozilla.org/docs/Glossary/DNS)。这减少了用户点击链接时的延迟。
+
+```js
+{
+  key: 'X-DNS-Prefetch-Control',
+  value: 'on'
+}
+```
+
+### Strict-Transport-Security
+
+[此标头](https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security) 通知浏览器应仅使用 HTTPS 访问，而不是使用 HTTP。使用以下配置，所有当前和未来的子域将使用 HTTPS，`max-age` 为 2 年。这会阻止访问只能通过 HTTP 提供的页面或子域。
+
+如果你部署到 [Vercel](https://vercel.com/docs/concepts/edge-network/headers#strict-transport-security?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)，则不需要此标头，因为它会自动添加到所有部署中，除非你在 `next.config.js` 中声明 `headers`。
+
+```js
+{
+  key: 'Strict-Transport-Security',
+  value: 'max-age=63072000; includeSubDomains; preload'
+}
+```
+
+### X-Frame-Options
+
+[此标头](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Frame-Options) 指示是否应允许网站在 `iframe` 中显示。这可以防止点击劫持攻击。
+
+**此标头已被 CSP 的 `frame-ancestors` 选项取代**，后者在现代浏览器中有更好的支持。
+
+```js
+{
+  key: 'X-Frame-Options',
+  value: 'SAMEORIGIN'
+}
+```
+
+### Permissions-Policy
+
+[此标头](https://developer.mozilla.org/docs/Web/HTTP/Headers/Permissions-Policy) 允许你控制浏览器中可以使用哪些功能和 API。它以前称为 `Feature-Policy`。
+
+```js
+{
+  key: 'Permissions-Policy',
+  value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()'
+}
+```
+
+### X-Content-Type-Options
+
+[此标头](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Content-Type-Options) 阻止浏览器在未明确设置 `Content-Type` 标头时尝试猜测内容类型。这可以防止允许用户上传和共享文件的网站的 XSS 攻击。
+
+例如，用户尝试下载图像，但将其视为不同的 `Content-Type`（如可执行文件），这可能是恶意的。此标头也适用于下载浏览器扩展。此标头的唯一有效值是 `nosniff`。
+
+```js
+{
+  key: 'X-Content-Type-Options',
+  value: 'nosniff'
+}
+```
+
+### Referrer-Policy
+
+[此标头](https://developer.mozilla.org/docs/Web/HTTP/Headers/Referrer-Policy) 控制浏览器在从当前网站（源）导航到另一个网站时包含多少信息。
+
+```js
+{
+  key: 'Referrer-Policy',
+  value: 'origin-when-cross-origin'
+}
+```
+
+### Content-Security-Policy
+
+了解有关为你的应用添加 [内容安全策略](/docs/app/building-your-application/configuring/content-security-policy) 的更多信息。
+
+## 版本历史
+
+| 版本       | 变更               |
+| ---------- | ------------------ |
+| `v13.3.0` | 添加 `missing`。   |
+| `v10.2.0` | 添加 `has`。       |
+| `v9.5.0`  | 添加标头支持。     |

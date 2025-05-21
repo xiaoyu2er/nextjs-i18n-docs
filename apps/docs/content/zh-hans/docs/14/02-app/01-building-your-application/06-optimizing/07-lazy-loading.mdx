@@ -1,0 +1,246 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:43:45.300Z
+title: 懒加载 (Lazy Loading)
+description: 通过延迟加载导入的库和 React 组件来提升应用的加载性能。
+---
+
+{/* 本文档内容在应用路由和页面路由间共享。您可以使用 `<PagesOnly>内容</PagesOnly>` 组件添加特定于页面路由的内容。任何共享内容不应包裹在组件中。 */}
+
+Next.js 中的[懒加载](https://developer.mozilla.org/docs/Web/Performance/Lazy_loading)通过减少渲染路由所需的 JavaScript 代码量，帮助提升应用的初始加载性能。
+
+它允许您延迟加载**客户端组件 (Client Components)** 和导入的库，仅在需要时才将它们包含在客户端包中。例如，您可以延迟加载一个模态框，直到用户点击打开它。
+
+在 Next.js 中有两种实现懒加载的方式：
+
+1. 使用 [`next/dynamic`](#nextdynamic) 进行[动态导入](#nextdynamic)
+2. 使用 [`React.lazy()`](https://react.dev/reference/react/lazy) 配合 [Suspense](https://react.dev/reference/react/Suspense)
+
+默认情况下，服务端组件 (Server Components) 会自动进行[代码分割 (code split)](https://developer.mozilla.org/docs/Glossary/Code_splitting)，您可以使用[流式传输 (streaming)](/docs/app/building-your-application/routing/loading-ui-and-streaming) 逐步从服务端向客户端发送 UI 片段。懒加载适用于客户端组件。
+
+## `next/dynamic`
+
+`next/dynamic` 是 [`React.lazy()`](https://react.dev/reference/react/lazy) 和 [Suspense](https://react.dev/reference/react/Suspense) 的组合。它在 `app` 和 `pages` 目录中的行为相同，以便进行渐进式迁移。
+
+## 示例
+
+<AppOnly>
+### 导入客户端组件
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
+
+// 客户端组件：
+const ComponentA = dynamic(() => import('../components/A'))
+const ComponentB = dynamic(() => import('../components/B'))
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+
+export default function ClientComponentExample() {
+  const [showMore, setShowMore] = useState(false)
+
+  return (
+    <div>
+      {/* 立即加载，但放在单独的客户端包中 */}
+      <ComponentA />
+
+      {/* 按需加载，仅在满足条件时加载 */}
+      {showMore && <ComponentB />}
+      <button onClick={() => setShowMore(!showMore)}>切换</button>
+
+      {/* 仅在客户端加载 */}
+      <ComponentC />
+    </div>
+  )
+}
+```
+
+### 跳过服务端渲染 (SSR)
+
+当使用 `React.lazy()` 和 Suspense 时，客户端组件默认会进行预渲染 (SSR)。
+
+如果您想禁用某个客户端组件的预渲染，可以将 `ssr` 选项设为 `false`：
+
+```jsx
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+```
+
+### 导入服务端组件
+
+如果动态导入一个服务端组件，只有该服务端组件的子客户端组件会被懒加载，而服务端组件本身不会。
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+// 服务端组件：
+const ServerComponent = dynamic(() => import('../components/ServerComponent'))
+
+export default function ServerComponentExample() {
+  return (
+    <div>
+      <ServerComponent />
+    </div>
+  )
+}
+```
+
+### 加载外部库
+
+可以使用 [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import) 函数按需加载外部库。此示例使用外部库 `fuse.js` 进行模糊搜索。该模块仅在用户在搜索框中输入后才会在客户端加载。
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="搜索"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // 动态加载 fuse.js
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>结果: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+### 添加自定义加载组件
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+const WithCustomLoading = dynamic(
+  () => import('../components/WithCustomLoading'),
+  {
+    loading: () => <p>加载中...</p>,
+  }
+)
+
+export default function Page() {
+  return (
+    <div>
+      {/* 当 <WithCustomLoading/> 加载时，将渲染加载组件 */}
+      <WithCustomLoading />
+    </div>
+  )
+}
+```
+
+### 导入具名导出
+
+要动态导入具名导出，可以从 [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import) 函数返回的 Promise 中返回它：
+
+```jsx filename="components/hello.js"
+'use client'
+
+export function Hello() {
+  return <p>你好!</p>
+}
+```
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+const ClientComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+通过使用 `next/dynamic`，头部组件将不会包含在页面的初始 JavaScript 包中。页面会先渲染 Suspense 的 `fallback`，然后在 `Suspense` 边界解析完成后渲染 `Header` 组件。
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  loading: () => <p>加载中...</p>,
+})
+
+export default function Home() {
+  return <DynamicHeader />
+}
+```
+
+> **须知**：在 `import('path/to/component')` 中，路径必须明确写出。不能使用模板字符串或变量。此外，`import()` 必须位于 `dynamic()` 调用内部，以便 Next.js 能够将 webpack 包/模块 ID 与特定的 `dynamic()` 调用匹配，并在渲染前预加载它们。`dynamic()` 不能在 React 渲染中使用，因为它需要在模块的顶层标记才能进行预加载，类似于 `React.lazy`。
+
+## 导入具名导出
+
+要动态导入具名导出，可以从 [`import()`](https://github.com/tc39/proposal-dynamic-import#example) 返回的 [Promise](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise) 中返回它：
+
+```jsx filename="components/hello.js"
+export function Hello() {
+  return <p>你好!</p>
+}
+
+// pages/index.js
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+## 禁用服务端渲染 (SSR)
+
+要在客户端动态加载组件，可以使用 `ssr` 选项禁用服务端渲染。这在外部依赖或组件依赖 `window` 等浏览器 API 时非常有用。
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  ssr: false,
+})
+```
+
+## 使用外部库
+
+此示例使用外部库 `fuse.js` 进行模糊搜索。该模块仅在用户在搜索框中输入后才会在浏览器中加载。
+
+```jsx
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="搜索"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // 动态加载 fuse.js
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>结果: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+</PagesOnly>

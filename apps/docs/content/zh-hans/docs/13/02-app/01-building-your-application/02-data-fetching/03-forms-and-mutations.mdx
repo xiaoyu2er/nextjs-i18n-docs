@@ -1,0 +1,983 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T21:08:02.600Z
+title: 表单与数据变更
+nav_title: 表单与数据变更
+description: 学习如何使用 Next.js 处理表单提交与数据变更。
+---
+
+{/* 本文档内容在应用路由和页面路由间共享。可使用 `<PagesOnly>内容</PagesOnly>` 组件添加页面路由专属内容，共享内容不应包裹在任何组件中 */}
+
+<PagesOnly>
+
+表单让您能够在网页应用中创建和更新数据。Next.js 通过 **API 路由** 提供了强大的表单提交与数据变更处理方案。
+
+> **须知：**
+>
+> - 我们即将推荐 [渐进式迁移](/docs/app/building-your-application/upgrading/app-router-migration) 到应用路由，并使用 [服务端操作 (Server Actions)](/docs/app/building-your-application/data-fetching/forms-and-mutations#how-server-actions-work) 处理表单提交与数据变更。服务端操作允许您定义异步服务端函数，无需手动创建 API 路由即可直接从组件调用。
+> - API 路由 [默认不指定 CORS 头信息](https://developer.mozilla.org/docs/Web/HTTP/CORS)，意味着默认仅支持同源请求。
+> - 由于 API 路由在服务端运行，可通过 [环境变量](/docs/pages/building-your-application/configuring/environment-variables) 使用敏感值（如 API 密钥）而不会暴露给客户端，这对应用安全性至关重要。
+
+</PagesOnly>
+
+<AppOnly>
+
+表单让您能够在网页应用中创建和更新数据。Next.js 通过 **服务端操作 (Server Actions)** 提供了强大的表单提交与数据变更处理方案。
+
+<details>
+  <summary>示例</summary>
+
+- [带加载与错误状态的表单](https://github.com/vercel/next.js/tree/canary/examples/next-forms)
+
+</details>
+
+## 服务端操作原理
+
+使用服务端操作时，您无需手动创建 API 端点，而是直接定义可在组件中调用的异步服务端函数。
+
+> **🎥 观看：** 通过应用路由学习表单与数据变更 → [YouTube (10分钟)](https://youtu.be/dDpZfOQBMaU?si=cJZHlUu_jFhCzHUg)。
+
+服务端操作可在服务端组件中定义，或从客户端组件调用。在服务端组件中定义操作可使表单在无 JavaScript 环境下正常工作，实现渐进增强。
+
+在 `next.config.js` 中启用服务端操作：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    serverActions: true,
+  },
+}
+```
+
+> **须知：**
+>
+> - 从服务端组件调用服务端操作的表单可在无 JavaScript 环境下运行。
+> - 从客户端组件调用服务端操作的表单会在 JavaScript 未加载时排队提交，优先保证客户端水合。
+> - 服务端操作继承所在页面或布局的 [运行时环境](/docs/app/building-your-application/rendering/edge-and-nodejs-runtimes)。
+> - 服务端操作兼容完全静态的路由（包括使用 ISR 重新验证数据）。
+
+## 重新验证缓存数据
+
+服务端操作与 Next.js [缓存与重新验证](/docs/app/building-your-application/caching) 架构深度集成。表单提交时，服务端操作可更新缓存数据并重新验证应变更的缓存键。
+
+不同于传统应用每个路由只能有一个表单，服务端操作支持每个路由多个操作。此外，表单提交时浏览器无需刷新。在单次网络往返中，Next.js 可同时返回更新后的 UI 和刷新数据。
+
+查看下方 [通过服务端操作重新验证数据](#revalidating-data) 的示例。
+
+</AppOnly>
+
+## 示例
+
+### 纯服务端表单
+
+<PagesOnly>
+
+使用页面路由时，您需要手动创建 API 端点来安全地在服务端变更数据。
+
+```ts filename="pages/api/submit.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const data = req.body
+  const id = await createItem(data)
+  res.status(200).json({ id })
+}
+```
+
+```js filename="pages/api/submit.js" switcher
+export default function handler(req, res) {
+  const data = req.body
+  const id = await createItem(data)
+  res.status(200).json({ id })
+}
+```
+
+然后通过事件处理器在客户端调用 API 路由：
+
+```tsx filename="pages/index.tsx" switcher
+import { FormEvent } from 'react'
+
+export default function Page() {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const response = await fetch('/api/submit', {
+      method: 'POST',
+      body: formData,
+    })
+
+    // 如需处理响应
+    const data = await response.json()
+    // ...
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <input type="text" name="name" />
+      <button type="submit">提交</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+export default function Page() {
+  async function onSubmit(event) {
+    event.preventDefault()
+
+    const formData = new FormData(event.target)
+    const response = await fetch('/api/submit', {
+      method: 'POST',
+      body: formData,
+    })
+
+    // 如需处理响应
+    const data = await response.json()
+    // ...
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <input type="text" name="name" />
+      <button type="submit">提交</button>
+    </form>
+  )
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+要创建纯服务端表单，需在服务端组件中定义服务端操作。操作可内联定义（在函数顶部添加 `"use server"` 指令），或在单独文件中定义（文件顶部添加指令）。
+
+```tsx filename="app/page.tsx" switcher
+export default function Page() {
+  async function create(formData: FormData) {
+    'use server'
+
+    // 变更数据
+    // 重新验证缓存
+  }
+
+  return <form action={create}>...</form>
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default function Page() {
+  async function create(formData) {
+    'use server'
+
+    // 变更数据
+    // 重新验证缓存
+  }
+
+  return <form action={create}>...</form>
+}
+```
+
+> **须知**：`<form action={create}>` 接收 [FormData](https://developer.mozilla.org/docs/Web/API/FormData/FormData) 数据类型。上例中通过 HTML [`form`](https://developer.mozilla.org/docs/Web/HTML/Element/form) 提交的 FormData 可在服务端操作 `create` 中访问。
+
+### 重新验证数据
+
+服务端操作允许您按需使 [Next.js 缓存](/docs/app/building-your-application/caching) 失效。您可以使用 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) 使整个路由段失效：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export default async function submit() {
+  await submitForm()
+  revalidatePath('/')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export default async function submit() {
+  await submitForm()
+  revalidatePath('/')
+}
+```
+
+或使用 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) 通过缓存标签使特定数据获取失效：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export default async function submit() {
+  await addPost()
+  revalidateTag('posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export default async function submit() {
+  await addPost()
+  revalidateTag('posts')
+}
+```
+
+</AppOnly>
+
+### 重定向
+
+<PagesOnly>
+
+若要在数据变更后重定向用户，可使用 [`redirect`](/docs/pages/building-your-application/routing/api-routes#response-helpers) 跳转到任意绝对或相对 URL：
+
+```ts filename="pages/api/submit.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const id = await addPost()
+  res.redirect(307, `/post/${id}`)
+}
+```
+
+```js filename="pages/api/submit.js" switcher
+export default async function handler(req, res) {
+  const id = await addPost()
+  res.redirect(307, `/post/${id}`)
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+若要在服务端操作完成后重定向用户，可使用 [`redirect`](/docs/app/api-reference/functions/redirect) 跳转到任意绝对或相对 URL：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export default async function submit() {
+  const id = await addPost()
+  revalidateTag('posts') // 更新缓存文章
+  redirect(`/post/${id}`) // 导航到新路由
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export default async function submit() {
+  const id = await addPost()
+  revalidateTag('posts') // 更新缓存文章
+  redirect(`/post/${id}`) // 导航到新路由
+}
+```
+
+</AppOnly>
+
+### 表单验证
+
+推荐使用 `required` 和 `type="email"` 等 HTML 验证进行基础表单验证。
+
+如需高级服务端验证，可使用 [zod](https://zod.dev/) 等模式验证库验证解析后的表单数据结构：
+
+<PagesOnly>
+
+```ts filename="pages/api/submit.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { z } from 'zod'
+
+const schema = z.object({
+  // ...
+})
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const parsed = schema.parse(req.body)
+  // ...
+}
+```
+
+```js filename="pages/api/submit.js" switcher
+import { z } from 'zod'
+
+const schema = z.object({
+  // ...
+})
+
+export default async function handler(req, res) {
+  const parsed = schema.parse(req.body)
+  // ...
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+```tsx filename="app/actions.ts" switcher
+import { z } from 'zod'
+
+const schema = z.object({
+  // ...
+})
+
+export default async function submit(formData: FormData) {
+  const parsed = schema.parse({
+    id: formData.get('id'),
+  })
+  // ...
+}
+```
+
+```jsx filename="app/actions.js" switcher
+import { z } from 'zod'
+
+const schema = z.object({
+  // ...
+})
+
+export default async function submit(formData) {
+  const parsed = schema.parse({
+    id: formData.get('id'),
+  })
+  // ...
+}
+```
+
+</AppOnly>
+
+### 显示加载状态
+
+<AppOnly>
+
+使用 `useFormStatus` 钩子显示表单在服务端提交时的加载状态。该钩子只能作为使用服务端操作的 `form` 元素的子组件使用。
+
+例如以下提交按钮：
+
+```tsx filename="app/submit-button.tsx" switcher
+'use client'
+
+import { experimental_useFormStatus as useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button type="submit" aria-disabled={pending}>
+      添加
+    </button>
+  )
+}
+```
+
+```jsx filename="app/submit-button.jsx" switcher
+'use client'
+
+import { experimental_useFormStatus as useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button type="submit" aria-disabled={pending}>
+      添加
+    </button>
+  )
+}
+```
+
+`<SubmitButton />` 可在包含服务端操作的表单中使用：
+
+```tsx filename="app/page.tsx" switcher
+import { SubmitButton } from '@/app/submit-button'
+
+export default async function Home() {
+  return (
+    <form action={...}>
+      <input type="text" name="field-name" />
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { SubmitButton } from '@/app/submit-button'
+
+export default async function Home() {
+  return (
+    <form action={...}>
+      <input type="text" name="field-name" />
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+可使用 React 状态显示表单在服务端提交时的加载状态：
+
+```tsx filename="pages/index.tsx" switcher
+import React, { useState, FormEvent } from 'react'
+
+export default function Page() {
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsLoading(true) // 请求开始时设置加载状态
+
+    try {
+      const formData = new FormData(event.currentTarget)
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        body: formData,
+      })
+
+      // 如需处理响应
+      const data = await response.json()
+      // ...
+    } catch (error) {
+      // 如需处理错误
+      console.error(error)
+    } finally {
+      setIsLoading(false) // 请求完成后取消加载状态
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <input type="text" name="name" />
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? '提交中...' : '提交'}
+      </button>
+    </form>
+  )
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+import React, { useState } from 'react'
+
+export default function Page() {
+  const [isLoading, setIsLoading] = useState(false)
+
+  async function onSubmit(event) {
+    event.preventDefault()
+    setIsLoading(true) // 请求开始时设置加载状态
+
+    try {
+      const formData = new FormData(event.currentTarget)
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        body: formData,
+      })
+
+      // 如需处理响应
+      const data = await response.json()
+      // ...
+    } catch (error) {
+      // 如需处理错误
+      console.error(error)
+    } finally {
+      setIsLoading(false) // 请求完成后取消加载状态
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <input type="text" name="name" />
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? '提交中...' : '提交'}
+      </button>
+    </form>
+  )
+}
+```
+
+</PagesOnly>
+
+### 错误处理
+
+<AppOnly>
+
+服务端操作 (Server Actions) 也可以返回[可序列化对象](https://developer.mozilla.org/docs/Glossary/Serialization)。例如，您的服务端操作可以处理创建新项目时的错误：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function createTodo(prevState: any, formData: FormData) {
+  try {
+    await createItem(formData.get('todo'))
+    return revalidatePath('/')
+  } catch (e) {
+    return { message: 'Failed to create' }
+  }
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function createTodo(prevState, formData) {
+  try {
+    await createItem(formData.get('todo'))
+    return revalidatePath('/')
+  } catch (e) {
+    return { message: 'Failed to create' }
+  }
+}
+```
+
+然后，在客户端组件 (Client Component) 中，您可以读取这个值并显示错误信息。
+
+```tsx filename="app/add-form.tsx" switcher
+'use client'
+
+import { experimental_useFormState as useFormState } from 'react-dom'
+import { experimental_useFormStatus as useFormStatus } from 'react-dom'
+import { createTodo } from '@/app/actions'
+
+const initialState = {
+  message: null,
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button type="submit" aria-disabled={pending}>
+      Add
+    </button>
+  )
+}
+
+export function AddForm() {
+  const [state, formAction] = useFormState(createTodo, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="todo">Enter Task</label>
+      <input type="text" id="todo" name="todo" required />
+      <SubmitButton />
+      <p aria-live="polite" className="sr-only">
+        {state?.message}
+      </p>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/add-form.jsx" switcher
+'use client'
+
+import { experimental_useFormState as useFormState } from 'react-dom'
+import { experimental_useFormStatus as useFormStatus } from 'react-dom'
+import { createTodo } from '@/app/actions'
+
+const initialState = {
+  message: null,
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button type="submit" aria-disabled={pending}>
+      Add
+    </button>
+  )
+}
+
+export function AddForm() {
+  const [state, formAction] = useFormState(createTodo, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="todo">Enter Task</label>
+      <input type="text" id="todo" name="todo" required />
+      <SubmitButton />
+      <p aria-live="polite" className="sr-only">
+        {state?.message}
+      </p>
+    </form>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+您可以使用 React 状态在表单提交失败时显示错误信息：
+
+```tsx filename="pages/index.tsx" switcher
+import React, { useState, FormEvent } from 'react'
+
+export default function Page() {
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsLoading(true)
+    setError(null) // 新请求开始时清除之前的错误
+
+    try {
+      const formData = new FormData(event.currentTarget)
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to submit the data. Please try again.')
+      }
+
+      // 如有需要处理响应
+      const data = await response.json()
+      // ...
+    } catch (error) {
+      // 捕获错误信息显示给用户
+      setError(error.message)
+      console.error(error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      {error && <div style={{ color: 'red' }}>{error}</div>}
+      <form onSubmit={onSubmit}>
+        <input type="text" name="name" />
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? '加载中...' : '提交'}
+        </button>
+      </form>
+    </div>
+  )
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+import React, { useState } from 'react'
+
+export default function Page() {
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function onSubmit(event) {
+    event.preventDefault()
+    setIsLoading(true)
+    setError(null) // 新请求开始时清除之前的错误
+
+    try {
+      const formData = new FormData(event.currentTarget)
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to submit the data. Please try again.')
+      }
+
+      // 如有需要处理响应
+      const data = await response.json()
+      // ...
+    } catch (error) {
+      // 捕获错误信息显示给用户
+      setError(error.message)
+      console.error(error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      {error && <div style={{ color: 'red' }}>{error}</div>}
+      <form onSubmit={onSubmit}>
+        <input type="text" name="name" />
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? '加载中...' : '提交'}
+        </button>
+      </form>
+    </div>
+  )
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+### 乐观更新 (Optimistic Updates)
+
+使用 `useOptimistic` 在服务端操作完成前乐观地更新 UI，而无需等待响应：
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { experimental_useOptimistic as useOptimistic } from 'react'
+import { send } from './actions'
+
+type Message = {
+  message: string
+}
+
+export function Thread({ messages }: { messages: Message[] }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<Message[]>(
+    messages,
+    (state: Message[], newMessage: string) => [
+      ...state,
+      { message: newMessage },
+    ]
+  )
+
+  return (
+    <div>
+      {optimisticMessages.map((m, k) => (
+        <div key={k}>{m.message}</div>
+      ))}
+      <form
+        action={async (formData: FormData) => {
+          const message = formData.get('message')
+          addOptimisticMessage(message)
+          await send(message)
+        }}
+      >
+        <input type="text" name="message" />
+        <button type="submit">发送</button>
+      </form>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+'use client'
+
+import { experimental_useOptimistic as useOptimistic } from 'react'
+import { send } from './actions'
+
+export function Thread({ messages }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state, newMessage) => [...state, { message: newMessage }]
+  )
+
+  return (
+    <div>
+      {optimisticMessages.map((m) => (
+        <div>{m.message}</div>
+      ))}
+      <form
+        action={async (formData) => {
+          const message = formData.get('message')
+          addOptimisticMessage(message)
+          await send(message)
+        }}
+      >
+        <input type="text" name="message" />
+        <button type="submit">发送</button>
+      </form>
+    </div>
+  )
+}
+```
+
+</AppOnly>
+
+### 设置 Cookies
+
+<PagesOnly>
+
+您可以在 API 路由中使用响应对象的 `setHeader` 方法设置 cookie：
+
+```ts filename="pages/api/cookie.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  res.setHeader('Set-Cookie', 'username=lee; Path=/; HttpOnly')
+  res.status(200).send('Cookie 已设置。')
+}
+```
+
+```js filename="pages/api/cookie.js" switcher
+export default async function handler(req, res) {
+  res.setHeader('Set-Cookie', 'username=lee; Path=/; HttpOnly')
+  res.status(200).send('Cookie 已设置。')
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+您可以在服务端操作中使用 [`cookies`](/docs/app/api-reference/functions/cookies) 函数设置 cookie：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function create() {
+  const cart = await createCart()
+  cookies().set('cartId', cart.id)
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function create() {
+  const cart = await createCart()
+  cookies().set('cartId', cart.id)
+}
+```
+
+</AppOnly>
+
+### 读取 Cookies
+
+<PagesOnly>
+
+您可以在 API 路由中使用 [`cookies`](/docs/pages/building-your-application/routing/api-routes#request-helpers) 请求辅助函数读取 cookie：
+
+```ts filename="pages/api/cookie.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const auth = req.cookies.authorization
+  // ...
+}
+```
+
+```js filename="pages/api/cookie.js" switcher
+export default async function handler(req, res) {
+  const auth = req.cookies.authorization
+  // ...
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+您可以在服务端操作中使用 [`cookies`](/docs/app/api-reference/functions/cookies) 函数读取 cookie：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function read() {
+  const auth = cookies().get('authorization')?.value
+  // ...
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function read() {
+  const auth = cookies().get('authorization')?.value
+  // ...
+}
+```
+
+</AppOnly>
+
+### 删除 Cookies
+
+<PagesOnly>
+
+您可以在 API 路由中使用响应对象的 `setHeader` 方法删除 cookie：
+
+```ts filename="pages/api/cookie.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  res.setHeader('Set-Cookie', 'username=; Path=/; HttpOnly; Max-Age=0')
+  res.status(200).send('Cookie 已删除。')
+}
+```
+
+```js filename="pages/api/cookie.js" switcher
+export default async function handler(req, res) {
+  res.setHeader('Set-Cookie', 'username=; Path=/; HttpOnly; Max-Age=0')
+  res.status(200).send('Cookie 已删除。')
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+您可以在服务端操作中使用 [`cookies`](/docs/app/api-reference/functions/cookies) 函数删除 cookie：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function delete() {
+  cookies().delete('name')
+  // ...
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function delete() {
+  cookies().delete('name')
+  // ...
+}
+```
+
+查看[更多示例](/docs/app/api-reference/functions/cookies#deleting-cookies)了解如何从服务端操作中删除 cookie。
+
+</AppOnly>

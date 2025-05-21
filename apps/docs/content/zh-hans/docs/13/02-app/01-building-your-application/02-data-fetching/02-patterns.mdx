@@ -1,0 +1,314 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T21:06:14.103Z
+title: 数据获取模式
+description: 了解 React 和 Next.js 中常见的数据获取模式。
+---
+
+在 React 和 Next.js 中有一些推荐的数据获取模式和最佳实践。本页将介绍一些最常见的模式及其使用方法。
+
+### 服务端数据获取
+
+我们建议尽可能在服务端获取数据。这样做可以：
+
+- 直接访问后端数据资源（如数据库）
+- 通过防止敏感信息（如访问令牌和 API 密钥）暴露给客户端，提高应用安全性
+- 在同一环境中获取数据并渲染，减少客户端与服务器之间的往返通信以及客户端的[主线程工作负载](https://vercel.com/blog/how-react-18-improves-application-performance)
+- 通过单次往返执行多次数据获取，而非在客户端发起多个独立请求
+- 减少客户端-服务器之间的[瀑布流问题](#并行与顺序数据获取)
+- 根据所在地区，数据获取可以更靠近数据源，从而降低延迟并提升性能
+
+您可以使用服务端组件、[路由处理器](/docs/app/building-your-application/routing/route-handlers)和[服务端操作](/docs/app/building-your-application/data-fetching/forms-and-mutations)在服务端获取数据。
+
+### 在需要的地方获取数据
+
+如果需要在组件树中的多个组件中使用相同数据（如当前用户），您不必全局获取数据或在组件间传递 props。相反，您可以在需要数据的组件中使用 `fetch` 或 React `cache`，而无需担心多次请求相同数据对性能的影响。
+
+这是因为 `fetch` 请求会自动被记忆化。了解更多关于[请求记忆化](/docs/app/building-your-application/caching#request-memoization)的内容。
+
+> **须知**：这也适用于布局，因为无法在父布局与其子组件之间传递数据。
+
+### 流式渲染
+
+流式渲染和 [Suspense](https://react.dev/reference/react/Suspense) 是 React 的功能，允许您逐步渲染并将 UI 单元增量式地流式传输到客户端。
+
+通过服务端组件和[嵌套布局](/docs/app/building-your-application/routing/pages-and-layouts)，您可以立即渲染不需要特定数据的页面部分，并为正在获取数据的页面部分显示[加载状态](/docs/app/building-your-application/routing/loading-ui-and-streaming)。这意味着用户无需等待整个页面加载完成即可开始与之交互。
+
+<Image
+  alt="服务端流式渲染"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+要了解更多关于流式渲染和 Suspense 的内容，请参阅[加载 UI](/docs/app/building-your-application/routing/loading-ui-and-streaming) 和[流式渲染与 Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense) 页面。
+
+### 并行与顺序数据获取
+
+在 React 组件内部获取数据时，需要注意两种数据获取模式：并行和顺序。
+
+<Image
+  alt="顺序与并行数据获取"
+  srcLight="/docs/light/sequential-parallel-data-fetching.png"
+  srcDark="/docs/dark/sequential-parallel-data-fetching.png"
+  width="1600"
+  height="525"
+/>
+
+- **顺序数据获取**：路由中的请求相互依赖，因此会产生瀑布流。某些情况下您可能需要这种模式，因为一个请求依赖于另一个请求的结果，或者您希望在满足某个条件后再进行下一个请求以节省资源。然而，这种行为也可能是无意的，并导致更长的加载时间。
+- **并行数据获取**：路由中的请求会立即并行发起，同时加载数据。这减少了客户端-服务器之间的瀑布流问题以及数据加载的总时间。
+
+#### 顺序数据获取
+
+如果有嵌套组件，且每个组件都获取自己的数据，那么当这些数据请求不同时（这不适用于相同数据的请求，因为它们会自动[记忆化](/docs/app/building-your-application/caching#request-memoization)），数据获取将按顺序进行。
+
+例如，`Playlists` 组件只有在 `Artist` 组件完成数据获取后才会开始获取数据，因为 `Playlists` 依赖于 `artistID` prop：
+
+```tsx filename="app/artist/page.tsx" switcher
+// ...
+
+async function Playlists({ artistID }: { artistID: string }) {
+  // 等待播放列表
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // 等待艺术家数据
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>加载中...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/page.js" switcher
+// ...
+
+async function Playlists({ artistID }) {
+  // 等待播放列表
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({ params: { username } }) {
+  // 等待艺术家数据
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>加载中...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+在这种情况下，您可以使用 [`loading.js`](/docs/app/building-your-application/routing/loading-ui-and-streaming)（用于路由段）或 [React `<Suspense>`](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense)（用于嵌套组件）来显示即时加载状态，同时 React 流式传输结果。
+
+这将防止整个路由被数据获取阻塞，用户可以与页面中未被阻塞的部分进行交互。
+
+> **阻塞式数据请求：**
+>
+> 防止瀑布流问题的另一种方法是在应用的根节点全局获取数据，但这会阻塞其下所有路由段的渲染，直到数据加载完成。这可以描述为“全有或全无”的数据获取方式。要么获取整个页面或应用的所有数据，要么什么也没有。
+>
+> 任何带有 `await` 的 `fetch` 请求都会阻塞其下整个树的渲染和数据获取，除非它们被包裹在 `<Suspense>` 边界中或使用了 `loading.js`。另一种方法是使用[并行数据获取](#并行数据获取)或[预加载模式](#预加载数据)。
+
+#### 并行数据获取
+
+要并行获取数据，您可以在使用数据的组件外部定义请求，然后在组件内部调用它们。这样可以同时发起两个请求以节省时间，但用户需要等待两个 Promise 都解析完成后才能看到渲染结果。
+
+在下面的示例中，`getArtist` 和 `getArtistAlbums` 函数在 `Page` 组件外部定义，然后在组件内部调用，我们等待两个 Promise 解析：
+
+```tsx filename="app/artist/[username]/page.tsx" switcher
+import Albums from './albums'
+
+async function getArtist(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // 并行发起两个请求
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // 等待 Promise 解析
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/[username]/page.js" switcher
+import Albums from './albums'
+
+async function getArtist(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({ params: { username } }) {
+  // 并行发起两个请求
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // 等待 Promise 解析
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+为了改善用户体验，您可以添加 [Suspense 边界](/docs/app/building-your-application/routing/loading-ui-and-streaming) 来分割渲染工作，并尽快显示部分结果。
+
+### 预加载数据
+
+防止瀑布流问题的另一种方法是使用预加载模式。您可以选择创建一个 `preload` 函数来进一步优化并行数据获取。通过这种方法，您无需将 Promise 作为 props 传递下去。`preload` 函数也可以使用任何名称，因为它是一种模式，而非 API。
+
+```tsx filename="components/Item.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id: string) => {
+  // void 运算符会执行给定表达式并返回 undefined
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }: { id: string }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="components/Item.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id) => {
+  // void 运算符会执行给定表达式并返回 undefined
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  // 开始加载项目数据
+  preload(id)
+  // 执行另一个异步任务
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({ params: { id } }) {
+  // 开始加载项目数据
+  preload(id)
+  // 执行另一个异步任务
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+### 使用 React `cache`、`server-only` 和预加载模式
+
+您可以结合 `cache` 函数、预加载模式和 `server-only` 包来创建一个可在整个应用中使用的数据获取工具。
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id: string) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id: string) => {
+  // ...
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id) => {
+  // ...
+})
+```
+
+通过这种方法，您可以急切地获取数据、缓存响应，并确保数据获取[仅在服务端进行](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment)。
+
+`utils/get-item` 的导出可以被布局、页面或其他组件使用，以控制何时获取项目数据。
+
+> **须知：**
+>
+> - 我们建议使用 [`server-only` 包](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment) 来确保服务端数据获取函数永远不会在客户端使用。

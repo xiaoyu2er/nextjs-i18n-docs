@@ -1,0 +1,375 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T21:06:48.651Z
+title: 数据获取、缓存与重新验证
+nav_title: 获取、缓存与重新验证
+description: 学习如何在您的 Next.js 应用中获取、缓存和重新验证数据。
+---
+
+数据获取是任何应用的核心部分。本文将介绍如何在 React 和 Next.js 中获取、缓存及重新验证数据。
+
+数据获取有以下四种方式：
+
+1. [在服务端使用 `fetch`](#在服务端使用-fetch-获取数据)
+2. [在服务端使用第三方库](#在服务端使用第三方库获取数据)
+3. [在客户端通过路由处理器获取](#在客户端通过路由处理器获取数据)
+4. [在客户端使用第三方库](#在客户端使用第三方库获取数据)
+
+## 在服务端使用 `fetch` 获取数据
+
+Next.js 扩展了原生的 [`fetch` Web API](https://developer.mozilla.org/docs/Web/API/Fetch_API)，允许您为服务端的每个 fetch 请求配置[缓存](#数据缓存)和[重新验证](#重新验证数据)行为。React 则扩展了 `fetch` 功能，在渲染 React 组件树时自动[记忆化](/docs/app/building-your-application/data-fetching/patterns#fetching-data-where-its-needed) fetch 请求。
+
+您可以在[服务端组件](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md)中使用 `async`/`await` 配合 `fetch`，也可用于[路由处理器](/docs/app/building-your-application/routing/route-handlers)和[服务端动作](/docs/app/building-your-application/data-fetching/forms-and-mutations)。
+
+例如：
+
+```tsx filename="app/page.tsx" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // 返回值不会被序列化
+  // 您可以返回 Date、Map、Set 等类型
+
+  if (!res.ok) {
+    // 这将触发最近的 `error.js` 错误边界
+    throw new Error('Failed to fetch data')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+```jsx filename="app/page.js" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // 返回值不会被序列化
+  // 您可以返回 Date、Map、Set 等类型
+
+  if (!res.ok) {
+    // 这将触发最近的 `error.js` 错误边界
+    throw new Error('Failed to fetch data')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+> **须知**：
+>
+> - Next.js 提供了一些在服务端组件中获取数据时可能有用的函数，如 [`cookies`](/docs/app/api-reference/functions/cookies) 和 [`headers`](/docs/app/api-reference/functions/headers)。这些函数会导致路由动态渲染，因为它们依赖于请求时的信息。
+> - 在路由处理器中，`fetch` 请求不会被记忆化，因为路由处理器不属于 React 组件树。
+> - 在 TypeScript 中使用 `async`/`await` 的服务端组件需要 TypeScript `5.1.3` 或更高版本以及 `@types/react` `18.2.8` 或更高版本。
+
+### 数据缓存
+
+缓存存储数据，避免每次请求都从数据源重新获取。
+
+默认情况下，Next.js 会自动将 `fetch` 的返回值缓存在服务端的[数据缓存](/docs/app/building-your-application/caching#data-cache)中。这意味着数据可以在构建时或请求时获取、缓存，并在每次数据请求时重复使用。
+
+```js
+// 'force-cache' 是默认值，可以省略
+fetch('https://...', { cache: 'force-cache' })
+```
+
+使用 `POST` 方法的 `fetch` 请求也会被自动缓存。除非它位于使用 `POST` 方法的[路由处理器](/docs/app/building-your-application/routing/route-handlers)中，此时不会被缓存。
+
+> **什么是数据缓存？**
+>
+> 数据缓存是一个持久的 [HTTP 缓存](https://developer.mozilla.org/docs/Web/HTTP/Caching)。根据您的平台，缓存可以自动扩展并[跨多个区域共享](https://vercel.com/docs/infrastructure/data-cache)。
+>
+> 了解更多关于[数据缓存](/docs/app/building-your-application/caching#data-cache)的信息。
+
+### 重新验证数据
+
+重新验证是清除数据缓存并重新获取最新数据的过程。这在数据发生变化且您希望确保显示最新信息时非常有用。
+
+缓存数据可以通过两种方式重新验证：
+
+- **基于时间的重新验证**：在一定时间间隔后自动重新验证数据。适用于变化不频繁且新鲜度要求不高的数据。
+- **按需重新验证**：基于事件（如表单提交）手动重新验证数据。按需重新验证可以使用基于标签或路径的方法一次性重新验证一组数据。适用于需要尽快显示最新数据的场景（例如无头 CMS 内容更新时）。
+
+#### 基于时间的重新验证
+
+要按时间间隔重新验证数据，可以使用 `fetch` 的 `next.revalidate` 选项设置资源的缓存生命周期（以秒为单位）。
+
+```js
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+或者，要重新验证路由段中的所有 `fetch` 请求，可以使用[段配置选项](/docs/app/api-reference/file-conventions/route-segment-config)。
+
+```jsx filename="layout.js | page.js"
+export const revalidate = 3600 // 最多每小时重新验证一次
+```
+
+如果在静态渲染的路由中有多个 fetch 请求，且每个请求有不同的重新验证频率，则所有请求将使用最短的时间。对于动态渲染的路由，每个 `fetch` 请求将独立重新验证。
+
+了解更多关于[基于时间的重新验证](/docs/app/building-your-application/caching#time-based-revalidation)。
+
+#### 按需重新验证
+
+可以在路由处理器或服务端动作中通过路径 ([`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)) 或缓存标签 ([`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)) 按需重新验证数据。
+
+Next.js 有一个缓存标签系统，用于跨路由使 `fetch` 请求失效。
+
+1. 使用 `fetch` 时，可以选择用一个或多个标签标记缓存条目。
+2. 然后，可以调用 `revalidateTag` 重新验证与该标签关联的所有条目。
+
+例如，以下 `fetch` 请求添加了缓存标签 `collection`：
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+如果使用路由处理器，应创建一个只有 Next.js 应用知道的密钥。此密钥用于防止未经授权的重新验证尝试。例如，可以通过以下 URL 结构访问路由（手动或通过 webhook）：
+
+```bash filename="URL"
+https://<your-site.com>/api/revalidate?tag=collection&secret=<token>
+```
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { NextRequest } from 'next/server'
+import { revalidateTag } from 'next/cache'
+
+// 例如 webhook 调用 `your-website.com/api/revalidate?tag=collection&secret=<token>`
+export async function POST(request: NextRequest) {
+  const secret = request.nextUrl.searchParams.get('secret')
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (secret !== process.env.MY_SECRET_TOKEN) {
+    return Response.json({ message: 'Invalid secret' }, { status: 401 })
+  }
+
+  if (!tag) {
+    return Response.json({ message: 'Missing tag param' }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidateTag } from 'next/cache'
+
+// 例如 webhook 调用 `your-website.com/api/revalidate?tag=collection&secret=<token>`
+export async function POST(request) {
+  const secret = request.nextUrl.searchParams.get('secret')
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (secret !== process.env.MY_SECRET_TOKEN) {
+    return Response.json({ message: 'Invalid secret' }, { status: 401 })
+  }
+
+  if (!tag) {
+    return Response.json({ message: 'Missing tag param' }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+或者，可以使用 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) 重新验证与路径关联的所有数据。
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { NextRequest } from 'next/server'
+import { revalidatePath } from 'next/cache'
+
+export async function POST(request: NextRequest) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (!path) {
+    return Response.json({ message: 'Missing path param' }, { status: 400 })
+  }
+
+  revalidatePath(path)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function POST(request) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (!path) {
+    return Response.json({ message: 'Missing path param' }, { status: 400 })
+  }
+
+  revalidatePath(path)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+了解更多关于[按需重新验证](/docs/app/building-your-application/caching#on-demand-revalidation)。
+
+#### 错误处理与重新验证
+
+如果在尝试重新验证数据时抛出错误，将继续从缓存中提供上次成功生成的数据。在后续请求中，Next.js 将重试重新验证数据。
+
+### 退出数据缓存
+
+以下情况 `fetch` 请求**不会**被缓存：
+
+- `fetch` 请求中添加了 `cache: 'no-store'`。
+- 单个 `fetch` 请求中添加了 `revalidate: 0` 选项。
+- `fetch` 请求位于使用 `POST` 方法的路由处理器中。
+- `fetch` 请求在使用了 `headers` 或 `cookies` 之后。
+- 使用了 `const dynamic = 'force-dynamic'` 路由段选项。
+- `fetchCache` 路由段选项配置为默认跳过缓存。
+- `fetch` 请求使用了 `Authorization` 或 `Cookie` 标头，并且组件树中有未缓存的请求在其上方。
+
+#### 单个 `fetch` 请求
+
+要为单个 `fetch` 请求退出缓存，可以将 `fetch` 的 `cache` 选项设置为 `'no-store'`。这将在每次请求时动态获取数据。
+
+```js filename="layout.js | page.js"
+fetch('https://...', { cache: 'no-store' })
+```
+
+查看所有可用的 `cache` 选项，请参阅 [`fetch` API 参考](/docs/app/api-reference/functions/fetch)。
+
+#### 多个 `fetch` 请求
+
+如果路由段（如布局或页面）中有多个 `fetch` 请求，可以使用[段配置选项](/docs/app/api-reference/file-conventions/route-segment-config)配置该段中所有数据请求的缓存行为。
+
+例如，使用 `const dynamic = 'force-dynamic'` 将导致所有数据在请求时获取，并且该段将动态渲染。
+
+```js filename="layout.js | page.js"
+// 添加
+export const dynamic = 'force-dynamic'
+```
+
+段配置选项提供了广泛的列表，让您可以精细控制路由段的静态和动态行为。更多信息请参阅[API 参考](/docs/app/api-reference/file-conventions/route-segment-config)。
+
+## 在服务端使用第三方库获取数据
+
+如果您使用的第三方库不支持或不暴露 `fetch`（例如数据库、CMS 或 ORM 客户端），可以使用[路由段配置选项](/docs/app/api-reference/file-conventions/route-segment-config)和 React 的 `cache` 函数配置这些请求的缓存和重新验证行为。
+
+数据是否缓存取决于路由段是[静态还是动态渲染](/docs/app/building-your-application/rendering/server-components#server-rendering-strategies)。如果段是静态的（默认），请求的输出将作为路由段的一部分被缓存和重新验证。如果段是动态的，请求的输出将**不会**被缓存，并在段渲染时每次请求都会重新获取。
+
+> **须知**：
+>
+> Next.js 正在开发一个 API `unstable_cache`，用于配置单个第三方请求的缓存和重新验证行为。
+
+### 示例
+
+在以下示例中：
+
+- `revalidate` 选项设置为 `3600`，意味着数据最多每小时缓存并重新验证一次。
+- React 的 `cache` 函数用于[记忆化](/docs/app/building-your-application/caching#request-memoization)数据请求。
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+
+export const revalidate = 3600 // 最多每小时重新验证数据一次
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+
+export const revalidate = 3600 // 最多每小时重新验证数据一次
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+尽管 `getItem` 函数被调用了两次，但只会向数据库发送一次查询。
+
+```tsx filename="app/item/[id]/layout.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Layout({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/layout.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Layout({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Page({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+## 在客户端通过路由处理器获取数据
+
+如果需要在客户端组件中获取数据，可以从客户端调用[路由处理器](/docs/app/building-your-application/routing/route-handlers)。路由处理器在服务端执行并将数据返回给客户端。这在您不想向客户端暴露敏感信息（如 API 令牌）时非常有用。
+
+请参阅[路由处理器](/docs/app/building-your-application/routing/route-handlers)文档中的示例。
+
+> **服务端组件与路由处理器**
+>
+> 由于服务端组件在服务端渲染，您不需要从服务端组件调用路由处理器来获取数据。相反，可以直接在服务端组件中获取数据。
+
+## 在客户端使用第三方库获取数据
+
+您也可以使用第三方库（如 [SWR](https://swr.vercel.app/) 或 [React Query](https://tanstack.com/query/latest)）在客户端获取数据。这些库提供了自己的 API 用于记忆化请求、缓存、重新验证和变更数据。
+
+> **未来 API**：
+>
+> `use` 是一个 React 函数，**接受并处理**由函数返回的 promise。目前**不建议**在客户端组件中包装 `fetch` 使用 `use`，因为这可能会触发多次重新渲染。了解更多关于 `use` 的信息，请参阅 [React RFC](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md#usepromise)。

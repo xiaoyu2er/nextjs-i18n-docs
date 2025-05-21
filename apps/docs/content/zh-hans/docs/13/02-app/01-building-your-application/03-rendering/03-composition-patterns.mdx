@@ -1,0 +1,556 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T21:06:45.530Z
+title: 服务端与客户端组合模式
+nav_title: 组合模式
+description: 关于使用服务端组件 (Server Components) 和客户端组件 (Client Components) 的推荐模式。
+---
+
+构建 React 应用时，您需要考虑应用的哪些部分应在服务端或客户端渲染。本文介绍使用服务端组件和客户端组件时的一些推荐组合模式。
+
+## 何时使用服务端与客户端组件？
+
+以下是服务端组件和客户端组件不同使用场景的快速参考：
+
+| 您需要实现的功能                                                                 | 服务端组件          | 客户端组件          |
+| -------------------------------------------------------------------------------- | ------------------- | ------------------- |
+| 获取数据                                                                         | <Check size={18} /> | <Cross size={18} /> |
+| 直接访问后端资源                                                                 | <Check size={18} /> | <Cross size={18} /> |
+| 在服务端保存敏感信息（访问令牌、API 密钥等）                                     | <Check size={18} /> | <Cross size={18} /> |
+| 将大型依赖保留在服务端 / 减少客户端 JavaScript                                   | <Check size={18} /> | <Cross size={18} /> |
+| 添加交互性和事件监听器（`onClick()`、`onChange()` 等）                           | <Cross size={18} /> | <Check size={18} /> |
+| 使用状态和生命周期 Effects（`useState()`、`useReducer()`、`useEffect()` 等）     | <Cross size={18} /> | <Check size={18} /> |
+| 使用仅限浏览器的 API                                                             | <Cross size={18} /> | <Check size={18} /> |
+| 使用依赖于状态、Effects 或浏览器 API 的自定义钩子                                | <Cross size={18} /> | <Check size={18} /> |
+| 使用 [React 类组件](https://react.dev/reference/react/Component)                  | <Cross size={18} /> | <Check size={18} /> |
+
+## 服务端组件模式
+
+在选择客户端渲染之前，您可能希望在服务端执行某些操作，例如获取数据或访问数据库和后端服务。
+
+以下是使用服务端组件时的常见模式：
+
+### 组件间共享数据
+
+在服务端获取数据时，有时需要在不同组件间共享数据。例如，某个布局和页面可能依赖相同的数据。
+
+您无需使用 [React Context](https://react.dev/learn/passing-data-deeply-with-context)（服务端不可用）或通过 props 传递数据，可以使用 [`fetch`](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#fetching-data-on-the-server-with-fetch) 或 React 的 `cache` 函数在需要数据的组件中获取相同数据，而无需担心重复请求。这是因为 React 扩展了 `fetch` 来自动记忆数据请求，当 `fetch` 不可用时可以使用 `cache` 函数。
+
+了解更多关于 React 中的 [记忆化 (memoization)](/docs/app/building-your-application/caching#request-memoization)。
+
+### 防止服务端代码泄露到客户端环境
+
+由于 JavaScript 模块可以在服务端和客户端组件间共享，原本仅应在服务端运行的代码可能会意外进入客户端。
+
+例如以下数据获取函数：
+
+```ts filename="lib/data.ts" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+```js filename="lib/data.js" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+乍看之下，`getData` 似乎在服务端和客户端都能工作。但此函数包含 `API_KEY`，其设计初衷是仅在服务端执行。
+
+由于环境变量 `API_KEY` 没有 `NEXT_PUBLIC_` 前缀，它是只能在服务端访问的私有变量。为防止环境变量泄露到客户端，Next.js 会用空字符串替换私有环境变量。
+
+因此，尽管 `getData()` 可以在客户端导入和执行，但不会按预期工作。虽然将变量公开可使函数在客户端工作，但您可能不希望将敏感信息暴露给客户端。
+
+为防止服务端代码意外在客户端使用，我们可以使用 `server-only` 包，在开发者意外将这些模块导入客户端组件时提供构建时错误。
+
+要使用 `server-only`，首先安装包：
+
+```bash filename="Terminal"
+npm install server-only
+```
+
+然后将包导入包含服务端代码的模块：
+
+```js filename="lib/data.js"
+import 'server-only'
+
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+现在，任何导入 `getData()` 的客户端组件都会收到构建时错误，说明此模块只能用于服务端。
+
+对应的 `client-only` 包可用于标记包含仅限客户端代码的模块——例如访问 `window` 对象的代码。
+
+### 使用第三方包和 Provider
+
+由于服务端组件是 React 的新特性，生态系统中的第三方包和 provider 刚开始为使用客户端特性的组件（如 `useState`、`useEffect` 和 `createContext`）添加 `"use client"` 指令。
+
+目前，许多来自 `npm` 的使用客户端特性的组件尚未添加该指令。这些第三方组件在客户端组件中可以正常工作（因为它们有 `"use client"` 指令），但在服务端组件中无法工作。
+
+例如，假设您安装了假设的 `acme-carousel` 包，其中包含 `<Carousel />` 组件。该组件使用了 `useState`，但尚未添加 `"use client"` 指令。
+
+如果在客户端组件中使用 `<Carousel />`，它会按预期工作：
+
+```tsx filename="app/gallery.tsx" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  let [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>View pictures</button>
+
+      {/* 可以工作，因为 Carousel 在客户端组件中使用 */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/gallery.js" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  let [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>View pictures</button>
+
+      {/* 可以工作，因为 Carousel 在客户端组件中使用 */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+但如果直接在服务端组件中使用，会出现错误：
+
+```tsx filename="app/page.tsx" switcher
+import { Carousel } from 'acme-carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+
+      {/* 错误：`useState` 不能在服务端组件中使用 */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Carousel } from 'acme-carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+
+      {/* 错误：`useState` 不能在服务端组件中使用 */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+这是因为 Next.js 不知道 `<Carousel />` 使用了客户端特性。
+
+要解决此问题，您可以将依赖客户端特性的第三方组件包装在您自己的客户端组件中：
+
+```tsx filename="app/carousel.tsx" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+```jsx filename="app/carousel.js" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+现在，您可以直接在服务端组件中使用 `<Carousel />`：
+
+```tsx filename="app/page.tsx" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+
+      {/* 可以工作，因为 Carousel 是客户端组件 */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+
+      {/* 可以工作，因为 Carousel 是客户端组件 */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+我们预计您不需要包装大多数第三方组件，因为您可能会在客户端组件中使用它们。但有一个例外是 provider，因为它们依赖 React 状态和上下文，并且通常需要在应用的根目录使用。[在下方了解更多关于第三方上下文 provider 的内容](#using-context-providers)。
+
+#### 使用上下文 Provider
+
+上下文 Provider 通常渲染在应用根目录附近以共享全局关注点，例如当前主题。由于 [React 上下文](https://react.dev/learn/passing-data-deeply-with-context) 在服务端组件中不受支持，尝试在应用根目录创建上下文会导致错误：
+
+```tsx filename="app/layout.tsx" switcher
+import { createContext } from 'react'
+
+// createContext 在服务端组件中不受支持
+export const ThemeContext = createContext({})
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import { createContext } from 'react'
+
+// createContext 在服务端组件中不受支持
+export const ThemeContext = createContext({})
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+      </body>
+    </html>
+  )
+}
+```
+
+要解决此问题，在客户端组件中创建上下文并渲染其 provider：
+
+```tsx filename="app/theme-provider.tsx" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({ children }) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+```jsx filename="app/theme-provider.js" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({ children }) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+现在您的服务端组件可以直接渲染 provider，因为它已被标记为客户端组件：
+
+```tsx filename="app/layout.tsx" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+在根目录渲染 provider 后，应用中所有其他客户端组件都可以消费此上下文。
+
+> **须知**：您应尽可能在组件树深层渲染 provider——注意 `ThemeProvider` 只包裹 `{children}` 而不是整个 `<html>` 文档。这使得 Next.js 更容易优化服务端组件的静态部分。
+
+#### 给库作者的建议
+
+同样，为其他开发者创建可消费包的库作者可以使用 `"use client"` 指令标记包的客户端入口点。这使得包用户可以直接将包组件导入其服务端组件，而无需创建包装边界。
+
+您可以通过 [在组件树深层使用 'use client'](#moving-client-components-down-the-tree) 来优化包，使导入的模块成为服务端组件模块图的一部分。
+
+值得注意的是，某些打包工具可能会移除 `"use client"` 指令。您可以在 [React Wrap Balancer](https://github.com/shuding/react-wrap-balancer/blob/main/tsup.config.ts#L10-L13) 和 [Vercel Analytics](https://github.com/vercel/analytics/blob/main/packages/web/tsup.config.js#L26-L30) 仓库中找到如何配置 esbuild 以包含 `"use client"` 指令的示例。
+
+## 客户端组件
+
+### 将客户端组件移至组件树深层
+
+为减少客户端 JavaScript 包大小，我们建议将客户端组件移至组件树深层。
+
+例如，您可能有一个包含静态元素（如徽标、链接等）和使用了状态的交互式搜索栏的布局。
+
+无需将整个布局设为客户端组件，将交互逻辑移至客户端组件（如 `<SearchBar />`），保持布局为服务端组件。这意味着您无需将布局的所有组件 JavaScript 发送到客户端。
+
+```tsx filename="app/layout.tsx" switcher
+// SearchBar 是客户端组件
+import SearchBar from './searchbar'
+// Logo 是服务端组件
+import Logo from './logo'
+
+// 默认情况下 Layout 是服务端组件
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+// SearchBar 是客户端组件
+import SearchBar from './searchbar'
+// Logo 是服务端组件
+import Logo from './logo'
+
+// 默认情况下 Layout 是服务端组件
+export default function Layout({ children }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+### 从服务端组件向客户端组件传递 props（序列化）
+
+如果在服务端组件获取数据，您可能希望将数据作为 props 传递给客户端组件。从服务端传递给客户端组件的 props 需要能被 React [序列化 (serializable)](https://developer.mozilla.org/docs/Glossary/Serialization)。
+
+如果您的客户端组件依赖不可序列化的数据，可以通过 [第三方库在客户端获取数据](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#fetching-data-on-the-client-with-third-party-libraries) 或在服务端通过 [路由处理器 (Route Handler)](/docs/app/building-your-application/routing/route-handlers) 获取。
+
+## 服务端组件与客户端组件交错渲染
+
+在交错使用服务端组件 (Server Components) 和客户端组件 (Client Components) 时，将您的 UI 可视化为组件树会很有帮助。从作为服务端组件的 [根布局 (root layout)](/docs/app/building-your-application/routing/pages-and-layouts#root-layout-required) 开始，您可以通过添加 `"use client"` 指令在客户端渲染特定的组件子树。
+
+{/* 图表 - 交错渲染 */}
+
+在这些客户端子树中，您仍然可以嵌套服务端组件或调用服务端操作 (Server Actions)，但需要注意以下几点：
+
+- 在请求-响应生命周期中，您的代码会从服务端移动到客户端。如果您需要在客户端访问服务端的数据或资源，您将向服务端发起**新的**请求——而不是来回切换。
+- 当向服务端发起新请求时，所有服务端组件会首先渲染，包括嵌套在客户端组件内部的那些。渲染结果（RSC Payload）将包含对客户端组件位置的引用。然后，在客户端上，React 会使用 RSC Payload 将服务端和客户端组件协调成单一的树结构。
+
+{/* 图表 */}
+
+- 由于客户端组件是在服务端组件之后渲染的，因此您不能将服务端组件导入到客户端组件模块中（因为这会需要向服务端发起新的请求）。相反，您可以将服务端组件作为 `props` 传递给客户端组件。请参阅下面的[不支持的模式](#unsupported-pattern-importing-server-components-into-client-components)和[支持的模式](#supported-pattern-passing-server-components-to-client-components-as-props)部分。
+
+### 不支持的模式：将服务端组件导入客户端组件
+
+以下模式不被支持。您不能将服务端组件导入到客户端组件中：
+
+```tsx filename="app/client-component.tsx" switcher highlight={4,17}
+'use client'
+
+// 不能将服务端组件导入到客户端组件中
+import ServerComponent from './Server-Component'
+
+export default function ClientComponent({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      <ServerComponent />
+    </>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" switcher highlight={3,13}
+'use client'
+
+// 不能将服务端组件导入到客户端组件中
+import ServerComponent from './Server-Component'
+
+export default function ClientComponent({ children }) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      <ServerComponent />
+    </>
+  )
+}
+```
+
+### 支持的模式：将服务端组件作为 Props 传递给客户端组件
+
+以下模式是支持的。您可以将服务端组件作为 prop 传递给客户端组件。
+
+一种常见的模式是使用 React 的 `children` prop 在您的客户端组件中创建一个“插槽”。
+
+在下面的示例中，`<ClientComponent>` 接受一个 `children` prop：
+
+```tsx filename="app/client-component.tsx" switcher highlight={6,15}
+'use client'
+
+import { useState } from 'react'
+
+export default function ClientComponent({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+      {children}
+    </>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" switcher highlight={5,12}
+'use client'
+
+import { useState } from 'react'
+
+export default function ClientComponent({ children }) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      {children}
+    </>
+  )
+}
+```
+
+`<ClientComponent>` 并不知道 `children` 最终会被服务端组件的结果填充。`<ClientComponent>` 的唯一职责是决定 `children` 最终被放置的**位置**。
+
+在父级服务端组件中，您可以同时导入 `<ClientComponent>` 和 `<ServerComponent>`，并将 `<ServerComponent>` 作为 `<ClientComponent>` 的子组件传递：
+
+```tsx filename="app/page.tsx"  highlight={11} switcher
+// 这种模式是可行的：
+// 您可以将服务端组件作为子组件或 prop 传递给客户端组件
+import ClientComponent from './client-component'
+import ServerComponent from './server-component'
+
+// Next.js 中的页面默认是服务端组件
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent />
+    </ClientComponent>
+  )
+}
+```
+
+```jsx filename="app/page.js" highlight={11} switcher
+// 这种模式是可行的：
+// 您可以将服务端组件作为子组件或 prop 传递给客户端组件
+import ClientComponent from './client-component'
+import ServerComponent from './server-component'
+
+// Next.js 中的页面默认是服务端组件
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent />
+    </ClientComponent>
+  )
+}
+```
+
+通过这种方法，`<ClientComponent>` 和 `<ServerComponent>` 是解耦的，可以独立渲染。在这种情况下，子组件 `<ServerComponent>` 可以在服务端渲染，远早于 `<ClientComponent>` 在客户端渲染。
+
+> **须知：**
+>
+> - “提升内容”的模式已被用于避免在父组件重新渲染时重新渲染嵌套的子组件。
+> - 您不仅限于使用 `children` prop。您可以使用任何 prop 来传递 JSX。

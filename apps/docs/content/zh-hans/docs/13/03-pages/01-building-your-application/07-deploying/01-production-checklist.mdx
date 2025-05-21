@@ -1,0 +1,145 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:52:02.386Z
+title: 生产环境部署
+description: 在将 Next.js 应用部署到生产环境前，请遵循以下建议以确保最佳用户体验。
+---
+
+在将 Next.js 应用部署到生产环境前，请遵循以下建议以确保最佳用户体验。
+
+## 通用建议
+
+- 尽可能使用[缓存](#缓存)机制
+- 确保数据库和后端服务部署在同一区域
+- 尽量减少 JavaScript 打包体积
+- 延迟加载重型 JavaScript 包
+- 配置完善的[日志记录](#日志记录)系统
+- 设置完备的[错误处理](#错误处理)机制
+- 配置 [404](/docs/pages/building-your-application/routing/custom-error#404-page)（未找到）和 [500](/docs/pages/building-your-application/routing/custom-error#500-page)（错误）页面
+- 实施[性能监控](/docs/pages/building-your-application/optimizing/analytics)
+- 使用 [Lighthouse](https://developers.google.com/web/tools/lighthouse) 检测性能、最佳实践、可访问性和 SEO。为获得最佳结果，请使用 Next.js 生产构建版本，并在浏览器无痕模式下测试以避免插件干扰
+- 检查[支持的浏览器和特性](/docs/architecture/supported-browsers)
+- 通过以下方式优化性能：
+  - [`next/image` 和自动图片优化](/docs/pages/building-your-application/optimizing/images)
+  - [自动字体优化](/docs/pages/building-your-application/optimizing/fonts)
+  - [脚本优化](/docs/pages/building-your-application/optimizing/scripts)
+- 提升[加载性能](#加载性能)
+- 考虑添加[内容安全策略](/docs/pages/building-your-application/configuring/content-security-policy)
+
+## 缓存
+
+<details open>
+  <summary>示例</summary>
+
+- [ssr-caching](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+缓存可提升响应速度并减少外部服务的请求次数。Next.js 会自动为 `/_next/static` 下的不可变资源（包括 JavaScript、CSS、静态图片和其他媒体文件）添加缓存头。
+
+```terminal
+Cache-Control: public, max-age=31536000, immutable
+```
+
+在 `next.config.js` 中设置的 `Cache-Control` 头会在生产环境中被覆盖，以确保静态资源能被有效缓存。如需重新验证[静态生成](/docs/pages/building-your-application/rendering/static-site-generation)页面的缓存，可通过页面 [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) 函数中的 `revalidate` 参数实现。使用 `next/image` 时，可配置默认图片优化加载器的 [`minimumCacheTTL`](/docs/pages/api-reference/components/image#minimumcachettl)。
+
+> **须知**：在本地使用 `next dev` 运行应用时，缓存头会被覆盖以防止本地缓存。
+
+```terminal
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+```
+
+您也可以在 `getServerSideProps` 和 API 路由中使用缓存头来处理动态响应。例如使用 [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/) 策略。
+
+```jsx
+// 此值在 10 秒内被视为最新 (s-maxage=10)
+// 如果在接下来 10 秒内重复请求，将返回缓存的响应
+// 如果在 59 秒内重复请求，将返回过时但可用的缓存响应 (stale-while-revalidate=59)
+//
+// 后台会自动发起重新验证请求以更新缓存
+// 刷新页面将看到新值
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+默认情况下，`Cache-Control` 头的设置会根据页面数据获取方式有所不同：
+
+- 使用 `getServerSideProps` 或 `getInitialProps` 的页面会采用 `next start` 的默认 `Cache-Control` 头以防止不可缓存响应被意外缓存。如需不同缓存行为，可在函数内使用 `res.setHeader('Cache-Control', 'value_you_prefer')` 如上所示
+- 使用 `getStaticProps` 的页面会设置 `s-maxage=REVALIDATE_SECONDS, stale-while-revalidate` 头。若未使用 `revalidate` 参数，则设置为 `s-maxage=31536000, stale-while-revalidate` 以实现最大缓存时长
+
+> **须知**：您的部署提供商必须支持动态响应缓存。自托管方案需通过 Redis 等键值存储自行实现。使用 Vercel 时，[边缘缓存无需额外配置](https://vercel.com/docs/edge-network/caching?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)
+
+## 减少 JavaScript 体积
+
+<details open>
+  <summary>示例</summary>
+
+- [with-dynamic-import](https://github.com/vercel/next.js/tree/canary/examples/with-dynamic-import)
+
+</details>
+
+可通过以下工具分析各 JavaScript 包的组成：
+
+- [Import Cost](https://marketplace.visualstudio.com/items?itemName=wix.vscode-import-cost) - 在 VSCode 中显示导入包的大小
+- [Package Phobia](https://packagephobia.com/) - 评估新增开发依赖的成本
+- [Bundle Phobia](https://bundlephobia.com/) - 分析依赖对打包体积的影响
+- [Webpack Bundle Analyzer](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer) - 通过交互式树状图可视化 webpack 输出文件大小
+- [bundlejs](https://bundlejs.com/) - 在线工具，可快速打包压缩项目并查看 gzip/brotli 压缩体积
+
+`next build` 时，`pages/` 目录下的每个文件会自动代码分割为独立 JavaScript 包。您还可以使用[动态导入](/docs/pages/building-your-application/optimizing/lazy-loading)实现组件和库的懒加载。例如可延迟加载模态框代码直到用户点击触发按钮。
+
+## 日志记录
+
+<details open>
+  <summary>示例</summary>
+
+- [Pino 和 Logflare 示例](https://github.com/Logflare/next-pino-logflare-logging-example)
+
+</details>
+
+Next.js 同时运行在客户端和服务器端，支持多种日志记录方式：
+
+- 浏览器端的 `console.log`
+- 服务器端的 `stdout`
+
+如需结构化日志方案，推荐使用 [Pino](https://www.npmjs.com/package/pino)。使用 Vercel 时，有[预构建的日志集成方案](https://vercel.com/integrations?utm_source=next-site&utm_medium=docs&utm_campaign=next-website#logging)与 Next.js 兼容。
+
+## 错误处理
+
+<details open>
+  <summary>示例</summary>
+
+- [with-sentry](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)
+
+</details>
+
+发生未捕获异常时，可通过[500 错误页面](/docs/pages/building-your-application/routing/custom-error#500-page)控制用户体验。建议替换默认主题为品牌定制页面。
+
+您还可以使用 Sentry 等工具记录和追踪异常。[此示例](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)展示了如何通过 Next.js 版 Sentry SDK 捕获并上报客户端和服务器端错误。Vercel 还提供 [Sentry 官方集成](https://vercel.com/integrations/sentry?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)。
+
+## 加载性能
+
+提升加载性能需先明确测量指标和方法。[核心网页指标](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)是可通过浏览器测量的行业标准。如不熟悉这些指标，请参阅这篇[博客文章](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)确定关键指标。理想情况下应在以下环境测量：
+
+- 实验室环境：使用本地计算机或模拟器
+- 真实环境：采集实际用户数据
+- 本地测试：在设备上运行测试
+- 云端测试：在云平台运行测试
+
+确立测量方法后，请按以下策略迭代优化（应用一个策略后测量效果，持续调整直至性能提升有限，再转向下一策略）：
+
+- 选择靠近数据库或 API 部署区域的缓存节点
+- 如[缓存](#缓存)章节所述，设置不会压垮后端的 `stale-while-revalidate` 值
+- 使用[增量静态生成](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)减少后端请求
+- 移除未使用的 JavaScript。阅读这篇[博客文章](https://calibreapp.com/blog/bundle-size-optimization)了解打包体积如何影响核心网页指标，并采用以下优化策略：
+  - 配置代码编辑器显示导入成本和大小
+  - 寻找更轻量的替代依赖
+  - 动态加载组件和依赖项
