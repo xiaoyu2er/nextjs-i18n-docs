@@ -18,6 +18,7 @@ export function DocsLayout({
     ...baseOptions({ title: t('title') }),
     tree: pageTree,
     sidebar: {},
+    githubUrl: 'https://github.com/xiaoyu2er/nextjs-i18n-docs',
   };
 
   return <FumaDocsLayout {...docsLayout}>{children}</FumaDocsLayout>;
