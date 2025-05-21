@@ -1,6 +1,7 @@
 import { routing } from '@/i18n/routing';
 import { getOramaDocuments } from '@/lib/orama/orama-document';
 import { sourceMap } from '@/lib/source';
+import type { Locale } from 'next-intl';
 
 import { NextResponse } from 'next/server';
 
@@ -8,7 +9,7 @@ export const revalidate = false;
 
 export async function GET(
   _req: Request,
-  { params }: { params: Promise<{ locale: string; page: string }> },
+  { params }: { params: Promise<{ locale: Locale; page: string }> },
 ) {
   const { locale, page = '0' } = await params;
   const s = sourceMap[locale];
