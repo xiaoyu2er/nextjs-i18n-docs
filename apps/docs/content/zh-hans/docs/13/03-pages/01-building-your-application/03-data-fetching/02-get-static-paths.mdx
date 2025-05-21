@@ -1,0 +1,143 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:53:15.935Z
+title: getStaticPaths
+description: 了解如何使用 `getStaticPaths` 获取数据并生成静态页面。获取有关 Next.js 中这一数据获取 API 的更多信息。
+---
+
+如果一个页面使用了[动态路由 (Dynamic Routes)](/docs/pages/building-your-application/routing/dynamic-routes) 并使用了 `getStaticProps`，则需要定义要静态生成的路径列表。
+
+当您从使用动态路由的页面导出一个名为 `getStaticPaths` 的函数（静态站点生成）时，Next.js 将静态预渲染 `getStaticPaths` 指定的所有路径。
+
+```tsx filename="pages/repo/[name].tsx" switcher
+import type {
+  InferGetStaticPropsType,
+  GetStaticProps,
+  GetStaticPaths,
+} from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getStaticPaths = (async () => {
+  return {
+    paths: [
+      {
+        params: {
+          name: 'next.js',
+        },
+      }, // 参见下方的 "paths" 部分
+    ],
+    fallback: true, // false 或 "blocking"
+  }
+}) satisfies GetStaticPaths
+
+export const getStaticProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetStaticProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/repo/[name].js" switcher
+export async function getStaticPaths() {
+  return {
+    paths: [
+      {
+        params: {
+          name: 'next.js',
+        },
+      }, // 参见下方的 "paths" 部分
+    ],
+    fallback: true, // false 或 "blocking"
+  }
+}
+
+export async function getStaticProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+[`getStaticPaths` API 参考文档](/docs/pages/api-reference/functions/get-static-paths) 涵盖了可与 `getStaticPaths` 一起使用的所有参数和属性。
+
+## 何时使用 getStaticPaths？
+
+如果您要静态预渲染使用动态路由的页面，并且满足以下条件，则应使用 `getStaticPaths`：
+
+- 数据来自无头 CMS
+- 数据来自数据库
+- 数据来自文件系统
+- 数据可以公开缓存（非用户特定）
+- 页面必须预渲染（出于 SEO 目的）且速度非常快 — `getStaticProps` 会生成 `HTML` 和 `JSON` 文件，两者都可以通过 CDN 缓存以提高性能
+
+## getStaticPaths 何时运行
+
+`getStaticPaths` 仅在生产环境的构建期间运行，不会在运行时调用。您可以使用[此工具](https://next-code-elimination.vercel.app/)验证 `getStaticPaths` 内部的代码已从客户端包中移除。
+
+### getStaticProps 如何与 getStaticPaths 配合运行
+
+- `getStaticProps` 在 `next build` 期间为构建时返回的任何 `paths` 运行
+- 当使用 `fallback: true` 时，`getStaticProps` 会在后台运行
+- 当使用 `fallback: blocking` 时，`getStaticProps` 会在初始渲染之前调用
+
+## 可以在何处使用 getStaticPaths
+
+- `getStaticPaths` **必须**与 `getStaticProps` 一起使用
+- **不能**将 `getStaticPaths` 与 [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) 一起使用
+- 可以从同时使用 `getStaticProps` 的[动态路由 (Dynamic Route)](/docs/pages/building-your-application/routing/dynamic-routes) 导出 `getStaticPaths`
+- **不能**从非页面文件（例如 `components` 文件夹）导出 `getStaticPaths`
+- 必须将 `getStaticPaths` 导出为独立函数，而不是页面组件的属性
+
+## 在开发环境中每次请求时运行
+
+在开发环境 (`next dev`) 中，`getStaticPaths` 会在每次请求时调用。
+
+## 按需生成路径
+
+`getStaticPaths` 允许您控制在构建期间生成哪些页面，而不是通过 [`fallback`](/docs/pages/api-reference/functions/get-static-paths#fallback-blocking) 按需生成。在构建期间生成更多页面会导致构建速度变慢。
+
+您可以通过为 `paths` 返回空数组来推迟按需生成所有页面。这在将 Next.js 应用程序部署到多个环境时特别有用。例如，您可以通过为预览环境（而非生产构建）按需生成所有页面来加快构建速度。这对于具有数百/数千个静态页面的站点非常有用。
+
+```jsx filename="pages/posts/[id].js"
+export async function getStaticPaths() {
+  // 当此值为 true 时（在预览环境中）
+  // 不预渲染任何静态页面
+  // （构建更快，但初始页面加载较慢）
+  if (process.env.SKIP_BUILD_STATIC_GENERATION) {
+    return {
+      paths: [],
+      fallback: 'blocking',
+    }
+  }
+
+  // 调用外部 API 端点获取文章
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // 根据文章获取要预渲染的路径
+  // 在生产环境中，预渲染所有页面
+  // （构建较慢，但初始页面加载更快）
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // { fallback: false } 表示其他路由应返回 404
+  return { paths, fallback: false }
+}
+```

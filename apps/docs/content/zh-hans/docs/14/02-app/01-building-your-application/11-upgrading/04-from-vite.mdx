@@ -1,0 +1,551 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:40:04.663Z
+title: 从 Vite 迁移至 Next.js
+description: 学习如何将现有的 React 应用从 Vite 迁移到 Next.js。
+---
+
+本指南将帮助您将现有的 Vite 应用迁移至 Next.js。
+
+## 为何要迁移？
+
+从 Vite 切换到 Next.js 有以下几大优势：
+
+### 初始页面加载缓慢
+
+如果使用 [Vite 默认的 React 插件](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react) 构建应用，您的应用是纯客户端应用。纯客户端应用（即单页应用 SPA）通常会遇到初始加载缓慢的问题，原因包括：
+
+1. 浏览器需要等待 React 代码和整个应用包下载并执行后，才能发起数据请求
+2. 随着功能增加和依赖项增多，应用代码体积会不断膨胀
+
+### 缺乏自动代码分割
+
+虽然代码分割可以缓解加载缓慢的问题，但手动实现代码分割往往适得其反，容易意外引入网络瀑布流问题。Next.js 的路由系统内置了自动代码分割功能。
+
+### 网络瀑布流
+
+当应用需要串行发起客户端-服务端请求获取数据时，就会导致性能下降。SPA 中常见的数据获取模式是先渲染占位内容，等组件挂载后再获取数据。这意味着子组件必须等待父组件完成数据加载后才能开始自己的数据获取。
+
+虽然 Next.js 支持客户端数据获取，但它还提供了服务端数据获取选项，能有效消除客户端-服务端瀑布流问题。
+
+### 快速可控的加载状态
+
+通过内置的 [React Suspense 流式渲染](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense) 支持，您可以精确控制 UI 各部分的加载优先级和顺序，同时避免网络瀑布流问题。
+
+这能帮助您构建加载更快的页面，消除 [布局偏移](https://vercel.com/blog/how-core-web-vitals-affect-seo)。
+
+### 灵活的数据获取策略
+
+Next.js 允许您针对不同页面和组件选择数据获取策略：构建时获取、服务端请求时获取或客户端获取。例如，您可以从 CMS 获取数据并在构建时渲染博客文章，然后通过 CDN 高效缓存。
+
+### 中间件
+
+[Next.js 中间件](/docs/app/building-your-application/routing/middleware) 能在请求完成前在服务端运行代码。这对于避免用户访问需认证页面时出现未授权内容闪烁非常有用——可直接重定向到登录页面。中间件还适用于实验性功能和 [国际化](/docs/app/building-your-application/routing/internationalization)。
+
+### 内置优化
+
+[图片](/docs/app/building-your-application/optimizing/images)、[字体](/docs/app/building-your-application/optimizing/fonts) 和 [第三方脚本](/docs/app/building-your-application/optimizing/scripts) 往往对应用性能影响显著。Next.js 提供的内置组件可自动优化这些资源。
+
+## 迁移步骤
+
+本次迁移的目标是快速获得可运行的 Next.js 应用，以便后续逐步采用其功能。初始阶段我们将保持纯客户端应用（SPA）形态，不迁移现有路由，以降低迁移风险和合并冲突。
+
+### 第一步：安装 Next.js 依赖
+
+首先安装最新版 Next.js：
+
+```bash filename="Terminal"
+npm install next@latest
+```
+
+### 第二步：创建 Next.js 配置文件
+
+在项目根目录创建 `next.config.mjs` 文件，用于配置 [Next.js 选项](/docs/app/api-reference/next-config-js)：
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // 输出为单页应用 (SPA)
+  distDir: './dist', // 将构建输出目录改为 `./dist/`
+}
+
+export default nextConfig
+```
+
+> **须知：** 配置文件名可使用 `.js` 或 `.mjs` 扩展名。
+
+### 第三步：更新 TypeScript 配置
+
+若使用 TypeScript，需按以下要求更新 `tsconfig.json` 文件。非 TypeScript 项目可跳过此步：
+
+1. 移除对 `tsconfig.node.json` 的 [项目引用](https://www.typescriptlang.org/tsconfig#references)
+2. 在 [`include` 数组](https://www.typescriptlang.org/tsconfig#include) 添加 `./dist/types/**/*.ts` 和 `./next-env.d.ts`
+3. 在 [`exclude` 数组](https://www.typescriptlang.org/tsconfig#exclude) 添加 `./node_modules`
+4. 在 [`compilerOptions.plugins`](https://www.typescriptlang.org/tsconfig#plugins) 添加 `{ "name": "next" }`：`"plugins": [{ "name": "next" }]`
+5. 启用 [`esModuleInterop`](https://www.typescriptlang.org/tsconfig#esModuleInterop)：`"esModuleInterop": true`
+6. 设置 [`jsx`](https://www.typescriptlang.org/tsconfig#jsx) 为 `preserve`：`"jsx": "preserve"`
+7. 启用 [`allowJs`](https://www.typescriptlang.org/tsconfig#allowJs)：`"allowJs": true`
+8. 启用 [`forceConsistentCasingInFileNames`](https://www.typescriptlang.org/tsconfig#forceConsistentCasingInFileNames)：`"forceConsistentCasingInFileNames": true`
+9. 启用 [`incremental`](https://www.typescriptlang.org/tsconfig#incremental)：`"incremental": true`
+
+配置示例：
+
+```json filename="tsconfig.json"
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["./src", "./dist/types/**/*.ts", "./next-env.d.ts"],
+  "exclude": ["./node_modules"]
+}
+```
+
+更多 TypeScript 配置信息请参考 [Next.js 文档](/docs/app/building-your-application/configuring/typescript#typescript-plugin)。
+
+### 第四步：创建根布局
+
+Next.js [应用路由](/docs/app) 必须包含 [根布局文件](/docs/app/building-your-application/routing/pages-and-layouts#root-layout-required)，这是一个 [React 服务端组件](/docs/app/building-your-application/rendering/server-components)，用于包裹所有页面。该文件位于 `app` 目录顶层。
+
+Vite 应用中与之最接近的是 [`index.html` 文件](https://vitejs.dev/guide/#index-html-and-project-root)，包含 `<html>`、`<head>` 和 `<body>` 标签。
+
+转换步骤：
+
+1. 在 `src` 目录创建 `app` 子目录
+2. 在 `app` 目录创建 `layout.tsx` 文件：
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return null
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return null
+}
+```
+
+> **提示：** 布局文件可使用 `.js`、`.jsx` 或 `.tsx` 扩展名
+
+3. 将 `index.html` 内容复制到 `<RootLayout>` 组件，并将 `body.div#root` 和 `body.script` 标签替换为 `<div id="root">{children}</div>`：
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+4. Next.js 默认包含 [meta charset](https://developer.mozilla.org/docs/Web/HTML/Element/meta#charset) 和 [meta viewport](https://developer.mozilla.org/docs/Web/HTML/Viewport_meta_tag) 标签，可从 `<head>` 中移除：
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+5. [元数据文件](/docs/app/building-your-application/optimizing/metadata#file-based-metadata) 如 `favicon.ico`、`icon.png`、`robots.txt` 只要放在 `app` 目录顶层，就会自动添加到 `<head>`。迁移 [支持的文件](/docs/app/building-your-application/optimizing/metadata#file-based-metadata) 后即可删除对应的 `<link>` 标签：
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+6. 最后，通过 [元数据 API](/docs/app/building-your-application/optimizing/metadata) 管理剩余的 `<head>` 标签。将元数据移至导出的 [`metadata` 对象](/docs/app/api-reference/functions/generate-metadata#metadata-object)：
+
+```tsx filename="app/layout.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My App',
+  description: 'My App is a...',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export const metadata = {
+  title: 'My App',
+  description: 'My App is a...',
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+通过以上变更，您将从 `index.html` 声明式配置转为使用 Next.js 基于约定的框架内置方案（[元数据 API](/docs/app/building-your-application/optimizing/metadata)）。这种方案能更轻松地提升页面 SEO 和分享能力。
+
+### 步骤5：创建入口页面
+
+在 Next.js 中，您可以通过创建 `page.tsx` 文件来声明应用的入口点。在 Vite 中与之最接近的是 `main.tsx` 文件。本步骤将设置应用的入口点。
+
+1. **在 `app` 目录中创建 `[[...slug]]` 目录**
+
+由于本指南的目标是先将 Next.js 设置为单页应用 (SPA)，您需要让页面入口捕获应用的所有可能路由。为此，请在 `app` 目录中新建一个 `[[...slug]]` 目录。
+
+此目录称为 [可选全捕获路由段](/docs/app/building-your-application/routing/dynamic-routes#optional-catch-all-segments)。Next.js 使用基于文件系统的路由器，其中 [目录用于定义路由](/docs/app/building-your-application/routing/defining-routes#creating-routes)。这个特殊目录将确保应用的所有路由都会被定向到其包含的 `page.tsx` 文件。
+
+2. **在 `app/[[...slug]]` 目录中创建新的 `page.tsx` 文件，内容如下：**
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // 稍后更新此处
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // 稍后更新此处
+}
+```
+
+> **须知**：页面文件可以使用 `.js`、`.jsx` 或 `.tsx` 扩展名。
+
+此文件是一个 [服务端组件 (Server Component)](/docs/app/building-your-application/rendering/server-components)。运行 `next build` 时，该文件会被预渲染为静态资源，不需要任何动态代码。
+
+该文件导入了全局 CSS，并告诉 [`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params) 我们只会生成一个路由，即根路径 `/`。
+
+接下来，我们将迁移 Vite 应用的其余部分，这部分将仅在客户端运行。
+
+```tsx filename="app/[[...slug]]/client.tsx" switcher
+'use client'
+
+import React from 'react'
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+```jsx filename="app/[[...slug]]/client.js" switcher
+'use client'
+
+import React from 'react'
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+此文件是一个 [客户端组件 (Client Component)](/docs/app/building-your-application/rendering/client-components)，由 `'use client'` 指令定义。客户端组件在发送到客户端之前仍会在服务器上 [预渲染为 HTML](/docs/app/building-your-application/rendering/client-components#how-are-client-components-rendered)。
+
+由于我们最初需要一个纯客户端应用，可以配置 Next.js 从 `App` 组件开始禁用预渲染。
+
+```tsx
+const App = dynamic(() => import('../../App'), { ssr: false })
+```
+
+现在更新入口页面以使用新组件：
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+### 步骤6：更新静态图片导入
+
+Next.js 处理静态图片导入的方式与 Vite 略有不同。在 Vite 中，导入图片文件会返回其公共 URL 字符串：
+
+```tsx filename="App.tsx"
+import image from './img.png' // 生产环境中 `image` 会是 '/assets/img.2d8efhg.png'
+
+export default function App() {
+  return <img src={image} />
+}
+```
+
+在 Next.js 中，静态图片导入返回一个对象。该对象可以直接用于 Next.js 的 [`<Image>` 组件](/docs/app/api-reference/components/image)，也可以使用对象的 `src` 属性与现有的 `<img>` 标签。
+
+`<Image>` 组件具有 [自动图片优化](/docs/app/building-your-application/optimizing/images) 的额外优势。`<Image>` 组件会根据图片尺寸自动设置生成的 `<img>` 的 `width` 和 `height` 属性，防止图片加载时的布局偏移。但如果应用中存在仅设置了一个维度而未将另一个维度设为 `auto` 的图片，可能会导致问题。未设为 `auto` 的维度会默认为 `<img>` 维度属性的值，可能导致图片显示变形。
+
+保留 `<img>` 标签可以减少应用的改动量并避免上述问题。之后您可以逐步迁移到 `<Image>` 组件，通过 [配置加载器 (loader)](/docs/app/building-your-application/optimizing/images#loaders) 或切换到默认的 Next.js 服务器（支持自动图片优化）来利用图片优化功能。
+
+1. **将 `/public` 导入的绝对路径图片改为相对路径导入：**
+
+```tsx
+// 之前
+import logo from '/logo.png'
+
+// 之后
+import logo from '../public/logo.png'
+```
+
+2. **将图片的 `src` 属性而非整个图片对象传递给 `<img>` 标签：**
+
+```tsx
+// 之前
+<img src={logo} />
+
+// 之后
+<img src={logo.src} />
+```
+
+或者，您可以根据文件名引用图片资源的公共 URL。例如，`public/logo.png` 会在应用中提供 `/logo.png` 作为图片的 `src` 值。
+
+> **警告**：如果使用 TypeScript，访问 `src` 属性时可能会遇到类型错误。目前可以安全忽略，这些问题将在本指南结束时解决。
+
+### 步骤7：迁移环境变量
+
+Next.js 支持与 Vite 类似的 `.env` [环境变量](/docs/app/building-your-application/configuring/environment-variables)。主要区别在于客户端暴露环境变量的前缀。
+
+- 将所有以 `VITE_` 为前缀的环境变量改为 `NEXT_PUBLIC_`。
+
+Vite 在特殊的 `import.meta.env` 对象上暴露了一些内置环境变量，Next.js 不支持这些变量。需要按以下方式更新它们的用法：
+
+- `import.meta.env.MODE` ⇒ `process.env.NODE_ENV`
+- `import.meta.env.PROD` ⇒ `process.env.NODE_ENV === 'production'`
+- `import.meta.env.DEV` ⇒ `process.env.NODE_ENV !== 'production'`
+- `import.meta.env.SSR` ⇒ `typeof window !== 'undefined'`
+
+Next.js 也不提供内置的 `BASE_URL` 环境变量。但如果需要，您仍然可以配置一个：
+
+1. **在 `.env` 文件中添加以下内容：**
+
+```bash filename=".env"
+# ...
+NEXT_PUBLIC_BASE_PATH="/some-base-path"
+```
+
+2. **在 `next.config.mjs` 文件中将 [`basePath`](/docs/app/api-reference/next-config-js/basePath) 设为 `process.env.NEXT_PUBLIC_BASE_PATH`：**
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // 输出为单页应用 (SPA)。
+  distDir: './dist', // 将构建输出目录改为 `./dist/`。
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH, // 将基础路径设为 `/some-base-path`。
+}
+
+export default nextConfig
+```
+
+3. **将 `import.meta.env.BASE_URL` 的用法更新为 `process.env.NEXT_PUBLIC_BASE_PATH`**
+
+### 步骤8：更新 `package.json` 中的脚本
+
+现在您应该可以运行应用来测试是否成功迁移到 Next.js。但在之前，需要更新 `package.json` 中的 `scripts`，添加 Next.js 相关命令，并将 `.next` 和 `next-env.d.ts` 添加到 `.gitignore`：
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+```txt filename=".gitignore"
+# ...
+.next
+next-env.d.ts
+dist
+```
+
+现在运行 `npm run dev`，并打开 [`http://localhost:3000`](http://localhost:3000)。您应该会看到应用已在 Next.js 上运行。
+
+> **示例**：查看 [此拉取请求](https://github.com/inngest/vite-to-nextjs/pull/1) 获取从 Vite 迁移到 Next.js 的完整示例。
+
+### 步骤9：清理
+
+现在可以清理代码库中与 Vite 相关的文件：
+
+- 删除 `main.tsx`
+- 删除 `index.html`
+- 删除 `vite-env.d.ts`
+- 删除 `tsconfig.node.json`
+- 删除 `vite.config.ts`
+- 卸载 Vite 依赖项
+
+## 后续步骤
+
+如果一切顺利，您现在已拥有一个作为单页应用运行的 Next.js 应用。但您尚未充分利用 Next.js 的大部分优势，接下来可以逐步进行以下改进：
+
+- 从 React Router 迁移到 [Next.js 应用路由 (App Router)](/docs/app/building-your-application/routing)，以获得：
+  - 自动代码拆分
+  - [流式服务端渲染 (Streaming Server-Rendering)](/docs/app/building-your-application/routing/loading-ui-and-streaming)
+  - [React 服务端组件 (Server Components)](/docs/app/building-your-application/rendering/server-components)
+- [使用 `<Image>` 组件优化图片](/docs/app/building-your-application/optimizing/images)
+- [使用 `next/font` 优化字体](/docs/app/building-your-application/optimizing/fonts)
+- [使用 `<Script>` 组件优化第三方脚本](/docs/app/building-your-application/optimizing/scripts)
+- [更新 ESLint 配置以支持 Next.js 规则](/docs/app/building-your-application/configuring/eslint)

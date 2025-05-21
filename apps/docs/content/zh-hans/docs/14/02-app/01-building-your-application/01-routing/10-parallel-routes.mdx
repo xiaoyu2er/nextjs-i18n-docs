@@ -1,0 +1,466 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:48:16.100Z
+title: 并行路由 (Parallel Routes)
+description: 在同一视图中同时或条件性地渲染多个可独立导航的页面。适用于高度动态的应用程序模式。
+related:
+  links:
+    - app/api-reference/file-conventions/default
+---
+
+并行路由 (Parallel Routes) 允许您在同一布局中同时或条件性地渲染多个页面。这种模式特别适用于应用中高度动态的部分，例如社交网站的仪表盘和信息流。
+
+以仪表盘为例，您可以使用并行路由同时渲染 `team` 和 `analytics` 两个页面：
+
+<Image
+  alt="并行路由示意图"
+  srcLight="/docs/light/parallel-routes.png"
+  srcDark="/docs/dark/parallel-routes.png"
+  width="1600"
+  height="942"
+/>
+
+## 插槽 (Slots)
+
+并行路由通过命名的**插槽 (slots)** 实现。插槽使用 `@folder` 的命名约定定义。例如，以下文件结构定义了两个插槽：`@analytics` 和 `@team`：
+
+<Image
+  alt="并行路由文件系统结构"
+  srcLight="/docs/light/parallel-routes-file-system.png"
+  srcDark="/docs/dark/parallel-routes-file-system.png"
+  width="1600"
+  height="687"
+/>
+
+插槽会作为属性传递给共享的父布局组件。对于上述示例，`app/layout.js` 中的组件现在可以接收 `@analytics` 和 `@team` 插槽属性，并与 `children` 属性并行渲染：
+
+```tsx filename="app/layout.tsx" switcher
+export default function Layout({
+  children,
+  team,
+  analytics,
+}: {
+  children: React.ReactNode
+  analytics: React.ReactNode
+  team: React.ReactNode
+}) {
+  return (
+    <>
+      {children}
+      {team}
+      {analytics}
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function Layout({ children, team, analytics }) {
+  return (
+    <>
+      {children}
+      {team}
+      {analytics}
+    </>
+  )
+}
+```
+
+需要注意的是，插槽**不是**[路由段 (route segments)](/docs/app/building-your-application/routing#route-segments)，不会影响 URL 结构。例如，对于 `/@analytics/views`，URL 实际会是 `/views`，因为 `@analytics` 只是一个插槽。
+
+> **须知**：
+>
+> - `children` 属性是一个隐式插槽，不需要映射到特定文件夹。这意味着 `app/page.js` 等同于 `app/@children/page.js`。
+
+## 活动状态与导航
+
+默认情况下，Next.js 会跟踪每个插槽的当前活动状态（或子页面）。但插槽中渲染的内容取决于导航类型：
+
+- [**软导航 (Soft Navigation)**](/docs/app/building-your-application/routing/linking-and-navigating#5-soft-navigation)：在客户端导航时，Next.js 会执行[部分渲染 (partial render)](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering)，仅改变插槽内的子页面，同时保持其他插槽的活动子页面不变，即使它们与当前 URL 不匹配。
+- **硬导航 (Hard Navigation)**：在整页加载（如浏览器刷新）后，Next.js 无法确定与当前 URL 不匹配的插槽的活动状态。此时，它会为不匹配的插槽渲染 [`default.js`](#defaultjs) 文件，如果该文件不存在则渲染 `404`。
+
+> **须知**：
+>
+> - 对于不匹配路由的 `404` 响应，可以确保不会意外地在不适用于并行路由的页面上渲染内容。
+
+### `default.js`
+
+您可以定义 `default.js` 文件，作为初始加载或整页刷新时不匹配插槽的回退内容。
+
+考虑以下文件夹结构。`@team` 插槽有 `/settings` 页面，但 `@analytics` 没有：
+
+<Image
+  alt="并行路由不匹配路由示例"
+  srcLight="/docs/light/parallel-routes-unmatched-routes.png"
+  srcDark="/docs/dark/parallel-routes-unmatched-routes.png"
+  width="1600"
+  height="930"
+/>
+
+当导航到 `/settings` 时，`@team` 插槽会渲染 `/settings` 页面，同时保持 `@analytics` 插槽当前的活动页面。
+
+刷新页面时，Next.js 会为 `@analytics` 渲染 `default.js`。如果 `default.js` 不存在，则渲染 `404`。
+
+此外，由于 `children` 是隐式插槽，您也需要创建 `default.js` 文件，以便在 Next.js 无法恢复父页面活动状态时为 `children` 提供回退内容。
+
+### `useSelectedLayoutSegment(s)`
+
+[`useSelectedLayoutSegment`](/docs/app/api-reference/functions/use-selected-layout-segment) 和 [`useSelectedLayoutSegments`](/docs/app/api-reference/functions/use-selected-layout-segments) 都接受 `parallelRoutesKey` 参数，允许您读取插槽内的活动路由段。
+
+```tsx filename="app/layout.tsx" switcher
+'use client'
+
+import { useSelectedLayoutSegment } from 'next/navigation'
+
+export default function Layout({ auth }: { auth: React.ReactNode }) {
+  const loginSegment = useSelectedLayoutSegment('auth')
+  // ...
+}
+```
+
+```jsx filename="app/layout.js" switcher
+'use client'
+
+import { useSelectedLayoutSegment } from 'next/navigation'
+
+export default function Layout({ auth }) {
+  const loginSegment = useSelectedLayoutSegment('auth')
+  // ...
+}
+```
+
+当用户导航到 `app/@auth/login`（或 URL 栏中的 `/login`）时，`loginSegment` 的值将是字符串 `"login"`。
+
+## 示例
+
+### 条件路由
+
+您可以使用并行路由根据特定条件（如用户角色）条件性地渲染路由。例如，为 `/admin` 或 `/user` 角色渲染不同的仪表盘页面：
+
+<Image
+  alt="条件路由示意图"
+  srcLight="/docs/light/conditional-routes-ui.png"
+  srcDark="/docs/dark/conditional-routes-ui.png"
+  width="1600"
+  height="898"
+/>
+
+```tsx filename="app/dashboard/layout.tsx" switcher
+import { checkUserRole } from '@/lib/auth'
+
+export default function Layout({
+  user,
+  admin,
+}: {
+  user: React.ReactNode
+  admin: React.ReactNode
+}) {
+  const role = checkUserRole()
+  return <>{role === 'admin' ? admin : user}</>
+}
+```
+
+```jsx filename="app/dashboard/layout.js" switcher
+import { checkUserRole } from '@/lib/auth'
+
+export default function Layout({ user, admin }) {
+  const role = checkUserRole()
+  return <>{role === 'admin' ? admin : user}</>
+}
+```
+
+### 选项卡组
+
+您可以在插槽内添加 `layout`，允许用户独立导航该插槽。这适用于创建选项卡式界面。
+
+例如，`@analytics` 插槽有两个子页面：`/page-views` 和 `/visitors`：
+
+<Image
+  alt="带有两个子页面和布局的 analytics 插槽"
+  srcLight="/docs/light/parallel-routes-tab-groups.png"
+  srcDark="/docs/dark/parallel-routes-tab-groups.png"
+  width="1600"
+  height="768"
+/>
+
+在 `@analytics` 内创建 [`layout`](/docs/app/building-your-application/routing/pages-and-layouts) 文件，在两个页面间共享选项卡：
+
+```tsx filename="app/@analytics/layout.tsx" switcher
+import Link from 'next/link'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <nav>
+        <Link href="/page-views">Page Views</Link>
+        <Link href="/visitors">Visitors</Link>
+      </nav>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```jsx filename="app/@analytics/layout.js" switcher
+import Link from 'next/link'
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <nav>
+        <Link href="/page-views">Page Views</Link>
+        <Link href="/visitors">Visitors</Link>
+      </nav>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+### 模态框
+
+并行路由可与[拦截路由 (Intercepting Routes)](/docs/app/building-your-application/routing/intercepting-routes) 结合使用来创建模态框。这解决了构建模态框时的常见挑战：
+
+- 通过 URL **共享模态框内容**
+- 刷新页面时**保留上下文**而非关闭模态框
+- **后退导航时关闭模态框**而非返回上一路由
+- **前进导航时重新打开模态框**
+
+考虑以下 UI 模式：用户可以通过客户端导航从布局中打开登录模态框，或访问独立的 `/login` 页面：
+
+<Image
+  alt="并行路由模态框示意图"
+  srcLight="/docs/light/parallel-routes-auth-modal.png"
+  srcDark="/docs/dark/parallel-routes-auth-modal.png"
+  width="1600"
+  height="687"
+/>
+
+要实现此模式，首先创建 `/login` 路由来渲染**主**登录页面：
+
+<Image
+  alt="并行路由模态框登录页面"
+  srcLight="/docs/light/parallel-routes-modal-login-page.png"
+  srcDark="/docs/dark/parallel-routes-modal-login-page.png"
+  width="1600"
+  height="768"
+/>
+
+```tsx filename="app/login/page.tsx" switcher
+import { Login } from '@/app/ui/login'
+
+export default function Page() {
+  return <Login />
+}
+```
+
+```jsx filename="app/login/page.js" switcher
+import { Login } from '@/app/ui/login'
+
+export default function Page() {
+  return <Login />
+}
+```
+
+然后在 `@auth` 插槽中添加 [`default.js`](/docs/app/api-reference/file-conventions/default) 文件并返回 `null`。这确保模态框在不活动时不会渲染。
+
+```tsx filename="app/@auth/default.tsx" switcher
+export default function Default() {
+  return null
+}
+```
+
+```jsx filename="app/@auth/default.js" switcher
+export default function Default() {
+  return null
+}
+```
+
+在 `@auth` 插槽中，通过更新 `/(.)login` 文件夹来拦截 `/login` 路由。将 `<Modal>` 组件及其子组件导入 `/(.)login/page.tsx` 文件：
+
+```tsx filename="app/@auth/(.)login/page.tsx" switcher
+import { Modal } from '@/app/ui/modal'
+import { Login } from '@/app/ui/login'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Login />
+    </Modal>
+  )
+}
+```
+
+```jsx filename="app/@auth/(.)login/page.js" switcher
+import { Modal } from '@/app/ui/modal'
+import { Login } from '@/app/ui/login'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Login />
+    </Modal>
+  )
+}
+```
+
+> **须知**：
+>
+> - 拦截路由的约定（如 `(.)`）取决于您的文件系统结构。详见[拦截路由约定](/docs/app/building-your-application/routing/intercepting-routes#convention)。
+> - 通过将 `<Modal>` 功能与模态框内容（`<Login>`）分离，可以确保模态框内的任何内容（如[表单](/docs/app/building-your-application/data-fetching/server-actions-and-mutations#forms)）都是服务端组件 (Server Components)。详见[混合客户端与服务端组件](/docs/app/building-your-application/rendering/composition-patterns#supported-pattern-passing-server-components-to-client-components-as-props)。
+
+#### 打开模态框
+
+现在，您可以利用 Next.js 路由来打开和关闭模态框。这确保在模态框打开时 URL 正确更新，并在前进和后退导航时保持一致性。
+
+要将模态框作为插槽传递给父布局，并与 `children` 属性一起渲染：
+
+```tsx filename="app/layout.tsx" switcher
+import Link from 'next/link'
+
+export default function Layout({
+  auth,
+  children,
+}: {
+  auth: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <>
+      <nav>
+        <Link href="/login">Open modal</Link>
+      </nav>
+      <div>{auth}</div>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import Link from 'next/link'
+
+export default function Layout({ auth, children }) {
+  return (
+    <>
+      <nav>
+        <Link href="/login">Open modal</Link>
+      </nav>
+      <div>{auth}</div>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+当用户点击 `<Link>` 时，会打开模态框而非导航到 `/login` 页面。但在刷新或初始加载时，访问 `/login` 会直接进入主登录页面。
+
+#### 关闭模态框
+
+您可以通过调用 `router.back()` 或使用 `Link` 组件来关闭模态框。
+
+```tsx filename="app/ui/modal.tsx" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export function Modal({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          router.back()
+        }}
+      >
+        Close modal
+      </button>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```jsx filename="app/ui/modal.js" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export function Modal({ children }) {
+  const router = useRouter()
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          router.back()
+        }}
+      >
+        Close modal
+      </button>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+当使用 `Link` 组件导航到不应再渲染 `@auth` 插槽的页面时，我们使用返回 `null` 的全捕获路由 (catch-all route)。
+
+```tsx filename="app/ui/modal.tsx" switcher
+import Link from 'next/link'
+
+export function Modal({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <Link href="/">Close modal</Link>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```jsx filename="app/ui/modal.js" switcher
+import Link from 'next/link'
+
+export function Modal({ children }) {
+  return (
+    <>
+      <Link href="/">Close modal</Link>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```tsx filename="app/@auth/[...catchAll]/page.tsx" switcher
+export default function CatchAll() {
+  return null
+}
+```
+
+```jsx filename="app/@auth/[...catchAll]/page.js" switcher
+export default function CatchAll() {
+  return null
+}
+```
+
+> **须知**：
+>
+> - 我们在 `@auth` 插槽中使用全捕获路由来关闭模态框，原因如[活动状态与导航](#active-state-and-navigation)中所述。由于客户端导航到不再匹配插槽的路由时，插槽内容仍会保持可见，我们需要将插槽匹配到一个返回 `null` 的路由来关闭模态框。
+> - 其他示例包括在相册中打开照片模态框同时保留独立的 `/photo/[id]` 页面，或在侧边栏中打开购物车模态框。
+> - [查看示例](https://github.com/vercel-labs/nextgram)了解如何使用拦截路由和并行路由实现模态框。
+
+### 加载与错误 UI
+
+并行路由可以独立流式传输，允许您为每个路由定义独立的错误和加载状态：
+
+<Image
+  alt="并行路由支持自定义错误和加载状态"
+  srcLight="/docs/light/parallel-routes-cinematic-universe.png"
+  srcDark="/docs/dark/parallel-routes-cinematic-universe.png"
+  width="1600"
+  height="1218"
+/>
+
+详见[加载 UI](/docs/app/building-your-application/routing/loading-ui-and-streaming) 和[错误处理](/docs/app/building-your-application/routing/error-handling)文档了解更多信息。

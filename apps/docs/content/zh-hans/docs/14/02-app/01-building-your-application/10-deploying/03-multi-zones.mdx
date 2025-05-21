@@ -1,0 +1,91 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:38:52.009Z
+title: 多区域 (Multi-Zones)
+description: 学习如何使用 Next.js 多区域 (Multi-Zones) 构建微前端，实现在单一域名下部署多个 Next.js 应用。
+---
+
+{/* 本文档内容在应用路由和页面路由间共享。您可以使用 `<PagesOnly>内容</PagesOnly>` 组件添加仅适用于页面路由的内容。任何共享内容不应包裹在组件中。*/}
+
+<details open>
+  <summary>示例</summary>
+
+- [多区域示例](https://github.com/vercel/next.js/tree/canary/examples/with-zones)
+
+</details>
+
+多区域 (Multi-Zones) 是一种微前端方案，它将一个大型应用按路径拆分为多个小型 Next.js 应用，这些应用共同服务于同一个域名。当应用中存在彼此无关的页面集合时，这一方案特别有用。通过将这些页面移至独立区域（即独立应用），您可以减小每个应用的体积，从而提升构建速度并移除仅特定区域所需的代码。
+
+例如，假设您有以下需要拆分的页面集合：
+
+- `/blog/*` 用于所有博客文章
+- `/dashboard/*` 用于用户登录仪表盘后的所有页面
+- `/*` 用于网站其他未被其他区域覆盖的部分
+
+借助多区域支持，您可以创建三个应用，它们都运行在同一个域名下且对用户呈现一致的外观，但每个应用可以独立开发和部署。
+
+<Image
+  alt="三个区域：A、B、C。展示不同区域间路由的硬导航 (hard navigation) 和同一区域内路由的软导航 (soft navigation)"
+  srcLight="/docs/light/multi-zones.png"
+  srcDark="/docs/dark/multi-zones.png"
+  width="1600"
+  height="750"
+/>
+
+在同一区域内导航会执行软导航 (soft navigation)，即无需重新加载页面的导航方式。例如，在此图中，从 `/` 导航到 `/products` 属于软导航。
+
+而从某个区域的页面导航至另一个区域的页面（如从 `/` 到 `/dashboard`）则会执行硬导航 (hard navigation)，卸载当前页面资源并加载新页面资源。经常一起访问的页面应置于同一区域以避免硬导航。
+
+## 如何定义区域
+
+定义新区域无需特殊 API。一个区域就是一个普通的 Next.js 应用，您只需配置 [basePath](/docs/app/api-reference/next-config-js/basePath) 来避免与其他区域的页面和静态文件冲突。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  basePath: '/blog',
+}
+```
+
+处理所有未被更具体区域匹配的路径的默认应用不需要设置 `basePath`。
+
+Next.js 资源（如 JavaScript 和 CSS）也会添加 `basePath` 前缀，确保它们不会与其他区域的资源冲突。这些资源将通过 `/basePath/_next/...` 路径为每个区域提供服务。
+
+如果某个区域服务的页面没有共同路径前缀（例如 `/home` 和 `/blog`），您还可以设置 [`assetPrefix`](/docs/app/api-reference/next-config-js/assetPrefix) 来确保该区域的所有 Next.js 资源使用唯一路径前缀，而不会影响应用中的其他路由。
+
+## 如何将请求路由至正确区域
+
+在多区域设置中，由于不同应用提供服务，您需要将路径路由至正确的区域。您可以使用任何 HTTP 代理实现这一点，但也可以使用其中一个 Next.js 应用来路由整个域名的请求。
+
+要使用 Next.js 应用路由至正确区域，可以使用 [`rewrites`](/docs/app/api-reference/next-config-js/rewrites)。对于由不同区域服务的每个路径，添加重写规则将其指向其他区域的域名。例如：
+
+```js filename="next.config.js"
+async rewrites() {
+    return [
+        {
+            source: '/blog',
+            destination: `${process.env.BLOG_DOMAIN}/blog`,
+        },
+        {
+            source: '/blog/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog/:path+`,
+        }
+    ];
+}
+```
+
+`destination` 应指向区域服务的 URL，包含协议和域名。在生产环境中应指向区域的正式域名，但在本地开发时也可用于路由至 `localhost`。
+
+> **须知**：URL 路径应在区域内保持唯一。例如，两个区域同时服务 `/blog` 路径会导致路由冲突。
+
+## 跨区域链接
+
+指向不同区域路径的链接应使用 `a` 标签而非 Next.js [`<Link>`](/docs/pages/api-reference/components/link) 组件。因为 Next.js 会尝试预取并通过 `<Link>` 组件软导航至任何相对路径，这在跨区域时无法正常工作。
+
+## 代码共享
+
+组成不同区域的 Next.js 应用可以存放在任何代码仓库中。但通常将它们置于 [monorepo](https://en.wikipedia.org/wiki/Monorepo) 中可以更方便地共享代码。对于不同仓库的区域，也可以通过公共或私有 NPM 包共享代码。
+
+由于不同区域的页面可能在不同时间发布，功能开关 (feature flags) 有助于在不同区域间统一启用或禁用功能。
+
+对于 [Vercel 上的 Next.js](https://vercel.com?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) 应用，您可以使用 [monorepo](https://vercel.com/blog/monorepos-are-changing-how-teams-build-software?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) 通过一次 `git push` 部署所有相关区域。

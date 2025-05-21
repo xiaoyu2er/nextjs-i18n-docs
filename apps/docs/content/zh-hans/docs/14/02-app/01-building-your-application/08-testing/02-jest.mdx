@@ -1,0 +1,387 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:41:34.529Z
+title: 在 Next.js 中配置 Jest
+nav_title: Jest
+description: 学习如何为 Next.js 配置 Jest 以实现单元测试和快照测试。
+---
+
+Jest 和 React Testing Library 常被搭配用于**单元测试**和**快照测试**。本指南将展示如何在 Next.js 中配置 Jest 并编写首个测试。
+
+> **须知：** 由于 `async` 服务端组件是 React 生态的新特性，Jest 目前暂不支持。虽然仍可为同步的服务端和客户端组件运行**单元测试**，但我们建议对 `async` 组件使用**端到端测试**。
+
+## 快速开始
+
+使用 `create-next-app` 配合 Next.js 官方 [with-jest](https://github.com/vercel/next.js/tree/canary/examples/with-jest) 示例快速创建项目：
+
+```bash filename="终端"
+npx create-next-app@latest --example with-jest with-jest-app
+```
+
+## 手动配置
+
+自 [Next.js 12](https://nextjs.org/blog/next-12) 起，Next.js 已内置 Jest 配置支持。
+
+安装 `jest` 及以下开发依赖项来配置 Jest：
+
+```bash filename="终端"
+npm install -D jest jest-environment-jsdom @testing-library/react @testing-library/jest-dom
+# 或
+yarn add -D jest jest-environment-jsdom @testing-library/react @testing-library/jest-dom
+# 或
+pnpm install -D jest jest-environment-jsdom @testing-library/react @testing-library/jest-dom
+```
+
+运行以下命令生成基础 Jest 配置文件：
+
+```bash filename="终端"
+npm init jest@latest
+# 或
+yarn create jest@latest
+# 或
+pnpm create jest@latest
+```
+
+该命令将通过交互式引导完成 Jest 配置，包括自动创建 `jest.config.ts|js` 文件。
+
+更新配置文件以使用 `next/jest`。此转换器包含所有必要的配置选项使 Jest 适配 Next.js：
+
+```ts filename="jest.config.ts" switcher
+import type { Config } from 'jest'
+import nextJest from 'next/jest.js'
+
+const createJestConfig = nextJest({
+  // 提供 Next.js 应用路径以在测试环境中加载 next.config.js 和 .env 文件
+  dir: './',
+})
+
+// 添加需传递给 Jest 的自定义配置
+const config: Config = {
+  coverageProvider: 'v8',
+  testEnvironment: 'jsdom',
+  // 在每次测试前添加更多设置选项
+  // setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+}
+
+// 通过此方式导出确保 next/jest 能异步加载 Next.js 配置
+export default createJestConfig(config)
+```
+
+```js filename="jest.config.js" switcher
+const nextJest = require('next/jest')
+
+/** @type {import('jest').Config} */
+const createJestConfig = nextJest({
+  // 提供 Next.js 应用路径以在测试环境中加载 next.config.js 和 .env 文件
+  dir: './',
+})
+
+// 添加需传递给 Jest 的自定义配置
+const config = {
+  coverageProvider: 'v8',
+  testEnvironment: 'jsdom',
+  // 在每次测试前添加更多设置选项
+  // setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+}
+
+// 通过此方式导出确保 next/jest 能异步加载 Next.js 配置
+module.exports = createJestConfig(config)
+```
+
+在底层，`next/jest` 自动完成以下配置：
+
+- 使用 [Next.js 编译器](/docs/architecture/nextjs-compiler) 设置 `transform`
+- 自动模拟样式表 (`.css`, `.module.css` 及其 scss 变体)、图片导入和 [`next/font`](/docs/pages/building-your-application/optimizing/fonts)
+- 将 `.env` (及其所有变体) 加载到 `process.env`
+- 从测试解析和转换中忽略 `node_modules`
+- 从测试解析中忽略 `.next`
+- 加载 `next.config.js` 以启用 SWC 转换的标记
+
+> **须知**：如需直接测试环境变量，需在单独的安装脚本或 `jest.config.ts` 中手动加载。详见[测试环境变量](/docs/pages/building-your-application/configuring/environment-variables#test-environment-variables)。
+
+<PagesOnly>
+
+## 配置 Jest (使用 Babel)
+
+如果选择不使用 [Next.js 编译器](/docs/architecture/nextjs-compiler) 而改用 Babel，则需额外安装 `babel-jest` 和 `identity-obj-proxy` 并手动配置 Jest。
+
+以下是推荐的 Next.js Jest 配置选项：
+
+```js filename="jest.config.js"
+module.exports = {
+  collectCoverage: true,
+  // 在 node 14.x 上 coverage provider v8 提供良好速度和较完整报告
+  coverageProvider: 'v8',
+  collectCoverageFrom: [
+    '**/*.{js,jsx,ts,tsx}',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+    '!<rootDir>/out/**',
+    '!<rootDir>/.next/**',
+    '!<rootDir>/*.config.js',
+    '!<rootDir>/coverage/**',
+  ],
+  moduleNameMapper: {
+    // 处理 CSS 导入 (使用 CSS modules)
+    // https://jestjs.io/docs/webpack#mocking-css-modules
+    '^.+\\.module\\.(css|sass|scss)$': 'identity-obj-proxy',
+
+    // 处理 CSS 导入 (不使用 CSS modules)
+    '^.+\\.(css|sass|scss)$': '<rootDir>/__mocks__/styleMock.js',
+
+    // 处理图片导入
+    // https://jestjs.io/docs/webpack#handling-static-assets
+    '^.+\\.(png|jpg|jpeg|gif|webp|avif|ico|bmp|svg)$/i': `<rootDir>/__mocks__/fileMock.js`,
+
+    // 处理模块别名
+    '^@/components/(.*)$': '<rootDir>/components/$1',
+
+    // 处理 @next/font
+    '@next/font/(.*)': `<rootDir>/__mocks__/nextFontMock.js`,
+    // 处理 next/font
+    'next/font/(.*)': `<rootDir>/__mocks__/nextFontMock.js`,
+    // 禁用 server-only
+    'server-only': `<rootDir>/__mocks__/empty.js`,
+  },
+  // 在每次测试前添加更多设置选项
+  // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/'],
+  testEnvironment: 'jsdom',
+  transform: {
+    // 使用 babel-jest 配合 next/babel 预设转译测试文件
+    // https://jestjs.io/docs/configuration#transform-objectstring-pathtotransformer--pathtotransformer-object
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
+  },
+  transformIgnorePatterns: [
+    '/node_modules/',
+    '^.+\\.module\\.(css|sass|scss)$',
+  ],
+}
+```
+
+各配置选项的详细信息可查阅 [Jest 文档](https://jestjs.io/docs/configuration)。同时建议参考 [`next/jest` 配置源码](https://github.com/vercel/next.js/blob/e02fe314dcd0ae614c65b505c6daafbdeebb920e/packages/next/src/build/jest/jest.ts) 了解 Next.js 的配置方式。
+
+### 处理样式表和图片导入
+
+测试中虽不使用样式表和图片，但导入它们可能导致错误，因此需进行模拟。
+
+在 `__mocks__` 目录中创建上述配置引用的模拟文件 `fileMock.js` 和 `styleMock.js`：
+
+```js filename="__mocks__/fileMock.js"
+module.exports = 'test-file-stub'
+```
+
+```js filename="__mocks__/styleMock.js"
+module.exports = {}
+```
+
+关于处理静态资源的更多信息，请参阅 [Jest 文档](https://jestjs.io/docs/webpack#handling-static-assets)。
+
+## 处理字体
+
+创建 `__mocks__/nextFontMock.js` 文件并添加以下配置来处理字体：
+
+```js filename="__mocks__/nextFontMock.js"
+module.exports = new Proxy(
+  {},
+  {
+    get: function getter() {
+      return () => ({
+        className: 'className',
+        variable: 'variable',
+        style: { fontFamily: 'fontFamily' },
+      })
+    },
+  }
+)
+```
+
+</PagesOnly>
+
+## 可选：处理绝对路径导入和模块别名
+
+如果项目使用[模块路径别名](/docs/pages/building-your-application/configuring/absolute-imports-and-module-aliases)，需通过配置 Jest 的 `moduleNameMapper` 选项来匹配 `jsconfig.json` 中的路径设置：
+
+```json filename="tsconfig.json 或 jsconfig.json"
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "baseUrl": "./",
+    "paths": {
+      "@/components/*": ["components/*"]
+    }
+  }
+}
+```
+
+```js filename="jest.config.js"
+moduleNameMapper: {
+  // ...
+  '^@/components/(.*)$': '<rootDir>/components/$1',
+}
+```
+
+## 可选：使用自定义匹配器扩展 Jest
+
+`@testing-library/jest-dom` 提供了一系列便捷的[自定义匹配器](https://github.com/testing-library/jest-dom#custom-matchers)，如 `.toBeInTheDocument()` 可简化测试编写。通过在 Jest 配置中添加以下选项为所有测试导入这些匹配器：
+
+```ts filename="jest.config.ts" switcher
+setupFilesAfterEnv: ['<rootDir>/jest.setup.ts']
+```
+
+```js filename="jest.config.js" switcher
+setupFilesAfterEnv: ['<rootDir>/jest.setup.js']
+```
+
+然后在 `jest.setup.ts` 中添加以下导入：
+
+```ts filename="jest.setup.ts" switcher
+import '@testing-library/jest-dom'
+```
+
+```js filename="jest.setup.js" switcher
+import '@testing-library/jest-dom'
+```
+
+> **须知**：[`v6.0` 移除了 `extend-expect`](https://github.com/testing-library/jest-dom/releases/tag/v6.0.0)，若使用 6.0 之前版本的 `@testing-library/jest-dom`，需导入 `@testing-library/jest-dom/extend-expect`。
+
+如需在每个测试前添加更多设置选项，可将其添加到上述 `jest.setup.js` 文件中。
+
+## 在 `package.json` 中添加测试脚本
+
+最后，在 `package.json` 中添加 Jest 测试脚本：
+
+```json filename="package.json" highlight={6-7}
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  }
+}
+```
+
+`jest --watch` 会在文件变更时重新运行测试。更多 Jest CLI 选项请参考 [Jest 文档](https://jestjs.io/docs/cli#reference)。
+
+### 创建首个测试
+
+项目现已准备好运行测试。在项目根目录创建 `__tests__` 文件夹。
+
+<PagesOnly>
+
+例如，添加测试来验证 `<Home />` 组件是否能成功渲染标题：
+
+```jsx filename="pages/index.js
+export default function Home() {
+  return <h1>Home</h1>
+}
+```
+
+```jsx filename="__tests__/index.test.js"
+import '@testing-library/jest-dom'
+import { render, screen } from '@testing-library/react'
+import Home from '../pages/index'
+
+describe('Home', () => {
+  it('渲染标题', () => {
+    render(<Home />)
+
+    const heading = screen.getByRole('heading', { level: 1 })
+
+    expect(heading).toBeInTheDocument()
+  })
+})
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+例如，添加测试来验证 `<Page />` 组件是否能成功渲染标题：
+
+```jsx filename="app/page.js
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <Link href="/about">About</Link>
+    </div>
+  )
+}
+```
+
+```jsx filename="__tests__/page.test.jsx"
+import '@testing-library/jest-dom'
+import { render, screen } from '@testing-library/react'
+import Page from '../app/page'
+
+describe('Page', () => {
+  it('渲染标题', () => {
+    render(<Page />)
+
+    const heading = screen.getByRole('heading', { level: 1 })
+
+    expect(heading).toBeInTheDocument()
+  })
+})
+```
+
+</AppOnly>
+
+可选添加[快照测试](https://jestjs.io/docs/snapshot-testing)来追踪组件的意外变更：
+
+<PagesOnly>
+
+```jsx filename="__tests__/snapshot.js"
+import { render } from '@testing-library/react'
+import Home from '../pages/index'
+
+it('主页渲染无异常', () => {
+  const { container } = render(<Home />)
+  expect(container).toMatchSnapshot()
+})
+```
+
+> **须知**：测试文件不应放在 Pages Router 内，因为该目录下的所有文件都会被视作路由。
+
+</PagesOnly>
+
+<AppOnly>
+
+```jsx filename="__tests__/snapshot.js"
+import { render } from '@testing-library/react'
+import Page from '../app/page'
+
+it('主页渲染无异常', () => {
+  const { container } = render(<Page />)
+  expect(container).toMatchSnapshot()
+})
+```
+
+</AppOnly>
+
+## 运行测试
+
+执行以下命令运行测试：
+
+```bash filename="终端"
+npm run test
+# 或
+yarn test
+# 或
+pnpm test
+```
+
+## 扩展资源
+
+以下资源可能对你有帮助：
+
+- [Next.js with Jest 示例](https://github.com/vercel/next.js/tree/canary/examples/with-jest)
+- [Jest 文档](https://jestjs.io/docs/getting-started)
+- [React Testing Library 文档](https://testing-library.com/docs/react-testing-library/intro/)
+- [Testing Playground](https://testing-playground.com/) - 使用最佳实践匹配元素

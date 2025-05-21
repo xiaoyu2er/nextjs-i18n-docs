@@ -1,0 +1,146 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:53:27.978Z
+title: getServerSideProps
+description: 通过 `getServerSideProps` 在每次请求时获取数据
+---
+
+如果从页面导出一个名为 `getServerSideProps`（服务端渲染 (Server-Side Rendering)）的函数，Next.js 会在每次请求时使用该函数返回的数据预渲染此页面。
+
+```tsx filename="pages/index.tsx" switcher
+import type { InferGetServerSidePropsType, GetServerSideProps } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getServerSideProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetServerSideProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/index.js" switcher
+export async function getServerSideProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+> 请注意，无论采用何种渲染方式，所有 `props` 都会传递给页面组件，并可在初始 HTML 的客户端查看。这是为了确保页面能正确进行[水合 (hydrate)](https://react.dev/reference/react-dom/hydrate)。请确保不要在 `props` 中传递任何不应在客户端获取的敏感信息。
+
+## getServerSideProps 何时运行
+
+`getServerSideProps` 仅在服务端运行，永远不会在浏览器端执行。如果页面使用了 `getServerSideProps`，则：
+
+- 当直接请求该页面时，`getServerSideProps` 会在请求时运行，页面将使用返回的 props 进行预渲染
+- 当通过 [`next/link`](/docs/pages/api-reference/components/link) 或 [`next/router`](/docs/pages/api-reference/functions/use-router) 在客户端进行页面跳转时，Next.js 会向服务器发送 API 请求，服务器将运行 `getServerSideProps`
+
+`getServerSideProps` 返回的 JSON 数据将用于渲染页面。所有这些工作都会由 Next.js 自动处理，只要定义了 `getServerSideProps`，您无需进行额外操作。
+
+您可以使用 [next-code-elimination 工具](https://next-code-elimination.vercel.app/) 来验证 Next.js 从客户端打包中移除了哪些代码。
+
+`getServerSideProps` 只能从**页面**导出，不能从非页面文件中导出。
+
+请注意，必须将 `getServerSideProps` 作为独立函数导出 —— 如果将其作为页面组件的属性添加，则**不会**生效。
+
+[`getServerSideProps` API 参考文档](/docs/pages/api-reference/functions/get-server-side-props) 涵盖了所有可与 `getServerSideProps` 一起使用的参数和 props。
+
+## 何时应该使用 getServerSideProps
+
+仅当需要渲染必须在请求时获取数据的页面时，才应使用 `getServerSideProps`。这可能是由于数据的性质或请求的属性（如 `authorization` 头信息或地理位置）。使用 `getServerSideProps` 的页面将在请求时进行服务端渲染，并且只有在[配置了缓存控制头信息](/docs/pages/building-your-application/deploying/production-checklist#caching)时才会被缓存。
+
+如果不需要在请求时渲染数据，则应考虑在[客户端获取数据](#fetching-data-on-the-client-side)或使用 [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)。
+
+### getServerSideProps 与 API 路由
+
+当需要从服务器获取数据时，可能会想要使用 [API 路由](/docs/pages/building-your-application/routing/api-routes)，然后从 `getServerSideProps` 调用该 API 路由。这是一种不必要且低效的做法，因为 `getServerSideProps` 和 API 路由都在服务器上运行，会导致额外的请求。
+
+请看以下示例。API 路由用于从 CMS 获取一些数据，然后直接从 `getServerSideProps` 调用该 API 路由。这会增加额外的调用，降低性能。相反，应直接将 API 路由中使用的逻辑导入到 `getServerSideProps` 中。这意味着可以直接在 `getServerSideProps` 内部调用 CMS、数据库或其他 API。
+
+### 在 Edge API 路由中使用 getServerSideProps
+
+`getServerSideProps` 可与 [Serverless 和 Edge 运行时](/docs/pages/building-your-application/rendering/edge-and-nodejs-runtimes) 一起使用，并且可以在两者中设置 props。但是，目前在 Edge 运行时中无法访问响应对象。这意味着例如无法在 `getServerSideProps` 中添加 cookies。要访问响应对象，应**继续使用 Node.js 运行时**，这是默认的运行时。
+
+可以通过修改 `config` 在每页基础上显式设置运行时，例如：
+
+```jsx filename="pages/index.js"
+export const config = {
+  runtime: 'nodejs', // 或 "edge"
+}
+
+export const getServerSideProps = async () => {}
+```
+
+## 在客户端获取数据
+
+如果页面包含频繁更新的数据，并且不需要预渲染数据，可以在[客户端](/docs/pages/building-your-application/data-fetching/client-side)获取数据。例如用户特定数据：
+
+- 首先，立即显示没有数据的页面。可以使用静态生成 (Static Generation) 预渲染页面的某些部分，并为缺失的数据显示加载状态
+- 然后，在客户端获取数据并在准备就绪时显示
+
+这种方法非常适合用户仪表盘页面。因为仪表盘是私有的、用户特定的页面，SEO 无关紧要，页面也不需要预渲染。数据频繁更新，因此需要在请求时获取数据。
+
+## 使用 getServerSideProps 在请求时获取数据
+
+以下示例展示了如何在请求时获取数据并预渲染结果。
+
+```jsx
+// 每次请求时都会调用此函数
+export async function getServerSideProps() {
+  // 从外部 API 获取数据
+  const res = await fetch(`https://.../data`)
+  const data = await res.json()
+
+  // 通过 props 将数据传递给页面
+  return { props: { data } }
+}
+
+export default function Page({ data }) {
+  // 渲染数据...
+}
+```
+
+## 服务端渲染 (SSR) 的缓存
+
+可以在 `getServerSideProps` 中使用缓存头信息（`Cache-Control`）来缓存动态响应。例如使用 [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/)。
+
+```jsx
+// 此值在十秒内被视为最新（s-maxage=10）。
+// 如果在接下来的 10 秒内重复请求，将仍然使用缓存的最新值。
+// 如果在 59 秒内重复请求，缓存的值将过时但仍会渲染（stale-while-revalidate=59）。
+//
+// 在后台，将发出重新验证请求以使用新值填充缓存。
+// 如果刷新页面，将看到新值。
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+了解更多关于[缓存](/docs/pages/building-your-application/deploying/production-checklist#caching)的信息。
+
+## getServerSideProps 是否会渲染错误页面
+
+如果在 `getServerSideProps` 中抛出错误，将显示 `pages/500.js` 文件。查看 [500 页面](/docs/pages/building-your-application/routing/custom-error#500-page) 文档以了解如何创建它。在开发过程中不会使用此文件，而是会显示开发覆盖层。

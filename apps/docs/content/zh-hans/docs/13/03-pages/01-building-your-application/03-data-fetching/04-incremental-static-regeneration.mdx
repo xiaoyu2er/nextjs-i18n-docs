@@ -1,0 +1,197 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:53:39.467Z
+title: 增量静态再生 (ISR)
+description: 了解如何在运行时通过增量静态再生 (ISR) 创建或更新静态页面。
+---
+
+<details>
+  <summary>示例</summary>
+
+- [Next.js Commerce](https://nextjs.org/commerce)
+- [GitHub Reactions 演示](https://reactions-demo.vercel.app/)
+- [Static Tweet 演示](https://static-tweet.vercel.app/)
+
+</details>
+
+Next.js 允许您在构建站点后创建或更新静态页面。增量静态再生 (ISR) 使您能够按页面使用静态生成功能，而无需重新构建整个站点。通过 ISR，您可以在扩展到数百万页面的同时保留静态化的优势。
+
+> **须知**：目前 [`edge` 运行时](/docs/pages/api-reference/edge) 与 ISR 不兼容，但您可以通过手动设置 `cache-control` 标头来利用 `stale-while-revalidate` 策略。
+
+要使用 ISR，请在 `getStaticProps` 中添加 `revalidate` 属性：
+
+```jsx
+function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+// 此函数在构建时于服务端调用
+// 如果启用了重新验证且收到新请求，可能会在无服务器函数上再次调用
+export async function getStaticProps() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  return {
+    props: {
+      posts,
+    },
+    // Next.js 将尝试重新生成页面：
+    // - 当收到请求时
+    // - 最多每 10 秒一次
+    revalidate: 10, // 单位为秒
+  }
+}
+
+// 此函数在构建时于服务端调用
+// 如果路径尚未生成，可能会在无服务器函数上再次调用
+export async function getStaticPaths() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // 根据 posts 获取需要预渲染的路径
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // 我们将在构建时仅预渲染这些路径
+  // { fallback: 'blocking' } 将在路径不存在时按需服务端渲染页面
+  return { paths, fallback: 'blocking' }
+}
+
+export default Blog
+```
+
+当请求访问构建时预渲染的页面时，将首先显示缓存的页面。
+
+- 在初始请求后的 10 秒内，所有对该页面的后续请求也都是缓存且即时响应的
+- 10 秒窗口期过后，下一个请求仍会显示缓存的（过时）页面
+- Next.js 会在后台触发页面重新生成
+- 一旦页面成功生成，Next.js 将使缓存失效并显示更新后的页面。如果后台重新生成失败，旧页面将保持不变
+
+当请求访问尚未生成的路径时，Next.js 会在第一次请求时进行服务端渲染。后续请求将从缓存中提供静态文件。Vercel 上的 ISR 会[全局持久化缓存并处理回滚](https://vercel.com/docs/concepts/next.js/incremental-static-regeneration?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)。
+
+> **须知**：检查您的上游数据提供商是否默认启用了缓存。您可能需要禁用缓存（例如设置 `useCdn: false`），否则重新验证将无法获取新数据来更新 ISR 缓存。当端点返回 `Cache-Control` 标头时，CDN 可能会对请求的端点进行缓存。
+
+## 按需重新验证
+
+如果您将 `revalidate` 时间设置为 `60`，所有访问者将在一分钟内看到相同的生成版本。使缓存失效的唯一方式是等待一分钟后有人访问该页面。
+
+从 `v12.2.0` 开始，Next.js 支持按需增量静态再生，可以手动清除特定页面的 Next.js 缓存。这在以下场景中更新站点更加方便：
+
+- 无头 CMS 中的内容被创建或更新
+- 电子商务元数据发生变化（价格、描述、类别、评论等）
+
+在 `getStaticProps` 中，您不需要指定 `revalidate` 来使用按需重新验证。如果省略 `revalidate`，Next.js 将使用默认值 `false`（不重新验证），仅在调用 `revalidate()` 时按需重新验证页面。
+
+> **须知**：[中间件](/docs/pages/building-your-application/routing/middleware) 不会为按需 ISR 请求执行。相反，应在您想要重新验证的精确路径上调用 `revalidate()`。例如，如果您有 `pages/blog/[slug].js` 和从 `/post-1` 重写到 `/blog/post-1`，您需要调用 `res.revalidate('/blog/post-1')`。
+
+### 使用按需重新验证
+
+首先，创建一个只有您的 Next.js 应用知道的密钥令牌。此密钥将用于防止未经授权访问重新验证 API 路由。您可以通过以下 URL 结构访问该路由（手动或通过 webhook）：
+
+```bash filename="终端"
+https://<your-site.com>/api/revalidate?secret=<token>
+```
+
+接下来，将密钥作为[环境变量](/docs/pages/building-your-application/configuring/environment-variables)添加到您的应用中。最后，创建重新验证 API 路由：
+
+```js filename="pages/api/revalidate.js"
+export default async function handler(req, res) {
+  // 检查密钥以确认这是有效请求
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: '无效令牌' })
+  }
+
+  try {
+    // 这应该是实际路径而非重写路径
+    // 例如对于 "/blog/[slug]"，这应该是 "/blog/post-1"
+    await res.revalidate('/path-to-revalidate')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // 如果出现错误，Next.js 将继续
+    // 显示最后成功生成的页面
+    return res.status(500).send('重新验证时出错')
+  }
+}
+```
+
+[查看我们的演示](https://on-demand-isr.vercel.app)以了解按需重新验证的实际应用并提供反馈。
+
+### 在开发期间测试按需 ISR
+
+当使用 `next dev` 本地运行时，`getStaticProps` 会在每个请求上调用。要验证您的按需 ISR 配置是否正确，您需要创建[生产构建](/docs/pages/api-reference/next-cli#build)并启动[生产服务器](/docs/pages/api-reference/next-cli#production)：
+
+```bash filename="终端"
+$ next build
+$ next start
+```
+
+然后，您可以确认静态页面已成功重新验证。
+
+## 错误处理和重新验证
+
+如果在处理后台重新生成时 `getStaticProps` 内部出现错误，或者您手动抛出错误，将继续显示最后成功生成的页面。在下一个后续请求中，Next.js 将重试调用 `getStaticProps`。
+
+```jsx
+export async function getStaticProps() {
+  // 如果此请求抛出未捕获的错误，Next.js 将
+  // 不会使当前显示的页面失效，并
+  // 在下一个请求上重试 getStaticProps
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  if (!res.ok) {
+    // 如果是服务器错误，您可能希望
+    // 抛出错误而不是返回，这样缓存将不会更新
+    // 直到下一个成功的请求
+    throw new Error(`获取文章失败，收到状态码 ${res.status}`)
+  }
+
+  // 如果请求成功，返回文章
+  // 并每 10 秒重新验证一次
+  return {
+    props: {
+      posts,
+    },
+    revalidate: 10,
+  }
+}
+```
+
+## 自托管 ISR
+
+增量静态再生 (ISR) 在[自托管 Next.js 站点](/docs/pages/building-your-application/deploying#self-hosting)上开箱即用，只需使用 `next start`。
+
+您可以在部署到容器编排系统如 [Kubernetes](https://kubernetes.io/) 或 [HashiCorp Nomad](https://www.nomadproject.io/) 时使用此方法。默认情况下，生成的资源将存储在每个 pod 的内存中。这意味着每个 pod 都有自己的一份静态文件副本。在请求命中特定 pod 之前，可能会显示过时数据。
+
+为确保所有 pod 之间的一致性，您可以禁用内存缓存。这将告知 Next.js 服务器仅使用文件系统中由 ISR 生成的资源。
+
+您可以在 Kubernetes pod（或类似设置）中使用共享网络挂载，以便在不同容器之间重用相同的文件系统缓存。通过共享相同的挂载点，包含 `next/image` 缓存的 `.next` 文件夹也将被共享和重用。
+
+要禁用内存缓存，请在 `next.config.js` 文件中将 `isrMemoryCacheSize` 设置为 `0`：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    // 默认为 50MB
+    isrMemoryCacheSize: 0, // 缓存大小（字节）
+  },
+}
+```
+
+> **须知**：根据共享挂载的配置方式，您可能需要考虑多个 pod 同时尝试更新缓存时的竞态条件。
+
+## 版本历史
+
+| 版本       | 变更                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------- |
+| `v12.2.0` | 按需 ISR 功能稳定                                                                 |
+| `v12.1.0` | 添加按需 ISR（测试版）                                                             |
+| `v12.0.0` | 添加[支持爬虫的 ISR 回退](https://nextjs.org/blog/next-12#bot-aware-isr-fallback) |
+| `v9.5.0`  | 添加基础路径支持                                                                        |

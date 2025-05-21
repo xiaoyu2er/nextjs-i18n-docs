@@ -1,0 +1,120 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-21T20:52:04.228Z
+title: 自定义服务器
+description: 通过编程方式使用自定义服务器启动 Next.js 应用。
+---
+
+<details>
+  <summary>示例</summary>
+
+- [自定义服务器](https://github.com/vercel/next.js/tree/canary/examples/custom-server)
+- [SSR 缓存](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+默认情况下，Next.js 通过 `next start` 命令自带服务器。如果您已有后端服务，仍然可以将其与 Next.js 配合使用（这不属于自定义服务器）。自定义 Next.js 服务器允许您 100% 通过编程方式启动服务器，以实现自定义服务器模式。大多数情况下您不需要这样做——但此功能仍为完全定制化需求保留。
+
+> **须知**:
+>
+> - 在决定使用自定义服务器前，请注意仅当 Next.js 内置路由无法满足应用需求时才应考虑此方案。自定义服务器将移除重要性能优化，如 **无服务器函数 (serverless functions)** 和 **[自动静态优化 (Automatic Static Optimization)](/docs/pages/building-your-application/rendering/automatic-static-optimization)**。
+> - 自定义服务器**无法**部署在 [Vercel](https://vercel.com/solutions/nextjs) 平台。
+
+参考以下自定义服务器示例：
+
+```js filename="server.js"
+const { createServer } = require('http')
+const { parse } = require('url')
+const next = require('next')
+
+const dev = process.env.NODE_ENV !== 'production'
+const hostname = 'localhost'
+const port = 3000
+// 使用中间件时必须提供 `hostname` 和 `port` 参数
+const app = next({ dev, hostname, port })
+const handle = app.getRequestHandler()
+
+app.prepare().then(() => {
+  createServer(async (req, res) => {
+    try {
+      // 确保向 `url.parse` 传递第二个参数 `true`
+      // 这将解析 URL 的查询部分
+      const parsedUrl = parse(req.url, true)
+      const { pathname, query } = parsedUrl
+
+      if (pathname === '/a') {
+        await app.render(req, res, '/a', query)
+      } else if (pathname === '/b') {
+        await app.render(req, res, '/b', query)
+      } else {
+        await handle(req, res, parsedUrl)
+      }
+    } catch (err) {
+      console.error('Error occurred handling', req.url, err)
+      res.statusCode = 500
+      res.end('internal server error')
+    }
+  })
+    .once('error', (err) => {
+      console.error(err)
+      process.exit(1)
+    })
+    .listen(port, () => {
+      console.log(`> Ready on http://${hostname}:${port}`)
+    })
+})
+```
+
+> `server.js` 不会经过 babel 或 webpack 处理。请确保该文件的语法和引用的源码与当前运行的 node 版本兼容。
+
+要运行自定义服务器，需要按如下方式更新 `package.json` 中的 `scripts`：
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "NODE_ENV=production node server.js"
+  }
+}
+```
+
+---
+
+自定义服务器通过以下导入方式将服务器与 Next.js 应用连接：
+
+```js
+const next = require('next')
+const app = next({})
+```
+
+上述 `next` 导入是一个函数，接收包含以下选项的对象：
+
+| 选项           | 类型                | 描述                                                                                                   |
+| -------------- | ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `conf`         | `Object`            | 与 [next.config.js](/docs/pages/api-reference/next-config-js) 相同的配置对象。默认为 `{}`              |
+| `customServer` | `Boolean`           | （可选）当服务器由 Next.js 创建时设为 false                                                           |
+| `dev`          | `Boolean`           | （可选）是否以开发模式启动 Next.js。默认为 `false`                                                    |
+| `dir`          | `String`            | （可选）Next.js 项目路径。默认为 `'.'`                                                                |
+| `quiet`        | `Boolean`           | （可选）隐藏包含服务器信息的错误消息。默认为 `false`                                                  |
+| `hostname`     | `String`            | （可选）服务器运行的主机名                                                                            |
+| `port`         | `Number`            | （可选）服务器运行的端口号                                                                            |
+| `httpServer`   | `node:http#Server`  | （可选）Next.js 运行所基于的 HTTP 服务器                                                              |
+
+返回的 `app` 对象可用于按需让 Next.js 处理请求。
+
+## 禁用文件系统路由
+
+默认情况下，`Next` 会将 `pages` 文件夹中的每个文件映射到与文件名匹配的路径提供服务。如果项目使用自定义服务器，此行为可能导致相同内容从多个路径提供服务，可能引发 SEO 和用户体验问题。
+
+要禁用此行为并阻止基于 `pages` 文件夹文件的路由，请在 `next.config.js` 中禁用 `useFileSystemPublicRoutes` 配置：
+
+```js filename="next.config.js"
+module.exports = {
+  useFileSystemPublicRoutes: false,
+}
+```
+
+> 注意 `useFileSystemPublicRoutes` 仅禁用 SSR 的文件名路由；客户端路由仍可能访问这些路径。使用此选项时，应通过编程方式防止导航到不需要的路由。
+
+> 您可能还需要配置客户端路由以禁止重定向到文件名路由，相关配置请参考 [`router.beforePopState`](/docs/pages/api-reference/functions/use-router#routerbeforepopstate)。
