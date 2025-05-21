@@ -35,3 +35,39 @@ export const NextPagesIcon = () => (
     />
   </svg>
 );
+
+export const NextLastedVersionIcon = () => (
+  <svg
+    height="16"
+    stroke-linejoin="round"
+    style={{ color: 'currentColor' }}
+    viewBox="0 0 16 16"
+    width="16"
+  >
+    <title>Next.js Latest Version Icon</title>
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M1.5 1.5H6.34315C7.00619 1.5 7.64207 1.76339 8.11091 2.23223L13.8787 8L8 13.8787L2.23223 8.11091C1.76339 7.64207 1.5 7.00619 1.5 6.34315V1.5ZM16 8L14.9393 6.93934L9.17157 1.17157C8.42143 0.421427 7.40401 0 6.34315 0H1.5H0V1.5V6.34315C0 7.40401 0.421426 8.42143 1.17157 9.17157L6.93934 14.9393L8 16L9.06066 14.9393L14.9393 9.06066L16 8ZM4.5 5.25C4.91421 5.25 5.25 4.91421 5.25 4.5C5.25 4.08579 4.91421 3.75 4.5 3.75C4.08579 3.75 3.75 4.08579 3.75 4.5C3.75 4.91421 4.08579 5.25 4.5 5.25Z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+export const NextOldVersionIcon = () => (
+  <svg
+    height="16"
+    strokeLinejoin="round"
+    viewBox="0 0 16 16"
+    width="16"
+    style={{ color: 'currentcolor' }}
+  >
+    <title>Next.js Old Version Icon</title>
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M1.5 3.5H14.5V5.5H13.5H2.5H1.5V3.5ZM1 7H0V5.5V3.5V2H1.5H14.5H16V3.5V5.5V7H15V12.5C15 13.8807 13.8807 15 12.5 15H3.5C2.11929 15 1 13.8807 1 12.5V7ZM2.5 7V12.5C2.5 13.0523 2.94772 13.5 3.5 13.5H12.5C13.0523 13.5 13.5 13.0523 13.5 12.5V7H2.5ZM6 9.5H6.75H9.25H10V11H9.25H6.75H6V9.5Z"
+      fill="currentColor"
+    />
+  </svg>
+);
