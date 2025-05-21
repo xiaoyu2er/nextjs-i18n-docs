@@ -1,12 +1,12 @@
 # Next.js i18n Documentation Project
 
-This is a monorepo project designed to sync with the official Next.js documentation and translate it into multiple languages. The project uses [Fumadocs](https://fumadocs.vercel.app) for documentation generation and includes a custom translation toolkit.
+This is a monorepo project designed to sync with the official Next.js documentation and translate it into multiple languages. The project uses [Fumadocs](https://fumadocs.dev/) for documentation generation and includes a custom translation toolkit.
 
 ## Features
 
 - 📚 Complete mirror of official Next.js documentation
 - 🌐 Multilingual support (currently English and Simplified Chinese)
-- 🔍 Full-text search with [Orama](https://oramasearch.com)
+- 🔍 Full-text search with [Orama](https://orama.com/)
 - 🤖 AI-powered translation using the `@next-i18n/translate` package
 
 ## Project Structure
@@ -86,7 +86,7 @@ pnpm update-search-index
 ## Learn More
 
 - [Next.js Documentation](https://nextjs.org/docs)
-- [Fumadocs Documentation](https://fumadocs.vercel.app)
+- [Fumadocs Documentation](https://fumadocs.dev/)
 - For detailed information about the translation utility, see the [translate package README](./packages/translate/README.md)
 
 ## License

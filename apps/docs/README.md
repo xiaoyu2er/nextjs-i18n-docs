@@ -1,6 +1,6 @@
 # Next.js i18n Documentation Site
 
-This is the documentation site package for the Next.js i18n Documentation Project. It renders multilingual Next.js documentation using [Fumadocs](https://fumadocs.vercel.app).
+This is the documentation site package for the Next.js i18n Documentation Project. It renders multilingual Next.js documentation using [Fumadocs](https://fumadocs.dev/).
 
 ## Quick Start
 
@@ -66,5 +66,5 @@ pnpm update-search-index
 ## Learn More
 
 - [Next.js Documentation](https://nextjs.org/docs) - official Next.js docs
-- [Fumadocs](https://fumadocs.vercel.app) - documentation framework used in this project
+- [Fumadocs](https://fumadocs.dev/) - documentation framework used in this project
 - [Next.js i18n Documentation](https://github.com/nextjs/next.js/tree/canary/docs) - source content

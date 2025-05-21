@@ -4,7 +4,7 @@ import { loader } from 'fumadocs-core/source';
 import type { Locale } from 'next-intl';
 import { createElement } from 'react';
 
-// See https://fumadocs.vercel.app/docs/headless/source-api for more info
+// See https://fumadocs.dev//docs/headless/source-api for more info
 const source_en = loader({
   source: docs_en.toFumadocsSource(),
   // it assigns a URL to your pages

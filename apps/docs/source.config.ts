@@ -30,7 +30,7 @@ const defaultDocsOptions = {
 };
 
 // You can customise Zod schemas for frontmatter and `meta.json` here
-// see https://fumadocs.vercel.app/docs/mdx/collections#define-docs
+// see https://fumadocs.dev//docs/mdx/collections#define-docs
 export const docs_en = defineDocs({
   dir: 'content/en/docs',
   ...defaultDocsOptions,
