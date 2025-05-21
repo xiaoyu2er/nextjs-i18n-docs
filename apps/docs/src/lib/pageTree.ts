@@ -50,121 +50,78 @@ export function cloneRoot(tree: PageTree.Root) {
 }
 
 export function getDocsLayoutTree(tree: PageTree.Root, slug: string[]) {
-  const isApp = slug[0] === 'app';
-  const isPages = slug[0] === 'pages';
   const isV14 = slug[0] === '14';
   const isV13 = slug[0] === '13';
+  const isLatest = !isV14 && !isV13;
+
   const root = cloneRoot(tree);
   for (const node of tree.children) {
-    // App
-    if (isApp && node.$id === '01-app' && node.type === 'folder') {
-      const children = node.children;
-      if (children[0].type === 'folder') {
-        children[0].defaultOpen = true;
+    if (isLatest) {
+      const isPages = slug[0] === 'pages';
+      // App
+      if (!isPages && node.$id === '01-app' && node.type === 'folder') {
+        const children = node.children;
+        if (children[0].type === 'folder') {
+          children[0].defaultOpen = true;
+        }
+        root.children.push(...children);
       }
-      root.children.push(...children);
-    }
-    // Pages
-    if (isPages && node.$id === '02-pages' && node.type === 'folder') {
-      const children = node.children;
-      if (children[0].type === 'folder') {
-        children[0].defaultOpen = true;
+      // Pages
+      if (isPages && node.$id === '02-pages' && node.type === 'folder') {
+        const children = node.children;
+        if (children[0].type === 'folder') {
+          children[0].defaultOpen = true;
+        }
+        root.children.push(...children);
       }
-      root.children.push(...children);
-    }
-    if (
-      !isV14 &&
-      !isV13 &&
-      !isApp &&
-      !isPages &&
-      node.$id &&
-      node.type === 'folder' &&
-      !['13', '14'].includes(node.$id)
-    ) {
-      root.children.push(node);
-    }
-    // Architecture && Community
-    if (
-      (isApp || isPages) &&
-      node.$id &&
-      !['13', '14', '01-app', '02-pages'].includes(node.$id) &&
-      node.type === 'folder'
-    ) {
-      root.children.push(node);
-    }
 
-    if (isV13 && node.$id === '13' && node.type === 'folder') {
-      const children = node.children;
-      const isApp = slug[1] === 'app';
-      const isPages = slug[1] === 'pages';
-      for (const child of children) {
-        const expandChildren = ['13/02-app', '13/03-pages'];
-        if (
-          child.$id &&
-          child.type === 'folder' &&
-          expandChildren.includes(child.$id)
-        ) {
-          for (const item of child.children) {
-            if (item.type === 'folder') item.defaultOpen = true;
-          }
-        }
-        if (isApp && child.$id === '13/02-app' && child.type === 'folder') {
-          root.children.push(...child.children);
-        }
-        if (isPages && child.$id === '13/03-pages' && child.type === 'folder') {
-          root.children.push(...child.children);
-        }
-        if (!isApp && !isPages && child.type === 'folder' && child.$id) {
-          root.children.push(child);
-        }
-        if (
-          (isApp || isPages) &&
-          child.$id &&
-          !['13/02-app', '13/03-pages'].includes(child.$id) &&
-          child.type === 'folder'
-        ) {
-          if (child.$id === '13/01-getting-started') {
-            child.defaultOpen = true;
-          }
-          root.children.push(child);
-        }
+      // Architecture && Community
+      if (
+        node.$id &&
+        !['13', '14', '01-app', '02-pages'].includes(node.$id) &&
+        node.type === 'folder'
+      ) {
+        root.children.push(node);
       }
     }
 
-    if (isV14 && node.$id === '14' && node.type === 'folder') {
-      const children = node.children;
-      const isApp = slug[1] === 'app';
-      const isPages = slug[1] === 'pages';
-      for (const child of children) {
-        const expandChildren = ['14/02-app', '14/03-pages'];
-        if (
-          child.$id &&
-          child.type === 'folder' &&
-          expandChildren.includes(child.$id)
-        ) {
-          for (const item of child.children) {
-            if (item.type === 'folder') item.defaultOpen = true;
+    if (isV13 || isV14) {
+      const version = isV14 ? '14' : '13';
+      const gettingStarted = `${version}/01-getting-started`;
+      const appFolder = `${version}/02-app`;
+      const pagesFolder = `${version}/03-pages`;
+      if (node.$id === version && node.type === 'folder') {
+        const children = node.children;
+
+        const isPages = slug[1] === 'pages';
+        for (const child of children) {
+          const expandChildren = [appFolder, pagesFolder];
+          if (
+            child.$id &&
+            child.type === 'folder' &&
+            expandChildren.includes(child.$id)
+          ) {
+            for (const item of child.children) {
+              if (item.type === 'folder') item.defaultOpen = true;
+            }
           }
-        }
-        if (isApp && child.$id === '14/02-app' && child.type === 'folder') {
-          root.children.push(...child.children);
-        }
-        if (isPages && child.$id === '14/03-pages' && child.type === 'folder') {
-          root.children.push(...child.children);
-        }
-        if (!isApp && !isPages && child.type === 'folder' && child.$id) {
-          root.children.push(child);
-        }
-        if (
-          (isApp || isPages) &&
-          child.$id &&
-          !['14/02-app', '14/03-pages'].includes(child.$id) &&
-          child.type === 'folder'
-        ) {
-          if (child.$id === '14/01-getting-started') {
-            child.defaultOpen = true;
+          if (!isPages && child.$id === appFolder && child.type === 'folder') {
+            root.children.push(...child.children);
           }
-          root.children.push(child);
+          if (isPages && child.$id === pagesFolder && child.type === 'folder') {
+            root.children.push(...child.children);
+          }
+
+          if (
+            child.$id &&
+            ![appFolder, pagesFolder].includes(child.$id) &&
+            child.type === 'folder'
+          ) {
+            if (child.$id === gettingStarted) {
+              child.defaultOpen = true;
+            }
+            root.children.push(child);
+          }
         }
       }
     }
