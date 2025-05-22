@@ -15,6 +15,7 @@ import {
   type DocsLayoutProps,
   DocsLayout as FumaDocsLayout,
 } from 'fumadocs-ui/layouts/notebook';
+import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 
 export function DocsLayout({
@@ -29,19 +30,20 @@ export function DocsLayout({
   routerType: RouterType;
 }) {
   const baseOptions = useBaseOptions();
+  const t = useTranslations('sidebar');
   const { appDocsRoot, pagesDocsRoot, docsRoot, docUrl, isPages } =
     parseDocId(docId);
   const options = [
     {
-      title: 'Using App Router',
-      description: 'Features available in /app',
+      title: t('app.title'),
+      description: t('app.description'),
       icon: <NextAppIcon />,
       url: appDocsRoot,
       ...(routerType !== 'pages' ? { urls: new Set([docUrl]) } : {}),
     },
     {
-      title: 'Using Pages Router',
-      description: 'Features available in /pages',
+      title: t('pages.title'),
+      description: t('pages.description'),
       icon: <NextPagesIcon />,
       url: pagesDocsRoot,
       ...(routerType === 'pages' ? { urls: new Set([docUrl]) } : {}),
@@ -59,19 +61,19 @@ export function DocsLayout({
           <RootToggle
             options={[
               {
-                title: 'Using Latest Version',
+                title: t('version.latest.title'),
                 description: '15.3.2',
                 icon: <NextLastedVersionIcon />,
                 url: '/docs/',
               },
               {
-                title: 'Using Version 14',
+                title: t('version.v14.title'),
                 description: '14.2.29',
                 icon: <NextOldVersionIcon />,
                 url: '/docs/14',
               },
               {
-                title: 'Using Version 13',
+                title: t('version.v13.title'),
                 description: '13.5.11',
                 icon: <NextOldVersionIcon />,
                 url: '/docs/13',
