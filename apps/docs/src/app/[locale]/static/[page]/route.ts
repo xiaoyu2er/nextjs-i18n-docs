@@ -22,6 +22,8 @@ export async function GET(
 }
 
 export function generateStaticParams() {
+  if (process.env.GEN_ORAMA_STATIC !== 'true') return [];
+
   const params = routing.locales.flatMap((locale) => {
     const source = sourceMap[locale];
     const pages = source.getPages();
@@ -35,6 +37,6 @@ export function generateStaticParams() {
       };
     });
   });
-  // console.log('params', params);
+  console.log('orama generateStaticParams', params);
   return params;
 }
