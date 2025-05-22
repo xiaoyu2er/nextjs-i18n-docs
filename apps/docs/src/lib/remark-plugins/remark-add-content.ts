@@ -1,4 +1,4 @@
-import type { Code, Heading, Paragraph, Root } from 'mdast';
+import type { Heading, Paragraph, Root } from 'mdast';
 
 /**
  * Remark plugin that adds content to the document based on frontmatter data

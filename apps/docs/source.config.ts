@@ -9,9 +9,17 @@ import { z } from 'zod';
 import { addMdxContent } from '@/lib/remark-plugins/remark-add-content';
 import { convertCodeMeta } from '@/lib/remark-plugins/remark-convert-code-meta';
 
+const asyncMode = process.env.MDX_ASYNC === 'true';
+if (!asyncMode && process.env.NODE_ENV === 'development') {
+  console.log('AsyncMode', asyncMode);
+  console.warn(
+    'This may result in longer dev server start time for large docs sites, you can enable Async Mode on doc collections to improve this.',
+  );
+}
+
 const defaultDocsOptions = {
   docs: {
-    async: true,
+    async: asyncMode,
     schema: frontmatterSchema.extend({
       nav_title: z.string().optional(),
       source: z.string().optional(),
@@ -43,7 +51,6 @@ export const docs_zh_hans = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
-    remarkStructureOptions: false,
     remarkPlugins: (v) => [convertCodeMeta, addMdxContent, ...v],
   },
 });

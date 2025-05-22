@@ -1,4 +1,5 @@
 import { DocsLayout } from '@/components/layout';
+import { routing } from '@/i18n/routing';
 import { type RouterType, routerTypeCookie } from '@/lib/const';
 import { getPage } from '@/lib/page';
 import { getDocsLayoutTree, getPageTreePeers } from '@/lib/pageTree';
@@ -15,7 +16,7 @@ import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 export default async function Docs(props: {
-  params: Promise<{ locale: Locale; slug?: string[] }>;
+  params: Promise<{ locale: Locale; slug: string[] }>;
 }) {
   const routerType = (await cookies()).get(routerTypeCookie)
     ?.value as RouterType;
@@ -28,8 +29,11 @@ export default async function Docs(props: {
   const page = getPage(locale, docUrl);
   if (!page) notFound();
   const { isApp, isPages } = parseDocId(docId);
-  // Markdown content requires await
-  let { body: MdxContent, toc } = await page.data.load();
+  // @ts-ignore
+  let { body: MdxContent, toc } = page.data.load
+    ? // @ts-ignore
+      await page.data.load()
+    : page.data;
 
   // source: app/getting-started/installation
   const ref = page.data.source;
@@ -37,7 +41,11 @@ export default async function Docs(props: {
     const refUrl = getDocUrl(ref);
     const refPage = getPage(locale, refUrl);
     if (!refPage) notFound();
-    const { body: MdxContent2, toc: toc2 } = await refPage.data.load();
+    // @ts-ignore
+    const { body: MdxContent2, toc: toc2 } = refPage.data.load
+      ? // @ts-ignore
+        await refPage.data.load()
+      : refPage.data;
 
     MdxContent = MdxContent2;
     toc = toc2;
