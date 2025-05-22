@@ -1,4 +1,6 @@
 import type { PageTree } from 'fumadocs-core/server';
+import type { RouterType } from './const';
+import { parseDocId } from './utils';
 
 /**
  * Get other page tree nodes that lives under the same parent
@@ -49,17 +51,22 @@ export function cloneRoot(tree: PageTree.Root) {
   };
 }
 
-export function getDocsLayoutTree(tree: PageTree.Root, slug: string[]) {
-  const isV14 = slug[0] === '14';
-  const isV13 = slug[0] === '13';
-  const isLatest = !isV14 && !isV13;
+export function getDocsLayoutTree(
+  tree: PageTree.Root,
+  docId: string,
+  routerType: RouterType,
+) {
+  const { isV13, isV14, isVLatest, isPages, version } = parseDocId(docId);
 
   const root = cloneRoot(tree);
   for (const node of tree.children) {
-    if (isLatest) {
-      const isPages = slug[0] === 'pages';
+    if (isVLatest) {
       // App
-      if (!isPages && node.$id === '01-app' && node.type === 'folder') {
+      if (
+        routerType !== 'pages' &&
+        node.$id === '01-app' &&
+        node.type === 'folder'
+      ) {
         const children = node.children;
         if (children[0].type === 'folder') {
           children[0].defaultOpen = true;
@@ -67,7 +74,11 @@ export function getDocsLayoutTree(tree: PageTree.Root, slug: string[]) {
         root.children.push(...children);
       }
       // Pages
-      if (isPages && node.$id === '02-pages' && node.type === 'folder') {
+      if (
+        routerType === 'pages' &&
+        node.$id === '02-pages' &&
+        node.type === 'folder'
+      ) {
         const children = node.children;
         if (children[0].type === 'folder') {
           children[0].defaultOpen = true;
@@ -86,14 +97,12 @@ export function getDocsLayoutTree(tree: PageTree.Root, slug: string[]) {
     }
 
     if (isV13 || isV14) {
-      const version = isV14 ? '14' : '13';
       const gettingStarted = `${version}/01-getting-started`;
       const appFolder = `${version}/02-app`;
       const pagesFolder = `${version}/03-pages`;
       if (node.$id === version && node.type === 'folder') {
         const children = node.children;
 
-        const isPages = slug[1] === 'pages';
         for (const child of children) {
           const expandChildren = [appFolder, pagesFolder];
           if (
@@ -105,10 +114,18 @@ export function getDocsLayoutTree(tree: PageTree.Root, slug: string[]) {
               if (item.type === 'folder') item.defaultOpen = true;
             }
           }
-          if (!isPages && child.$id === appFolder && child.type === 'folder') {
+          if (
+            routerType !== 'pages' &&
+            child.$id === appFolder &&
+            child.type === 'folder'
+          ) {
             root.children.push(...child.children);
           }
-          if (isPages && child.$id === pagesFolder && child.type === 'folder') {
+          if (
+            routerType === 'pages' &&
+            child.$id === pagesFolder &&
+            child.type === 'folder'
+          ) {
             root.children.push(...child.children);
           }
 

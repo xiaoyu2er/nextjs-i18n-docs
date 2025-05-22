@@ -1,6 +1,7 @@
 'use client';
 
 import { useBaseOptions } from '@/hooks/useLayoutOptions';
+import type { RouterType } from '@/lib/const';
 import { parseDocId } from '@/lib/utils';
 import {
   NextAppIcon,
@@ -20,13 +21,32 @@ export function DocsLayout({
   children,
   pageTree,
   docId,
+  routerType,
 }: {
   children: ReactNode;
   pageTree: PageTree.Root;
   docId: string;
+  routerType: RouterType;
 }) {
   const baseOptions = useBaseOptions();
-  const { appDocsRoot, pagesDocsRoot, docsRoot } = parseDocId(docId);
+  const { appDocsRoot, pagesDocsRoot, docsRoot, docUrl, isPages } =
+    parseDocId(docId);
+  const options = [
+    {
+      title: 'Using App Router',
+      description: 'Features available in /app',
+      icon: <NextAppIcon />,
+      url: appDocsRoot,
+      ...(routerType !== 'pages' ? { urls: new Set([docUrl]) } : {}),
+    },
+    {
+      title: 'Using Pages Router',
+      description: 'Features available in /pages',
+      icon: <NextPagesIcon />,
+      url: pagesDocsRoot,
+      ...(routerType === 'pages' ? { urls: new Set([docUrl]) } : {}),
+    },
+  ];
 
   const docsLayout: DocsLayoutProps = {
     ...baseOptions,
@@ -35,23 +55,7 @@ export function DocsLayout({
     sidebar: {
       banner: (
         <>
-          <RootToggle
-            options={[
-              {
-                title: 'Using App Router',
-                description: 'Features available in /app',
-                icon: <NextAppIcon />,
-                url: appDocsRoot,
-                urls: new Set([docsRoot, appDocsRoot]),
-              },
-              {
-                title: 'Using Pages Router',
-                description: 'Features available in /pages',
-                icon: <NextPagesIcon />,
-                url: pagesDocsRoot,
-              },
-            ]}
-          />
+          <RootToggle options={options} />
           <RootToggle
             options={[
               {

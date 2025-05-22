@@ -1,4 +1,5 @@
 import { DocsLayout } from '@/components/layout';
+import { type RouterType, routerTypeCookie } from '@/lib/const';
 import { getPage } from '@/lib/page';
 import { getDocsLayoutTree, getPageTreePeers } from '@/lib/pageTree';
 import { type Page, type Source, sourceMap } from '@/lib/source';
@@ -10,11 +11,14 @@ import { Card, Cards } from 'fumadocs-ui/components/card';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import { type Locale, useLocale } from 'next-intl';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 export default async function Docs(props: {
   params: Promise<{ locale: Locale; slug?: string[] }>;
 }) {
+  const routerType = (await cookies()).get(routerTypeCookie)
+    ?.value as RouterType;
   const params = await props.params;
   const slug = params.slug || [];
   const locale = params.locale;
@@ -44,8 +48,9 @@ export default async function Docs(props: {
 
   return (
     <DocsLayout
+      routerType={routerType}
       docId={docId}
-      pageTree={getDocsLayoutTree(source.pageTree, slug)}
+      pageTree={getDocsLayoutTree(source.pageTree, docId, routerType)}
     >
       <DocsPage
         toc={toc}

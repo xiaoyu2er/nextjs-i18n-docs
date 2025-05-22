@@ -55,7 +55,11 @@ export const getDocTags = (id: string) => {
  * @returns
  */
 export const getDocId = (locale: Locale, docUrl: string) => {
-  return `${locale}${docUrl}`;
+  const id = `${locale}${docUrl}`;
+  if (id.endsWith('/')) {
+    return id.slice(0, -1);
+  }
+  return id;
 };
 
 /**
@@ -67,6 +71,9 @@ export const getDocId = (locale: Locale, docUrl: string) => {
  */
 export const parseDocId = (id: string) => {
   const paths = id.split('/');
+  if (paths[paths.length - 1] === '') {
+    paths.pop();
+  }
   const locale = paths[0];
   // const tags = paths.slice(0, 2);
   const slugs = paths.slice(2);
@@ -95,6 +102,7 @@ export const parseDocId = (id: string) => {
   const whereTag = !isVLatest ? `${locale}/docs/${version}` : `${locale}/docs`;
 
   return {
+    slugs,
     locale: paths[0],
     version,
     isApp,
@@ -102,9 +110,10 @@ export const parseDocId = (id: string) => {
     isV13,
     isV14,
     isVLatest,
-    docsRoot: isVLatest ? '/docs' : `/docs/${slugs[0]}`,
-    appDocsRoot: isVLatest ? '/docs/app' : `/docs/${slugs[0]}/app`,
-    pagesDocsRoot: isVLatest ? '/docs/pages' : `/docs/${slugs[0]}/pages`,
+    docUrl: `/${paths.slice(1).join('/')}`,
+    docsRoot: isVLatest ? '/docs' : `/docs/${version}`,
+    appDocsRoot: isVLatest ? '/docs/app' : `/docs/${version}/app`,
+    pagesDocsRoot: isVLatest ? '/docs/pages' : `/docs/${version}/pages`,
     docTag,
     appTag,
     pagesTag,
