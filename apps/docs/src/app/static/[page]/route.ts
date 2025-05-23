@@ -2,6 +2,7 @@ import { getOramaDocuments } from '@/lib/orama/orama-document';
 import { source } from '@/lib/source';
 
 import { getLocale } from 'next-intl/server';
+import { notFound } from 'next/navigation';
 
 import { NextResponse } from 'next/server';
 
@@ -11,6 +12,9 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ page: string }> },
 ) {
+  if (process.env.GEN_ORAMA_STATIC !== 'true') {
+    throw notFound();
+  }
   const { page = '0' } = await params;
   const locale = await getLocale();
 

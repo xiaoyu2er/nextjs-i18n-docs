@@ -23,10 +23,6 @@ export default function HomePage() {
   );
 }
 
-// export function generateStaticParams() {
-//   return routing.locales.map((locale) => ({ locale }));
-// }
-
 export async function generateMetadata() {
   const t = await getTranslations('HomePage');
 
