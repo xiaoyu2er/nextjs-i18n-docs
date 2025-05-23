@@ -1,7 +1,9 @@
 'use client';
 
 import { useBaseOptions } from '@/hooks/useLayoutOptions';
+import { useRouterType } from '@/hooks/useRouterType';
 import type { RouterType } from '@/lib/const';
+import { getDocsLayoutTree } from '@/lib/pageTree';
 import { parseDocId } from '@/lib/utils';
 import {
   NextAppIcon,
@@ -22,15 +24,15 @@ export function DocsLayout({
   children,
   pageTree,
   docId,
-  routerType,
 }: {
   children: ReactNode;
   pageTree: PageTree.Root;
   docId: string;
-  routerType: RouterType;
 }) {
+  const routerType = useRouterType();
   const baseOptions = useBaseOptions();
   const t = useTranslations('sidebar');
+  const tree = getDocsLayoutTree(pageTree, docId, routerType);
   const { appDocsRoot, pagesDocsRoot, docsRoot, docUrl, isPages } =
     parseDocId(docId);
   const options = [
@@ -53,7 +55,7 @@ export function DocsLayout({
   const docsLayout: DocsLayoutProps = {
     ...baseOptions,
     links: [],
-    tree: pageTree,
+    tree,
     sidebar: {
       banner: (
         <>
