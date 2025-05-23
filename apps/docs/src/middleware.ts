@@ -1,6 +1,4 @@
-import createMiddleware from 'next-intl/middleware';
-import type { NextRequest } from 'next/server';
-import { routing } from './i18n/routing';
+import { type NextRequest, NextResponse } from 'next/server';
 import { routerTypeCookie } from './lib/const';
 import { parseDocId } from './lib/utils';
 
@@ -16,8 +14,7 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
-  const handleI18nRouting = createMiddleware(routing);
-  const response = handleI18nRouting(request);
+  const response = NextResponse.next();
 
   if (isDocs) {
     const docId = `en${url.pathname}`;

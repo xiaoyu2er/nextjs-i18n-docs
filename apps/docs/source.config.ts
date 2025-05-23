@@ -17,7 +17,10 @@ if (!asyncMode && process.env.NODE_ENV === 'development') {
   );
 }
 
-const defaultDocsOptions = {
+// You can customise Zod schemas for frontmatter and `meta.json` here
+// see https://fumadocs.dev//docs/mdx/collections#define-docs
+export const docs = defineDocs({
+  dir: `content/${process.env.LOCALE}/docs`,
   docs: {
     async: asyncMode,
     schema: frontmatterSchema.extend({
@@ -35,18 +38,6 @@ const defaultDocsOptions = {
   meta: {
     schema: metaSchema,
   },
-};
-
-// You can customise Zod schemas for frontmatter and `meta.json` here
-// see https://fumadocs.dev//docs/mdx/collections#define-docs
-export const docs_en = defineDocs({
-  dir: 'content/en/docs',
-  ...defaultDocsOptions,
-});
-
-export const docs_zh_hans = defineDocs({
-  dir: 'content/zh-hans/docs',
-  ...defaultDocsOptions,
 });
 
 export default defineConfig({
