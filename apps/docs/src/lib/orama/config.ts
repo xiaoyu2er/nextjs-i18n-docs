@@ -11,7 +11,7 @@ const ORAMA_EN_CONFIG = {
 type ORAMA_EN_CONFIG = typeof ORAMA_EN_CONFIG;
 
 const OORAMA_ZH_HANS_CONFIG = {
-  locale: 'zh-Hans',
+  locale: 'zh-hans',
   privateKey: process.env.ORAMA_PRIVATE_API_KEY_ZH_HANS || '',
   apiKey: '6nEUS4tyXiajWxZ8qMEQMzzLoOYTuLSk',
   index: 'vcwl00bwd64h3pa8yq8x107y',
@@ -22,5 +22,5 @@ export const ORAMA_CONFIGS = [ORAMA_EN_CONFIG, OORAMA_ZH_HANS_CONFIG] as const;
 
 export const ORAMA_CONFIGS_MAP: Record<Locale, ORAMA_EN_CONFIG> = {
   en: ORAMA_EN_CONFIG,
-  'zh-Hans': OORAMA_ZH_HANS_CONFIG,
+  'zh-hans': OORAMA_ZH_HANS_CONFIG,
 } as const;

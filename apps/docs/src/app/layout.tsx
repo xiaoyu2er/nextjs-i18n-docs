@@ -1,11 +1,9 @@
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import './global.css';
-import { Provider } from '@/app/[locale]/provider';
-import { routing } from '@/i18n/routing';
+import { Provider } from '@/app/provider';
 
-import { setRequestLocale } from 'next-intl/server';
+import { getLocale } from 'next-intl/server';
 import { Inter } from 'next/font/google';
-import { notFound } from 'next/navigation';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -13,18 +11,10 @@ const inter = Inter({
 
 export default async function Layout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ locale: string }>;
 }) {
-  // Ensure that the incoming `locale` is valid
-  const { locale } = await params;
-  if (!hasLocale(routing.locales, locale)) {
-    notFound();
-  }
-  // Enable static rendering
-  setRequestLocale(locale);
+  const locale = await getLocale();
 
   return (
     <html lang={locale} className={inter.className} suppressHydrationWarning>

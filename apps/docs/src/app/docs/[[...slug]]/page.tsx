@@ -1,9 +1,8 @@
 import { DocsLayout } from '@/components/layout';
-import { routing } from '@/i18n/routing';
 import { type RouterType, routerTypeCookie } from '@/lib/const';
 import { getPage } from '@/lib/page';
 import { getDocsLayoutTree, getPageTreePeers } from '@/lib/pageTree';
-import { type Page, type Source, sourceMap } from '@/lib/source';
+import { type Page, type Source, source } from '@/lib/source';
 import { getDocId, getDocUrl, parseDocId } from '@/lib/utils';
 import { getMDXComponents } from '@/mdx-components';
 import { Identity } from '@/mdx/Identity';
@@ -12,21 +11,21 @@ import { Card, Cards } from 'fumadocs-ui/components/card';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import { type Locale, useLocale } from 'next-intl';
+import { getLocale } from 'next-intl/server';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 export default async function Docs(props: {
-  params: Promise<{ locale: Locale; slug: string[] }>;
+  params: Promise<{ slug: string[] }>;
 }) {
+  const locale: Locale = await getLocale();
   const routerType = (await cookies()).get(routerTypeCookie)
     ?.value as RouterType;
   const params = await props.params;
   const slug = params.slug || [];
-  const locale = params.locale;
-  const source = sourceMap[locale];
   const docUrl = getDocUrl(slug);
   const docId = getDocId(locale, docUrl);
-  const page = getPage(locale, docUrl);
+  const page = getPage(docUrl);
   if (!page) notFound();
   const { isApp, isPages } = parseDocId(docId);
   // @ts-ignore
@@ -39,7 +38,7 @@ export default async function Docs(props: {
   const ref = page.data.source;
   if (ref) {
     const refUrl = getDocUrl(ref);
-    const refPage = getPage(locale, refUrl);
+    const refPage = getPage(refUrl);
     if (!refPage) notFound();
     // @ts-ignore
     const { body: MdxContent2, toc: toc2 } = refPage.data.load
@@ -104,7 +103,7 @@ function DocsRelated({ page }: { page: Page }) {
   const relatedLinks = page.data.related?.links || [];
   const pages = relatedLinks
     .map((link) => {
-      return getPage(locale, getDocUrl(link));
+      return getPage(getDocUrl(link));
     })
     .filter(Boolean) as Page[];
   return (
@@ -124,24 +123,17 @@ function DocsRelated({ page }: { page: Page }) {
   );
 }
 
-// export async function generateStaticParams() {
-//   const staticParams = routing.locales.flatMap((locale) => {
-//     return sourceMap[locale].generateParams().map((params) => {
-//       return {
-//         locale,
-//         ...params,
-//       };
-//     });
-//   });
-//   return staticParams;
-// }
+export async function generateStaticParams() {
+  if (process.env.GEN_DOC_STATIC !== 'true') return [];
+  return source.generateParams();
+}
 
 export async function generateMetadata(props: {
-  params: Promise<{ slug?: string[]; locale: Locale }>;
+  params: Promise<{ slug?: string[] }>;
 }) {
   const params = await props.params;
   const url = getDocUrl(params.slug);
-  const page = getPage(params.locale, url);
+  const page = getPage(url);
   if (!page) notFound();
 
   return {

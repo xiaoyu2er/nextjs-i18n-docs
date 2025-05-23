@@ -1,4 +1,4 @@
-import { type Locale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
@@ -27,11 +27,8 @@ export default function HomePage() {
 //   return routing.locales.map((locale) => ({ locale }));
 // }
 
-export async function generateMetadata(props: {
-  params: Promise<{ locale: Locale }>;
-}) {
-  const { locale } = await props.params;
-  const t = await getTranslations({ locale, namespace: 'HomePage' });
+export async function generateMetadata() {
+  const t = await getTranslations('HomePage');
 
   return {
     title: t('title'),
