@@ -1,5 +1,4 @@
 import { useTranslations } from 'next-intl';
-import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -87,11 +86,4 @@ export default function HomePage() {
       </section>
     </main>
   );
-}
-
-export async function generateMetadata() {
-  const t = await getTranslations('HomePage');
-  return {
-    title: t('title'),
-  };
 }

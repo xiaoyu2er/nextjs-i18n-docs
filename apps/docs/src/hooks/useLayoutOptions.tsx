@@ -1,6 +1,7 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 import { Book } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 
 export const useBaseOptions = () => {
   const t = useTranslations('baseOptions');
@@ -8,15 +9,7 @@ export const useBaseOptions = () => {
     nav: {
       title: (
         <>
-          <svg
-            width="24"
-            height="24"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-label="Logo"
-          >
-            <title>Logo</title>
-            <circle cx={12} cy={12} r={12} fill="currentColor" />
-          </svg>
+          <Image src="/favicon.ico" alt="logo" width={24} height={24} />
           {t('title')}
         </>
       ),
