@@ -1,4 +1,5 @@
 import { DocsLayout } from '@/components/layout';
+import { createMetadata } from '@/lib/metadata';
 import { getPage } from '@/lib/page';
 import { getPageTreePeers } from '@/lib/pageTree';
 import { type Page, type Source, source } from '@/lib/source';
@@ -128,8 +129,8 @@ export async function generateMetadata(props: {
   const page = getPage(url);
   if (!page) notFound();
 
-  return {
+  return createMetadata({
     title: page.data.nav_title || page.data.title,
     description: page.data.description,
-  };
+  });
 }
