@@ -51,6 +51,7 @@ export const docs_zh_hans = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
+    remarkImageOptions: false,
     remarkPlugins: (v) => [convertCodeMeta, addMdxContent, ...v],
   },
 });
