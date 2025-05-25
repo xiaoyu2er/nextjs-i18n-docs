@@ -47,7 +47,7 @@ pnpm dev
 This project includes a custom translation utility that can translate the Next.js documentation into multiple languages. Currently, it supports:
 
 - English (source)
-- Simplified Chinese (zh-Hans)
+- Simplified Chinese (zh-hans)
 - More languages can be added in the translation configuration
 
 Documentation content is stored in the `apps/docs/content` directory:

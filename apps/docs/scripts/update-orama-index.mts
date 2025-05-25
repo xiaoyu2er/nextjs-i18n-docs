@@ -7,10 +7,17 @@ import type { Locale } from 'next-intl';
 import { sync } from '../src/lib/orama/orama-cloud';
 
 export async function updateSearchIndexes(): Promise<void> {
-  const { locale, privateKey, index } =
-    ORAMA_CONFIGS_MAP[process.env.LOCALE as Locale];
+  if (!process.env.ORAMA_PRIVATE_API_KEY) {
+    console.warn(
+      'ORAMA_PRIVATE_API_KEY is not set. Skipping Orama index update.',
+    );
+    return;
+  }
+  const { locale, index } = ORAMA_CONFIGS_MAP[process.env.LOCALE as Locale];
 
-  const manager = new CloudManager({ api_key: privateKey });
+  const manager = new CloudManager({
+    api_key: process.env.ORAMA_PRIVATE_API_KEY || '',
+  });
   // Get all .body files in the static directory
   const staticDir = path.join('.next/server/app/static');
   let allRecords: OramaDocument[] = [];
