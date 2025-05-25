@@ -1,0 +1,145 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:35:15.232Z
+title: 正式環境部署
+description: 在將您的 Next.js 應用程式部署至正式環境前，以下是一些確保最佳使用者體驗的建議。
+---
+
+在將您的 Next.js 應用程式部署至正式環境前，以下是一些確保最佳使用者體驗的建議。
+
+## 一般建議
+
+- 盡可能使用[快取](#caching)機制
+- 確保您的資料庫與後端服務部署在同一區域
+- 目標是載入最少量的 JavaScript
+- 延遲載入大型 JavaScript 套件直到需要時
+- 確保已設定[日誌記錄](#logging)
+- 確保已設定[錯誤處理](#error-handling)機制
+- 配置 [404](/docs/pages/building-your-application/routing/custom-error#404-page) (找不到頁面) 和 [500](/docs/pages/building-your-application/routing/custom-error#500-page) (錯誤) 頁面
+- 確保您正在[測量效能](/docs/pages/building-your-application/optimizing/analytics)
+- 執行 [Lighthouse](https://developers.google.com/web/tools/lighthouse) 檢查效能、最佳實踐、無障礙性和 SEO。為獲得最佳結果，請使用 Next.js 的正式環境建置版本，並在瀏覽器中使用無痕模式以避免擴充功能影響結果
+- 檢閱[支援的瀏覽器與功能](/docs/architecture/supported-browsers)
+- 使用以下方式提升效能：
+  - [`next/image` 與自動圖片優化](/docs/pages/building-your-application/optimizing/images)
+  - [自動字型優化](/docs/pages/building-your-application/optimizing/fonts)
+  - [腳本優化](/docs/pages/building-your-application/optimizing/scripts)
+- 改善[載入效能](#loading-performance)
+- 考慮加入[內容安全政策](/docs/pages/building-your-application/configuring/content-security-policy)
+
+## 快取機制
+
+<details open>
+  <summary>範例</summary>
+
+- [ssr-caching](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+快取機制能改善回應時間並減少對外部服務的請求次數。Next.js 會自動為 `/_next/static` 下的不可變資源（包括 JavaScript、CSS、靜態圖片和其他媒體）加入快取標頭。
+
+```terminal
+Cache-Control: public, max-age=31536000, immutable
+```
+
+在 `next.config.js` 中設定的 `Cache-Control` 標頭會在正式環境中被覆寫，以確保靜態資源能被有效快取。如果您需要重新驗證已[靜態生成](/docs/pages/building-your-application/rendering/static-site-generation)頁面的快取，可以在頁面的 [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) 函式中設定 `revalidate` 參數。若使用 `next/image`，您可以為預設的圖片優化載入器配置 [`minimumCacheTTL`](/docs/pages/api-reference/components/image#minimumcachettl)。
+
+> **須知**：當您使用 `next dev` 在本地運行應用程式時，標頭會被覆寫以防止本地快取。
+
+```terminal
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+```
+
+您也可以在 `getServerSideProps` 和 API 路由中使用快取標頭來處理動態回應。例如使用 [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/)。
+
+```jsx
+// 此值在十秒內被視為新鮮 (s-maxage=10)
+// 如果在接下來的 10 秒內重複請求，將使用先前快取的新鮮值
+// 如果在 59 秒內重複請求，快取值將過期但仍會呈現 (stale-while-revalidate=59)
+//
+// 在背景中，將發送重新驗證請求以用新值更新快取
+// 如果您刷新頁面，將會看到新值
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+根據預設，`Cache-Control` 標頭會根據頁面獲取資料的方式而有所不同：
+
+- 若頁面使用 `getServerSideProps` 或 `getInitialProps`，將使用 `next start` 設定的預設 `Cache-Control` 標頭，以防止意外快取不可快取的回應。若您在使用 `getServerSideProps` 時需要不同的快取行為，請如上所示在函式中使用 `res.setHeader('Cache-Control', '您偏好的值')`
+- 若頁面使用 `getStaticProps`，將具有 `s-maxage=REVALIDATE_SECONDS, stale-while-revalidate` 的 `Cache-Control` 標頭；若未使用 `revalidate`，則為 `s-maxage=31536000, stale-while-revalidate` 以實現最大快取時間
+
+> **須知**：您的部署供應商必須支援動態回應的快取。若您自行託管，需使用如 Redis 的鍵值儲存自行實現此邏輯。若您使用 Vercel，[邊緣快取無需配置即可工作](https://vercel.com/docs/edge-network/caching?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)。
+
+## 減少 JavaScript 體積
+
+<details open>
+  <summary>範例</summary>
+
+- [with-dynamic-import](https://github.com/vercel/next.js/tree/canary/examples/with-dynamic-import)
+
+</details>
+
+為減少傳送至瀏覽器的 JavaScript 量，您可以使用以下工具來了解每個 JavaScript 套件中包含的內容：
+
+- [Import Cost](https://marketplace.visualstudio.com/items?itemName=wix.vscode-import-cost) – 在 VSCode 中顯示導入套件的大小
+- [Package Phobia](https://packagephobia.com/) – 查找新增開發依賴對專案的影響
+- [Bundle Phobia](https://bundlephobia.com/) – 分析依賴會如何增加套件大小
+- [Webpack Bundle Analyzer](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer) – 使用可互動縮放的樹狀圖視覺化 webpack 輸出檔案的大小
+- [bundlejs](https://bundlejs.com/) – 線上工具快速打包與壓縮專案，同時查看壓縮後的 gzip/brotli 套件大小，全部在瀏覽器中本地運行
+
+`next build` 時，`pages/` 目錄下的每個檔案會自動程式碼分割為獨立的 JavaScript 套件。您也可以使用[動態導入](/docs/pages/building-your-application/optimizing/lazy-loading)來延遲載入元件和函式庫。例如，您可以等到使用者點擊開啟按鈕時才載入模組程式碼。
+
+## 日誌記錄
+
+<details open>
+  <summary>範例</summary>
+
+- [Pino 與 Logflare 範例](https://github.com/Logflare/next-pino-logflare-logging-example)
+
+</details>
+
+由於 Next.js 同時運行於客戶端和伺服器端，支援多種日誌記錄方式：
+
+- 瀏覽器中的 `console.log`
+- 伺服器端的 `stdout`
+
+若您需要結構化的日誌套件，我們推薦 [Pino](https://www.npmjs.com/package/pino)。若您使用 Vercel，有[預建的日誌整合](https://vercel.com/integrations?utm_source=next-site&utm_medium=docs&utm_campaign=next-website#logging)與 Next.js 相容。
+
+## 錯誤處理
+
+<details open>
+  <summary>範例</summary>
+
+- [with-sentry](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)
+
+</details>
+
+當未處理的例外發生時，您可以使用 [500 頁面](/docs/pages/building-your-application/routing/custom-error#500-page)來控制使用者的體驗。我們建議將其自訂為您的品牌風格，而非使用 Next.js 的預設主題。
+
+您也可以使用如 Sentry 的工具來記錄與追蹤例外。[此範例](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)展示如何使用 Sentry SDK for Next.js 來捕捉並回報客戶端與伺服器端的錯誤。另有 [Sentry 的 Vercel 整合](https://vercel.com/integrations/sentry?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)。
+
+## 載入效能
+
+要改善載入效能，首先需要確定測量什麼以及如何測量。[核心網頁指標](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)是一個良好的業界標準，可使用您的網頁瀏覽器進行測量。如果您不熟悉核心網頁指標的度量標準，請檢閱這篇[部落格文章](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)並確定哪些特定指標將成為您載入效能的驅動因素。理想情況下，您應在以下環境中測量載入效能：
+
+- 實驗室環境：使用您自己的電腦或模擬器
+- 實際環境：使用來自真實訪客的實際數據
+- 本地測試：在您的裝置上運行的測試
+- 遠端測試：在雲端運行的測試
+
+一旦能夠測量載入效能，請使用以下策略進行迭代式改善，應用一個策略後測量新效能並持續調整，直到改善不明顯為止。然後，您可以轉向下一個策略。
+
+- 使用與您的資料庫或 API 部署區域相近的快取區域
+- 如[快取](#caching)章節所述，使用不會使後端過載的 `stale-while-revalidate` 值
+- 使用[增量靜態再生](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)來減少對後端的請求次數
+- 移除未使用的 JavaScript。檢閱這篇[部落格文章](https://calibreapp.com/blog/bundle-size-optimization)了解套件大小如何影響核心網頁指標，以及您可以使用的減小策略，例如：
+  - 設定程式碼編輯器以查看導入成本與大小
+  - 尋找替代的較小套件
+  - 動態載入元件與依賴項

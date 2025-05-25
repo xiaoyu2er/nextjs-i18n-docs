@@ -1,0 +1,554 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:03:22.607Z
+title: Codemods
+description: 使用 codemods 在發布新功能時升級您的 Next.js 程式碼庫。
+---
+
+Codemods 是透過程式化方式在程式碼庫中執行的轉換工具。這讓大量變更可以透過程式化方式套用，而無需手動檢查每個檔案。
+
+Next.js 提供 Codemod 轉換功能，協助您在 API 更新或棄用時升級 Next.js 程式碼庫。
+
+## 使用方式
+
+在終端機中，先導航 (`cd`) 至您的專案資料夾，然後執行：
+
+```bash filename="Terminal"
+npx @next/codemod <transform> <path>
+```
+
+將 `<transform>` 和 `<path>` 替換為適當的值。
+
+- `transform` - 轉換名稱
+- `path` - 要轉換的檔案或目錄
+- `--dry` 執行乾跑測試，不會實際修改程式碼
+- `--print` 輸出變更內容供比較
+
+## Codemods
+
+### 15.0
+
+#### 將 App Router 路由區段配置 `runtime` 值從 `experimental-edge` 轉換為 `edge`
+
+##### `app-dir-runtime-config-experimental-edge`
+
+> **注意**：此 codemod 專用於 App Router。
+
+```bash filename="Terminal"
+npx @next/codemod@latest app-dir-runtime-config-experimental-edge .
+```
+
+此 codemod 將[路由區段配置 `runtime`](https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config#runtime) 值 `experimental-edge` 轉換為 `edge`。
+
+例如：
+
+```ts
+export const runtime = 'experimental-edge'
+```
+
+轉換為：
+
+```ts
+export const runtime = 'edge'
+```
+
+#### 遷移至非同步動態 API
+
+原先支援同步存取的動態渲染 API 現在改為非同步。您可以在[升級指南](/docs/app/guides/upgrading/version-15)中閱讀更多關於此重大變更的資訊。
+
+##### `next-async-request-api`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-async-request-api .
+```
+
+此 codemod 會將現在改為非同步的動態 API (`cookies()`、`headers()` 和 `next/headers` 中的 `draftMode()`) 轉換為適當的 `await` 或視情況使用 `React.use()` 包裹。
+當無法自動遷移時，codemod 會添加類型轉換 (如果是 TypeScript 檔案) 或註解來告知使用者需要手動檢查與更新。
+
+例如：
+
+```tsx
+import { cookies, headers } from 'next/headers'
+const token = cookies().get('token')
+
+function useToken() {
+  const token = cookies().get('token')
+  return token
+}
+
+export default function Page() {
+  const name = cookies().get('name')
+}
+
+function getHeader() {
+  return headers().get('x-foo')
+}
+```
+
+轉換為：
+
+```tsx
+import { use } from 'react'
+import {
+  cookies,
+  headers,
+  type UnsafeUnwrappedCookies,
+  type UnsafeUnwrappedHeaders,
+} from 'next/headers'
+const token = (cookies() as unknown as UnsafeUnwrappedCookies).get('token')
+
+function useToken() {
+  const token = use(cookies()).get('token')
+  return token
+}
+
+export default async function Page() {
+  const name = (await cookies()).get('name')
+}
+
+function getHeader() {
+  return (headers() as unknown as UnsafeUnwrappedHeaders).get('x-foo')
+}
+```
+
+當我們在頁面/路由入口 (`page.js`、`layout.js`、`route.js` 或 `default.js`) 或 `generateMetadata` / `generateViewport` API 中檢測到對 `params` 或 `searchParams` 屬性的存取時，
+它會嘗試將呼叫點從同步函數轉換為非同步函數，並 `await` 屬性存取。如果無法改為非同步 (例如客戶端元件)，則會使用 `React.use` 來解開 Promise。
+
+例如：
+
+```tsx
+// page.tsx
+export default function Page({
+  params,
+  searchParams,
+}: {
+  params: { slug: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
+  const { value } = searchParams
+  if (value === 'foo') {
+    // ...
+  }
+}
+
+export function generateMetadata({ params }: { params: { slug: string } }) {
+  const { slug } = params
+  return {
+    title: `My Page - ${slug}`,
+  }
+}
+```
+
+轉換為：
+
+```tsx
+// page.tsx
+export default async function Page(props: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const searchParams = await props.searchParams
+  const { value } = searchParams
+  if (value === 'foo') {
+    // ...
+  }
+}
+
+export async function generateMetadata(props: {
+  params: Promise<{ slug: string }>
+}) {
+  const params = await props.params
+  const { slug } = params
+  return {
+    title: `My Page - ${slug}`,
+  }
+}
+```
+
+> **須知**：當此 codemod 識別出可能需要手動介入但無法確定確切修復方式的位置時，它會在程式碼中添加註解或類型轉換來告知使用者需要手動更新。這些註解以 **@next/codemod** 為前綴，類型轉換則以 `UnsafeUnwrapped` 為前綴。
+> 在明確移除這些註解前，您的建置會報錯。[了解更多](/docs/messages/sync-dynamic-apis)。
+
+#### 使用 `@vercel/functions` 取代 `NextRequest` 的 `geo` 和 `ip` 屬性
+
+##### `next-request-geo-ip`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-request-geo-ip .
+```
+
+此 codemod 會安裝 `@vercel/functions` 並將 `NextRequest` 的 `geo` 和 `ip` 屬性轉換為對應的 `@vercel/functions` 功能。
+
+例如：
+
+```ts
+import type { NextRequest } from 'next/server'
+
+export function GET(req: NextRequest) {
+  const { geo, ip } = req
+}
+```
+
+轉換為：
+
+```ts
+import type { NextRequest } from 'next/server'
+import { geolocation, ipAddress } from '@vercel/functions'
+
+export function GET(req: NextRequest) {
+  const geo = geolocation(req)
+  const ip = ipAddress(req)
+}
+```
+
+### 14.0
+
+#### 遷移 `ImageResponse` 導入
+
+##### `next-og-import`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-og-import .
+```
+
+此 codemod 會將 [動態 OG 圖片生成](/docs/app/getting-started/metadata-and-og-images#generated-open-graph-images) 的導入從 `next/server` 移至 `next/og`。
+
+例如：
+
+```js
+import { ImageResponse } from 'next/server'
+```
+
+轉換為：
+
+```js
+import { ImageResponse } from 'next/og'
+```
+
+#### 使用 `viewport` 導出
+
+##### `metadata-to-viewport-export`
+
+```bash filename="Terminal"
+npx @next/codemod@latest metadata-to-viewport-export .
+```
+
+此 codemod 會將某些 viewport 元數據遷移至 `viewport` 導出。
+
+例如：
+
+```js
+export const metadata = {
+  title: 'My App',
+  themeColor: 'dark',
+  viewport: {
+    width: 1,
+  },
+}
+```
+
+轉換為：
+
+```js
+export const metadata = {
+  title: 'My App',
+}
+
+export const viewport = {
+  width: 1,
+  themeColor: 'dark',
+}
+```
+
+### 13.2
+
+#### 使用內建字體
+
+##### `built-in-next-font`
+
+```bash filename="Terminal"
+npx @next/codemod@latest built-in-next-font .
+```
+
+此 codemod 會解除安裝 `@next/font` 套件並將 `@next/font` 導入轉換為內建的 `next/font`。
+
+例如：
+
+```js
+import { Inter } from '@next/font/google'
+```
+
+轉換為：
+
+```js
+import { Inter } from 'next/font/google'
+```
+
+### 13.0
+
+#### 重新命名 Next Image 導入
+
+##### `next-image-to-legacy-image`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-image-to-legacy-image .
+```
+
+安全地將 Next.js 10、11 或 12 應用程式中的 `next/image` 導入重新命名為 Next.js 13 中的 `next/legacy/image`。同時將 `next/future/image` 重新命名為 `next/image`。
+
+例如：
+
+```jsx filename="pages/index.js"
+import Image1 from 'next/image'
+import Image2 from 'next/future/image'
+
+export default function Home() {
+  return (
+    <div>
+      <Image1 src="/test.jpg" width="200" height="300" />
+      <Image2 src="/test.png" width="500" height="400" />
+    </div>
+  )
+}
+```
+
+轉換為：
+
+```jsx filename="pages/index.js"
+// 'next/image' 變為 'next/legacy/image'
+import Image1 from 'next/legacy/image'
+// 'next/future/image' 變為 'next/image'
+import Image2 from 'next/image'
+
+export default function Home() {
+  return (
+    <div>
+      <Image1 src="/test.jpg" width="200" height="300" />
+      <Image2 src="/test.png" width="500" height="400" />
+    </div>
+  )
+}
+```
+
+#### 遷移至新版 Image 元件
+
+##### `next-image-experimental`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-image-experimental .
+```
+
+危險地從 `next/legacy/image` 遷移至新版 `next/image`，透過添加行內樣式並移除未使用的屬性。
+
+- 移除 `layout` 屬性並添加 `style`
+- 移除 `objectFit` 屬性並添加 `style`
+- 移除 `objectPosition` 屬性並添加 `style`
+- 移除 `lazyBoundary` 屬性
+- 移除 `lazyRoot` 屬性
+
+#### 從 Link 元件中移除 `<a>` 標籤
+
+##### `new-link`
+
+```bash filename="Terminal"
+npx @next/codemod@latest new-link .
+```
+
+<AppOnly>
+
+移除 [Link 元件](/docs/app/api-reference/components/link) 中的 `<a>` 標籤，或為無法自動修復的 Links 添加 `legacyBehavior` 屬性。
+
+</AppOnly>
+
+<PagesOnly>
+
+移除 [Link 元件](/docs/pages/api-reference/components/link) 中的 `<a>` 標籤，或為無法自動修復的 Links 添加 `legacyBehavior` 屬性。
+
+</PagesOnly>
+
+例如：
+
+```jsx
+<Link href="/about">
+  <a>About</a>
+</Link>
+// 轉換為
+<Link href="/about">
+  About
+</Link>
+
+<Link href="/about">
+  <a onClick={() => console.log('clicked')}>About</a>
+</Link>
+// 轉換為
+<Link href="/about" onClick={() => console.log('clicked')}>
+  About
+</Link>
+```
+
+在無法自動修復的情況下，會添加 `legacyBehavior` 屬性。這讓您的應用程式可以針對特定連結繼續使用舊行為。
+
+```jsx
+const Component = () => <a>About</a>
+
+<Link href="/about">
+  <Component />
+</Link>
+// 變為
+<Link href="/about" legacyBehavior>
+  <Component />
+</Link>
+```
+
+### 11
+
+#### 從 CRA 遷移
+
+##### `cra-to-next`
+
+```bash filename="Terminal"
+npx @next/codemod cra-to-next
+```
+
+將 Create React App 專案遷移至 Next.js；建立 Pages Router 和必要的配置以匹配行為。最初會使用僅客戶端渲染以避免因 SSR 期間使用 `window` 而導致相容性問題，並可無縫啟用以逐步採用 Next.js 特定功能。
+
+請在[此討論](https://github.com/vercel/next.js/discussions/25858)中分享與此轉換相關的任何反饋。
+
+### 10
+
+#### 添加 React 導入
+
+##### `add-missing-react-import`
+
+```bash filename="Terminal"
+npx @next/codemod add-missing-react-import
+```
+
+轉換未導入 `React` 的檔案以包含導入，以便新的 [React JSX 轉換](https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html)能正常工作。
+
+例如：
+
+```jsx filename="my-component.js"
+export default class Home extends React.Component {
+  render() {
+    return <div>Hello World</div>
+  }
+}
+```
+
+轉換為：
+
+```jsx filename="my-component.js"
+import React from 'react'
+export default class Home extends React.Component {
+  render() {
+    return <div>Hello World</div>
+  }
+}
+```
+
+### 9
+
+#### 將匿名元件轉換為具名元件
+
+##### `name-default-component`
+
+```bash filename="Terminal"
+npx @next/codemod name-default-component
+```
+
+**版本 9 及以上。**
+
+將匿名元件轉換為具名元件以確保它們與[快速刷新](https://nextjs.org/blog/next-9-4#fast-refresh)相容。
+
+例如：
+
+```jsx filename="my-component.js"
+export default function () {
+  return <div>Hello World</div>
+}
+```
+
+轉換為：
+
+```jsx filename="my-component.js"
+export default function MyComponent() {
+  return <div>Hello World</div>
+}
+```
+
+元件會根據檔案名稱獲得一個駝峰式命名，這也適用於箭頭函數。
+
+### 8
+
+#### 將 AMP HOC 轉換為頁面配置
+
+##### `withamp-to-config`
+
+```bash filename="Terminal"
+npx @next/codemod withamp-to-config
+```
+
+將 `withAmp` HOC 轉換為 Next.js 9 的頁面配置。
+
+例如：
+
+```js
+// 轉換前
+import { withAmp } from 'next/amp'
+
+function Home() {
+  return <h1>My AMP Page</h1>
+}
+
+export default withAmp(Home)
+```
+
+```js
+// 轉換後
+export default function Home() {
+  return <h1>My AMP Page</h1>
+}
+
+export const config = {
+  amp: true,
+}
+```
+
+### 6
+
+#### 使用 `withRouter`
+
+##### `url-to-withrouter`
+
+```bash filename="Terminal"
+npx @next/codemod url-to-withrouter
+```
+
+將頂層頁面上已棄用的自動注入 `url` 屬性轉換為使用 `withRouter` 及其注入的 `router` 屬性。了解更多：[https://nextjs.org/docs/messages/url-deprecated](/docs/messages/url-deprecated)
+
+例如：
+
+```js filename="轉換前"
+import React from 'react'
+export default class extends React.Component {
+  render() {
+    const { pathname } = this.props.url
+    return <div>Current pathname: {pathname}</div>
+  }
+}
+```
+
+```js filename="轉換後"
+import React from 'react'
+import { withRouter } from 'next/router'
+export default withRouter(
+  class extends React.Component {
+    render() {
+      const { pathname } = this.props.router
+      return <div>Current pathname: {pathname}</div>
+    }
+  }
+)
+```
+
+這是一個案例。所有轉換 (且經過測試) 的案例可以在 [`__testfixtures__` 目錄](https://github.com/vercel/next.js/tree/canary/packages/next-codemod/transforms/__testfixtures__/url-to-withrouter)中找到。

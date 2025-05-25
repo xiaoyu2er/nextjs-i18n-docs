@@ -1,0 +1,401 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:52:51.128Z
+title: 中介軟體 (Middleware)
+description: 學習如何使用中介軟體 (Middleware) 在請求完成前執行程式碼。
+---
+
+{/* 此文件內容在應用程式路由器和頁面路由器之間共享。您可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於頁面路由器的內容。任何共享內容不應包裹在元件中。 */}
+
+中介軟體 (Middleware) 允許您在請求完成前執行程式碼。然後，根據傳入的請求，您可以透過重寫、重新導向、修改請求或回應標頭，或直接回應來修改回應。
+
+中介軟體會在快取內容和路由匹配之前執行。詳情請參閱 [路徑匹配](#matching-paths)。
+
+## 慣例
+
+在專案根目錄中使用 `middleware.ts` (或 `.js`) 檔案來定義中介軟體。例如，與 `pages` 或 `app` 同層級，或適用的情況下放在 `src` 目錄內。
+
+## 範例
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+// 如果內部使用 `await`，此函式可標記為 `async`
+export function middleware(request: NextRequest) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// 詳情請參閱下方的「路徑匹配」
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+// 如果內部使用 `await`，此函式可標記為 `async`
+export function middleware(request) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// 詳情請參閱下方的「路徑匹配」
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+## 路徑匹配
+
+中介軟體會針對**專案中的每個路由**被調用。以下是執行順序：
+
+1. `next.config.js` 中的 `headers`
+2. `next.config.js` 中的 `redirects`
+3. 中介軟體 (`rewrites`、`redirects` 等)
+4. `next.config.js` 中的 `beforeFiles` (`rewrites`)
+5. 檔案系統路由 (`public/`、`_next/static/`、`pages/`、`app/` 等)
+6. `next.config.js` 中的 `afterFiles` (`rewrites`)
+7. 動態路由 (`/blog/[slug]`)
+8. `next.config.js` 中的 `fallback` (`rewrites`)
+
+有兩種方式可以定義中介軟體將在哪些路徑上執行：
+
+1. [自訂匹配器設定](#matcher)
+2. [條件語句](#conditional-statements)
+
+### 匹配器 (Matcher)
+
+`matcher` 允許您過濾中介軟體以在特定路徑上執行。
+
+```js filename="middleware.js"
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+您可以使用陣列語法匹配單一路徑或多個路徑：
+
+```js filename="middleware.js"
+export const config = {
+  matcher: ['/about/:path*', '/dashboard/:path*'],
+}
+```
+
+`matcher` 設定允許完整的正則表達式，因此支援如負向先行斷言或字元匹配等操作。以下是一個負向先行斷言的範例，用於匹配除特定路徑外的所有路徑：
+
+```js filename="middleware.js"
+export const config = {
+  matcher: [
+    /*
+     * 匹配所有請求路徑，除了以下開頭的路徑：
+     * - api (API 路由)
+     * - _next/static (靜態檔案)
+     * - _next/image (圖片最佳化檔案)
+     * - favicon.ico (網站圖示檔案)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
+}
+```
+
+> **須知**：`matcher` 的值必須是常數，以便在構建時進行靜態分析。動態值（如變數）將被忽略。
+
+配置的匹配器：
+
+1. 必須以 `/` 開頭
+2. 可以包含命名參數：`/about/:path` 匹配 `/about/a` 和 `/about/b`，但不匹配 `/about/a/c`
+3. 可以在命名參數上使用修飾符（以 `:` 開頭）：`/about/:path*` 匹配 `/about/a/b/c`，因為 `*` 表示 _零個或多個_。`?` 表示 _零個或一個_，`+` 表示 _一個或多個_
+4. 可以使用括號包圍的正則表達式：`/about/(.*)` 與 `/about/:path*` 相同
+
+詳情請參閱 [path-to-regexp](https://github.com/pillarjs/path-to-regexp#path-to-regexp-1) 文件。
+
+> **須知**：為了向後兼容，Next.js 始終將 `/public` 視為 `/public/index`。因此，`/public/:path` 的匹配器將會匹配。
+
+### 條件語句
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+## NextResponse
+
+`NextResponse` API 允許您：
+
+- `redirect` 將傳入的請求重新導向到不同的 URL
+- `rewrite` 透過顯示給定的 URL 來重寫回應
+- 為 API 路由、`getServerSideProps` 和 `rewrite` 目的地設定請求標頭
+- 設定回應 cookies
+- 設定回應標頭
+
+<AppOnly>
+
+要從中介軟體產生回應，您可以：
+
+1. `rewrite` 到一個會產生回應的路由 ([頁面](/docs/app/building-your-application/routing/pages-and-layouts) 或 [路由處理程式](/docs/app/building-your-application/routing/route-handlers))
+2. 直接回傳 `NextResponse`。請參閱 [產生回應](#producing-a-response)
+
+</AppOnly>
+
+<PagesOnly>
+
+要從中介軟體產生回應，您可以：
+
+1. `rewrite` 到一個會產生回應的路由 ([頁面](/docs/pages/building-your-application/routing/pages-and-layouts) 或 [Edge API 路由](/docs/pages/building-your-application/routing/api-routes))
+2. 直接回傳 `NextResponse`。請參閱 [產生回應](#producing-a-response)
+
+</PagesOnly>
+
+## 使用 Cookies
+
+Cookies 是常規的標頭。在 `Request` 中，它們儲存在 `Cookie` 標頭中。在 `Response` 中，它們位於 `Set-Cookie` 標頭中。Next.js 透過 `NextRequest` 和 `NextResponse` 上的 `cookies` 擴展提供了一種方便的方式來存取和操作這些 cookies。
+
+1. 對於傳入的請求，`cookies` 提供以下方法：`get`、`getAll`、`set` 和 `delete` cookies。您可以使用 `has` 檢查 cookie 是否存在，或使用 `clear` 移除所有 cookies。
+2. 對於傳出的回應，`cookies` 有以下方法：`get`、`getAll`、`set` 和 `delete`。
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // 假設傳入的請求中存在 "Cookie:nextjs=fast" 標頭
+  // 使用 `RequestCookies` API 從請求中取得 cookies
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // 使用 `ResponseCookies` API 在回應上設定 cookies
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // 傳出的回應將具有 `Set-Cookie:vercel=fast;path=/test` 標頭。
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  // 假設傳入的請求中存在 "Cookie:nextjs=fast" 標頭
+  // 使用 `RequestCookies` API 從請求中取得 cookies
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // 使用 `ResponseCookies` API 在回應上設定 cookies
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // 傳出的回應將具有 `Set-Cookie:vercel=fast;path=/test` 標頭。
+
+  return response
+}
+```
+
+## 設定標頭
+
+您可以使用 `NextResponse` API 設定請求和回應標頭（設定 _請求_ 標頭自 Next.js v13.0.0 起可用）。
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // 複製請求標頭並設定新標頭 `x-hello-from-middleware1`
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-middleware1', 'hello')
+
+  // 您也可以在 NextResponse.rewrite 中設定請求標頭
+  const response = NextResponse.next({
+    request: {
+      // 新請求標頭
+      headers: requestHeaders,
+    },
+  })
+
+  // 設定新回應標頭 `x-hello-from-middleware2`
+  response.headers.set('x-hello-from-middleware2', 'hello')
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  // 複製請求標頭並設定新標頭 `x-hello-from-middleware1`
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-middleware1', 'hello')
+
+  // 您也可以在 NextResponse.rewrite 中設定請求標頭
+  const response = NextResponse.next({
+    request: {
+      // 新請求標頭
+      headers: requestHeaders,
+    },
+  })
+
+  // 設定新回應標頭 `x-hello-from-middleware2`
+  response.headers.set('x-hello-from-middleware2', 'hello')
+  return response
+}
+```
+
+> **須知**：避免設定過大的標頭，因為根據後端網頁伺服器的配置，可能會導致 [431 請求標頭欄位過大](https://developer.mozilla.org/docs/Web/HTTP/Status/431) 錯誤。
+
+## 產生回應
+
+您可以透過回傳 `Response` 或 `NextResponse` 實例直接從中介軟體回應。（此功能自 [Next.js v13.1.0](https://nextjs.org/blog/next-13-1#nextjs-advanced-middleware) 起可用）
+
+```ts filename="middleware.ts" switcher
+import { NextRequest } from 'next/server'
+import { isAuthenticated } from '@lib/auth'
+
+// 將中介軟體限制在以 `/api/` 開頭的路徑
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function middleware(request: NextRequest) {
+  // 呼叫我們的驗證函式來檢查請求
+  if (!isAuthenticated(request)) {
+    // 回傳 JSON 表示錯誤訊息
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+```js filename="middleware.js" switcher
+import { isAuthenticated } from '@lib/auth'
+
+// 將中介軟體限制在以 `/api/` 開頭的路徑
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function middleware(request) {
+  // 呼叫我們的驗證函式來檢查請求
+  if (!isAuthenticated(request)) {
+    // 回傳 JSON 表示錯誤訊息
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+## 進階中介軟體標誌
+
+在 Next.js 的 `v13.1` 版本中，新增了兩個中介軟體標誌 `skipMiddlewareUrlNormalize` 和 `skipTrailingSlashRedirect` 來處理進階使用案例。
+
+`skipTrailingSlashRedirect` 允許禁用 Next.js 預設的添加或移除尾部斜線的重定向，允許在中介軟體中進行自訂處理，這可以讓某些路徑保持尾部斜線而其他路徑不保持，從而更容易進行增量遷移。
+
+```js filename="next.config.js"
+module.exports = {
+  skipTrailingSlashRedirect: true,
+}
+```
+
+```js filename="middleware.js"
+const legacyPrefixes = ['/docs', '/blog']
+
+export default async function middleware(req) {
+  const { pathname } = req.nextUrl
+
+  if (legacyPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next()
+  }
+
+  // 應用尾部斜線處理
+  if (
+    !pathname.endsWith('/') &&
+    !pathname.match(/((?!\.well-known(?:\/.*)?)(?:[^/]+\/)*[^/]+\.\w+)/)
+  ) {
+    req.nextUrl.pathname += '/'
+    return NextResponse.redirect(req.nextUrl)
+  }
+}
+```
+
+`skipMiddlewareUrlNormalize` 允許禁用 Next.js 進行的 URL 正規化，該正規化是為了使直接訪問和客戶端轉換的處理相同。在某些需要完全控制原始 URL 的進階案例中，這可以解鎖這些功能。
+
+```js filename="next.config.js"
+module.exports = {
+  skipMiddlewareUrlNormalize: true,
+}
+```
+
+```js filename="middleware.js"
+export default async function middleware(req) {
+  const { pathname } = req.nextUrl
+
+  // GET /_next/data/build-id/hello.json
+
+  console.log(pathname)
+  // 使用此標誌時，現在為 /_next/data/build-id/hello.json
+  // 不使用此標誌時，將會正規化為 /hello
+}
+```
+
+## 版本歷史
+
+| 版本       | 變更                                                                                       |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| `v13.1.0` | 新增進階中介軟體標誌                                                                      |
+| `v13.0.0` | 中介軟體可以修改請求標頭、回應標頭和發送回應                                              |
+| `v12.2.0` | 中介軟體穩定，請參閱 [升級指南](/docs/messages/middleware-upgrade-guide)                  |
+| `v12.0.9` | 在 Edge Runtime 中強制使用絕對 URL ([PR](https://github.com/vercel/next.js/pull/33410))    |
+| `v12.0.0` | 新增中介軟體 (Beta)                                                                       |

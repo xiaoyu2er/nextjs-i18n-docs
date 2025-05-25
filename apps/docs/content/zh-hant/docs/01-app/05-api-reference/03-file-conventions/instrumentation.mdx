@@ -1,0 +1,141 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T20:51:57.197Z
+title: instrumentation.js
+description: 關於 instrumentation.js 檔案的 API 參考文件。
+related:
+  title: 深入了解 Instrumentation
+  links:
+    - app/guides/instrumentation
+---
+
+`instrumentation.js|ts` 檔案用於將可觀測性工具整合到您的應用程式中，讓您可以追蹤效能和行為，並在生產環境中除錯問題。
+
+要使用它，請將檔案放在應用程式的**根目錄**，或如果使用 [`src` 資料夾](/docs/app/api-reference/file-conventions/src-folder) 則放在其中。
+
+## 匯出項目
+
+### `register` (選用)
+
+該檔案匯出一個 `register` 函式，當新的 Next.js 伺服器實例初始化時會**呼叫一次**。`register` 可以是非同步函式。
+
+```ts filename="instrumentation.ts" switcher
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel('next-app')
+}
+```
+
+```js filename="instrumentation.js" switcher
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel('next-app')
+}
+```
+
+### `onRequestError` (選用)
+
+您可以選擇匯出一個 `onRequestError` 函式，以將**伺服器**錯誤追蹤到任何自訂的可觀測性提供者。
+
+- 如果您在 `onRequestError` 中執行任何非同步任務，請確保它們被等待。`onRequestError` 會在 Next.js 伺服器捕獲錯誤時觸發。
+- `error` 實例可能不是拋出的原始錯誤實例，因為如果在伺服器元件渲染期間遇到錯誤，它可能會被 React 處理。如果發生這種情況，您可以使用錯誤上的 `digest` 屬性來識別實際的錯誤類型。
+
+```ts filename="instrumentation.ts" switcher
+import { type Instrumentation } from 'next'
+
+export const onRequestError: Instrumentation.onRequestError = async (
+  err,
+  request,
+  context
+) => {
+  await fetch('https://.../report-error', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: err.message,
+      request,
+      context,
+    }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+}
+```
+
+```js filename="instrumentation.js" switcher
+export async function onRequestError(err, request, context) {
+  await fetch('https://.../report-error', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: err.message,
+      request,
+      context,
+    }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+}
+```
+
+#### 參數
+
+該函式接受三個參數：`error`、`request` 和 `context`。
+
+```ts filename="Types"
+export function onRequestError(
+  error: { digest: string } & Error,
+  request: {
+    path: string // 資源路徑，例如 /blog?name=foo
+    method: string // 請求方法，例如 GET、POST 等
+    headers: { [key: string]: string }
+  },
+  context: {
+    routerKind: 'Pages Router' | 'App Router' // 路由器類型
+    routePath: string // 路由檔案路徑，例如 /app/blog/[dynamic]
+    routeType: 'render' | 'route' | 'action' | 'middleware' // 發生錯誤的上下文
+    renderSource:
+      | 'react-server-components'
+      | 'react-server-components-payload'
+      | 'server-rendering'
+    revalidateReason: 'on-demand' | 'stale' | undefined // undefined 表示沒有重新驗證的正常請求
+    renderType: 'dynamic' | 'dynamic-resume' // 'dynamic-resume' 用於 PPR
+  }
+): void | Promise<void>
+```
+
+- `error`: 捕獲的錯誤本身（類型始終為 `Error`），以及 `digest` 屬性，這是錯誤的唯一 ID。
+- `request`: 與錯誤相關聯的唯讀請求資訊。
+- `context`: 發生錯誤的上下文。這可以是路由器的類型（App 或 Pages Router），和/或（伺服器元件 (`'render'`)、路由處理程式 (`'route'`)、伺服器動作 (`'action'`) 或中介軟體 (`'middleware'`)）。
+
+### 指定執行環境
+
+`instrumentation.js` 檔案在 Node.js 和 Edge 執行環境中均可使用，但您可以使用 `process.env.NEXT_RUNTIME` 來針對特定執行環境。
+
+```js filename="instrumentation.js"
+export function register() {
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    return require('./register.edge')
+  } else {
+    return require('./register.node')
+  }
+}
+
+export function onRequestError() {
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    return require('./on-request-error.edge')
+  } else {
+    return require('./on-request-error.node')
+  }
+}
+```
+
+## 版本歷史
+
+| 版本       | 變更內容                                                 |
+| ---------- | ------------------------------------------------------- |
+| `v15.0.0` | 引入 `onRequestError`，`instrumentation` 穩定版         |
+| `v14.0.4` | Turbopack 支援 `instrumentation`                        |
+| `v13.2.0` | `instrumentation` 作為實驗性功能引入                    |

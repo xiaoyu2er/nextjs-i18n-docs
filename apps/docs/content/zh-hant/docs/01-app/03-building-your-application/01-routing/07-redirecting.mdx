@@ -1,0 +1,648 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-25T21:02:39.313Z
+title: 重新導向
+description: 了解在 Next.js 中處理重新導向的不同方法。
+related:
+  links:
+    - app/api-reference/functions/redirect
+    - app/api-reference/functions/permanentRedirect
+    - app/building-your-application/routing/middleware
+    - app/api-reference/config/next-config-js/redirects
+---
+
+在 Next.js 中有幾種處理重新導向的方法。本頁將介紹每種可用選項、使用情境以及如何管理大量重新導向。
+
+<AppOnly>
+
+| API                                                            | 用途                                           | 使用位置                                             | 狀態碼                            |
+| -------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------- | ---------------------------------- |
+| [`redirect`](#redirect-function)                               | 在變更或事件後重新導向使用者           | 伺服器元件 (Server Components)、伺服器動作 (Server Actions)、路由處理器 (Route Handlers) | 307 (臨時) 或 303 (伺服器動作) |
+| [`permanentRedirect`](#permanentredirect-function)             | 在變更或事件後永久重新導向使用者       | 伺服器元件、伺服器動作、路由處理器                | 308 (永久)                        |
+| [`useRouter`](#userouter-hook)                                 | 執行客戶端導航                          | 客戶端元件中的事件處理器                          | 不適用                             |
+| [`redirects` in `next.config.js`](#redirects-in-nextconfigjs)  | 根據路徑重新導向傳入請求                | `next.config.js` 檔案                             | 307 (臨時) 或 308 (永久)         |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | 根據條件重新導向傳入請求                | 中介層 (Middleware)                               | 任意                               |
+
+</AppOnly>
+
+<PagesOnly>
+
+| API                                                            | 用途                                           | 使用位置                 | 狀態碼                        |
+| -------------------------------------------------------------- | --------------------------------------------- | ----------------------- | ---------------------------- |
+| [`useRouter`](#userouter-hook)                                 | 執行客戶端導航                          | 元件                    | 不適用                         |
+| [`redirects` in `next.config.js`](#redirects-in-nextconfigjs)  | 根據路徑重新導向傳入請求                | `next.config.js` 檔案   | 307 (臨時) 或 308 (永久)     |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | 根據條件重新導向傳入請求                | 中介層                  | 任意                           |
+
+</PagesOnly>
+
+<AppOnly>
+
+## `redirect` 函式
+
+`redirect` 函式允許你將使用者重新導向至另一個 URL。你可以在[伺服器元件](/docs/app/getting-started/server-and-client-components)、[路由處理器](/docs/app/building-your-application/routing/route-handlers)和[伺服器動作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations)中呼叫 `redirect`。
+
+`redirect` 通常用於變更或事件後。例如，建立一篇文章：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id: string) {
+  try {
+    // 呼叫資料庫
+  } catch (error) {
+    // 處理錯誤
+  }
+
+  revalidatePath('/posts') // 更新快取文章
+  redirect(`/post/${id}`) // 導向至新文章頁面
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id) {
+  try {
+    // 呼叫資料庫
+  } catch (error) {
+    // 處理錯誤
+  }
+
+  revalidatePath('/posts') // 更新快取文章
+  redirect(`/post/${id}`) // 導向至新文章頁面
+}
+```
+
+> **須知事項**：
+>
+> - `redirect` 預設回傳 307 (臨時重新導向) 狀態碼。在伺服器動作中使用時，會回傳 303 (查看其他)，通常用於 POST 請求後導向至成功頁面。
+> - `redirect` 內部會拋出錯誤，因此應在 `try/catch` 區塊外呼叫。
+> - `redirect` 可以在客戶端元件的渲染過程中呼叫，但不能在事件處理器中使用。你可以改用 [`useRouter` 鉤子](#userouter-hook)。
+> - `redirect` 也接受絕對 URL，可用於導向外部連結。
+> - 若想在渲染過程前進行重新導向，請使用 [`next.config.js`](#redirects-in-nextconfigjs) 或[中介層](#nextresponseredirect-in-middleware)。
+
+詳見 [`redirect` API 參考文件](/docs/app/api-reference/functions/redirect)以獲取更多資訊。
+
+## `permanentRedirect` 函式
+
+`permanentRedirect` 函式允許你**永久**將使用者重新導向至另一個 URL。你可以在[伺服器元件](/docs/app/getting-started/server-and-client-components)、[路由處理器](/docs/app/building-your-application/routing/route-handlers)和[伺服器動作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations)中呼叫 `permanentRedirect`。
+
+`permanentRedirect` 通常用於變更實體標準 URL 的變更或事件後，例如在使用者更改使用者名稱後更新其個人資料 URL：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username: string, formData: FormData) {
+  try {
+    // 呼叫資料庫
+  } catch (error) {
+    // 處理錯誤
+  }
+
+  revalidateTag('username') // 更新所有使用者名稱的參考
+  permanentRedirect(`/profile/${username}`) // 導向至新使用者個人資料頁面
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username, formData) {
+  try {
+    // 呼叫資料庫
+  } catch (error) {
+    // 處理錯誤
+  }
+
+  revalidateTag('username') // 更新所有使用者名稱的參考
+  permanentRedirect(`/profile/${username}`) // 導向至新使用者個人資料頁面
+}
+```
+
+> **須知事項**：
+>
+> - `permanentRedirect` 預設回傳 308 (永久重新導向) 狀態碼。
+> - `permanentRedirect` 也接受絕對 URL，可用於導向外部連結。
+> - 若想在渲染過程前進行重新導向，請使用 [`next.config.js`](#redirects-in-nextconfigjs) 或[中介層](#nextresponseredirect-in-middleware)。
+
+詳見 [`permanentRedirect` API 參考文件](/docs/app/api-reference/functions/permanentRedirect)以獲取更多資訊。
+
+</AppOnly>
+
+## `useRouter()` 鉤子
+
+<AppOnly>
+
+若需要在客戶端元件的事件處理器中進行重新導向，可以使用 `useRouter` 鉤子的 `push` 方法。例如：
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      儀表板
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      儀表板
+    </button>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+若需要在元件中進行重新導向，可以使用 `useRouter` 鉤子的 `push` 方法。例如：
+
+```tsx filename="app/page.tsx" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      儀表板
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      儀表板
+    </button>
+  )
+}
+```
+
+</PagesOnly>
+
+> **須知事項**：
+>
+> - 若不需要以程式方式導航使用者，應使用 [`<Link>`](/docs/app/api-reference/components/link) 元件。
+
+<AppOnly>
+
+詳見 [`useRouter` API 參考文件](/docs/app/api-reference/functions/use-router)以獲取更多資訊。
+
+</AppOnly>
+
+<PagesOnly>
+
+詳見 [`useRouter` API 參考文件](/docs/pages/api-reference/functions/use-router)以獲取更多資訊。
+
+</PagesOnly>
+
+## `next.config.js` 中的 `redirects`
+
+`next.config.js` 檔案中的 `redirects` 選項允許你將傳入請求路徑重新導向至不同的目標路徑。這在變更頁面 URL 結構或預先知道一系列重新導向時非常有用。
+
+`redirects` 支援[路徑](/docs/app/api-reference/config/next-config-js/redirects#path-matching)、[標頭、Cookie 和查詢匹配](/docs/app/api-reference/config/next-config-js/redirects#header-cookie-and-query-matching)，讓你根據傳入請求靈活地重新導向使用者。
+
+要使用 `redirects`，請在 `next.config.js` 檔案中加入該選項：
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      // 基本重新導向
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // 萬用字元路徑匹配
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  async redirects() {
+    return [
+      // 基本重新導向
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // 萬用字元路徑匹配
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+詳見 [`redirects` API 參考文件](/docs/app/api-reference/config/next-config-js/redirects)以獲取更多資訊。
+
+> **須知事項**：
+>
+> - `redirects` 可透過 `permanent` 選項回傳 307 (臨時重新導向) 或 308 (永久重新導向) 狀態碼。
+> - 在某些平台上，`redirects` 可能有數量限制。例如，在 Vercel 上最多只能設定 1,024 個重新導向。若要管理大量重新導向 (1000+)，可以考慮使用[中介層](/docs/app/building-your-application/routing/middleware)建立自訂解決方案。詳見[大規模管理重新導向](#managing-redirects-at-scale-advanced)以獲取更多資訊。
+> - `redirects` 會在**中介層之前**執行。
+
+## 中介層中的 `NextResponse.redirect`
+
+中介層允許你在請求完成前執行程式碼。然後，根據傳入請求，使用 `NextResponse.redirect` 重新導向至不同的 URL。這在需要根據條件 (例如驗證、會話管理等) 重新導向使用者或處理[大量重新導向](#managing-redirects-at-scale-advanced)時非常有用。
+
+例如，若使用者未通過驗證，則將其重新導向至 `/login` 頁面：
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request: NextRequest) {
+  const isAuthenticated = authenticate(request)
+
+  // 若使用者已通過驗證，則繼續正常流程
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // 若未通過驗證，則重新導向至登入頁面
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request) {
+  const isAuthenticated = authenticate(request)
+
+  // 若使用者已通過驗證，則繼續正常流程
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // 若未通過驗證，則重新導向至登入頁面
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+> **須知事項**：
+>
+> - 中介層會在 `next.config.js` 中的 `redirects` **之後**執行，並在渲染**之前**執行。
+
+詳見[中介層](/docs/app/building-your-application/routing/middleware)文件以獲取更多資訊。
+
+## 大規模管理重新導向 (進階)
+
+若要管理大量重新導向 (1000+)，可以考慮使用中介層建立自訂解決方案。這讓你能以程式方式處理重新導向，而無需重新部署應用程式。
+
+為此，你需要考慮：
+
+1. 建立並儲存重新導向映射表。
+2. 優化資料查詢效能。
+
+> **Next.js 範例**：請參閱我們的[使用 Bloom 過濾器的中介層](https://redirects-bloom-filter.vercel.app/)範例，了解以下建議的實作方式。
+
+### 1. 建立並儲存重新導向映射表
+
+重新導向映射表是一個重新導向清單，可以儲存在資料庫 (通常是鍵值儲存) 或 JSON 檔案中。
+
+考慮以下資料結構：
+
+```json
+{
+  "/old": {
+    "destination": "/new",
+    "permanent": true
+  },
+  "/blog/post-old": {
+    "destination": "/blog/post-new",
+    "permanent": true
+  }
+}
+```
+
+在[中介層](/docs/app/building-your-application/routing/middleware)中，你可以從 Vercel 的[邊緣設定 (Edge Config)](https://vercel.com/docs/edge-config/get-started) 或 [Redis](https://vercel.com/docs/redis) 等資料庫讀取資料，並根據傳入請求重新導向使用者：
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData && typeof redirectData === 'string') {
+    const redirectEntry: RedirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // 未找到重新導向，繼續流程
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+export async function middleware(request) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData) {
+    const redirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // 未找到重新導向，繼續流程
+  return NextResponse.next()
+}
+```
+
+### 2. 優化資料查詢效能
+
+針對每個傳入請求讀取大型資料集可能會導致效能緩慢且成本高昂。您可以透過以下兩種方式優化資料查詢效能：
+
+- 使用針對快速讀取優化的資料庫
+- 採用如 [布隆過濾器 (Bloom filter)](https://en.wikipedia.org/wiki/Bloom_filter) 的資料查詢策略，在讀取較大的重新導向檔案或資料庫**之前**，有效率地檢查重新導向是否存在。
+
+延續先前的範例，您可以將生成的布隆過濾器檔案匯入中介軟體 (Middleware)，然後檢查傳入請求的路徑名稱是否存在於布隆過濾器中。
+
+若存在，則將請求轉發至 <AppOnly>[路由處理器 (Route Handler)](/docs/app/building-your-application/routing/route-handlers)</AppOnly> <PagesOnly>[API 路由 (API Routes)](/docs/pages/building-your-application/routing/api-routes)</PagesOnly>，由其實際檢查檔案並將使用者重新導向至適當的 URL。這樣可避免將大型重新導向檔案匯入中介軟體，導致每個傳入請求變慢。
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+// 從生成的 JSON 檔案初始化布隆過濾器
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter as any)
+
+export async function middleware(request: NextRequest) {
+  // 取得傳入請求的路徑
+  const pathname = request.nextUrl.pathname
+
+  // 檢查路徑是否存在於布隆過濾器中
+  if (bloomFilter.has(pathname)) {
+    // 將路徑名稱轉發至路由處理器
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // 從路由處理器取得重新導向資料
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry: RedirectEntry | undefined =
+          await redirectData.json()
+
+        if (redirectEntry) {
+          // 決定狀態碼
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // 重新導向至目的地
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // 未找到重新導向，繼續處理請求而不重新導向
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+// 從生成的 JSON 檔案初始化布隆過濾器
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter)
+
+export async function middleware(request) {
+  // 取得傳入請求的路徑
+  const pathname = request.nextUrl.pathname
+
+  // 檢查路徑是否存在於布隆過濾器中
+  if (bloomFilter.has(pathname)) {
+    // 將路徑名稱轉發至路由處理器
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // 從路由處理器取得重新導向資料
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry = await redirectData.json()
+
+        if (redirectEntry) {
+          // 決定狀態碼
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // 重新導向至目的地
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // 未找到重新導向，繼續處理請求而不重新導向
+  return NextResponse.next()
+}
+```
+
+<AppOnly>
+
+接著，在路由處理器中：
+
+```ts filename="app/api/redirects/route.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export function GET(request: NextRequest) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // 從 redirects.json 檔案取得重新導向項目
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // 處理布隆過濾器的誤判情況
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // 回傳重新導向項目
+  return NextResponse.json(redirect)
+}
+```
+
+```js filename="app/api/redirects/route.js" switcher
+import { NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+export function GET(request) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // 從 redirects.json 檔案取得重新導向項目
+  const redirect = redirects[pathname]
+
+  // 處理布隆過濾器的誤判情況
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // 回傳重新導向項目
+  return NextResponse.json(redirect)
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+接著，在 API 路由中：
+
+```ts filename="pages/api/redirects.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // 從 redirects.json 檔案取得重新導向項目
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // 處理布隆過濾器的誤判情況
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // 回傳重新導向項目
+  return res.json(redirect)
+}
+```
+
+```js filename="pages/api/redirects.js" switcher
+import redirects from '@/app/redirects/redirects.json'
+
+export default function handler(req, res) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // 從 redirects.json 檔案取得重新導向項目
+  const redirect = redirects[pathname]
+
+  // 處理布隆過濾器的誤判情況
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // 回傳重新導向項目
+  return res.json(redirect)
+}
+```
+
+</PagesOnly>
+
+> **須知事項：**
+>
+> - 若要生成布隆過濾器，您可以使用如 [`bloom-filters`](https://www.npmjs.com/package/bloom-filters) 的函式庫。
+> - 您應驗證發送至路由處理器的請求，以防止惡意請求。

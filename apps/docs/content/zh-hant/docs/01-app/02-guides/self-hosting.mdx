@@ -1,0 +1,271 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-05-25T20:37:54.750Z
+title: 如何自託管你的 Next.js 應用程式
+nav_title: 自託管
+description: 學習如何在 Node.js 伺服器、Docker 映像或靜態 HTML 檔案（靜態匯出）上自託管你的 Next.js 應用程式。
+---
+
+{/* 此文件內容在 app 和 pages 路由間共享。你可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於 Pages Router 的內容。任何共享內容不應包裹在元件中。 */}
+
+當[部署](/docs/app/getting-started/deploying)你的 Next.js 應用程式時，你可能會想根據基礎架構來配置不同功能的處理方式。
+
+> **🎥 觀看影片：** 深入了解自託管 Next.js → [YouTube (45 分鐘)](https://www.youtube.com/watch?v=sIVL4JMqRfc)。
+
+## 圖片最佳化
+
+透過 `next/image` 進行的[圖片最佳化](/docs/app/api-reference/components/image)在使用 `next start` 部署時，無需配置即可自託管運作。如果你偏好使用獨立服務來最佳化圖片，可以[配置圖片載入器](/docs/app/api-reference/components/image#loader)。
+
+圖片最佳化可與[靜態匯出](/docs/app/guides/static-exports#image-optimization)一起使用，只需在 `next.config.js` 中定義自訂圖片載入器。請注意，圖片是在執行階段最佳化，而非建置期間。
+
+> **須知事項：**
+>
+> - 在基於 glibc 的 Linux 系統上，圖片最佳化可能需要[額外配置](https://sharp.pixelplumbing.com/install#linux-memory-allocator)以避免過度記憶體使用。
+> - 深入了解[最佳化圖片的快取行為](/docs/app/api-reference/components/image#minimumcachettl)及如何配置 TTL。
+> - 你也可以[停用圖片最佳化](/docs/app/api-reference/components/image#unoptimized)並保留使用 `next/image` 的其他好處。例如，如果你已自行分開最佳化圖片。
+
+## 中介軟體
+
+[中介軟體](/docs/app/building-your-application/routing/middleware)在使用 `next start` 部署時，無需配置即可自託管運作。由於它需要存取傳入請求，因此不支援[靜態匯出](/docs/app/guides/static-exports)。
+
+中介軟體使用[邊緣執行環境 (Edge runtime)](/docs/app/api-reference/edge)，這是所有可用 Node.js API 的子集，有助於確保低延遲，因為它可能在應用程式的每個路由或資產前執行。如果不希望如此，你可以使用[完整的 Node.js 執行環境](/blog/next-15-2#nodejs-middleware-experimental)來執行中介軟體。
+
+如果你想新增需要所有 Node.js API 的邏輯（或使用外部套件），可以考慮將此邏輯移至[版面配置 (layout)](/docs/app/building-your-application/routing/layouts-and-templates#layouts) 作為[伺服器元件 (Server Component)](/docs/app/getting-started/server-and-client-components)。例如，檢查[標頭 (headers)](/docs/app/api-reference/functions/headers) 和[重新導向 (redirecting)](/docs/app/api-reference/functions/redirect)。你也可以使用標頭、Cookie 或查詢參數透過 `next.config.js` 進行[重新導向](/docs/app/api-reference/config/next-config-js/redirects#header-cookie-and-query-matching)或[重寫](/docs/app/api-reference/config/next-config-js/rewrites#header-cookie-and-query-matching)。如果這不可行，你還可以使用[自訂伺服器](/docs/pages/guides/custom-server)。
+
+## 環境變數
+
+Next.js 支援建置時和執行階段的環境變數。
+
+**預設情況下，環境變數僅在伺服器端可用**。要將環境變數暴露給瀏覽器，必須加上 `NEXT_PUBLIC_` 前綴。然而，這些公開的環境變數會在 `next build` 期間內嵌到 JavaScript 套件中。
+
+<PagesOnly>
+
+要讀取執行階段的環境變數，我們建議使用 `getServerSideProps` 或[逐步採用 App Router](/docs/app/guides/migrating/app-router-migration)。
+
+</PagesOnly>
+
+<AppOnly>
+
+你可以在動態渲染期間安全地在伺服器端讀取環境變數。
+
+```tsx filename="app/page.ts" switcher
+import { connection } from 'next/server'
+
+export default async function Component() {
+  await connection()
+  // cookies、headers 和其他動態 API
+  // 也會啟用動態渲染，意味著
+  // 此環境變數會在執行階段評估
+  const value = process.env.MY_VALUE
+  // ...
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { connection } from 'next/server'
+
+export default async function Component() {
+  await connection()
+  // cookies、headers 和其他動態 API
+  // 也會啟用動態渲染，意味著
+  // 此環境變數會在執行階段評估
+  const value = process.env.MY_VALUE
+  // ...
+}
+```
+
+</AppOnly>
+
+這讓你可以使用單一的 Docker 映像，並在多個環境中推廣，同時使用不同的值。
+
+> **須知事項：**
+>
+> - 你可以使用 [`register` 函式](/docs/app/guides/instrumentation)在伺服器啟動時執行程式碼。
+> - 我們不建議使用 [runtimeConfig](/docs/pages/api-reference/config/next-config-js/runtime-configuration) 選項，因為這不支援獨立輸出模式。相反，我們建議[逐步採用](/docs/app/guides/migrating/app-router-migration) App Router。
+
+## 快取與 ISR
+
+Next.js 可以快取回應、生成的靜態頁面、建置輸出以及其他靜態資產，如圖片、字型和腳本。
+
+快取和重新驗證頁面（使用[增量靜態再生 (ISR)](/docs/app/guides/incremental-static-regeneration)）使用**相同的共享快取**。預設情況下，此快取會儲存在 Next.js 伺服器的檔案系統（磁碟）上。**這在使用 Pages 和 App Router 自託管時會自動運作**。
+
+如果你想將快取的頁面和資料持久化到耐久性儲存，或在多個容器或 Next.js 應用程式實例間共享快取，可以配置 Next.js 快取位置。
+
+### 自動快取
+
+- Next.js 為真正不可變的資產設定 `Cache-Control` 標頭為 `public, max-age=31536000, immutable`。這無法被覆寫。這些不可變檔案在檔名中包含 SHA 雜湊，因此可以安全地永久快取。例如，[靜態圖片匯入](/docs/app/getting-started/images#local-images)。你可以為圖片[配置 TTL](/docs/app/api-reference/components/image#minimumcachettl)。
+- 增量靜態再生 (ISR) 設定 `Cache-Control` 標頭為 `s-maxage: <在 getStaticProps 中設定的重新驗證時間>, stale-while-revalidate`。此重新驗證時間在你的 [`getStaticProps` 函式](/docs/pages/building-your-application/data-fetching/get-static-props)中以秒為單位定義。如果設定 `revalidate: false`，則預設為一年的快取期限。
+- 動態渲染的頁面設定 `Cache-Control` 標頭為 `private, no-cache, no-store, max-age=0, must-revalidate`，以防止使用者特定資料被快取。這適用於 App Router 和 Pages Router。這也包括[草稿模式 (Draft Mode)](/docs/app/guides/draft-mode)。
+
+### 靜態資產
+
+如果你想在不同的網域或 CDN 上託管靜態資產，可以在 `next.config.js` 中使用 `assetPrefix` [配置](/docs/app/api-reference/config/next-config-js/assetPrefix)。Next.js 會在擷取 JavaScript 或 CSS 檔案時使用此資產前綴。將資產分離到不同網域的缺點是需要額外的 DNS 和 TLS 解析時間。
+
+[深入了解 `assetPrefix`](/docs/app/api-reference/config/next-config-js/assetPrefix)。
+
+### 配置快取
+
+預設情況下，生成的快取資產會儲存在記憶體中（預設為 50mb）和磁碟上。如果你使用 Kubernetes 等容器編排平台託管 Next.js，每個 pod 都會有一份快取副本。為避免因預設情況下 pod 間不共享快取而顯示過時資料，你可以配置 Next.js 快取以提供快取處理器並停用記憶體快取。
+
+要在自託管時配置 ISR/資料快取位置，可以在 `next.config.js` 檔案中配置自訂處理器：
+
+```jsx filename="next.config.js"
+module.exports = {
+  cacheHandler: require.resolve('./cache-handler.js'),
+  cacheMaxMemorySize: 0, // 停用預設的記憶體快取
+}
+```
+
+然後，在專案根目錄建立 `cache-handler.js`，例如：
+
+```jsx filename="cache-handler.js"
+const cache = new Map()
+
+module.exports = class CacheHandler {
+  constructor(options) {
+    this.options = options
+  }
+
+  async get(key) {
+    // 這可以儲存在任何地方，如耐久性儲存
+    return cache.get(key)
+  }
+
+  async set(key, data, ctx) {
+    // 這可以儲存在任何地方，如耐久性儲存
+    cache.set(key, {
+      value: data,
+      lastModified: Date.now(),
+      tags: ctx.tags,
+    })
+  }
+
+  async revalidateTag(tags) {
+    // tags 可以是字串或字串陣列
+    tags = [tags].flat()
+    // 遍歷快取中的所有條目
+    for (let [key, value] of cache) {
+      // 如果值的標籤包含指定的標籤，則刪除此條目
+      if (value.tags.some((tag) => tags.includes(tag))) {
+        cache.delete(key)
+      }
+    }
+  }
+
+  // 如果你想為單一請求設定臨時記憶體快取，並在下一個請求前重置
+  // 可以利用此方法
+  resetRequestCache() {}
+}
+```
+
+使用自訂快取處理器可以確保所有託管 Next.js 應用程式的 pod 之間的一致性。例如，你可以將快取值儲存在任何地方，如 [Redis](https://github.com/vercel/next.js/tree/canary/examples/cache-handler-redis) 或 AWS S3。
+
+> **須知事項：**
+>
+> - `revalidatePath` 是快取標籤上的便利層。呼叫 `revalidatePath` 會使用預設的特殊標籤呼叫 `revalidateTag` 函式。
+
+## 建置快取
+
+Next.js 在 `next build` 期間生成一個 ID，以識別正在提供服務的應用程式版本。相同的建置應被使用並在多個容器中啟動。
+
+如果你為環境的每個階段重新建置，則需要生成一致的建置 ID 以在容器間使用。在 `next.config.js` 中使用 `generateBuildId` 指令：
+
+```jsx filename="next.config.js"
+module.exports = {
+  generateBuildId: async () => {
+    // 這可以是任何內容，使用最新的 git 雜湊
+    return process.env.GIT_HASH
+  },
+}
+```
+
+## 版本偏差
+
+Next.js 會自動緩解大多數[版本偏差 (version skew)](https://www.industrialempathy.com/posts/version-skew/) 的情況，並在檢測到時自動重新載入應用程式以擷取新資產。例如，如果 `deploymentId` 不匹配，頁面間的轉換會執行硬導航而非使用預先擷取的值。
+
+當應用程式重新載入時，如果未設計為在頁面導航間持久化，可能會遺失應用程式狀態。例如，使用 URL 狀態或本地儲存會在頁面重新整理後保留狀態。然而，元件狀態如 `useState` 會在此類導航中遺失。
+
+<AppOnly>
+
+## 串流與 Suspense
+
+Next.js App Router 在自託管時支援[串流回應](/docs/app/building-your-application/routing/loading-ui-and-streaming)。如果使用 Nginx 或類似代理，需配置其停用緩衝以啟用串流。
+
+例如，你可以透過設定 `X-Accel-Buffering` 為 `no` 來停用 Nginx 的緩衝：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*{/}?',
+        headers: [
+          {
+            key: 'X-Accel-Buffering',
+            value: 'no',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## 部分預渲染
+
+[部分預渲染 (實驗性)](/docs/app/getting-started/partial-prerendering) 預設與 Next.js 一起運作，並非僅限 CDN 的功能。這包括作為 Node.js 伺服器部署（透過 `next start`）和使用 Docker 容器時。
+
+## 與 CDN 一起使用
+
+在 Next.js 應用程式前使用 CDN 時，當存取動態 API 時，頁面會包含 `Cache-Control: private` 回應標頭。這確保生成的 HTML 頁面被標記為不可快取。如果頁面完全預渲染為靜態，則會包含 `Cache-Control: public` 以允許頁面在 CDN 上快取。
+
+如果不需要混合靜態和動態元件，可以將整個路由設為靜態並在 CDN 上快取輸出 HTML。如果未使用動態 API，此自動靜態最佳化是執行 `next build` 時的預設行為。
+
+隨著部分預渲染趨於穩定，我們將透過部署適配器 API 提供支援。
+
+</AppOnly>
+
+<AppOnly>
+
+## `after`
+
+[`after`](/docs/app/api-reference/functions/after) 在使用 `next start` 自託管時完全支援。
+
+停止伺服器時，請透過發送 `SIGINT` 或 `SIGTERM` 訊號並等待來確保優雅關機。這讓 Next.js 伺服器能等待 `after` 內使用的待處理回呼函式或 Promise 完成。
+
+</AppOnly>
+
+<PagesOnly>
+
+## 手動優雅關機
+
+自託管時，你可能想在伺服器因 `SIGTERM` 或 `SIGINT` 訊號關閉時執行程式碼。
+
+你可以將環境變數 `NEXT_MANUAL_SIG_HANDLE` 設為 `true`，然後在 `_document.js` 檔案中為該訊號註冊處理器。你需要在 `package.json` 腳本中直接註冊環境變數，而非在 `.env` 檔案中。
+
+> **須知事項**：手動訊號處理在 `next dev` 中不可用。
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "NEXT_MANUAL_SIG_HANDLE=true next start"
+  }
+}
+```
+
+```js filename="pages/_document.js"
+if (process.env.NEXT_MANUAL_SIG_HANDLE) {
+  process.on('SIGTERM', () => {
+    console.log('收到 SIGTERM: 清理中')
+    process.exit(0)
+  })
+  process.on('SIGINT', () => {
+    console.log('收到 SIGINT: 清理中')
+    process.exit(0)
+  })
+}
+```
+
+</PagesOnly>

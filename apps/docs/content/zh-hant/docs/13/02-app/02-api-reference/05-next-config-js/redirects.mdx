@@ -1,0 +1,322 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:40:15.925Z
+title: 重新導向 (redirects)
+description: 在您的 Next.js 應用程式中新增重新導向功能。
+---
+
+{/* 此文件內容在應用程式路由器和頁面路由器之間共享。您可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於頁面路由器的內容。任何共享內容不應包裹在元件中。 */}
+
+重新導向功能允許您將傳入的請求路徑重新導向至不同的目標路徑。
+
+要使用重新導向功能，您可以在 `next.config.js` 中使用 `redirects` 鍵：
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+`redirects` 是一個非同步函式，預期回傳一個包含物件的陣列，這些物件具有 `source`、`destination` 和 `permanent` 屬性：
+
+- `source` 是傳入的請求路徑模式。
+- `destination` 是您想要路由至的路徑。
+- `permanent` 為 `true` 或 `false` - 若為 `true` 將使用 308 狀態碼，指示客戶端/搜尋引擎永久快取此重新導向；若為 `false` 則使用 307 狀態碼，表示臨時性且不會被快取。
+
+> **為何 Next.js 使用 307 和 308？** 傳統上，302 用於臨時重新導向，301 用於永久重新導向，但許多瀏覽器會將重新導向的請求方法更改為 `GET`，無論原始方法為何。例如，如果瀏覽器發送 `POST /v1/users` 請求並收到狀態碼 `302` 與位置 `/v2/users`，後續請求可能會變成 `GET /v2/users` 而非預期的 `POST /v2/users`。Next.js 使用 307 臨時重新導向和 308 永久重新導向狀態碼，明確保留所使用的請求方法。
+
+- `basePath`: `false` 或 `undefined` - 若為 false，則在匹配時不會包含 `basePath`，僅可用於外部重新導向。
+- `locale`: `false` 或 `undefined` - 是否在匹配時不包含語言環境。
+- `has` 是一個包含 `type`、`key` 和 `value` 屬性的 [has 物件](#header-cookie-and-query-matching) 陣列。
+- `missing` 是一個包含 `type`、`key` 和 `value` 屬性的 [missing 物件](#header-cookie-and-query-matching) 陣列。
+
+重新導向會在檔案系統（包括頁面和 `/public` 檔案）之前進行檢查。
+
+重新導向不會應用於客戶端路由（`Link`、`router.push`），除非存在 [中介軟體 (Middleware)](/docs/app/building-your-application/routing/middleware) 且匹配路徑。
+
+當應用重新導向時，請求中提供的任何查詢值都會傳遞至重新導向目標。例如，請看以下重新導向配置：
+
+```js
+{
+  source: '/old-blog/:path*',
+  destination: '/blog/:path*',
+  permanent: false
+}
+```
+
+當請求 `/old-blog/post-1?hello=world` 時，客戶端將被重新導向至 `/blog/post-1?hello=world`。
+
+## 路徑匹配
+
+允許路徑匹配，例如 `/old-blog/:slug` 將匹配 `/old-blog/hello-world`（不包含巢狀路徑）：
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/old-blog/:slug',
+        destination: '/news/:slug', // 匹配的參數可用於目標路徑
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### 萬用字元路徑匹配
+
+要匹配萬用字元路徑，您可以在參數後使用 `*`，例如 `/blog/:slug*` 將匹配 `/blog/a/b/c/d/hello-world`：
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/blog/:slug*',
+        destination: '/news/:slug*', // 匹配的參數可用於目標路徑
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### 正規表示式路徑匹配
+
+要匹配正規表示式路徑，您可以將正規表示式包裹在參數後的括號中，例如 `/post/:slug(\\d{1,})` 將匹配 `/post/123` 但不匹配 `/post/abc`：
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/post/:slug(\\d{1,})',
+        destination: '/news/:slug', // 匹配的參數可用於目標路徑
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+以下字元 `(`、`)`、`{`、`}`、`:`、`*`、`+`、`?` 用於正規表示式路徑匹配，因此當在 `source` 中作為非特殊值使用時，必須在它們前面加上 `\\` 進行轉義：
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        // 這將匹配請求 `/english(default)/something`
+        source: '/english\\(default\\)/:slug',
+        destination: '/en-us/:slug',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+## 標頭、Cookie 和查詢匹配
+
+若要僅在標頭、Cookie 或查詢值也匹配 `has` 欄位或不匹配 `missing` 欄位時才匹配重新導向，可以使用 `has` 或 `missing`。`source` 和所有 `has` 項目都必須匹配，且所有 `missing` 項目都必須不匹配，才會應用重新導向。
+
+`has` 和 `missing` 項目可以包含以下欄位：
+
+- `type`: `String` - 必須是 `header`、`cookie`、`host` 或 `query` 之一。
+- `key`: `String` - 要匹配的所選類型的鍵。
+- `value`: `String` 或 `undefined` - 要檢查的值，若為 undefined 則任何值都會匹配。可以使用類似正規表示式的字串來捕捉值的特定部分，例如，若值為 `first-(?<paramName>.*)` 用於 `first-second`，則 `second` 可在目標中使用 `:paramName`。
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      // 如果標頭 `x-redirect-me` 存在，
+      // 將應用此重新導向
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'header',
+            key: 'x-redirect-me',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // 如果標頭 `x-dont-redirect` 存在，
+      // 將不會應用此重新導向
+      {
+        source: '/:path((?!another-page$).*)',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-do-not-redirect',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // 如果來源、查詢和 Cookie 都匹配，
+      // 將應用此重新導向
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // 由於提供了值且未使用命名捕捉組（例如 (?<page>home)，
+            // 頁面值將不會在目標中可用
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        permanent: false,
+        destination: '/another/:path*',
+      },
+      // 如果標頭 `x-authorized` 存在且包含匹配值，
+      // 將應用此重新導向
+      {
+        source: '/',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        permanent: false,
+        destination: '/home?authorized=:authorized',
+      },
+      // 如果主機是 `example.com`，
+      // 將應用此重新導向
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+    ]
+  },
+}
+```
+
+### 支援 basePath 的重新導向
+
+當結合 [`basePath` 支援](/docs/app/api-reference/next-config-js/basePath) 使用重新導向時，每個 `source` 和 `destination` 會自動加上 `basePath` 前綴，除非您在重新導向中新增 `basePath: false`：
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async redirects() {
+    return [
+      {
+        source: '/with-basePath', // 自動變為 /docs/with-basePath
+        destination: '/another', // 自動變為 /docs/another
+        permanent: false,
+      },
+      {
+        // 由於設定了 basePath: false，不會新增 /docs
+        source: '/without-basePath',
+        destination: 'https://example.com',
+        basePath: false,
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+### 支援 i18n 的重新導向
+
+<AppOnly>
+
+當結合 [`i18n` 支援](/docs/app/building-your-application/routing/internationalization) 使用重新導向時，每個 `source` 和 `destination` 會自動加上前綴以處理配置的 `locales`，除非您在重新導向中新增 `locale: false`。若使用 `locale: false`，您必須在 `source` 和 `destination` 前加上語言環境才能正確匹配。
+
+</AppOnly>
+
+<PagesOnly>
+
+當結合 [`i18n` 支援](/docs/pages/building-your-application/routing/internationalization) 使用重新導向時，每個 `source` 和 `destination` 會自動加上前綴以處理配置的 `locales`，除非您在重新導向中新增 `locale: false`。若使用 `locale: false`，您必須在 `source` 和 `destination` 前加上語言環境才能正確匹配。
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/with-locale', // 自動處理所有語言環境
+        destination: '/another', // 自動傳遞語言環境
+        permanent: false,
+      },
+      {
+        // 由於設定了 locale: false，不會自動處理語言環境
+        source: '/nl/with-locale-manual',
+        destination: '/nl/another',
+        locale: false,
+        permanent: false,
+      },
+      {
+        // 這匹配 '/' 因為 `en` 是 defaultLocale
+        source: '/en',
+        destination: '/en/another',
+        locale: false,
+        permanent: false,
+      },
+      // 即使設定了 locale: false，也可以匹配所有語言環境
+      {
+        source: '/:locale/page',
+        destination: '/en/newpage',
+        permanent: false,
+        locale: false,
+      },
+      {
+        // 這會被轉換為 /(en|fr|de)/(.*)，因此不會匹配頂層
+        // `/` 或 `/fr` 路由，如同 /:path* 那樣
+        source: '/(.*)',
+        destination: '/another',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+在某些罕見情況下，您可能需要為舊版 HTTP 客戶端指派自訂狀態碼以正確重新導向。在這些情況下，您可以使用 `statusCode` 屬性而非 `permanent` 屬性，但不能同時使用。為了確保 IE11 相容性，會自動為 308 狀態碼新增 `Refresh` 標頭。
+
+## 其他重新導向方式
+
+- 在 [API 路由](/docs/pages/api-reference/functions/next-server) 中，您可以使用 `res.redirect()`。
+- 在 [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) 和 [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) 中，您可以在請求時重新導向特定頁面。
+
+## 版本歷史
+
+| 版本       | 變更                |
+| ---------- | ------------------- |
+| `v13.3.0` | 新增 `missing`。    |
+| `v10.2.0` | 新增 `has`。        |
+| `v9.5.0`  | 新增 `redirects`。  |
