@@ -1,0 +1,370 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T20:39:29.150Z
+title: 如何使用 OpenTelemetry 設定監測工具
+nav_title: OpenTelemetry
+description: 了解如何為您的 Next.js 應用程式設定 OpenTelemetry 監測工具。
+---
+
+{/* 此文件內容在應用程式路由器和頁面路由器之間共享。您可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於頁面路由器的內容。任何共享內容不應包裹在元件中。 */}
+
+可觀測性 (Observability) 對於理解和優化 Next.js 應用程式的行為與效能至關重要。
+
+隨著應用程式變得越來越複雜，識別和診斷可能出現的問題也變得更加困難。透過利用可觀測性工具（如日誌記錄和指標），開發人員可以深入了解應用程式的行為並找出需要優化的地方。透過可觀測性，開發人員可以在問題變嚴重之前主動解決，並提供更好的使用者體驗。因此，強烈建議在 Next.js 應用程式中使用可觀測性來提升效能、優化資源並增強使用者體驗。
+
+我們推薦使用 OpenTelemetry 來監測您的應用程式。
+這是一種與平台無關的應用程式監測方式，讓您可以在不更改程式碼的情況下更換可觀測性供應商。
+有關 OpenTelemetry 及其運作原理的更多資訊，請閱讀 [OpenTelemetry 官方文件](https://opentelemetry.io/docs/)。
+
+本文件使用了如 _Span_、_Trace_ 或 _Exporter_ 等術語，這些都可以在 [OpenTelemetry 可觀測性入門](https://opentelemetry.io/docs/concepts/observability-primer/) 中找到。
+
+Next.js 原生支援 OpenTelemetry 監測工具，這意味著我們已經為 Next.js 本身進行了監測。
+
+<PagesOnly>
+  當您啟用 OpenTelemetry 時，我們會自動將您的所有程式碼（如 `getStaticProps`）包裝在帶有有用屬性的 _spans_ 中。
+</PagesOnly>
+
+## 開始使用
+
+OpenTelemetry 是可擴展的，但正確設定可能會相當繁瑣。
+這就是為什麼我們準備了一個 `@vercel/otel` 套件來幫助您快速開始。
+
+### 使用 `@vercel/otel`
+
+首先，安裝以下套件：
+
+```bash filename="終端機"
+npm install @vercel/otel @opentelemetry/sdk-logs @opentelemetry/api-logs @opentelemetry/instrumentation
+```
+
+<AppOnly>
+
+接下來，在專案的 **根目錄**（或使用 `src` 資料夾時在其中）建立一個自訂的 [`instrumentation.ts`](/docs/app/guides/instrumentation)（或 `.js`）檔案：
+
+</AppOnly>
+
+<PagesOnly>
+
+接下來，在專案的 **根目錄**（或使用 `src` 資料夾時在其中）建立一個自訂的 [`instrumentation.ts`](/docs/pages/guides/instrumentation)（或 `.js`）檔案：
+
+</PagesOnly>
+
+```ts filename="your-project/instrumentation.ts" switcher
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel({ serviceName: 'next-app' })
+}
+```
+
+```js filename="your-project/instrumentation.js" switcher
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel({ serviceName: 'next-app' })
+}
+```
+
+有關其他配置選項，請參閱 [`@vercel/otel` 文件](https://www.npmjs.com/package/@vercel/otel)。
+
+<AppOnly>
+
+> **須知事項**：
+>
+> - `instrumentation` 檔案應位於專案的根目錄，而不是 `app` 或 `pages` 目錄中。如果您使用 `src` 資料夾，則將檔案放在 `src` 中，與 `pages` 和 `app` 同級。
+> - 如果您使用 [`pageExtensions` 配置選項](/docs/app/api-reference/config/next-config-js/pageExtensions) 來新增後綴，則還需要更新 `instrumentation` 檔案名稱以匹配。
+> - 我們已建立一個基本的 [with-opentelemetry](https://github.com/vercel/next.js/tree/canary/examples/with-opentelemetry) 範例供您使用。
+
+</AppOnly>
+
+<PagesOnly>
+
+> **須知事項**：
+>
+> - `instrumentation` 檔案應位於專案的根目錄，而不是 `app` 或 `pages` 目錄中。如果您使用 `src` 資料夾，則將檔案放在 `src` 中，與 `pages` 和 `app` 同級。
+> - 如果您使用 [`pageExtensions` 配置選項](/docs/pages/api-reference/config/next-config-js/pageExtensions) 來新增後綴，則還需要更新 `instrumentation` 檔案名稱以匹配。
+> - 我們已建立一個基本的 [with-opentelemetry](https://github.com/vercel/next.js/tree/canary/examples/with-opentelemetry) 範例供您使用。
+
+</PagesOnly>
+
+### 手動配置 OpenTelemetry
+
+`@vercel/otel` 套件提供了許多配置選項，應能滿足大多數常見的使用情境。但如果它不符合您的需求，您可以手動配置 OpenTelemetry。
+
+首先，您需要安裝 OpenTelemetry 套件：
+
+```bash filename="終端機"
+npm install @opentelemetry/sdk-node @opentelemetry/resources @opentelemetry/semantic-conventions @opentelemetry/sdk-trace-node @opentelemetry/exporter-trace-otlp-http
+```
+
+現在您可以在 `instrumentation.ts` 中初始化 `NodeSDK`。
+與 `@vercel/otel` 不同，`NodeSDK` 不支援邊緣運行時 (edge runtime)，因此您需要確保僅在 `process.env.NEXT_RUNTIME === 'nodejs'` 時導入它們。我們建議建立一個新檔案 `instrumentation.node.ts`，並僅在使用 node 時有條件地導入：
+
+```ts filename="instrumentation.ts" switcher
+export async function register() {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('./instrumentation.node.ts')
+  }
+}
+```
+
+```js filename="instrumentation.js" switcher
+export async function register() {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('./instrumentation.node.js')
+  }
+}
+```
+
+```ts filename="instrumentation.node.ts" switcher
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
+import { Resource } from '@opentelemetry/resources'
+import { NodeSDK } from '@opentelemetry/sdk-node'
+import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
+import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
+
+const sdk = new NodeSDK({
+  resource: new Resource({
+    [ATTR_SERVICE_NAME]: 'next-app',
+  }),
+  spanProcessor: new SimpleSpanProcessor(new OTLPTraceExporter()),
+})
+sdk.start()
+```
+
+```js filename="instrumentation.node.js" switcher
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
+import { Resource } from '@opentelemetry/resources'
+import { NodeSDK } from '@opentelemetry/sdk-node'
+import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
+import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
+
+const sdk = new NodeSDK({
+  resource: new Resource({
+    [ATTR_SERVICE_NAME]: 'next-app',
+  }),
+  spanProcessor: new SimpleSpanProcessor(new OTLPTraceExporter()),
+})
+sdk.start()
+```
+
+這樣做與使用 `@vercel/otel` 等效，但可以修改和擴展一些 `@vercel/otel` 未公開的功能。如果需要邊緣運行時支援，則必須使用 `@vercel/otel`。
+
+## 測試您的監測工具
+
+您需要一個 OpenTelemetry 收集器和相容的後端來在本地測試 OpenTelemetry 追蹤。
+我們推薦使用我們的 [OpenTelemetry 開發環境](https://github.com/vercel/opentelemetry-collector-dev-setup)。
+
+如果一切正常，您應該能看到標記為 `GET /requested/pathname` 的根伺服器 span。
+該特定追蹤的所有其他 span 都將嵌套在其下。
+
+Next.js 追蹤的 span 比預設發送的要多。
+要查看更多 span，您必須設定 `NEXT_OTEL_VERBOSE=1`。
+
+## 部署
+
+### 使用 OpenTelemetry 收集器
+
+當您使用 OpenTelemetry 收集器部署時，可以使用 `@vercel/otel`。
+這在 Vercel 和自託管環境中都可以使用。
+
+#### 在 Vercel 上部署
+
+我們確保 OpenTelemetry 在 Vercel 上開箱即用。
+
+按照 [Vercel 文件](https://vercel.com/docs/concepts/observability/otel-overview/quickstart) 將您的專案連接到可觀測性供應商。
+
+#### 自託管
+
+部署到其他平台也很簡單。您需要啟動自己的 OpenTelemetry 收集器來接收和處理來自 Next.js 應用程式的遙測資料。
+
+為此，請遵循 [OpenTelemetry 收集器入門指南](https://opentelemetry.io/docs/collector/getting-started/)，該指南將引導您設定收集器並配置其從 Next.js 應用程式接收資料。
+
+一旦您的收集器啟動並運行，您可以按照相應的部署指南將 Next.js 應用程式部署到您選擇的平台。
+
+### 自訂導出器
+
+OpenTelemetry 收集器並非必需。您可以使用自訂的 OpenTelemetry 導出器搭配 [`@vercel/otel`](#使用-vercelotel) 或 [手動 OpenTelemetry 配置](#手動-opentelemetry-配置)。
+
+## 自訂 Span
+
+您可以使用 [OpenTelemetry API](https://opentelemetry.io/docs/instrumentation/js/instrumentation) 新增自訂 span。
+
+```bash filename="終端機"
+npm install @opentelemetry/api
+```
+
+以下範例展示了一個獲取 GitHub star 數的函數，並新增了一個自訂的 `fetchGithubStars` span 來追蹤 fetch 請求的結果：
+
+```ts
+import { trace } from '@opentelemetry/api'
+
+export async function fetchGithubStars() {
+  return await trace
+    .getTracer('nextjs-example')
+    .startActiveSpan('fetchGithubStars', async (span) => {
+      try {
+        return await getValue()
+      } finally {
+        span.end()
+      }
+    })
+}
+```
+
+`register` 函數將在新環境中運行您的程式碼之前執行。
+您可以開始建立新的 span，它們應該會被正確地加入到導出的追蹤中。
+
+## Next.js 中的預設 Span
+
+Next.js 自動為您監測多個 span，以提供有關應用程式效能的實用洞察。
+
+span 上的屬性遵循 [OpenTelemetry 語意慣例](https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/)。我們還在 `next` 命名空間下新增了一些自訂屬性：
+
+- `next.span_name` - 重複 span 名稱
+- `next.span_type` - 每個 span 類型都有唯一的識別碼
+- `next.route` - 請求的路由模式（例如 `/[param]/user`）。
+- `next.rsc` (true/false) - 請求是否為 RSC 請求，例如預取。
+- `next.page`
+  - 這是應用路由器使用的內部值。
+  - 您可以將其視為指向特殊檔案的路由（如 `page.ts`、`layout.ts`、`loading.ts` 等）
+  - 僅當與 `next.route` 配對時，它才能作為唯一識別碼，因為 `/layout` 可以用來識別 `/(groupA)/layout.ts` 和 `/(groupB)/layout.ts`
+
+### `[http.method] [next.route]`
+
+- `next.span_type`: `BaseServer.handleRequest`
+
+此 span 代表每個傳入 Next.js 應用程式請求的根 span。它追蹤請求的 HTTP 方法、路由、目標和狀態碼。
+
+屬性：
+
+- [通用 HTTP 屬性](https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/http/#common-attributes)
+  - `http.method`
+  - `http.status_code`
+- [伺服器 HTTP 屬性](https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/http/#http-server-semantic-conventions)
+  - `http.route`
+  - `http.target`
+- `next.span_name`
+- `next.span_type`
+- `next.route`
+
+### `render route (app) [next.route]`
+
+- `next.span_type`: `AppRender.getBodyResult`.
+
+此 span 代表在應用路由器中渲染路由的過程。
+
+屬性：
+
+- `next.span_name`
+- `next.span_type`
+- `next.route`
+
+### `fetch [http.method] [http.url]`
+
+- `next.span_type`: `AppRender.fetch`.
+
+此 span 代表在您的程式碼中執行的 fetch 請求。
+
+屬性：
+
+- [通用 HTTP 屬性](https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/http/#common-attributes)
+  - `http.method`
+- [客戶端 HTTP 屬性](https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/http/#http-client)
+  - `http.url`
+  - `net.peer.name`
+  - `net.peer.port` (僅在指定時)
+- `next.span_name`
+- `next.span_type`
+
+可以通過在環境中設定 `NEXT_OTEL_FETCH_DISABLED=1` 來關閉此 span。這在您想使用自訂的 fetch 監測工具庫時很有用。
+
+### `executing api route (app) [next.route]`
+
+- `next.span_type`: `AppRouteRouteHandlers.runHandler`.
+
+此 span 代表在應用路由器中執行 API Route Handler 的過程。
+
+屬性：
+
+- `next.span_name`
+- `next.span_type`
+- `next.route`
+
+### `getServerSideProps [next.route]`
+
+- `next.span_type`: `Render.getServerSideProps`.
+
+此 span 代表為特定路由執行 `getServerSideProps` 的過程。
+
+屬性：
+
+- `next.span_name`
+- `next.span_type`
+- `next.route`
+
+### `getStaticProps [next.route]`
+
+- `next.span_type`: `Render.getStaticProps`.
+
+此 span 代表為特定路由執行 `getStaticProps` 的過程。
+
+屬性：
+
+- `next.span_name`
+- `next.span_type`
+- `next.route`
+
+### `render route (pages) [next.route]`
+
+- `next.span_type`: `Render.renderDocument`.
+
+此 span 代表為特定路由渲染文件的過程。
+
+屬性：
+
+- `next.span_name`
+- `next.span_type`
+- `next.route`
+
+### `generateMetadata [next.page]`
+
+- `next.span_type`: `ResolveMetadata.generateMetadata`.
+
+此 span 代表為特定頁面生成元資料的過程（單個路由可以有多個此類 span）。
+
+屬性：
+
+- `next.span_name`
+- `next.span_type`
+- `next.page`
+
+### `resolve page components`
+
+- `next.span_type`: `NextNodeServer.findPageComponents`.
+
+此 span 代表為特定頁面解析頁面元件的過程。
+
+屬性：
+
+- `next.span_name`
+- `next.span_type`
+- `next.route`
+
+### `resolve segment modules`
+
+- `next.span_type`: `NextNodeServer.getLayoutOrPageModule`.
+
+此 span 代表載入布局或頁面的程式碼模組的過程。
+
+屬性：
+
+- `next.span_name`
+- `next.span_type`
+- `next.segment`
+
+### `start response`
+
+- `next.span_type`: `NextNodeServer.startResponse`.
+
+此零長度 span 代表回應中第一個位元組發送的時間。

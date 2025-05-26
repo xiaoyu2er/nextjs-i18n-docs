@@ -1,0 +1,132 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T20:38:54.654Z
+title: 如何優化記憶體使用
+nav_title: 記憶體使用
+description: 在開發與生產環境中優化應用程式的記憶體使用。
+---
+
+隨著應用程式功能日益豐富，在本地開發或建立生產版本時可能會需要更多資源。
+
+讓我們探討一些優化記憶體的策略與技巧，並解決 Next.js 中常見的記憶體問題。
+
+## 減少依賴套件數量
+
+應用程式若依賴大量套件，將會使用更多記憶體。
+
+[套件分析工具 (Bundle Analyzer)](/docs/app/guides/package-bundling) 可協助您找出應用程式中可能移除的大型依賴套件，以提升效能並降低記憶體使用量。
+
+## 嘗試 `experimental.webpackMemoryOptimizations`
+
+從 `v15.0.0` 開始，您可以在 `next.config.js` 檔案中加入 `experimental.webpackMemoryOptimizations: true`，這會改變 Webpack 的行為以降低最大記憶體使用量，但可能會略微增加編譯時間。
+
+> **須知**：此功能目前處於實驗階段，需先在更多專案上測試，但被認為是低風險的。
+
+## 使用 `--experimental-debug-memory-usage` 執行 `next build`
+
+從 `14.2.0` 開始，您可以執行 `next build --experimental-debug-memory-usage`，在此模式下 Next.js 會在整個建置過程中持續輸出記憶體使用資訊，例如堆積使用量與垃圾回收統計數據。當記憶體使用量接近設定上限時，也會自動拍攝堆積快照。
+
+> **須知**：此功能與 Webpack 建置工作選項不相容，除非您有自訂的 webpack 設定，否則該選項會自動啟用。
+
+## 記錄堆積分析檔
+
+為了找出記憶體問題，您可以從 Node.js 記錄堆積分析檔，並在 Chrome DevTools 中載入以識別潛在的記憶體洩漏來源。
+
+在終端機中，啟動 Next.js 建置時傳遞 `--heap-prof` 參數給 Node.js：
+
+```sh
+node --heap-prof node_modules/next/dist/bin/next build
+```
+
+建置結束時，Node.js 會建立一個 `.heapprofile` 檔案。
+
+在 Chrome DevTools 中，您可以開啟「Memory」分頁並點擊「Load Profile」按鈕來視覺化該檔案。
+
+## 分析堆積快照
+
+您可以使用檢查工具來分析應用程式的記憶體使用情況。
+
+執行 `next build` 或 `next dev` 指令時，在指令開頭加入 `NODE_OPTIONS=--inspect`。這會在預設連接埠上暴露檢查代理程式。若您希望在執行任何使用者程式碼前中斷，可以改傳遞 `--inspect-brk`。當程序執行時，您可以使用 Chrome DevTools 等工具連接到偵錯連接埠，記錄並分析堆積快照以查看哪些記憶體被保留。
+
+從 `14.2.0` 開始，您也可以使用 `--experimental-debug-memory-usage` 參數執行 `next build`，讓拍攝堆積快照更簡單。
+
+在此模式下執行時，您可以隨時向程序發送 `SIGUSR2` 信號，程序會拍攝堆積快照。
+
+堆積快照會儲存在 Next.js 應用程式的專案根目錄中，可載入到任何堆積分析工具（如 Chrome DevTools）中查看保留的記憶體。此模式目前尚不支援 Webpack 建置工作。
+
+更多資訊請參閱[如何記錄與分析堆積快照](https://developer.chrome.com/docs/devtools/memory-problems/heap-snapshots)。
+
+## Webpack 建置工作
+
+Webpack 建置工作讓您能在獨立的 Node.js 工作程序中執行 Webpack 編譯，這會降低建置期間應用程式的記憶體使用量。
+
+從 `v14.1.0` 開始，若您的應用程式沒有自訂 Webpack 設定，此選項會預設啟用。
+
+如果您使用較舊版本的 Next.js 或有自訂 Webpack 設定，可以在 `next.config.js` 中設定 `experimental.webpackBuildWorker: true` 來啟用此選項。
+
+> **須知**：此功能可能與所有自訂 Webpack 外掛不相容。
+
+## 停用 Webpack 快取
+
+[Webpack 快取](https://webpack.js.org/configuration/cache/)會將產生的 Webpack 模組儲存在記憶體或硬碟中，以提升建置速度。這有助於效能，但也會增加應用程式的記憶體使用量來儲存快取資料。
+
+您可以透過為應用程式新增[自訂 Webpack 設定](/docs/app/api-reference/config/next-config-js/webpack)來停用此行為：
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  webpack: (
+    config,
+    { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack }
+  ) => {
+    if (config.cache && !dev) {
+      config.cache = Object.freeze({
+        type: 'memory',
+      })
+    }
+    // 重要：回傳修改後的設定
+    return config
+  },
+}
+
+export default nextConfig
+```
+
+## 停用靜態分析
+
+型別檢查與程式碼檢查可能會消耗大量記憶體，特別是在大型專案中。然而，多數專案已有專用的 CI 執行器來處理這些任務。當建置在「Linting and checking validity of types」步驟中發生記憶體不足問題時，您可以在建置期間停用這些任務：
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  eslint: {
+    // 警告：即使專案有 ESLint 錯誤，此設定仍允許生產建置成功完成。
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // !! 警告 !!
+    // 即使專案有型別錯誤，仍危險地允許生產建置成功完成。
+    // !! 警告 !!
+    ignoreBuildErrors: true,
+  },
+}
+
+export default nextConfig
+```
+
+- [忽略 TypeScript 錯誤](/docs/app/api-reference/config/typescript#disabling-typescript-errors-in-production)
+- [Next.js 設定中的 ESLint](/docs/pages/api-reference/config/next-config-js/eslint)
+
+請注意，這可能會因型別錯誤或程式碼檢查問題而導致部署失敗。我們強烈建議僅在靜態分析完成後才將建置推送到生產環境。如果您部署到 Vercel，可以查看[預覽部署指南](https://vercel.com/docs/deployments/managing-deployments#staging-and-promoting-a-production-deployment)了解如何在自訂任務成功後將建置推送到生產環境。
+
+## 停用原始碼對應
+
+產生原始碼對應會在建置過程中消耗額外記憶體。
+
+您可以透過在 Next.js 設定中加入 `productionBrowserSourceMaps: false` 和 `experimental.serverSourceMaps: false` 來停用原始碼對應的產生。
+
+> **須知**：某些外掛可能會啟用原始碼對應，可能需要自訂設定才能停用。
+
+## Edge 記憶體問題
+
+Next.js `v14.1.3` 修復了使用 Edge 執行環境時的記憶體問題。請更新至此版本（或更新版本）以確認是否解決您的問題。

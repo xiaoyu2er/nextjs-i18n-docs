@@ -1,0 +1,218 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-05-25T20:39:37.706Z
+title: 國際化 (Internationalization)
+description: 透過國際化路由與本地化內容來新增多語言支援。
+---
+
+Next.js 讓您能設定路由與內容渲染以支援多種語言。讓您的網站適應不同地區設定 (locale) 包含翻譯內容 (本地化) 與國際化路由。
+
+## 術語
+
+- **地區設定 (Locale):** 一組語言與格式偏好的識別碼。通常包含使用者的偏好語言與可能的地理區域。
+  - `en-US`: 美國使用的英文
+  - `nl-NL`: 荷蘭使用的荷蘭文
+  - `nl`: 荷蘭文，無特定區域
+
+## 路由概覽
+
+建議使用瀏覽器中的使用者語言偏好來選擇要使用的地區設定。變更偏好語言會修改傳入您應用程式的 `Accept-Language` 標頭。
+
+例如，使用以下程式庫，您可以查看傳入的 `Request`，根據 `Headers`、您計劃支援的地區設定與預設地區設定來決定要選擇的地區設定。
+
+```js filename="middleware.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+路由可以透過子路徑 (`/fr/products`) 或網域 (`my-site.fr/products`) 進行國際化。有了這些資訊，您現在可以根據 [中介軟體 (Middleware)](/docs/app/building-your-application/routing/middleware) 中的地區設定來重新導向使用者。
+
+```js filename="middleware.js"
+import { NextResponse } from "next/server";
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// 取得偏好地區設定，類似上述方式或使用程式庫
+function getLocale(request) { ... }
+
+export function middleware(request) {
+  // 檢查路徑中是否有任何支援的地區設定
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  // 若無地區設定則重新導向
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // 例如傳入請求為 /products
+  // 新網址現在是 /en-US/products
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // 跳過所有內部路徑 (_next)
+    '/((?!_next).*)',
+    // 可選: 僅在根 (/) URL 執行
+    // '/'
+  ],
+}
+```
+
+最後，確保 `app/` 內的所有特殊檔案都巢狀放置在 `app/[lang]` 下。這讓 Next.js 路由器能動態處理路由中的不同地區設定，並將 `lang` 參數傳遞給每個佈局 (layout) 與頁面。例如：
+
+```tsx filename="app/[lang]/page.tsx" switcher
+// 您現在可以存取目前的地區設定
+// 例如 /en-US/products -> `lang` 是 "en-US"
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
+  const { lang } = await params
+  return ...
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+// 您現在可以存取目前的地區設定
+// 例如 /en-US/products -> `lang` 是 "en-US"
+export default async function Page({ params }) {
+  const { lang } = await params
+  return ...
+}
+```
+
+根佈局也可以巢狀放置在新資料夾中 (例如 `app/[lang]/layout.js`)。
+
+## 本地化 (Localization)
+
+根據使用者的偏好地區設定變更顯示內容，或稱本地化，並非 Next.js 特有的功能。以下描述的模式在任何網頁應用程式中都適用。
+
+假設我們想在應用程式中同時支援英文與荷蘭文內容。我們可能會維護兩個不同的「字典」，這些物件提供從某個鍵到本地化字串的對應。例如：
+
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+接著我們可以建立一個 `getDictionary` 函式來載入請求地區設定的翻譯：
+
+```ts filename="app/[lang]/dictionaries.ts" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale: 'en' | 'nl') =>
+  dictionaries[locale]()
+```
+
+```js filename="app/[lang]/dictionaries.js" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale) => dictionaries[locale]()
+```
+
+根據目前選擇的語言，我們可以在佈局或頁面中取得字典。
+
+```tsx filename="app/[lang]/page.tsx" switcher
+import { getDictionary } from './dictionaries'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ lang: 'en' | 'nl' }>
+}) {
+  const { lang } = await params
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+import { getDictionary } from './dictionaries'
+
+export default async function Page({ params }) {
+  const { lang } = await params
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+由於 `app/` 目錄中的所有佈局與頁面預設為 [伺服器元件 (Server Components)](/docs/app/getting-started/server-and-client-components)，我們無需擔心翻譯檔案的大小會影響客戶端的 JavaScript 套件大小。此程式碼**僅會在伺服器上執行**，只有產生的 HTML 會傳送至瀏覽器。
+
+## 靜態渲染 (Static Rendering)
+
+若要為一組地區設定產生靜態路由，我們可以在任何頁面或佈局中使用 `generateStaticParams`。這可以是全域的，例如在根佈局中：
+
+```tsx filename="app/[lang]/layout.tsx" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({
+  children,
+  params,
+}: Readonly<{
+  children: React.ReactNode
+  params: Promise<{ lang: 'en-US' | 'de' }>
+}>) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/[lang]/layout.js" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({ children, params }) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## 資源
+
+- [最小化 i18n 路由與翻譯](https://github.com/vercel/next.js/tree/canary/examples/i18n-routing)
+- [`next-intl`](https://next-intl.dev)
+- [`next-international`](https://github.com/QuiiBz/next-international)
+- [`next-i18n-router`](https://github.com/i18nexus/next-i18n-router)
+- [`paraglide-next`](https://inlang.com/m/osslbuzt/paraglide-next-i18n)
+- [`lingui`](https://lingui.dev)

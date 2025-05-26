@@ -1,0 +1,1652 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-25T20:48:57.707Z
+title: 如何在 Next.js 中實現身份驗證
+nav_title: 身份驗證
+description: 學習如何在你的 Next.js 應用程式中實現身份驗證功能。
+---
+
+理解身份驗證對於保護應用程式資料至關重要。本頁將引導你了解該使用哪些 React 和 Next.js 功能來實現驗證機制。
+
+開始之前，可先將流程分解為三個概念：
+
+1. **[身份驗證 (Authentication)](#authentication)**：確認使用者是否為其所聲稱的身份。要求使用者透過他們擁有的憑證（如用戶名和密碼）來證明身份。
+2. **[會話管理 (Session Management)](#session-management)**：跨請求追蹤使用者的驗證狀態。
+3. **[授權 (Authorization)](#authorization)**：決定使用者可以存取哪些路由和資料。
+
+以下圖表展示使用 React 和 Next.js 功能的驗證流程：
+
+<Image
+  alt="展示使用 React 和 Next.js 功能的驗證流程圖表"
+  srcLight="/docs/light/authentication-overview.png"
+  srcDark="/docs/dark/authentication-overview.png"
+  width="1600"
+  height="1383"
+/>
+
+本頁範例將以教學目的展示基本的用戶名和密碼驗證。雖然你可以實作自訂驗證方案，但為了提升安全性和簡化流程，我們建議使用驗證函式庫。這些函式庫提供內建的驗證、會話管理和授權解決方案，以及額外功能如社交登入、多因素驗證和基於角色的存取控制。你可以在[驗證函式庫](#auth-libraries)章節找到相關清單。
+
+## 身份驗證
+
+<AppOnly>
+
+### 註冊與登入功能
+
+你可以使用 [`<form>`](https://react.dev/reference/react-dom/components/form) 元素搭配 React 的[伺服器動作 (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) 和 `useActionState` 來獲取用戶憑證、驗證表單欄位，並呼叫你的驗證提供者 API 或資料庫。
+
+由於伺服器動作總是在伺服器端執行，它們為處理驗證邏輯提供了安全的環境。
+
+以下是實作註冊/登入功能的步驟：
+
+#### 1. 獲取用戶憑證
+
+要獲取用戶憑證，可建立一個在提交時觸發伺服器動作的表單。例如，一個接受用戶姓名、電子郵件和密碼的註冊表單：
+
+```tsx filename="app/ui/signup-form.tsx" switcher
+import { signup } from '@/app/actions/auth'
+
+export function SignupForm() {
+  return (
+    <form action={signup}>
+      <div>
+        <label htmlFor="name">Name</label>
+        <input id="name" name="name" placeholder="Name" />
+      </div>
+      <div>
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="Email" />
+      </div>
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      <button type="submit">Sign Up</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup-form.js" switcher
+import { signup } from '@/app/actions/auth'
+
+export function SignupForm() {
+  return (
+    <form action={signup}>
+      <div>
+        <label htmlFor="name">Name</label>
+        <input id="name" name="name" placeholder="Name" />
+      </div>
+      <div>
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="Email" />
+      </div>
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      <button type="submit">Sign Up</button>
+    </form>
+  )
+}
+```
+
+```tsx filename="app/actions/auth.ts" switcher
+export async function signup(formData: FormData) {}
+```
+
+```jsx filename="app/actions/auth.js" switcher
+export async function signup(formData) {}
+```
+
+#### 2. 在伺服器端驗證表單欄位
+
+使用伺服器動作在伺服器端驗證表單欄位。如果你的驗證提供者不提供表單驗證功能，可以使用如 [Zod](https://zod.dev/) 或 [Yup](https://github.com/jquense/yup) 這類的結構驗證函式庫。
+
+以 Zod 為例，你可以定義一個包含適當錯誤訊息的表單結構：
+
+```ts filename="app/lib/definitions.ts" switcher
+import { z } from 'zod'
+
+export const SignupFormSchema = z.object({
+  name: z
+    .string()
+    .min(2, { message: 'Name must be at least 2 characters long.' })
+    .trim(),
+  email: z.string().email({ message: 'Please enter a valid email.' }).trim(),
+  password: z
+    .string()
+    .min(8, { message: 'Be at least 8 characters long' })
+    .regex(/[a-zA-Z]/, { message: 'Contain at least one letter.' })
+    .regex(/[0-9]/, { message: 'Contain at least one number.' })
+    .regex(/[^a-zA-Z0-9]/, {
+      message: 'Contain at least one special character.',
+    })
+    .trim(),
+})
+
+export type FormState =
+  | {
+      errors?: {
+        name?: string[]
+        email?: string[]
+        password?: string[]
+      }
+      message?: string
+    }
+  | undefined
+```
+
+```js filename="app/lib/definitions.js" switcher
+import { z } from 'zod'
+
+export const SignupFormSchema = z.object({
+  name: z
+    .string()
+    .min(2, { message: 'Name must be at least 2 characters long.' })
+    .trim(),
+  email: z.string().email({ message: 'Please enter a valid email.' }).trim(),
+  password: z
+    .string()
+    .min(8, { message: 'Be at least 8 characters long' })
+    .regex(/[a-zA-Z]/, { message: 'Contain at least one letter.' })
+    .regex(/[0-9]/, { message: 'Contain at least one number.' })
+    .regex(/[^a-zA-Z0-9]/, {
+      message: 'Contain at least one special character.',
+    })
+    .trim(),
+})
+```
+
+為避免對驗證提供者的 API 或資料庫進行不必要的呼叫，你可以在伺服器動作中提前 `return`，如果任何表單欄位不符合定義的結構。
+
+```ts filename="app/actions/auth.ts" switcher
+import { SignupFormSchema, FormState } from '@/app/lib/definitions'
+
+export async function signup(state: FormState, formData: FormData) {
+  // Validate form fields
+  const validatedFields = SignupFormSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+  })
+
+  // If any form fields are invalid, return early
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // Call the provider or db to create a user...
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { SignupFormSchema } from '@/app/lib/definitions'
+
+export async function signup(state, formData) {
+  // Validate form fields
+  const validatedFields = SignupFormSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+  })
+
+  // If any form fields are invalid, return early
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // Call the provider or db to create a user...
+}
+```
+
+回到你的 `<SignupForm />`，可以使用 React 的 `useActionState` 鉤子來在表單提交時顯示驗證錯誤：
+
+```tsx filename="app/ui/signup-form.tsx" switcher highlight={7,15,21,27-36}
+'use client'
+
+import { signup } from '@/app/actions/auth'
+import { useActionState } from 'react'
+
+export default function SignupForm() {
+  const [state, action, pending] = useActionState(signup, undefined)
+
+  return (
+    <form action={action}>
+      <div>
+        <label htmlFor="name">Name</label>
+        <input id="name" name="name" placeholder="Name" />
+      </div>
+      {state?.errors?.name && <p>{state.errors.name}</p>}
+
+      <div>
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" placeholder="Email" />
+      </div>
+      {state?.errors?.email && <p>{state.errors.email}</p>}
+
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      {state?.errors?.password && (
+        <div>
+          <p>Password must:</p>
+          <ul>
+            {state.errors.password.map((error) => (
+              <li key={error}>- {error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button disabled={pending} type="submit">
+        Sign Up
+      </button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup-form.js" switcher highlight={7,15,21,27-36}
+'use client'
+
+import { signup } from '@/app/actions/auth'
+import { useActionState } from 'react'
+
+export default function SignupForm() {
+  const [state, action, pending] = useActionState(signup, undefined)
+
+  return (
+    <form action={action}>
+      <div>
+        <label htmlFor="name">Name</label>
+        <input id="name" name="name" placeholder="Name" />
+      </div>
+      {state?.errors?.name && <p>{state.errors.name}</p>}
+
+      <div>
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" placeholder="Email" />
+      </div>
+      {state?.errors?.email && <p>{state.errors.email}</p>}
+
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      {state?.errors?.password && (
+        <div>
+          <p>Password must:</p>
+          <ul>
+            {state.errors.password.map((error) => (
+              <li key={error}>- {error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button disabled={pending} type="submit">
+        Sign Up
+      </button>
+    </form>
+  )
+}
+```
+
+> **小提示：**
+>
+> - 在 React 19 中，`useFormStatus` 包含返回物件中的其他鍵，如 data、method 和 action。如果你未使用 React 19，則僅有 `pending` 鍵可用。
+> - 在變更資料前，你應始終確認使用者是否有權執行該操作。請參閱[驗證與授權](#authorization)。
+
+#### 3. 建立使用者或驗證使用者憑證
+
+在驗證表單欄位後，您可以透過呼叫您的驗證提供者 API 或資料庫來建立新使用者帳戶或檢查使用者是否存在。
+
+延續先前的範例：
+
+```tsx filename="app/actions/auth.tsx" switcher
+export async function signup(state: FormState, formData: FormData) {
+  // 1. 驗證表單欄位
+  // ...
+
+  // 2. 準備要插入資料庫的資料
+  const { name, email, password } = validatedFields.data
+  // 例如：在儲存前雜湊使用者的密碼
+  const hashedPassword = await bcrypt.hash(password, 10)
+
+  // 3. 將使用者插入資料庫或呼叫驗證函式庫的 API
+  const data = await db
+    .insert(users)
+    .values({
+      name,
+      email,
+      password: hashedPassword,
+    })
+    .returning({ id: users.id })
+
+  const user = data[0]
+
+  if (!user) {
+    return {
+      message: '建立帳戶時發生錯誤。',
+    }
+  }
+
+  // 待辦事項：
+  // 4. 建立使用者工作階段
+  // 5. 重新導向使用者
+}
+```
+
+```jsx filename="app/actions/auth.js" switcher
+export async function signup(state, formData) {
+  // 1. 驗證表單欄位
+  // ...
+
+  // 2. 準備要插入資料庫的資料
+  const { name, email, password } = validatedFields.data
+  // 例如：在儲存前雜湊使用者的密碼
+  const hashedPassword = await bcrypt.hash(password, 10)
+
+  // 3. 將使用者插入資料庫或呼叫函式庫 API
+  const data = await db
+    .insert(users)
+    .values({
+      name,
+      email,
+      password: hashedPassword,
+    })
+    .returning({ id: users.id })
+
+  const user = data[0]
+
+  if (!user) {
+    return {
+      message: '建立帳戶時發生錯誤。',
+    }
+  }
+
+  // 待辦事項：
+  // 4. 建立使用者工作階段
+  // 5. 重新導向使用者
+}
+```
+
+成功建立使用者帳戶或驗證使用者憑證後，您可以建立工作階段來管理使用者的驗證狀態。根據您的工作階段管理策略，工作階段可以儲存在 cookie 或資料庫中，或兩者皆存。繼續閱讀[工作階段管理](#session-management)章節以了解更多。
+
+> **提示：**
+>
+> - 上述範例較為詳細，因為它為了教學目的分解了驗證步驟。這突顯了實作自己的安全解決方案可能很快變得複雜。考慮使用[驗證函式庫](#auth-libraries)來簡化流程。
+> - 為了改善使用者體驗，您可能希望在註冊流程的早期階段檢查重複的電子郵件或使用者名稱。例如，當使用者輸入使用者名稱或輸入欄位失去焦點時。這可以幫助避免不必要的表單提交，並立即向使用者提供回饋。您可以使用像 [use-debounce](https://www.npmjs.com/package/use-debounce) 這樣的函式庫來管理這些檢查的頻率。
+
+</AppOnly>
+
+<PagesOnly>
+
+以下是實作註冊和/或登入表單的步驟：
+
+1. 使用者透過表單提交其憑證。
+2. 表單發送一個由 API 路由處理的請求。
+3. 成功驗證後，流程完成，表示使用者已成功驗證。
+4. 如果驗證失敗，則顯示錯誤訊息。
+
+考慮一個登入表單，使用者可以輸入其憑證：
+
+```tsx filename="pages/login.tsx" switcher
+import { FormEvent } from 'react'
+import { useRouter } from 'next/router'
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (response.ok) {
+      router.push('/profile')
+    } else {
+      // 處理錯誤
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" name="email" placeholder="電子郵件" required />
+      <input type="password" name="password" placeholder="密碼" required />
+      <button type="submit">登入</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="pages/login.jsx" switcher
+import { useRouter } from 'next/router'
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (response.ok) {
+      router.push('/profile')
+    } else {
+      // 處理錯誤
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" name="email" placeholder="電子郵件" required />
+      <input type="password" name="password" placeholder="密碼" required />
+      <button type="submit">登入</button>
+    </form>
+  )
+}
+```
+
+上述表單有兩個輸入欄位，用於擷取使用者的電子郵件和密碼。提交時，它會觸發一個函式，向 API 路由 (`/api/auth/login`) 發送 POST 請求。
+
+然後，您可以在 API 路由中呼叫您的驗證提供者 API 來處理驗證：
+
+```ts filename="pages/api/auth/login.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { signIn } from '@/auth'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    const { email, password } = req.body
+    await signIn('credentials', { email, password })
+
+    res.status(200).json({ success: true })
+  } catch (error) {
+    if (error.type === 'CredentialsSignin') {
+      res.status(401).json({ error: '無效的憑證。' })
+    } else {
+      res.status(500).json({ error: '發生錯誤。' })
+    }
+  }
+}
+```
+
+```js filename="pages/api/auth/login.js" switcher
+import { signIn } from '@/auth'
+
+export default async function handler(req, res) {
+  try {
+    const { email, password } = req.body
+    await signIn('credentials', { email, password })
+
+    res.status(200).json({ success: true })
+  } catch (error) {
+    if (error.type === 'CredentialsSignin') {
+      res.status(401).json({ error: '無效的憑證。' })
+    } else {
+      res.status(500).json({ error: '發生錯誤。' })
+    }
+  }
+}
+```
+
+</PagesOnly>
+
+## 工作階段管理
+
+工作階段管理確保使用者的驗證狀態在請求之間保持。它涉及建立、儲存、刷新和刪除工作階段或令牌。
+
+有兩種類型的工作階段：
+
+1. [**無狀態 (Stateless)**](#stateless-sessions)：工作階段資料（或令牌）儲存在瀏覽器的 cookie 中。cookie 會隨每個請求發送，允許在伺服器上驗證工作階段。這種方法較簡單，但如果未正確實作，可能較不安全。
+2. [**資料庫 (Database)**](#database-sessions)：工作階段資料儲存在資料庫中，使用者的瀏覽器僅接收加密的工作階段 ID。這種方法較安全，但可能較複雜且使用更多伺服器資源。
+
+> **須知：**雖然您可以使用任一方法或兩者，但我們建議使用工作階段管理函式庫，例如 [iron-session](https://github.com/vvo/iron-session) 或 [Jose](https://github.com/panva/jose)。
+
+### 無狀態工作階段
+
+<AppOnly>
+
+要建立和管理無狀態工作階段，您需要遵循以下幾個步驟：
+
+1. 產生一個秘密金鑰，用於簽署您的工作階段，並將其儲存為[環境變數](/docs/app/guides/environment-variables)。
+2. 使用工作階段管理函式庫編寫加密/解密工作階段資料的邏輯。
+3. 使用 Next.js [`cookies`](/docs/app/api-reference/functions/cookies) API 管理 cookie。
+
+除了上述內容外，考慮新增功能在使用者返回應用程式時[更新（或刷新）](#updating-or-refreshing-sessions)工作階段，並在使用者登出時[刪除](#deleting-the-session)工作階段。
+
+> **須知：**檢查您的[驗證函式庫](#auth-libraries)是否包含工作階段管理。
+
+#### 1. 產生秘密金鑰
+
+有幾種方法可以產生用於簽署工作階段的秘密金鑰。例如，您可以選擇在終端機中使用 `openssl` 命令：
+
+```bash filename="terminal"
+openssl rand -base64 32
+```
+
+此命令會產生一個 32 字元的隨機字串，您可以將其用作秘密金鑰並儲存在您的[環境變數檔案](/docs/app/guides/environment-variables)中：
+
+```bash filename=".env"
+SESSION_SECRET=your_secret_key
+```
+
+然後，您可以在工作階段管理邏輯中引用此金鑰：
+
+```js filename="app/lib/session.js"
+const secretKey = process.env.SESSION_SECRET
+```
+
+#### 2. 加密和解密工作階段
+
+接下來，您可以使用您偏好的[工作階段管理函式庫](#session-management-libraries)來加密和解密工作階段。延續先前的範例，我們將使用 [Jose](https://www.npmjs.com/package/jose)（與 [Edge Runtime](/docs/app/api-reference/edge) 相容）和 React 的 [`server-only`](https://www.npmjs.com/package/server-only) 套件，以確保您的工作階段管理邏輯僅在伺服器上執行。
+
+```tsx filename="app/lib/session.ts" switcher
+import 'server-only'
+import { SignJWT, jwtVerify } from 'jose'
+import { SessionPayload } from '@/app/lib/definitions'
+
+const secretKey = process.env.SESSION_SECRET
+const encodedKey = new TextEncoder().encode(secretKey)
+
+export async function encrypt(payload: SessionPayload) {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(encodedKey)
+}
+
+export async function decrypt(session: string | undefined = '') {
+  try {
+    const { payload } = await jwtVerify(session, encodedKey, {
+      algorithms: ['HS256'],
+    })
+    return payload
+  } catch (error) {
+    console.log('無法驗證工作階段')
+  }
+}
+```
+
+```jsx filename="app/lib/session.js" switcher
+import 'server-only'
+import { SignJWT, jwtVerify } from 'jose'
+
+const secretKey = process.env.SESSION_SECRET
+const encodedKey = new TextEncoder().encode(secretKey)
+
+export async function encrypt(payload) {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(encodedKey)
+}
+
+export async function decrypt(session) {
+  try {
+    const { payload } = await jwtVerify(session, encodedKey, {
+      algorithms: ['HS256'],
+    })
+    return payload
+  } catch (error) {
+    console.log('無法驗證工作階段')
+  }
+}
+```
+
+> **提示：**
+>
+> - 負載應包含在後續請求中使用的**最小**、唯一使用者資料，例如使用者的 ID、角色等。它不應包含個人識別資訊，如電話號碼、電子郵件地址、信用卡資訊等，或敏感資料如密碼。
+
+#### 3. 設定 cookie（推薦選項）
+
+要將工作階段儲存在 cookie 中，請使用 Next.js [`cookies`](/docs/app/api-reference/functions/cookies) API。cookie 應在伺服器上設定，並包含推薦的選項：
+
+- **HttpOnly**：防止客戶端 JavaScript 存取 cookie。
+- **Secure**：使用 https 發送 cookie。
+- **SameSite**：指定 cookie 是否可以與跨站請求一起發送。
+- **Max-Age 或 Expires**：在一定時間後刪除 cookie。
+- **Path**：定義 cookie 的 URL 路徑。
+
+請參考 [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies) 以獲取有關這些選項的更多資訊。
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function createSession(userId: string) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const session = await encrypt({ userId, expiresAt })
+  const cookieStore = await cookies()
+
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function createSession(userId) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const session = await encrypt({ userId, expiresAt })
+  const cookieStore = await cookies()
+
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+回到您的伺服器動作中，您可以呼叫 `createSession()` 函式，並使用 [`redirect()`](/docs/app/building-your-application/routing/redirecting) API 將使用者重新導向到適當的頁面：
+
+```ts filename="app/actions/auth.ts" switcher
+import { createSession } from '@/app/lib/session'
+
+export async function signup(state: FormState, formData: FormData) {
+  // 先前步驟：
+  // 1. 驗證表單欄位
+  // 2. 準備要插入資料庫的資料
+  // 3. 將使用者插入資料庫或呼叫函式庫 API
+
+  // 目前步驟：
+  // 4. 建立使用者工作階段
+  await createSession(user.id)
+  // 5. 重新導向使用者
+  redirect('/profile')
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { createSession } from '@/app/lib/session'
+
+export async function signup(state, formData) {
+  // 先前步驟：
+  // 1. 驗證表單欄位
+  // 2. 準備要插入資料庫的資料
+  // 3. 將使用者插入資料庫或呼叫函式庫 API
+
+  // 目前步驟：
+  // 4. 建立使用者工作階段
+  await createSession(user.id)
+  // 5. 重新導向使用者
+  redirect('/profile')
+}
+```
+
+> **提示：**
+>
+> - **Cookie 應在伺服器上設定**以防止客戶端篡改。
+> - 🎥 觀看：了解更多關於無狀態工作階段和 Next.js 驗證 → [YouTube (11 分鐘)](https://www.youtube.com/watch?v=DJvM2lSPn6w)。
+
+#### 更新（或刷新）工作階段
+
+您也可以延長工作階段的過期時間。這對於在使用者再次存取應用程式時保持登入狀態很有用。例如：
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export async function updateSession() {
+  const session = (await cookies()).get('session')?.value
+  const payload = await decrypt(session)
+
+  if (!session || !payload) {
+    return null
+  }
+
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expires,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export async function updateSession() {
+  const session = (await cookies()).get('session')?.value
+  const payload = await decrypt(session)
+
+  if (!session || !payload) {
+    return null
+  }
+
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)(
+    await cookies()
+  ).set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expires,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+> **提示：**檢查您的驗證函式庫是否支援刷新令牌，可用於延長使用者的工作階段。
+
+#### 刪除工作階段 (session)
+
+要刪除工作階段，您可以刪除 cookie：
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function deleteSession() {
+  const cookieStore = await cookies()
+  cookieStore.delete('session')
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function deleteSession() {
+  const cookieStore = await cookies()
+  cookieStore.delete('session')
+}
+```
+
+然後您可以在應用程式中重複使用 `deleteSession()` 函式，例如在登出時：
+
+```ts filename="app/actions/auth.ts" switcher
+import { cookies } from 'next/headers'
+import { deleteSession } from '@/app/lib/session'
+
+export async function logout() {
+  await deleteSession()
+  redirect('/login')
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { cookies } from 'next/headers'
+import { deleteSession } from '@/app/lib/session'
+
+export async function logout() {
+  await deleteSession()
+  redirect('/login')
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+#### 設定與刪除 cookies
+
+您可以使用 [API 路由 (API Routes)](/docs/pages/building-your-application/routing/api-routes) 在伺服器上將工作階段設定為 cookie：
+
+```ts filename="pages/api/login.ts" switcher
+import { serialize } from 'cookie'
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { encrypt } from '@/app/lib/session'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const sessionData = req.body
+  const encryptedSessionData = encrypt(sessionData)
+
+  const cookie = serialize('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // 一週
+    path: '/',
+  })
+  res.setHeader('Set-Cookie', cookie)
+  res.status(200).json({ message: 'Successfully set cookie!' })
+}
+```
+
+```js filename="pages/api/login.js" switcher
+import { serialize } from 'cookie'
+import { encrypt } from '@/app/lib/session'
+
+export default function handler(req, res) {
+  const sessionData = req.body
+  const encryptedSessionData = encrypt(sessionData)
+
+  const cookie = serialize('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // 一週
+    path: '/',
+  })
+  res.setHeader('Set-Cookie', cookie)
+  res.status(200).json({ message: 'Successfully set cookie!' })
+}
+```
+
+</PagesOnly>
+
+### 資料庫工作階段 (Database Sessions)
+
+要建立和管理資料庫工作階段，您需要遵循以下步驟：
+
+1. 在資料庫中建立一個表格來儲存工作階段和資料（或檢查您的驗證庫是否已處理此功能）。
+2. 實作插入、更新和刪除工作階段的功能。
+3. 在將工作階段 ID 儲存到使用者的瀏覽器之前對其進行加密，並確保資料庫和 cookie 保持同步（這是可選的，但建議用於[中介軟體 (Middleware)](#optimistic-checks-with-middleware-optional) 中的樂觀驗證檢查）。
+
+<AppOnly>
+
+例如：
+
+```ts filename="app/lib/session.ts" switcher
+import cookies from 'next/headers'
+import { db } from '@/app/lib/db'
+import { encrypt } from '@/app/lib/session'
+
+export async function createSession(id: number) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  // 1. 在資料庫中建立工作階段
+  const data = await db
+    .insert(sessions)
+    .values({
+      userId: id,
+      expiresAt,
+    })
+    // 回傳工作階段 ID
+    .returning({ id: sessions.id })
+
+  const sessionId = data[0].id
+
+  // 2. 加密工作階段 ID
+  const session = await encrypt({ sessionId, expiresAt })
+
+  // 3. 將工作階段儲存在 cookie 中以進行樂觀驗證檢查
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import cookies from 'next/headers'
+import { db } from '@/app/lib/db'
+import { encrypt } from '@/app/lib/session'
+
+export async function createSession(id) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  // 1. 在資料庫中建立工作階段
+  const data = await db
+    .insert(sessions)
+    .values({
+      userId: id,
+      expiresAt,
+    })
+    // 回傳工作階段 ID
+    .returning({ id: sessions.id })
+
+  const sessionId = data[0].id
+
+  // 2. 加密工作階段 ID
+  const session = await encrypt({ sessionId, expiresAt })
+
+  // 3. 將工作階段儲存在 cookie 中以進行樂觀驗證檢查
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+> **提示**：
+>
+> - 為了更快存取，您可以考慮為工作階段的生命週期添加伺服器快取。您也可以將工作階段資料保留在主資料庫中，並合併資料請求以減少查詢次數。
+> - 您可以選擇使用資料庫工作階段來處理更進階的使用案例，例如追蹤使用者上次登入的時間、活躍裝置的數量，或讓使用者能夠登出所有裝置。
+
+實作工作階段管理後，您需要添加授權邏輯來控制使用者在應用程式中可以存取和執行的操作。繼續閱讀[授權 (Authorization)](#authorization) 部分以了解更多。
+
+</AppOnly>
+
+<PagesOnly>
+
+**在伺服器上建立工作階段**：
+
+```ts filename="pages/api/create-session.ts" switcher
+import db from '../../lib/db'
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    const user = req.body
+    const sessionId = generateSessionId()
+    await db.insertSession({
+      sessionId,
+      userId: user.id,
+      createdAt: new Date(),
+    })
+
+    res.status(200).json({ sessionId })
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
+}
+```
+
+```js filename="pages/api/create-session.js" switcher
+import db from '../../lib/db'
+
+export default async function handler(req, res) {
+  try {
+    const user = req.body
+    const sessionId = generateSessionId()
+    await db.insertSession({
+      sessionId,
+      userId: user.id,
+      createdAt: new Date(),
+    })
+
+    res.status(200).json({ sessionId })
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
+}
+```
+
+</PagesOnly>
+
+## 授權 (Authorization)
+
+一旦使用者通過驗證並建立工作階段後，您可以實作授權來控制使用者在應用程式中可以存取和執行的操作。
+
+主要有兩種類型的授權檢查：
+
+1. **樂觀檢查 (Optimistic)**：使用儲存在 cookie 中的工作階段資料檢查使用者是否有權存取路由或執行操作。這些檢查適用於快速操作，例如顯示/隱藏 UI 元素或根據權限或角色重定向使用者。
+2. **安全檢查 (Secure)**：使用儲存在資料庫中的工作階段資料檢查使用者是否有權存取路由或執行操作。這些檢查更安全，適用於需要存取敏感資料或操作的場景。
+
+對於這兩種情況，我們建議：
+
+- 建立[資料存取層 (Data Access Layer)](#creating-a-data-access-layer-dal) 來集中授權邏輯
+- 使用[資料傳輸物件 (Data Transfer Objects, DTO)](#using-data-transfer-objects-dto) 僅回傳必要的資料
+- 可選使用[中介軟體 (Middleware)](#optimistic-checks-with-middleware-optional) 來執行樂觀檢查。
+
+### 使用中介軟體進行樂觀檢查（可選）
+
+在某些情況下，您可能希望使用[中介軟體 (Middleware)](/docs/app/building-your-application/routing/middleware) 並根據權限重定向使用者：
+
+- 執行樂觀檢查。由於中介軟體在每個路由上執行，這是集中重定向邏輯和預先過濾未授權使用者的好方法。
+- 保護在使用者之間共享資料的靜態路由（例如付費牆後的內容）。
+
+然而，由於中介軟體在每個路由上執行，包括[預取 (prefetched)](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching) 路由，因此重要的是僅從 cookie 讀取工作階段（樂觀檢查），並避免資料庫檢查以防止效能問題。
+
+例如：
+
+```tsx filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+import { decrypt } from '@/app/lib/session'
+import { cookies } from 'next/headers'
+
+// 1. 指定受保護和公開路由
+const protectedRoutes = ['/dashboard']
+const publicRoutes = ['/login', '/signup', '/']
+
+export default async function middleware(req: NextRequest) {
+  // 2. 檢查目前路由是受保護還是公開
+  const path = req.nextUrl.pathname
+  const isProtectedRoute = protectedRoutes.includes(path)
+  const isPublicRoute = publicRoutes.includes(path)
+
+  // 3. 從 cookie 解密工作階段
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  // 4. 如果使用者未通過驗證，重定向到 /login
+  if (isProtectedRoute && !session?.userId) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl))
+  }
+
+  // 5. 如果使用者已通過驗證，重定向到 /dashboard
+  if (
+    isPublicRoute &&
+    session?.userId &&
+    !req.nextUrl.pathname.startsWith('/dashboard')
+  ) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
+  }
+
+  return NextResponse.next()
+}
+
+// 中介軟體不應執行的路由
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { decrypt } from '@/app/lib/session'
+import { cookies } from 'next/headers'
+
+// 1. 指定受保護和公開路由
+const protectedRoutes = ['/dashboard']
+const publicRoutes = ['/login', '/signup', '/']
+
+export default async function middleware(req) {
+  // 2. 檢查目前路由是受保護還是公開
+  const path = req.nextUrl.pathname
+  const isProtectedRoute = protectedRoutes.includes(path)
+  const isPublicRoute = publicRoutes.includes(path)
+
+  // 3. 從 cookie 解密工作階段
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  // 5. 如果使用者未通過驗證，重定向到 /login
+  if (isProtectedRoute && !session?.userId) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl))
+  }
+
+  // 6. 如果使用者已通過驗證，重定向到 /dashboard
+  if (
+    isPublicRoute &&
+    session?.userId &&
+    !req.nextUrl.pathname.startsWith('/dashboard')
+  ) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
+  }
+
+  return NextResponse.next()
+}
+
+// 中介軟體不應執行的路由
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+}
+```
+
+雖然中介軟體對於初始檢查很有用，但它不應該是保護資料的唯一防線。大多數安全檢查應盡可能靠近資料源執行，請參閱[資料存取層 (Data Access Layer)](#creating-a-data-access-layer-dal) 以獲取更多資訊。
+
+> **提示**：
+>
+> - 在中介軟體中，您也可以使用 `req.cookies.get('session').value` 讀取 cookies。
+> - 中介軟體使用[邊緣執行環境 (Edge Runtime)](/docs/app/api-reference/edge)，請檢查您的驗證庫和工作階段管理庫是否相容。
+> - 您可以使用中介軟體中的 `matcher` 屬性來指定中介軟體應執行的路由。儘管如此，對於驗證，建議中介軟體在所有路由上執行。
+
+<AppOnly>
+
+### 建立資料存取層 (Data Access Layer, DAL)
+
+我們建議建立 DAL 來集中資料請求和授權邏輯。
+
+DAL 應包含一個函式，在使用者與應用程式互動時驗證其工作階段。至少，該函式應檢查工作階段是否有效，然後重定向或回傳進行進一步請求所需的使用者資訊。
+
+例如，為您的 DAL 建立一個單獨的檔案，其中包含 `verifySession()` 函式。然後使用 React 的 [cache](https://react.dev/reference/react/cache) API 在 React 渲染過程中記憶化函式的回傳值：
+
+```tsx filename="app/lib/dal.ts" switcher
+import 'server-only'
+
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export const verifySession = cache(async () => {
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  if (!session?.userId) {
+    redirect('/login')
+  }
+
+  return { isAuth: true, userId: session.userId }
+})
+```
+
+```js filename="app/lib/dal.js" switcher
+import 'server-only'
+
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export const verifySession = cache(async () => {
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  if (!session.userId) {
+    redirect('/login')
+  }
+
+  return { isAuth: true, userId: session.userId }
+})
+```
+
+然後您可以在資料請求、伺服器操作 (Server Actions)、路由處理程式 (Route Handlers) 中呼叫 `verifySession()` 函式：
+
+```tsx filename="app/lib/dal.ts" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  try {
+    const data = await db.query.users.findMany({
+      where: eq(users.id, session.userId),
+      // 明確回傳您需要的欄位，而不是整個使用者物件
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    })
+
+    const user = data[0]
+
+    return user
+  } catch (error) {
+    console.log('Failed to fetch user')
+    return null
+  }
+})
+```
+
+```jsx filename="app/lib/dal.js" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  try {
+    const data = await db.query.users.findMany({
+      where: eq(users.id, session.userId),
+      // 明確回傳您需要的欄位，而不是整個使用者物件
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    })
+
+    const user = data[0]
+
+    return user
+  } catch (error) {
+    console.log('Failed to fetch user')
+    return null
+  }
+})
+```
+
+> **提示**：
+>
+> - DAL 可用於保護在請求時擷取的資料。然而，對於在使用者之間共享資料的靜態路由，資料將在建置時擷取，而不是在請求時。使用[中介軟體 (Middleware)](#optimistic-checks-with-middleware-optional) 來保護靜態路由。
+> - 對於安全檢查，您可以通過比較工作階段 ID 與資料庫來檢查工作階段是否有效。使用 React 的 [cache](https://react.dev/reference/react/cache) 函式來避免在渲染過程中對資料庫進行不必要的重複請求。
+> - 您可能希望將相關的資料請求合併到一個 JavaScript 類別中，該類別在任何方法之前執行 `verifySession()`。
+
+### 使用資料傳輸物件 (DTO)
+
+在擷取資料時，建議只回傳應用程式中會用到的必要資料，而非整個物件。舉例來說，當你獲取使用者資料時，可能只需要回傳使用者的 ID 和名稱，而不是包含密碼、電話號碼等敏感資訊的完整使用者物件。
+
+但如果你無法控制回傳的資料結構，或是在團隊協作中想避免整個物件被傳遞到客戶端，你可以使用一些策略，例如指定哪些欄位可以安全地暴露給客戶端。
+
+```tsx filename="app/lib/dto.ts" switcher
+import 'server-only'
+import { getUser } from '@/app/lib/dal'
+
+function canSeeUsername(viewer: User) {
+  return true
+}
+
+function canSeePhoneNumber(viewer: User, team: string) {
+  return viewer.isAdmin || team === viewer.team
+}
+
+export async function getProfileDTO(slug: string) {
+  const data = await db.query.users.findMany({
+    where: eq(users.slug, slug),
+    // 在此回傳特定欄位
+  })
+  const user = data[0]
+
+  const currentUser = await getUser(user.id)
+
+  // 或在此僅回傳查詢所需的特定資料
+  return {
+    username: canSeeUsername(currentUser) ? user.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, user.team)
+      ? user.phonenumber
+      : null,
+  }
+}
+```
+
+```js filename="app/lib/dto.js" switcher
+import 'server-only'
+import { getUser } from '@/app/lib/dal'
+
+function canSeeUsername(viewer) {
+  return true
+}
+
+function canSeePhoneNumber(viewer, team) {
+  return viewer.isAdmin || team === viewer.team
+}
+
+export async function getProfileDTO(slug) {
+  const data = await db.query.users.findMany({
+    where: eq(users.slug, slug),
+    // 在此回傳特定欄位
+  })
+  const user = data[0]
+
+  const currentUser = await getUser(user.id)
+
+  // 或在此僅回傳查詢所需的特定資料
+  return {
+    username: canSeeUsername(currentUser) ? user.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, user.team)
+      ? user.phonenumber
+      : null,
+  }
+}
+```
+
+透過將資料請求與授權邏輯集中到資料存取層 (DAL) 並使用 DTO，你可以確保所有資料請求都是安全且一致的，這使得應用程式在擴展時更容易維護、稽核和除錯。
+
+> **小知識**：
+>
+> - 定義 DTO 有幾種不同的方式，從使用 `toJSON()` 到像上面範例中的獨立函式，或是 JS 類別。由於這些是 JavaScript 的模式，而非 React 或 Next.js 的功能，我們建議進行一些研究，找到最適合你應用程式的模式。
+> - 在我們的 [Next.js 安全性文章](/blog/security-nextjs-server-components-actions) 中了解更多安全最佳實踐。
+
+### 伺服器元件 (Server Components)
+
+在 [伺服器元件](/docs/app/getting-started/server-and-client-components) 中進行權限檢查對於基於角色的存取控制非常有用。例如，根據使用者角色條件式渲染元件：
+
+```tsx filename="app/dashboard/page.tsx" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export default function Dashboard() {
+  const session = await verifySession()
+  const userRole = session?.user?.role // 假設 'role' 是 session 物件的一部分
+
+  if (userRole === 'admin') {
+    return <AdminDashboard />
+  } else if (userRole === 'user') {
+    return <UserDashboard />
+  } else {
+    redirect('/login')
+  }
+}
+```
+
+```jsx filename="app/dashboard/page.jsx" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export default function Dashboard() {
+  const session = await verifySession()
+  const userRole = session.role // 假設 'role' 是 session 物件的一部分
+
+  if (userRole === 'admin') {
+    return <AdminDashboard />
+  } else if (userRole === 'user') {
+    return <UserDashboard />
+  } else {
+    redirect('/login')
+  }
+}
+```
+
+在這個範例中，我們使用來自 DAL 的 `verifySession()` 函式來檢查 'admin'、'user' 和未授權的角色。這種模式確保每位使用者只能與其角色相符的元件互動。
+
+### 佈局 (Layouts) 與權限檢查
+
+由於 [部分渲染 (Partial Rendering)](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering)，在 [佈局](/docs/app/building-your-application/routing/layouts-and-templates) 中進行檢查時需謹慎，因為這些佈局在導航時不會重新渲染，這意味著使用者 session 不會在每次路由變更時被檢查。
+
+相反地，你應該在資料來源附近或將被條件式渲染的元件中進行檢查。
+
+例如，考慮一個共享佈局會獲取使用者資料並在導航欄中顯示使用者圖片。與其在佈局中進行權限檢查，你應該在佈局中獲取使用者資料 (`getUser()`)，並在 DAL 中進行權限檢查。
+
+這確保了無論在應用程式的何處呼叫 `getUser()`，都會執行權限檢查，並防止開發者忘記檢查使用者是否有權存取資料。
+
+```tsx filename="app/layout.tsx" switcher
+export default async function Layout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await getUser();
+
+  return (
+    // ...
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default async function Layout({ children }) {
+  const user = await getUser();
+
+  return (
+    // ...
+  )
+}
+```
+
+```ts filename="app/lib/dal.ts" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  // 從 session 中獲取使用者 ID 並擷取資料
+})
+```
+
+```js filename="app/lib/dal.js" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  // 從 session 中獲取使用者 ID 並擷取資料
+})
+```
+
+> **小知識**：
+>
+> - 在單頁應用 (SPA) 中，常見的模式是在佈局或頂層元件中若使用者未授權則 `return null`。這種模式 **不推薦**，因為 Next.js 應用程式有多個進入點，這無法防止巢狀路由區段和伺服器動作 (Server Actions) 被存取。
+
+### 伺服器動作 (Server Actions)
+
+將 [伺服器動作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) 視為與對外公開的 API 端點相同的安全考量，並驗證使用者是否被允許執行變更。
+
+在以下範例中，我們在允許動作繼續之前檢查使用者的角色：
+
+```ts filename="app/lib/actions.ts" switcher
+'use server'
+import { verifySession } from '@/app/lib/dal'
+
+export async function serverAction(formData: FormData) {
+  const session = await verifySession()
+  const userRole = session?.user?.role
+
+  // 若使用者未獲授權執行此動作，則提前返回
+  if (userRole !== 'admin') {
+    return null
+  }
+
+  // 為授權使用者繼續執行動作
+}
+```
+
+```js filename="app/lib/actions.js" switcher
+'use server'
+import { verifySession } from '@/app/lib/dal'
+
+export async function serverAction() {
+  const session = await verifySession()
+  const userRole = session.user.role
+
+  // 若使用者未獲授權執行此動作，則提前返回
+  if (userRole !== 'admin') {
+    return null
+  }
+
+  // 為授權使用者繼續執行動作
+}
+```
+
+### 路由處理器 (Route Handlers)
+
+將 [路由處理器](/docs/app/building-your-application/routing/route-handlers) 視為與對外公開的 API 端點相同的安全考量，並驗證使用者是否被允許存取路由處理器。
+
+例如：
+
+```ts filename="app/api/route.ts" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export async function GET() {
+  // 使用者驗證與角色檢查
+  const session = await verifySession()
+
+  // 檢查使用者是否已驗證
+  if (!session) {
+    // 使用者未驗證
+    return new Response(null, { status: 401 })
+  }
+
+  // 檢查使用者是否具有 'admin' 角色
+  if (session.user.role !== 'admin') {
+    // 使用者已驗證但無適當權限
+    return new Response(null, { status: 403 })
+  }
+
+  // 為授權使用者繼續執行
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export async function GET() {
+  // 使用者驗證與角色檢查
+  const session = await verifySession()
+
+  // 檢查使用者是否已驗證
+  if (!session) {
+    // 使用者未驗證
+    return new Response(null, { status: 401 })
+  }
+
+  // 檢查使用者是否具有 'admin' 角色
+  if (session.user.role !== 'admin') {
+    // 使用者已驗證但無適當權限
+    return new Response(null, { status: 403 })
+  }
+
+  // 為授權使用者繼續執行
+}
+```
+
+上面的範例展示了一個具有雙層安全檢查的路由處理器。它首先檢查有效的 session，然後確認登入的使用者是否為 'admin'。
+
+## 上下文提供者 (Context Providers)
+
+由於 [交錯渲染 (interleaving)](/docs/app/getting-started/server-and-client-components#examples#interleaving-server-and-client-components)，使用上下文提供者進行驗證是可行的。然而，React `context` 在伺服器元件中不被支援，因此僅適用於客戶端元件。
+
+這種方式可行，但任何子伺服器元件會先在伺服器端渲染，且無法存取上下文提供者的 session 資料：
+
+```tsx filename="app/layout.ts" switcher
+import { ContextProvider } from 'auth-lib'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <ContextProvider>{children}</ContextProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```tsx filename="app/ui/profile.ts switcher
+'use client';
+
+import { useSession } from "auth-lib";
+
+export default function Profile() {
+  const { userId } = useSession();
+  const { data } = useSWR(`/api/user/${userId}`, fetcher)
+
+  return (
+    // ...
+  );
+}
+```
+
+```jsx filename="app/ui/profile.js switcher
+'use client';
+
+import { useSession } from "auth-lib";
+
+export default function Profile() {
+  const { userId } = useSession();
+  const { data } = useSWR(`/api/user/${userId}`, fetcher)
+
+  return (
+    // ...
+  );
+}
+```
+
+如果客戶端元件需要 session 資料（例如用於客戶端資料擷取），可以使用 React 的 [`taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) API 來防止敏感的 session 資料暴露給客戶端。
+
+</AppOnly>
+
+<PagesOnly>
+
+### 建立資料存取層 (DAL)
+
+#### 保護 API 路由
+
+Next.js 中的 API 路由對於處理伺服器端邏輯和資料管理至關重要。保護這些路由以確保只有授權使用者能存取特定功能是必要的。這通常涉及驗證使用者的驗證狀態及其基於角色的權限。
+
+以下是一個保護 API 路由的範例：
+
+```ts filename="pages/api/route.ts" switcher
+import { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const session = await getSession(req)
+
+  // 檢查使用者是否已驗證
+  if (!session) {
+    res.status(401).json({
+      error: '使用者未驗證',
+    })
+    return
+  }
+
+  // 檢查使用者是否具有 'admin' 角色
+  if (session.user.role !== 'admin') {
+    res.status(401).json({
+      error: '未授權存取：使用者無管理員權限。',
+    })
+    return
+  }
+
+  // 為授權使用者繼續執行路由
+  // ... API 路由的實作
+}
+```
+
+```js filename="pages/api/route.js" switcher
+export default async function handler(req, res) {
+  const session = await getSession(req)
+
+  // 檢查使用者是否已驗證
+  if (!session) {
+    res.status(401).json({
+      error: '使用者未驗證',
+    })
+    return
+  }
+
+  // 檢查使用者是否具有 'admin' 角色
+  if (session.user.role !== 'admin') {
+    res.status(401).json({
+      error: '未授權存取：使用者無管理員權限。',
+    })
+    return
+  }
+
+  // 為授權使用者繼續執行路由
+  // ... API 路由的實作
+}
+```
+
+這個範例展示了一個具有雙層安全檢查的 API 路由，用於驗證和授權。它首先檢查有效的 session，然後確認登入的使用者是否為 'admin'。這種方法確保了僅限已驗證和授權的使用者能安全存取，保持了請求處理的穩健安全性。
+
+</PagesOnly>
+
+## 資源
+
+現在你已經了解了 Next.js 中的驗證機制，以下是一些 Next.js 相容的函式庫和資源，可幫助你實作安全的驗證和 session 管理：
+
+### 驗證函式庫
+
+- [Auth0](https://auth0.com/docs/quickstart/webapp/nextjs/01-login)
+- [Better Auth](https://www.better-auth.com/docs/integrations/next)
+- [Clerk](https://clerk.com/docs/quickstarts/nextjs)
+- [Kinde](https://kinde.com/docs/developer-tools/nextjs-sdk)
+- [Logto](https://docs.logto.io/quick-starts/next-app-router)
+- [NextAuth.js](https://authjs.dev/getting-started/installation?framework=next.js)
+- [Ory](https://www.ory.sh/docs/getting-started/integrate-auth/nextjs)
+- [Stack Auth](https://docs.stack-auth.com/getting-started/setup)
+- [Supabase](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs)
+- [Stytch](https://stytch.com/docs/guides/quickstarts/nextjs)
+- [WorkOS](https://workos.com/docs/user-management/nextjs)
+
+### Session 管理函式庫
+
+- [Iron Session](https://github.com/vvo/iron-session)
+- [Jose](https://github.com/panva/jose)
+
+## 延伸閱讀
+
+若要繼續學習有關驗證與安全的知識，請查看以下資源：
+
+- [如何在 Next.js 中思考安全性](/blog/security-nextjs-server-components-actions)
+- [理解 XSS 攻擊](https://vercel.com/guides/understanding-xss-attacks)
+- [理解 CSRF 攻擊](https://vercel.com/guides/understanding-csrf-attacks)
+- [The Copenhagen Book](https://thecopenhagenbook.com/)

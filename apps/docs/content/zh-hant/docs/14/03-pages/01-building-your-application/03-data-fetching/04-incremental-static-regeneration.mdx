@@ -1,0 +1,181 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:09:57.025Z
+title: 增量靜態再生 (ISR)
+description: 了解如何使用增量靜態再生 (Incremental Static Regeneration) 在運行時建立或更新靜態頁面。
+---
+
+<details>
+  <summary>範例</summary>
+
+- [Next.js Commerce](https://nextjs.org/commerce)
+- [GitHub Reactions 示範](https://reactions-demo.vercel.app/)
+- [Static Tweet 示範](https://static-tweet.vercel.app/)
+
+</details>
+
+Next.js 允許您在網站建置完成後，仍能建立或更新靜態頁面。增量靜態再生 (ISR) 讓您可以針對每個頁面使用靜態生成，**無需重新建置整個網站**。透過 ISR，您可以在擴展至數百萬頁面的同時，保留靜態頁面的優勢。
+
+> **須知事項**: 目前 [`edge` 運行時](/docs/pages/api-reference/edge) 與 ISR 不相容，但您可以透過手動設定 `cache-control` 標頭來利用 `stale-while-revalidate` 機制。
+
+要使用 ISR，請在 `getStaticProps` 中添加 `revalidate` 屬性：
+
+```jsx
+function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+// 此函式會在伺服器端的建置階段被呼叫。
+// 如果啟用了重新驗證且收到新請求，它可能會在無伺服器函式上再次被呼叫
+export async function getStaticProps() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  return {
+    props: {
+      posts,
+    },
+    // Next.js 會嘗試重新生成頁面：
+    // - 當收到請求時
+    // - 最多每 10 秒一次
+    revalidate: 10, // 單位為秒
+  }
+}
+
+// 此函式會在伺服器端的建置階段被呼叫。
+// 如果路徑尚未生成，它可能會在無伺服器函式上再次被呼叫
+export async function getStaticPaths() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // 根據文章內容取得我們想要預先渲染的路徑
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // 我們只會在建置時預先渲染這些路徑。
+  // { fallback: 'blocking' } 會在路徑不存在時按需伺服器渲染頁面
+  return { paths, fallback: 'blocking' }
+}
+
+export default Blog
+```
+
+當請求發送到在建置階段預先渲染的頁面時，最初會顯示快取的頁面。
+
+- 在初始請求後 10 秒內對該頁面的任何請求也會被快取並立即回應
+- 10 秒窗口期過後，下一個請求仍會顯示快取的（過期）頁面
+- Next.js 會在背景觸發頁面的重新生成
+- 一旦頁面成功生成，Next.js 會使快取失效並顯示更新後的頁面。如果背景重新生成失敗，舊頁面仍會保持不變
+
+當請求發送到尚未生成的路徑時，Next.js 會在第一次請求時進行伺服器端渲染。後續請求將從快取中提供靜態檔案。在 Vercel 上，ISR 會[全局持久化快取並處理回滾](https://vercel.com/docs/concepts/next.js/incremental-static-regeneration?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)。
+
+> **須知事項**: 檢查您的上游資料提供者是否預設啟用了快取。您可能需要禁用快取（例如設定 `useCdn: false`），否則重新驗證將無法獲取新資料來更新 ISR 快取。當端點返回 `Cache-Control` 標頭時，快取可能發生在 CDN 層級。
+
+## 按需重新驗證
+
+如果您將 `revalidate` 時間設定為 `60`，所有訪客將在一分鐘內看到相同的生成版本。唯一使快取失效的方法是有人在該分鐘過後訪問該頁面。
+
+從 `v12.2.0` 開始，Next.js 支援按需增量靜態再生，可以手動清除特定頁面的 Next.js 快取。這使得在以下情況更新網站更加容易：
+
+- 您的無頭 CMS 內容被建立或更新
+- 電子商務元資料發生變化（價格、描述、類別、評論等）
+
+在 `getStaticProps` 內部，您不需要指定 `revalidate` 來使用按需重新驗證。如果省略 `revalidate`，Next.js 將使用預設值 `false`（不重新驗證），僅在呼叫 `revalidate()` 時按需重新驗證頁面。
+
+> **須知事項**: [中介軟體](/docs/pages/building-your-application/routing/middleware) 不會為按需 ISR 請求執行。相反，您需要在想要重新驗證的 _確切_ 路徑上呼叫 `revalidate()`。例如，如果您有 `pages/blog/[slug].js` 和從 `/post-1` 重寫到 `/blog/post-1` 的路由，您需要呼叫 `res.revalidate('/blog/post-1')`。
+
+### 使用按需重新驗證
+
+首先，建立一個只有您的 Next.js 應用程式知道的秘密令牌。此秘密將用於防止未經授權存取重新驗證 API 路由。您可以透過以下 URL 結構存取該路由（手動或透過 webhook）：
+
+```bash filename="終端機"
+https://<your-site.com>/api/revalidate?secret=<token>
+```
+
+接下來，將該秘密添加為應用程式的[環境變數](/docs/pages/building-your-application/configuring/environment-variables)。最後，建立重新驗證 API 路由：
+
+```js filename="pages/api/revalidate.js"
+export default async function handler(req, res) {
+  // 檢查秘密以確認這是有效的請求
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: '無效的令牌' })
+  }
+
+  try {
+    // 這應該是實際路徑而非重寫路徑
+    // 例如對於 "/blog/[slug]" 應該是 "/blog/post-1"
+    await res.revalidate('/path-to-revalidate')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // 如果發生錯誤，Next.js 會繼續
+    // 顯示最後成功生成的頁面
+    return res.status(500).send('重新驗證時發生錯誤')
+  }
+}
+```
+
+[查看我們的示範](https://on-demand-isr.vercel.app) 以了解按需重新驗證的實際運作並提供反饋。
+
+### 在開發期間測試按需 ISR
+
+當使用 `next dev` 本地運行時，`getStaticProps` 會在每個請求上被呼叫。要驗證您的按需 ISR 配置是否正確，您需要建立一個[生產版本](/docs/pages/api-reference/cli/next#next-build-options)並啟動[生產伺服器](/docs/pages/api-reference/cli/next#next-start-options)：
+
+```bash filename="終端機"
+$ next build
+$ next start
+```
+
+然後，您可以確認靜態頁面已成功重新驗證。
+
+## 錯誤處理和重新驗證
+
+如果在處理背景重新生成時 `getStaticProps` 內部發生錯誤，或者您手動拋出錯誤，最後成功生成的頁面將繼續顯示。在下一個後續請求中，Next.js 將重試呼叫 `getStaticProps`。
+
+```jsx
+export async function getStaticProps() {
+  // 如果此請求拋出未捕獲的錯誤，Next.js 將
+  // 不會使當前顯示的頁面失效，並在
+  // 下一個請求時重試 getStaticProps
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  if (!res.ok) {
+    // 如果是伺服器錯誤，您可能希望
+    // 拋出錯誤而不是返回，這樣快取將不會更新
+    // 直到下一個成功的請求
+    throw new Error(`獲取文章失敗，收到狀態碼 ${res.status}`)
+  }
+
+  // 如果請求成功，返回文章
+  // 並每 10 秒重新驗證一次
+  return {
+    props: {
+      posts,
+    },
+    revalidate: 10,
+  }
+}
+```
+
+## 自託管 ISR
+
+增量靜態再生 (ISR) 在[自託管的 Next.js 網站](/docs/pages/building-your-application/deploying#self-hosting)上開箱即用，當您使用 `next start` 時。
+
+了解更多關於[自託管 Next.js](/docs/pages/building-your-application/deploying#self-hosting) 的資訊。
+
+## 版本歷史
+
+| 版本      | 變更                                                                                 |
+| --------- | ----------------------------------------------------------------------------------- |
+| `v14.1.0` | 自訂 `cacheHandler` 穩定化                                                         |
+| `v12.2.0` | 按需 ISR 穩定化                                                                     |
+| `v12.1.0` | 新增按需 ISR（測試版）                                                              |
+| `v12.0.0` | 新增[機器人感知的 ISR 回退](https://nextjs.org/blog/next-12#bot-aware-isr-fallback) |
+| `v9.5.0`  | 新增基礎路徑支援                                                                    |

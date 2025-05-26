@@ -1,0 +1,258 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T20:39:23.200Z
+title: 如何延遲載入客戶端元件與函式庫
+nav_title: 延遲載入
+description: 透過延遲載入導入的函式庫和 React 元件，提升應用程式的載入效能。
+---
+
+{/* 此文件內容在應用程式路由和頁面路由間共享。您可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於頁面路由的內容。任何共享內容不應包裹在元件中。 */}
+
+Next.js 中的[延遲載入 (Lazy loading)](https://developer.mozilla.org/docs/Web/Performance/Lazy_loading) 可透過減少渲染路由所需的 JavaScript 量，來提升應用程式的初始載入效能。
+
+它允許您延遲載入**客戶端元件 (Client Components)** 和導入的函式庫，僅在使用時才將其包含在客戶端套件中。例如，您可以延遲載入模態框，直到使用者點擊開啟它為止。
+
+在 Next.js 中有兩種實現延遲載入的方式：
+
+1. 使用 `next/dynamic` 進行[動態導入](#nextdynamic)
+2. 使用 [`React.lazy()`](https://react.dev/reference/react/lazy) 搭配 [Suspense](https://react.dev/reference/react/Suspense)
+
+預設情況下，伺服器元件 (Server Components) 會自動進行[程式碼分割 (code splitting)](https://developer.mozilla.org/docs/Glossary/Code_splitting)，您可以使用[串流 (streaming)](/docs/app/building-your-application/routing/loading-ui-and-streaming) 逐步從伺服器傳送 UI 片段到客戶端。延遲載入適用於客戶端元件。
+
+## `next/dynamic`
+
+`next/dynamic` 是 [`React.lazy()`](https://react.dev/reference/react/lazy) 和 [Suspense](https://react.dev/reference/react/Suspense) 的組合。它在 `app` 和 `pages` 目錄中的行為相同，以支援漸進式遷移。
+
+## 範例
+
+<AppOnly>
+### 導入客戶端元件
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
+
+// 客戶端元件：
+const ComponentA = dynamic(() => import('../components/A'))
+const ComponentB = dynamic(() => import('../components/B'))
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+
+export default function ClientComponentExample() {
+  const [showMore, setShowMore] = useState(false)
+
+  return (
+    <div>
+      {/* 立即載入，但在獨立的客戶端套件中 */}
+      <ComponentA />
+
+      {/* 按需載入，僅在條件滿足時 */}
+      {showMore && <ComponentB />}
+      <button onClick={() => setShowMore(!showMore)}>切換</button>
+
+      {/* 僅在客戶端載入 */}
+      <ComponentC />
+    </div>
+  )
+}
+```
+
+> **注意：** 當伺服器元件動態導入客戶端元件時，目前**不**支援自動[程式碼分割 (code splitting)](https://developer.mozilla.org/docs/Glossary/Code_splitting)。
+
+### 跳過 SSR
+
+使用 `React.lazy()` 和 Suspense 時，客戶端元件預設會進行[預渲染 (prerendered)](https://github.com/reactwg/server-components/discussions/4)（SSR）。
+
+> **注意：** `ssr: false` 選項僅適用於客戶端元件，將其移至客戶端元件以確保客戶端程式碼分割正常運作。
+
+如果您想禁用客戶端元件的預渲染，可以將 `ssr` 選項設為 `false`：
+
+```jsx
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+```
+
+### 導入伺服器元件
+
+如果您動態導入伺服器元件，僅伺服器元件的子客戶端元件會被延遲載入，而非伺服器元件本身。當您在伺服器元件中使用時，它還會幫助預載靜態資源，如 CSS。
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+// 伺服器元件：
+const ServerComponent = dynamic(() => import('../components/ServerComponent'))
+
+export default function ServerComponentExample() {
+  return (
+    <div>
+      <ServerComponent />
+    </div>
+  )
+}
+```
+
+> **注意：** 伺服器元件不支援 `ssr: false` 選項。如果您嘗試在伺服器元件中使用它，將會看到錯誤。
+> `ssr: false` 不允許在伺服器元件中使用 `next/dynamic`。請將其移至客戶端元件。
+
+### 載入外部函式庫
+
+外部函式庫可以使用 [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import) 函式按需載入。此範例使用外部函式庫 `fuse.js` 進行模糊搜尋。該模組僅在使用者在搜尋輸入框中輸入後才會在客戶端載入。
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="搜尋"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // 動態載入 fuse.js
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>結果： {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+### 新增自訂載入元件
+
+```jsx filename="app/page.js"
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const WithCustomLoading = dynamic(
+  () => import('../components/WithCustomLoading'),
+  {
+    loading: () => <p>載入中...</p>,
+  }
+)
+
+export default function Page() {
+  return (
+    <div>
+      {/* 當 <WithCustomLoading/> 載入時，將渲染載入元件 */}
+      <WithCustomLoading />
+    </div>
+  )
+}
+```
+
+### 導入具名導出
+
+要動態導入具名導出，您可以從 [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import) 函式返回的 Promise 中返回它：
+
+```jsx filename="components/hello.js"
+'use client'
+
+export function Hello() {
+  return <p>你好！</p>
+}
+```
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+const ClientComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+使用 `next/dynamic` 時，標頭元件不會包含在頁面的初始 JavaScript 套件中。頁面會先渲染 Suspense 的 `fallback`，然後在 `Suspense` 邊界解析後渲染 `Header` 元件。
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  loading: () => <p>載入中...</p>,
+})
+
+export default function Home() {
+  return <DynamicHeader />
+}
+```
+
+> **須知**：在 `import('path/to/component')` 中，路徑必須明確寫出。不能是模板字串或變數。此外，`import()` 必須位於 `dynamic()` 呼叫內部，以便 Next.js 能夠將 webpack 套件/模組 ID 與特定的 `dynamic()` 呼叫匹配，並在渲染前預載它們。`dynamic()` 不能在 React 渲染內部使用，因為它需要標記在模組的頂層以實現預載功能，類似於 `React.lazy`。
+
+## 使用具名導出
+
+要動態導入具名導出，您可以從 [`import()`](https://github.com/tc39/proposal-dynamic-import#example) 返回的 [Promise](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise) 中返回它：
+
+```jsx filename="components/hello.js"
+export function Hello() {
+  return <p>你好！</p>
+}
+
+// pages/index.js
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+## 不使用 SSR
+
+要在客戶端動態載入元件，您可以使用 `ssr` 選項禁用伺服器渲染。這在外部依賴或元件依賴於瀏覽器 API（如 `window`）時非常有用。
+
+```jsx
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  ssr: false,
+})
+```
+
+## 使用外部函式庫
+
+此範例使用外部函式庫 `fuse.js` 進行模糊搜尋。該模組僅在使用者在搜尋輸入框中輸入後才會在瀏覽器中載入。
+
+```jsx
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="搜尋"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // 動態載入 fuse.js
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>結果： {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+</PagesOnly>

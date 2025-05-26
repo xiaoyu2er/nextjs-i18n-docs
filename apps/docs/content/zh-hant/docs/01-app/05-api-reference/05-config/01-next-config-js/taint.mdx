@@ -1,0 +1,228 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-25T21:55:37.968Z
+title: taint
+description: 啟用物件與值的汙染 (taint) 功能。
+version: experimental
+---
+
+## 使用方式
+
+`taint` 選項可啟用實驗性的 React API 來汙染 (taint) 物件與值。此功能有助於防止敏感資料被意外傳遞至客戶端。啟用後，您可以使用：
+
+- [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) 汙染物件參考
+- [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) 汙染唯一值
+
+> **須知**：啟用此標記也會為 `app` 目錄開啟 React 的 `experimental` 通道。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **警告**：請勿將汙染 API 作為防止敏感資料暴露給客戶端的唯一機制。請參閱我們的[安全建議](/blog/security-nextjs-server-components-actions)。
+
+汙染 API 允許您以防禦性的方式，透過宣告式且明確地標記不允許通過伺服器-客戶端邊界的資料。當物件或值嘗試通過此邊界時，React 會拋出錯誤。
+
+這在以下情況下特別有用：
+
+- 讀取資料的方法不在您的控制範圍內
+- 您必須處理非您定義的敏感資料結構
+- 敏感資料在伺服器元件渲染過程中被存取
+
+建議您設計資料模型與 API，確保敏感資料不會傳回不需要的上下文。
+
+## 注意事項
+
+- 汙染只能透過參考追蹤物件。複製物件會產生未受汙染的版本，這將失去 API 提供的所有保證。您需要對複製的物件重新進行汙染。
+- 汙染無法追蹤從受汙染值衍生的資料。您也需要對衍生值進行汙染。
+- 值的汙染有效期僅限於其參考生命週期在作用域內時。詳情請參閱 [`experimental_taintUniqueValue` 參數參考](https://react.dev/reference/react/experimental_taintUniqueValue#parameters)。
+
+## 範例
+
+### 汙染物件參考
+
+在此案例中，`getUserDetails` 函式回傳指定使用者的資料。我們汙染使用者物件的參考，使其無法跨越伺服器-客戶端邊界。例如，假設 `UserCard` 是一個客戶端元件。
+
+```ts switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id: string): UserDetails {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    '請勿使用完整的使用者資訊物件。請僅選取您需要的欄位。',
+    user
+  )
+
+  return user
+}
+```
+
+```js switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id) {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    '請勿使用完整的使用者資訊物件。請僅選取您需要的欄位。',
+    user
+  )
+
+  return user
+}
+```
+
+我們仍可從受汙染的 `userDetails` 物件存取個別欄位。
+
+```tsx filename="app/contact/page.tsx" switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+```jsx filename="app/contact/page.js" switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+現在，若嘗試將整個物件傳遞給客戶端元件，將會拋出錯誤。
+
+```tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const userDetails = await getUserDetails(id)
+
+  // 會拋出錯誤
+  return <UserCard user={userDetails} />
+}
+```
+
+```jsx switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  // 會拋出錯誤
+  return <UserCard user={userDetails} />
+}
+```
+
+### 汙染唯一值
+
+在此案例中，我們可以透過呼叫 `config.getConfigDetails` 來存取伺服器設定。然而，系統設定包含我們不希望暴露給客戶端的 `SERVICE_API_KEY`。
+
+我們可以汙染 `config.SERVICE_API_KEY` 值。
+
+```ts switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig(): SystemConfig {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    '請勿將設定令牌傳遞給客戶端',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+```js switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig() {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    '請勿將設定令牌傳遞給客戶端',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+我們仍可存取 `systemConfig` 物件的其他屬性。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+
+  return <ClientDashboard version={systemConfig.SERVICE_API_VERSION} />
+}
+```
+
+然而，將 `SERVICE_API_KEY` 傳遞給 `ClientDashboard` 會拋出錯誤。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // 有人在 PR 中犯了錯誤
+  const version = systemConfig.SERVICE_API_KEY
+
+  return <ClientDashboard version={version} />
+}
+```
+
+請注意，即使將 `systemConfig.SERVICE_API_KEY` 重新賦值給新變數，將其傳遞給客戶端元件仍會拋出錯誤。
+
+而從受汙染的唯一值衍生的值，仍會被暴露給客戶端。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // 有人在 PR 中犯了錯誤
+  const version = `version::${systemConfig.SERVICE_API_KEY}`
+
+  return <ClientDashboard version={version} />
+}
+```
+
+更好的做法是從 `getSystemConfig` 回傳的資料中移除 `SERVICE_API_KEY`。

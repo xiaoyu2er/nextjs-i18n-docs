@@ -1,0 +1,229 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:33:21.867Z
+title: getStaticProps
+description: API `getStaticProps` 参考文档。了解如何使用 `getStaticProps` 在 Next.js 中生成静态页面。
+---
+
+匯出一個名為 `getStaticProps` 的函式，將會在建置時使用該函式回傳的 props 預先渲染頁面：
+
+```tsx filename="pages/index.tsx" switcher
+import type { InferGetStaticPropsType, GetStaticProps } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getStaticProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetStaticProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/index.js" switcher
+export async function getStaticPaths() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+您可以在頂層作用域匯入模組供 `getStaticProps` 使用。這些匯入的模組**不會被打包到客戶端**。這意味著您可以直接在 `getStaticProps` 中撰寫**伺服器端程式碼**，包括從資料庫獲取資料。
+
+## Context 參數
+
+`context` 參數是一個物件，包含以下鍵值：
+
+| 名稱             | 描述                                                                                                                                                                                                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `params`         | 包含使用[動態路由](/docs/pages/building-your-application/routing/dynamic-routes)的頁面路由參數。例如，如果頁面名稱是 `[id].js`，則 `params` 會像 `{ id: ... }`。您應該將此與 `getStaticPaths` 一起使用，我們稍後會解釋。                                                                       |
+| `preview`        | (已棄用，改用 `draftMode`) 如果頁面處於[預覽模式 (Preview Mode)](/docs/pages/building-your-application/configuring/preview-mode)，則 `preview` 為 `true`，否則為 `false`。                                                                                                                    |
+| `previewData`    | (已棄用，改用 `draftMode`) 由 `setPreviewData` 設定的[預覽 (preview)](/docs/pages/building-your-application/configuring/preview-mode) 資料。                                                                                                                                                   |
+| `draftMode`      | 如果頁面處於[草稿模式 (Draft Mode)](/docs/pages/building-your-application/configuring/draft-mode)，則 `draftMode` 為 `true`，否則為 `false`。                                                                                                                                                 |
+| `locale`         | 包含當前啟用的語言環境 (如果已啟用)。                                                                                                                                                                                                                                                         |
+| `locales`        | 包含所有支援的語言環境 (如果已啟用)。                                                                                                                                                                                                                                                         |
+| `defaultLocale`  | 包含設定的預設語言環境 (如果已啟用)。                                                                                                                                                                                                                                                         |
+
+## getStaticProps 回傳值
+
+`getStaticProps` 函式應回傳一個物件，包含 `props`、`redirect` 或 `notFound` 之一，並可選地包含 `revalidate` 屬性。
+
+### `props`
+
+`props` 物件是一個鍵值對，每個值都會傳遞給頁面元件。它應該是一個[可序列化物件 (serializable object)](https://developer.mozilla.org/docs/Glossary/Serialization)，以便任何傳遞的 props 都可以使用 [`JSON.stringify`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify) 序列化。
+
+```jsx
+export async function getStaticProps(context) {
+  return {
+    props: { message: `Next.js is awesome` }, // 將作為 props 傳遞給頁面元件
+  }
+}
+```
+
+### `revalidate`
+
+`revalidate` 屬性是頁面重新生成的時間間隔 (以秒為單位)，預設為 `false` (不重新驗證)。
+
+```js
+// 此函式會在伺服器端的建置階段被呼叫
+// 如果啟用了重新驗證且收到新請求，可能會在無伺服器函式中再次呼叫
+export async function getStaticProps() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  return {
+    props: {
+      posts,
+    },
+    // Next.js 將嘗試重新生成頁面：
+    // - 當收到請求時
+    // - 最多每 10 秒一次
+    revalidate: 10, // 單位為秒
+  }
+}
+```
+
+了解更多關於[增量靜態生成 (Incremental Static Regeneration)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)。
+
+利用 ISR 的頁面快取狀態可透過讀取 `x-nextjs-cache` 回應標頭的值來確定。可能的值如下：
+
+- `MISS` - 路徑不在快取中 (首次訪問時最多發生一次)
+- `STALE` - 路徑在快取中但已超過重新驗證時間，將在背景更新
+- `HIT` - 路徑在快取中且未超過重新驗證時間
+
+### `notFound`
+
+`notFound` 布林值允許頁面回傳 `404` 狀態和[404 頁面](/docs/pages/building-your-application/routing/custom-error#404-page)。即使之前成功生成了頁面，`notFound: true` 也會讓頁面回傳 `404`。這用於支援像使用者生成內容被作者刪除等情況。注意，`notFound` 遵循與[此處描述](#revalidate)相同的 `revalidate` 行為。
+
+```js
+export async function getStaticProps(context) {
+  const res = await fetch(`https://.../data`)
+  const data = await res.json()
+
+  if (!data) {
+    return {
+      notFound: true,
+    }
+  }
+
+  return {
+    props: { data }, // 將作為 props 傳遞給頁面元件
+  }
+}
+```
+
+> **須知**：對於 [`fallback: false`](/docs/pages/api-reference/functions/get-static-paths#fallback-false) 模式，不需要使用 `notFound`，因為只有從 `getStaticPaths` 回傳的路徑會被預先渲染。
+
+### `redirect`
+
+`redirect` 物件允許重新導向到內部或外部資源。它應符合 `{ destination: string, permanent: boolean }` 的結構。
+
+在極少數情況下，您可能需要為舊版 `HTTP` 客戶端指定自訂狀態碼以正確重新導向。在這些情況下，您可以使用 `statusCode` 屬性代替 `permanent` 屬性，**但不能同時使用**。您也可以設定 `basePath: false`，類似於 `next.config.js` 中的重新導向設定。
+
+```js
+export async function getStaticProps(context) {
+  const res = await fetch(`https://...`)
+  const data = await res.json()
+
+  if (!data) {
+    return {
+      redirect: {
+        destination: '/',
+        permanent: false,
+        // statusCode: 301
+      },
+    }
+  }
+
+  return {
+    props: { data }, // 將作為 props 傳遞給頁面元件
+  }
+}
+```
+
+如果重新導向在建置時已知，應改為在 [`next.config.js`](/docs/pages/api-reference/next-config-js/redirects) 中新增。
+
+## 讀取檔案：使用 `process.cwd()`
+
+可以直接在 `getStaticProps` 中從檔案系統讀取檔案。
+
+為此，您需要取得檔案的完整路徑。
+
+由於 Next.js 將您的程式碼編譯到單獨的目錄中，您不能使用 `__dirname`，因為它回傳的路徑會與 Pages Router 不同。
+
+相反，您可以使用 `process.cwd()`，它會給您 Next.js 正在執行的目錄。
+
+```jsx
+import { promises as fs } from 'fs'
+import path from 'path'
+
+// posts 將在 getStaticProps() 的建置階段被填充
+function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li>
+          <h3>{post.filename}</h3>
+          <p>{post.content}</p>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// 此函式會在伺服器端的建置階段被呼叫
+// 不會在客戶端呼叫，因此您甚至可以
+// 直接執行資料庫查詢
+export async function getStaticProps() {
+  const postsDirectory = path.join(process.cwd(), 'posts')
+  const filenames = await fs.readdir(postsDirectory)
+
+  const posts = filenames.map(async (filename) => {
+    const filePath = path.join(postsDirectory, filename)
+    const fileContents = await fs.readFile(filePath, 'utf8')
+
+    // 通常您會在此解析/轉換內容
+    // 例如將 markdown 轉換為 HTML
+
+    return {
+      filename,
+      content: fileContents,
+    }
+  })
+  // 透過回傳 { props: { posts } }，Blog 元件
+  // 將在建置時收到 `posts` 作為 prop
+  return {
+    props: {
+      posts: await Promise.all(posts),
+    },
+  }
+}
+
+export default Blog
+```
+
+## 版本歷史
+
+| 版本       | 變更                                                                                                                                                               |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.4.0` | [App Router](/docs/app/building-your-application/data-fetching) 現已穩定，並簡化了資料獲取                                                                        |
+| `v12.2.0` | [隨需增量靜態生成 (On-Demand Incremental Static Regeneration)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration#on-demand-revalidation) 穩定版 |
+| `v12.1.0` | 新增[隨需增量靜態生成 (On-Demand Incremental Static Regeneration)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration#on-demand-revalidation) (測試版) |
+| `v10.0.0` | 新增 `locale`、`locales`、`defaultLocale` 和 `notFound` 選項                                                                                                     |
+| `v10.0.0` | 新增 `fallback: 'blocking'` 回傳選項                                                                                                                             |
+| `v9.5.0`  | 穩定版[增量靜態生成 (Incremental Static Regeneration)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)                       |
+| `v9.3.0`  | 引入 `getStaticProps`                                                                                                                                            |
