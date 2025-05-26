@@ -68,10 +68,56 @@ jobs:
           vercel_project_id: ${{ secrets[matrix.secret_project_id] }}
           vercel_org_id: ${{ secrets.VERCEL_ORG_ID }}
           vercel_token: ${{ secrets.VERCEL_TOKEN }}
-      - name: Comment PR with Vercel Preview Links (${{ matrix.locale }})
+      - name: Set deploy outputs
         if: steps.should_deploy.outputs.should_deploy == 'true'
+        id: set_outputs
+        run: |
+          echo "preview_url=${{ steps.deploy.outputs.prod_url }}" >> $GITHUB_OUTPUT
+          echo "inspect_url=${{ steps.deploy.outputs.inspect_url }}" >> $GITHUB_OUTPUT
+          echo "label=${{ matrix.locale }}" >> $GITHUB_OUTPUT
+      - name: Write deploy result to file
+        if: steps.should_deploy.outputs.should_deploy == 'true'
+        run: |
+          jq -n \
+            --arg label "${{ steps.set_outputs.outputs.label }}" \
+            --arg preview_url "${{ steps.set_outputs.outputs.preview_url }}" \
+            --arg inspect_url "${{ steps.set_outputs.outputs.inspect_url }}" \
+            '{label: $label, preview_url: $preview_url, inspect_url: $inspect_url}' > deploy-result.json
+      - name: Upload deploy result artifact
+        if: steps.should_deploy.outputs.should_deploy == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-result-${{ matrix.locale }}
+          path: deploy-result.json
+
+  comment-vercel-previews:
+    needs: deploy
+    name: Comment Vercel Previews
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Download all deploy result artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deploy-result-*
+          path: deploy-results
+      - name: Combine deploy results
+        id: aggregate
+        run: |
+          jq -s '.' deploy-results/deploy-result-*/deploy-result.json > deploy-results.json
+      - name: Check if deploy results exist
+        id: check_results
+        run: |
+          if [ -f deploy-results.json ] && [ $(jq length deploy-results.json) -gt 0 ]; then
+            echo "has_results=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_results=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Comment PR with all Vercel Preview Links
+        if: |
+          success() && hashFiles('deploy-results.json') != '' && steps.check_results.outputs.has_results == 'true'
         uses: ./.github/actions/comment-vercel-preview
         with:
-          inspect_url: ${{ steps.deploy.outputs.inspect_url }}
-          preview_url: ${{ steps.deploy.outputs.prod_url }}
-          label: ${{ matrix.locale }}
+          deploy_results_path: deploy-results.json
