@@ -14,7 +14,6 @@ permissions:
 
 jobs:
   deploy:
-    if: contains(github.event.pull_request.labels.*.name, 'prerelease')
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -27,13 +26,41 @@ jobs:
             secret_project_id: VERCEL_PROJECT_ZH_HANT_ID
     name: Deploy ${{ matrix.locale }}
     steps:
+      # Calculate if this matrix job should run based on PR labels
+      #
+      # This job will deploy if:
+      # - The event is NOT a pull_request (e.g., workflow_dispatch)
+      # - OR the PR has the label 'prerelease'
+      # - OR the PR has the label 'prerelease:<locale>' matching the current matrix locale
+      - name: Calculate should_deploy
+        id: should_deploy
+        shell: bash
+        run: |
+          LABELS_JSON='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          echo "LABELS_JSON: $LABELS_JSON"
+          SHOULD_DEPLOY=false
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            SHOULD_DEPLOY=true
+          elif echo "$LABELS_JSON" | grep -E '"prerelease"' > /dev/null; then
+            SHOULD_DEPLOY=true
+          elif echo "$LABELS_JSON" | grep -E '"prerelease:'"${{ matrix.locale }}"'"' > /dev/null; then
+            SHOULD_DEPLOY=true
+          fi
+          echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
       - name: Checkout code
+        if: steps.should_deploy.outputs.should_deploy == 'true'
         uses: actions/checkout@v3
         with:
           fetch-depth: 1
+          ref: ${{ github.head_ref }}
+      - name: Log checked out commit
+        if: steps.should_deploy.outputs.should_deploy == 'true'
+        run: git log -1
       - name: Setup Tools
+        if: steps.should_deploy.outputs.should_deploy == 'true'
         uses: ./.github/actions/setup
       - name: Deploy to Vercel (${{ matrix.locale }})
+        if: steps.should_deploy.outputs.should_deploy == 'true'
         id: deploy
         uses: ./.github/actions/vercel-deploy
         with:
@@ -42,6 +69,7 @@ jobs:
           vercel_org_id: ${{ secrets.VERCEL_ORG_ID }}
           vercel_token: ${{ secrets.VERCEL_TOKEN }}
       - name: Comment PR with Vercel Preview Links (${{ matrix.locale }})
+        if: steps.should_deploy.outputs.should_deploy == 'true'
         uses: ./.github/actions/comment-vercel-preview
         with:
           inspect_url: ${{ steps.deploy.outputs.inspect_url }}
