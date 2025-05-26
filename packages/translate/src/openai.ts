@@ -70,6 +70,8 @@ General rules:
 • NEVER start a frontmatter value with inline code (text between \`backticks\`)
 • This applies to ALL inline code including \`<Component>\` tags, \`functions\`, variables, etc.
 • In frontmatter (sections between --- marks), ALWAYS rearrange sentences so inline code appears AFTER some text
+• If a frontmatter value would start with inline code after translation, ALWAYS rewrite the sentence so that some descriptive text comes before the inline code. For example, instead of \`title: \`public\` 目錄中的靜態資源\`, use \`title: 靜態資源（\`public\` 目錄）\` or \`title: 關於 public 目錄的靜態資源\`.
+• This rule applies to ALL frontmatter keys (title, description, etc.), not just description.
 • ALWAYS preserve both the opening and closing frontmatter delimiters (---) - never omit the closing delimiter
 • Maintain the exact structure of frontmatter - beginning with ---, followed by key-value pairs, and ending with ---
 • These rules are ABSOLUTELY REQUIRED for proper rendering of the documentation
@@ -126,6 +128,20 @@ Examples of MDX Frontmatter Translation:
     title: Link
     description: 关于 \`<Link>\` 组件的 API 参考文档。
     (missing closing delimiter)
+
+# Example 4: Do NOT start with inline code in any frontmatter key
+✓ CORRECT (Always do this):
+  Original:
+    title: \`public\` directory static assets
+  Translation:
+    title: 靜態資源（public 目錄）
+    title: 關於 public 目錄的靜態資源
+
+✗ INCORRECT (Never do this):
+  Original:
+    title: \`public\` directory static assets
+  Translation:
+    title: \`public\` 目錄中的靜態資源
 
 These rules apply ONLY to frontmatter (between --- marks) and are CRITICAL for proper document rendering.
 REMEMBER: You must NEVER start with inline code in frontmatter values and ALWAYS include both opening and closing --- delimiters.
