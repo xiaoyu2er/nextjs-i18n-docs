@@ -1,0 +1,358 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-05-25T20:32:13.868Z
+title: Next.js 編譯器
+description: Next.js 編譯器採用 Rust 編寫，用於轉換和壓縮您的 Next.js 應用程式。
+---
+
+Next.js 編譯器採用 Rust 編寫並使用 [SWC](https://swc.rs/)，能為生產環境轉換和壓縮 JavaScript 程式碼。這取代了原本用於單一檔案的 Babel 和用於壓縮輸出包的 Terser。
+
+自 Next.js 12 版起預設啟用此編譯器，其編譯速度比 Babel 快 17 倍。若您現有 Babel 配置或使用[不支援的功能](#不支援的功能)，應用程式將自動切回使用 Babel。
+
+## 為何選擇 SWC？
+
+[SWC](https://swc.rs/) 是一個基於 Rust 的可擴展平台，專為新一代快速開發工具而設計。
+
+SWC 可用於編譯、壓縮、打包等，並支援擴展功能。您可呼叫它來執行程式碼轉換（內建或自訂）。這些轉換透過 Next.js 等高階工具執行。
+
+選擇 SWC 的原因如下：
+
+- **可擴展性**：SWC 可作為 Crate 整合至 Next.js，無需分叉函式庫或設計變通方案。
+- **效能**：切換至 SWC 後，Next.js 的快速重新整理速度提升約 3 倍，建置速度提升約 5 倍，且仍有優化空間。
+- **WebAssembly**：Rust 對 WASM 的支援，讓 Next.js 能跨平台開發。
+- **社群**：Rust 社群和生態系統蓬勃發展。
+
+## 支援的功能
+
+### 樣式化元件 (Styled Components)
+
+我們正將 `babel-plugin-styled-components` 移植至 Next.js 編譯器。
+
+首先更新至最新版 Next.js：`npm install next@latest`。接著更新 `next.config.js` 檔案：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    styledComponents: true,
+  },
+}
+```
+
+進階使用可配置樣式化元件的個別屬性。
+
+> 注意：在 Next.js 中使用 `styled-components` 主要需 `ssr` 和 `displayName` 轉換。
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // 詳見 https://styled-components.com/docs/tooling#babel-plugin 了解選項說明
+    styledComponents: {
+      // 開發環境預設啟用，生產環境預設停用以減少檔案大小，
+      // 設定此選項將覆蓋所有環境的預設值。
+      displayName?: boolean,
+      // 預設啟用。
+      ssr?: boolean,
+      // 預設啟用。
+      fileName?: boolean,
+      // 預設為空。
+      topLevelImportPaths?: string[],
+      // 預設為 ["index"]。
+      meaninglessFileNames?: string[],
+      // 預設啟用。
+      minify?: boolean,
+      // 預設啟用。
+      transpileTemplateLiterals?: boolean,
+      // 預設為空。
+      namespace?: string,
+      // 預設停用。
+      pure?: boolean,
+      // 預設啟用。
+      cssProp?: boolean,
+    },
+  },
+}
+```
+
+### Jest
+
+Next.js 編譯器會轉譯測試程式碼，並簡化與 Next.js 整合的 Jest 配置，包括：
+
+- 自動模擬 `.css`、`.module.css`（及其 `.scss` 變體）和圖片匯入
+- 使用 SWC 自動設定 `transform`
+- 將 `.env`（及所有變體）載入 `process.env`
+- 忽略 `node_modules` 的測試解析和轉換
+- 忽略 `.next` 的測試解析
+- 載入 `next.config.js` 以啟用實驗性 SWC 轉換
+
+首先更新至最新版 Next.js：`npm install next@latest`。接著更新 `jest.config.js` 檔案：
+
+```js filename="jest.config.js"
+const nextJest = require('next/jest')
+
+// 提供 Next.js 應用路徑以載入 next.config.js 和 .env 檔案
+const createJestConfig = nextJest({ dir: './' })
+
+// 傳遞給 Jest 的自訂配置
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+}
+
+// 以此方式匯出 createJestConfig 以確保 next/jest 能非同步載入 Next.js 配置
+module.exports = createJestConfig(customJestConfig)
+```
+
+### Relay
+
+啟用 [Relay](https://relay.dev/) 支援：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    relay: {
+      // 需與 relay.config.js 一致
+      src: './',
+      artifactDirectory: './__generated__',
+      language: 'typescript',
+      eagerEsModules: false,
+    },
+  },
+}
+```
+
+> **須知**：在 Next.js 中，`pages` 目錄下所有 JavaScript 檔案均視為路由。因此 `relay-compiler` 需指定 `artifactDirectory` 配置於 `pages` 外，否則產生的檔案會被視為路由而導致生產建置失敗。
+
+### 移除 React 屬性
+
+可移除 JSX 屬性，常用於測試。類似 `babel-plugin-react-remove-properties`。
+
+移除符合預設正則式 `^data-test` 的屬性：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    reactRemoveProperties: true,
+  },
+}
+```
+
+移除自訂屬性：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // 此處定義的正則式由 Rust 處理，語法與 JavaScript `RegExp` 不同
+    reactRemoveProperties: { properties: ['^data-custom$'] },
+  },
+}
+```
+
+### 移除 Console
+
+此轉換可移除應用程式碼中所有 `console.*` 呼叫（不包括 `node_modules`）。類似 `babel-plugin-transform-remove-console`。
+
+移除所有 `console.*` 呼叫：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: true,
+  },
+}
+```
+
+僅保留 `console.error`：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: {
+      exclude: ['error'],
+    },
+  },
+}
+```
+
+### 傳統裝飾器 (Legacy Decorators)
+
+Next.js 會自動偵測 `jsconfig.json` 或 `tsconfig.json` 中的 `experimentalDecorators`。傳統裝飾器常用於舊版函式庫如 `mobx`。
+
+此標記僅為相容現有應用，不建議在新專案中使用。
+
+首先更新至最新版 Next.js：`npm install next@latest`。接著更新設定檔：
+
+```js
+{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}
+```
+
+### importSource
+
+Next.js 會自動偵測 `jsconfig.json` 或 `tsconfig.json` 中的 `jsxImportSource` 並套用。常用於 [Theme UI](https://theme-ui.com) 等函式庫。
+
+首先更新至最新版 Next.js：`npm install next@latest`。接著更新設定檔：
+
+```js
+{
+  "compilerOptions": {
+    "jsxImportSource": "theme-ui"
+  }
+}
+```
+
+### Emotion
+
+我們正將 `@emotion/babel-plugin` 移植至 Next.js 編譯器。
+
+首先更新至最新版 Next.js：`npm install next@latest`。接著更新 `next.config.js`：
+
+```js filename="next.config.js"
+
+module.exports = {
+  compiler: {
+    emotion: boolean | {
+      // 預設為 true，生產環境建置時會停用。
+      sourceMap?: boolean,
+      // 預設為 'dev-only'。
+      autoLabel?: 'never' | 'dev-only' | 'always',
+      // 預設為 '[local]'。
+      // 可選值：`[local]` `[filename]` 和 `[dirname]`
+      // 僅在 autoLabel 設為 'dev-only' 或 'always' 時生效。
+      // 可定義標籤格式，格式字串中變數部分需用方括號 [] 包裹。
+      // 例如 labelFormat: "my-classname--[local]"，[local] 會被替換為變數名稱。
+      labelFormat?: string,
+      // 預設為 undefined。
+      // 此選項可指定編譯器應檢查哪些匯入以決定轉換對象，
+      // 即使重新匯出 Emotion 的匯出仍可使用轉換功能。
+      importMap?: {
+        [packageName: string]: {
+          [exportName: string]: {
+            canonicalImport?: [string, string],
+            styledBaseImport?: [string, string],
+          }
+        }
+      },
+    },
+  },
+}
+```
+
+### 壓縮 (Minification)
+
+自 v13 起預設使用 SWC 編譯器進行壓縮，速度比 Terser 快 7 倍。
+
+> **須知**：從 v15 開始，無法透過 `next.config.js` 自訂壓縮設定，已移除 `swcMinify` 標記支援。
+
+### 模組轉譯
+
+Next.js 可自動轉譯並打包本地套件（如 monorepo）或外部依賴（`node_modules`）的模組。這取代了 `next-transpile-modules` 套件。
+
+```js filename="next.config.js"
+module.exports = {
+  transpilePackages: ['@acme/ui', 'lodash-es'],
+}
+```
+
+### 模組化匯入 (Modularize Imports)
+
+此選項在 Next.js 13.5 後由 [`optimizePackageImports`](/docs/app/api-reference/config/next-config-js/optimizePackageImports) 取代。建議升級使用無需手動配置匯入路徑的新選項。
+
+### Define（建置時替換變數）
+
+`define` 選項允許在建置時靜態替換程式碼中的變數。
+該選項接受鍵值對物件，鍵為需替換的變數，值為替換內容。
+
+在 `next.config.js` 中使用 `compiler.define` 為所有環境（伺服器、edge 和客戶端）定義變數。或使用 `compiler.defineServer` 僅為伺服器端程式碼定義變數：
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    define: {
+      MY_VARIABLE: 'my-string',
+      'process.env.MY_ENV_VAR': 'my-env-var',
+    },
+    defineServer: {
+      MY_SERVER_VARIABLE: 'my-server-var',
+    },
+  },
+}
+```
+
+### 建置生命週期鉤子 (Build Lifecycle Hooks)
+
+Next.js 編譯器支援生命週期鉤子，允許在建置過程特定階段執行自訂程式碼。目前支援以下鉤子：
+
+#### runAfterProductionCompile
+
+此鉤子函式在生產建置編譯完成後執行，但在執行類型檢查和靜態頁面產生等後編譯任務之前。該鉤子提供專案元資料存取，包括專案目錄和建置輸出目錄，適合第三方工具收集如 sourcemaps 等建置輸出。
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    runAfterProductionCompile: async ({ distDir, projectDir }) => {
+      // 在此處加入自訂程式碼
+    },
+  },
+}
+```
+
+鉤子接收包含以下屬性的物件：
+
+- `distDir`：建置輸出目錄（預設為 `.next`）
+- `projectDir`：專案根目錄
+
+## 實驗性功能
+
+### SWC 追蹤分析 (SWC Trace profiling)
+
+可產生 SWC 內部轉換追蹤，格式為 Chromium 的 [trace event format](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview?mode=html#%21=)。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcTraceProfiling: true,
+  },
+}
+```
+
+啟用後，SWC 會在 `.next/` 下產生名為 `swc-trace-profile-${timestamp}.json` 的追蹤檔案。可使用 Chromium 的追蹤檢視器（chrome://tracing/、https://ui.perfetto.dev/）或相容的火焰圖檢視器（https://www.speedscope.app/）載入並視覺化追蹤結果。
+
+### SWC 插件（實驗性）
+
+可配置 SWC 轉換以使用實驗性的 WASM 插件支援來自訂轉換行為。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcPlugins: [
+      [
+        'plugin',
+        {
+          ...pluginOptions,
+        },
+      ],
+    ],
+  },
+}
+```
+
+`swcPlugins` 接受由元組組成的陣列來配置插件。每個插件元組包含插件路徑和配置物件。插件路徑可以是 npm 模組名稱或 `.wasm` 二進位檔案的絕對路徑。
+
+## 不支援的功能
+
+當應用程式存在 `.babelrc` 檔案時，Next.js 會自動切回使用 Babel 轉換單一檔案。這確保了與現有使用自訂 Babel 插件的應用程式相容。
+
+若您使用自訂 Babel 配置，[請分享您的設定](https://github.com/vercel/next.js/discussions/30174)。我們正努力移植常見的 Babel 轉換，並在未來支援插件功能。
+
+## 版本歷史
+
+| 版本       | 變更                                                                                                                                                                                                  |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.1.0` | [模組轉譯](https://nextjs.org/blog/next-13-1#built-in-module-transpilation-stable) 和 [模組化匯入](https://nextjs.org/blog/next-13-1#import-resolution-for-smaller-bundles) 功能穩定。 |
+| `v13.0.0` | 預設啟用 SWC 壓縮器。                                                                                                                                                                         |
+| `v12.3.0` | SWC 壓縮器[穩定](https://nextjs.org/blog/next-12-3#swc-minifier-stable)。                                                                                                                            |
+| `v12.2.0` | 新增 [SWC 插件](#swc-插件實驗性) 實驗性支援。                                                                                                                                     |
+| `v12.1.0` | 新增支援樣式化元件、Jest、Relay、移除 React 屬性、傳統裝飾器、移除 Console 和 jsxImportSource。                                                                       |
+| `v12.0.0` | 推出 [Next.js 編譯器](https://nextjs.org/blog/next-12)。                                                                                                                                          |

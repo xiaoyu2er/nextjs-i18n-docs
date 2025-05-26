@@ -1,0 +1,246 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:22:39.322Z
+title: 草稿模式 (Draft Mode)
+description: Next.js 提供了草稿模式功能，可在靜態頁面與動態頁面之間切換。您可以在這裡了解它如何與 App Router 協同工作。
+---
+
+當您的頁面從無頭式 CMS (headless CMS) 獲取資料時，靜態渲染 (static rendering) 非常有用。然而，當您在無頭式 CMS 上撰寫草稿並希望立即在頁面上預覽時，這種方式就不太理想。您會希望 Next.js 在**請求時** (request time) 而非建置時 (build time) 渲染這些頁面，並獲取草稿內容而非已發布的內容。您會希望 Next.js 僅針對這種特定情況切換到[動態渲染 (dynamic rendering)](/docs/app/building-your-application/rendering/server-components#dynamic-rendering)。
+
+Next.js 的**草稿模式 (Draft Mode)**功能正是為了解決這個問題。以下是使用說明。
+
+## 步驟 1：建立並存取路由處理器 (Route Handler)
+
+首先，建立一個[路由處理器 (Route Handler)](/docs/app/building-your-application/routing/route-handlers)。它可以任意命名，例如 `app/api/draft/route.ts`
+
+然後，從 `next/headers` 導入 `draftMode` 並呼叫 `enable()` 方法。
+
+```ts filename="app/api/draft/route.ts" switcher
+// 啟用草稿模式的路由處理器
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  draftMode().enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+// 啟用草稿模式的路由處理器
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  draftMode().enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+這將設定一個 **cookie** 來啟用草稿模式。後續包含此 cookie 的請求將觸發**草稿模式**，改變靜態生成頁面的行為（詳見後文）。
+
+您可以手動測試此功能，訪問 `/api/draft` 並查看瀏覽器的開發者工具。注意 `Set-Cookie` 回應標頭中名為 `__prerender_bypass` 的 cookie。
+
+### 從無頭式 CMS 安全存取
+
+實際上，您會希望從無頭式 CMS _安全地_ 呼叫此路由處理器。具體步驟會根據您使用的無頭式 CMS 而有所不同，但以下是一些常見做法。
+
+這些步驟假設您使用的無頭式 CMS 支援設定**自訂草稿 URL**。如果不支援，您仍然可以使用此方法保護草稿 URL，但需要手動建構並存取草稿 URL。
+
+**首先**，您應該使用您選擇的令牌生成器建立一個**秘密令牌字串 (secret token string)**。此秘密僅由您的 Next.js 應用程式和無頭式 CMS 知曉。這可以防止沒有 CMS 存取權限的人訪問草稿 URL。
+
+**其次**，如果您的無頭式 CMS 支援設定自訂草稿 URL，請將以下內容指定為草稿 URL。此處假設您的路由處理器位於 `app/api/draft/route.ts`
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+- `<your-site>` 應為您的部署網域。
+- `<token>` 應替換為您生成的秘密令牌。
+- `<path>` 應為您想查看的頁面路徑。例如，如果您想查看 `/posts/foo`，則應使用 `&slug=/posts/foo`。
+
+您的無頭式 CMS 可能允許您在草稿 URL 中包含變數，以便根據 CMS 的資料動態設定 `<path>`，例如：`&slug=/posts/{entry.fields.slug}`
+
+**最後**，在路由處理器中：
+
+- 檢查秘密是否匹配以及 `slug` 參數是否存在（如果沒有，請求應失敗）。
+- 呼叫 `draftMode.enable()` 來設定 cookie。
+- 然後將瀏覽器重新導向到 `slug` 指定的路徑。
+
+```ts filename="app/api/draft/route.ts" switcher
+// 包含秘密和 slug 的路由處理器
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // 解析查詢字串參數
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // 檢查秘密和 slug 參數
+  // 此秘密應僅由此路由處理器和 CMS 知曉
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Invalid token', { status: 401 })
+  }
+
+  // 從無頭式 CMS 獲取資料以檢查提供的 `slug` 是否存在
+  // getPostBySlug 將實作從無頭式 CMS 獲取資料的邏輯
+  const post = await getPostBySlug(slug)
+
+  // 如果 slug 不存在，則阻止啟用草稿模式
+  if (!post) {
+    return new Response('Invalid slug', { status: 401 })
+  }
+
+  // 透過設定 cookie 啟用草稿模式
+  draftMode().enable()
+
+  // 重新導向到從獲取的 post 中指定的路徑
+  // 我們不重新導向到 searchParams.slug，這可能導致開放重新導向漏洞
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+// 包含秘密和 slug 的路由處理器
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // 解析查詢字串參數
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // 檢查秘密和 slug 參數
+  // 此秘密應僅由此路由處理器和 CMS 知曉
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Invalid token', { status: 401 })
+  }
+
+  // 從無頭式 CMS 獲取資料以檢查提供的 `slug` 是否存在
+  // getPostBySlug 將實作從無頭式 CMS 獲取資料的邏輯
+  const post = await getPostBySlug(slug)
+
+  // 如果 slug 不存在，則阻止啟用草稿模式
+  if (!post) {
+    return new Response('Invalid slug', { status: 401 })
+  }
+
+  // 透過設定 cookie 啟用草稿模式
+  draftMode().enable()
+
+  // 重新導向到從獲取的 post 中指定的路徑
+  // 我們不重新導向到 searchParams.slug，這可能導致開放重新導向漏洞
+  redirect(post.slug)
+}
+```
+
+如果成功，瀏覽器將被重新導向到您想查看的路徑，並帶有草稿模式的 cookie。
+
+## 步驟 2：更新頁面
+
+下一步是更新您的頁面以檢查 `draftMode().isEnabled` 的值。
+
+如果請求的頁面設定了 cookie，則資料將在**請求時** (request time) 獲取（而非在建置時）。
+
+此外，`isEnabled` 的值將為 `true`。
+
+```tsx filename="app/page.tsx" switcher
+// 獲取資料的頁面
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// 獲取資料的頁面
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+就是這樣！如果您從無頭式 CMS 或手動存取草稿路由處理器（帶有 `secret` 和 `slug`），您現在應該可以看到草稿內容。如果您更新草稿而不發布，您應該能夠查看草稿。
+
+在您的無頭式 CMS 上設定此為草稿 URL 或手動存取，您應該能夠看到草稿。
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+## 更多細節
+
+### 清除草稿模式 cookie
+
+預設情況下，草稿模式工作階段 (session) 會在瀏覽器關閉時結束。
+
+要手動清除草稿模式 cookie，請建立一個呼叫 `draftMode().disable()` 的路由處理器：
+
+```ts filename="app/api/disable-draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  draftMode().disable()
+  return new Response('Draft mode is disabled')
+}
+```
+
+```js filename="app/api/disable-draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  draftMode().disable()
+  return new Response('Draft mode is disabled')
+}
+```
+
+然後，發送請求到 `/api/disable-draft` 以呼叫路由處理器。如果使用 [`next/link`](/docs/app/api-reference/components/link) 呼叫此路由，您必須傳遞 `prefetch={false}` 以防止在預取時意外刪除 cookie。
+
+### 每次 `next build` 時唯一
+
+每次執行 `next build` 時，都會生成一個新的繞過 cookie 值。
+
+這確保了繞過 cookie 無法被猜測。
+
+> **須知**：要在本地透過 HTTP 測試草稿模式，您的瀏覽器需要允許第三方 cookie 和本地儲存存取。

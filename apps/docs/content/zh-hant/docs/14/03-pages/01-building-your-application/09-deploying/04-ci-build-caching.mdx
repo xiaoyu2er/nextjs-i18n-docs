@@ -1,0 +1,170 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:07:17.685Z
+title: 持續整合 (CI) 建置快取
+description: 了解如何設定 CI 來快取 Next.js 建置
+---
+
+為了提升建置效能，Next.js 會將快取儲存在 `.next/cache` 中，這些快取在建置之間是共用的。
+
+要在持續整合 (CI) 環境中利用此快取，您的 CI 工作流程需要設定為在建置之間正確地保留快取。
+
+> 如果您的 CI 未設定為在建置之間保留 `.next/cache`，您可能會看到 [未偵測到快取](/docs/messages/no-cache) 錯誤。
+
+以下是常見 CI 供應商的快取設定範例：
+
+## Vercel
+
+Next.js 快取會自動為您設定。您無需採取任何動作。
+
+## CircleCI
+
+在 `.circleci/config.yml` 中編輯您的 `save_cache` 步驟，加入 `.next/cache`：
+
+```yaml
+steps:
+  - save_cache:
+      key: dependency-cache-{{ checksum "yarn.lock" }}
+      paths:
+        - ./node_modules
+        - ./.next/cache
+```
+
+如果您沒有 `save_cache` 鍵，請遵循 CircleCI 的 [設定建置快取文件](https://circleci.com/docs/2.0/caching/)。
+
+## Travis CI
+
+在您的 `.travis.yml` 中加入或合併以下內容：
+
+```yaml
+cache:
+  directories:
+    - $HOME/.cache/yarn
+    - node_modules
+    - .next/cache
+```
+
+## GitLab CI
+
+在您的 `.gitlab-ci.yml` 中加入或合併以下內容：
+
+```yaml
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+    - .next/cache/
+```
+
+## Netlify CI
+
+使用 [Netlify Plugins](https://www.netlify.com/products/build/plugins/) 搭配 [`@netlify/plugin-nextjs`](https://www.npmjs.com/package/@netlify/plugin-nextjs)。
+
+## AWS CodeBuild
+
+在您的 `buildspec.yml` 中加入（或合併）以下內容：
+
+```yaml
+cache:
+  paths:
+    - 'node_modules/**/*' # 快取 `node_modules` 以加速 `yarn` 或 `npm i`
+    - '.next/cache/**/*' # 快取 Next.js 以加速應用程式重建
+```
+
+## GitHub Actions
+
+使用 GitHub 的 [actions/cache](https://github.com/actions/cache)，在您的工作流程檔案中加入以下步驟：
+
+```yaml
+uses: actions/cache@v4
+with:
+  # 關於使用 `yarn` 快取的說明請見此處 https://github.com/actions/cache/blob/main/examples.md#node---yarn 或者您可以使用 actions/setup-node 的快取功能 https://github.com/actions/setup-node
+  path: |
+    ~/.npm
+    ${{ github.workspace }}/.next/cache
+  # 當套件或原始檔變更時產生新的快取。
+  key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+  # 如果原始檔變更但套件未變更，則從先前的快取重建。
+  restore-keys: |
+    ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+```
+
+## Bitbucket Pipelines
+
+在您的 `bitbucket-pipelines.yml` 頂層（與 `pipelines` 同層級）加入或合併以下內容：
+
+```yaml
+definitions:
+  caches:
+    nextcache: .next/cache
+```
+
+然後在管線的 `step` 的 `caches` 區塊中引用它：
+
+```yaml
+- step:
+    name: your_step_name
+    caches:
+      - node
+      - nextcache
+```
+
+## Heroku
+
+使用 Heroku 的 [自訂快取](https://devcenter.heroku.com/articles/nodejs-support#custom-caching)，在您的頂層 package.json 中加入 `cacheDirectories` 陣列：
+
+```javascript
+"cacheDirectories": [".next/cache"]
+```
+
+## Azure Pipelines
+
+使用 Azure Pipelines 的 [快取任務](https://docs.microsoft.com/en-us/azure/devops/pipelines/tasks/utility/cache)，在您的管線 yaml 檔案中執行 `next build` 的任務之前加入以下任務：
+
+```yaml
+- task: Cache@2
+  displayName: '快取 .next/cache'
+  inputs:
+    key: next | $(Agent.OS) | yarn.lock
+    path: '$(System.DefaultWorkingDirectory)/.next/cache'
+```
+
+## Jenkins (Pipeline)
+
+使用 Jenkins 的 [Job Cacher](https://www.jenkins.io/doc/pipeline/steps/jobcacher/) 外掛，在您的 `Jenkinsfile` 中通常執行 `next build` 或 `npm install` 的地方加入以下建置步驟：
+
+```yaml
+stage("Restore npm packages") {
+    steps {
+        // 根據 GIT_COMMIT 雜湊將鎖定檔寫入快取
+        writeFile file: "next-lock.cache", text: "$GIT_COMMIT"
+
+        cache(caches: [
+            arbitraryFileCache(
+                path: "node_modules",
+                includes: "**/*",
+                cacheValidityDecidingFile: "package-lock.json"
+            )
+        ]) {
+            sh "npm install"
+        }
+    }
+}
+stage("Build") {
+    steps {
+        // 根據 GIT_COMMIT 雜湊將鎖定檔寫入快取
+        writeFile file: "next-lock.cache", text: "$GIT_COMMIT"
+
+        cache(caches: [
+            arbitraryFileCache(
+                path: ".next/cache",
+                includes: "**/*",
+                cacheValidityDecidingFile: "next-lock.cache"
+            )
+        ]) {
+            // 即 `next build`
+            sh "npm run build"
+        }
+    }
+}
+```

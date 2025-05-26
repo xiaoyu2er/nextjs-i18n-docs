@@ -1,0 +1,659 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T20:39:40.098Z
+title: 如何使用 Next.js 建構漸進式網路應用程式 (PWA)
+nav_title: PWA
+description: 學習如何使用 Next.js 建構漸進式網路應用程式 (Progressive Web Application, PWA)。
+related:
+  links:
+    - app/api-reference/file-conventions/metadata/manifest
+---
+
+漸進式網路應用程式 (Progressive Web Applications, PWA) 結合了網路應用的廣泛觸及性與原生行動應用的功能和使用者體驗。透過 Next.js，您可以建立跨平台無縫的類原生應用體驗，無需維護多個程式碼庫或通過應用商店審核。
+
+PWA 讓您能夠：
+
+- 即時部署更新，無需等待應用商店審核
+- 使用單一程式碼庫建立跨平台應用
+- 提供類原生功能，如主畫面安裝與推播通知
+
+## 使用 Next.js 建立 PWA
+
+### 1. 建立網路應用清單 (Web App Manifest)
+
+Next.js 提供內建支援，可透過 App Router 建立 [網路應用清單](/docs/app/api-reference/file-conventions/metadata/manifest)。您可以建立靜態或動態的清單檔案：
+
+例如，建立 `app/manifest.ts` 或 `app/manifest.json` 檔案：
+
+```tsx filename="app/manifest.ts" switcher
+import type { MetadataRoute } from 'next'
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'Next.js PWA',
+    short_name: 'NextPWA',
+    description: 'A Progressive Web App built with Next.js',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#ffffff',
+    theme_color: '#000000',
+    icons: [
+      {
+        src: '/icon-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        src: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+      },
+    ],
+  }
+}
+```
+
+```jsx filename="app/manifest.js" switcher
+export default function manifest() {
+  return {
+    name: 'Next.js PWA',
+    short_name: 'NextPWA',
+    description: 'A Progressive Web App built with Next.js',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#ffffff',
+    theme_color: '#000000',
+    icons: [
+      {
+        src: '/icon-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        src: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+      },
+    ],
+  }
+}
+```
+
+此檔案應包含應用名稱、圖示以及如何在使用者裝置上顯示為圖示的資訊。這將允許使用者將您的 PWA 安裝到主畫面，提供類原生應用的體驗。
+
+您可以使用 [favicon 產生器](https://realfavicongenerator.net/) 等工具建立不同尺寸的圖示集，並將生成的檔案放置於 `public/` 資料夾中。
+
+### 2. 實作網路推播通知
+
+網路推播通知 (Web Push Notifications) 支援所有現代瀏覽器，包括：
+
+- iOS 16.4+（需安裝至主畫面）
+- macOS 13 或更高版本的 Safari 16
+- Chromium 核心瀏覽器
+- Firefox
+
+這使得 PWA 成為原生應用的可行替代方案。值得注意的是，您無需離線支援即可觸發安裝提示。
+
+網路推播通知讓您即使用戶未主動使用應用時也能重新吸引他們。以下是在 Next.js 應用中實作的方法：
+
+首先，我們在 `app/page.tsx` 建立主頁面元件。為了便於理解，我們將其拆分成較小的部分。首先加入一些我們需要的導入和工具函數（暫時不用擔心引用的 Server Actions 尚未存在）：
+
+```tsx switcher
+'use client'
+
+import { useState, useEffect } from 'react'
+import { subscribeUser, unsubscribeUser, sendNotification } from './actions'
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+```
+
+```jsx switcher
+'use client'
+
+import { useState, useEffect } from 'react'
+import { subscribeUser, unsubscribeUser, sendNotification } from './actions'
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding)
+    .replace(/\\-/g, '+')
+    .replace(/_/g, '/')
+
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+```
+
+現在讓我們加入管理訂閱、取消訂閱和發送推播通知的元件。
+
+```tsx switcher
+function PushNotificationManager() {
+  const [isSupported, setIsSupported] = useState(false)
+  const [subscription, setSubscription] = useState<PushSubscription | null>(
+    null
+  )
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      setIsSupported(true)
+      registerServiceWorker()
+    }
+  }, [])
+
+  async function registerServiceWorker() {
+    const registration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    })
+    const sub = await registration.pushManager.getSubscription()
+    setSubscription(sub)
+  }
+
+  async function subscribeToPush() {
+    const registration = await navigator.serviceWorker.ready
+    const sub = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+      ),
+    })
+    setSubscription(sub)
+    const serializedSub = JSON.parse(JSON.stringify(sub))
+    await subscribeUser(serializedSub)
+  }
+
+  async function unsubscribeFromPush() {
+    await subscription?.unsubscribe()
+    setSubscription(null)
+    await unsubscribeUser()
+  }
+
+  async function sendTestNotification() {
+    if (subscription) {
+      await sendNotification(message)
+      setMessage('')
+    }
+  }
+
+  if (!isSupported) {
+    return <p>此瀏覽器不支援推播通知。</p>
+  }
+
+  return (
+    <div>
+      <h3>推播通知</h3>
+      {subscription ? (
+        <>
+          <p>您已訂閱推播通知。</p>
+          <button onClick={unsubscribeFromPush}>取消訂閱</button>
+          <input
+            type="text"
+            placeholder="輸入通知訊息"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+          <button onClick={sendTestNotification}>發送測試</button>
+        </>
+      ) : (
+        <>
+          <p>您尚未訂閱推播通知。</p>
+          <button onClick={subscribeToPush}>訂閱</button>
+        </>
+      )}
+    </div>
+  )
+}
+```
+
+```jsx switcher
+function PushNotificationManager() {
+  const [isSupported, setIsSupported] = useState(false);
+  const [subscription, setSubscription] = useState(null);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      setIsSupported(true);
+      registerServiceWorker();
+    }
+  }, []);
+
+  async function registerServiceWorker() {
+    const registration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    });
+    const sub = await registration.pushManager.getSubscription();
+    setSubscription(sub);
+  }
+
+  async function subscribeToPush() {
+    const registration = await navigator.serviceWorker.ready;
+    const sub = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+      ),
+    });
+    setSubscription(sub);
+    await subscribeUser(sub);
+  }
+
+  async function unsubscribeFromPush() {
+    await subscription?.unsubscribe();
+    setSubscription(null);
+    await unsubscribeUser();
+  }
+
+  async function sendTestNotification() {
+    if (subscription) {
+      await sendNotification(message);
+      setMessage('');
+    }
+  }
+
+  if (!isSupported) {
+    return <p>此瀏覽器不支援推播通知。</p>;
+  }
+
+  return (
+    <div>
+      <h3>推播通知</h3>
+      {subscription ? (
+        <>
+          <p>您已訂閱推播通知。</p>
+          <button onClick={unsubscribeFromPush}>取消訂閱</button>
+          <input
+            type="text"
+            placeholder="輸入通知訊息"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+          <button onClick={sendTestNotification}>發送測試</button>
+        </>
+      ) : (
+        <>
+          <p>您尚未訂閱推播通知。</p>
+          <button onClick={subscribeToPush}>訂閱</button>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+最後，我們建立一個元件來顯示 iOS 裝置的安裝提示，僅在應用尚未安裝時顯示。
+
+```tsx switcher
+function InstallPrompt() {
+  const [isIOS, setIsIOS] = useState(false)
+  const [isStandalone, setIsStandalone] = useState(false)
+
+  useEffect(() => {
+    setIsIOS(
+      /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    )
+
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
+  }, [])
+
+  if (isStandalone) {
+    return null // 若已安裝則不顯示安裝按鈕
+  }
+
+  return (
+    <div>
+      <h3>安裝應用</h3>
+      <button>新增至主畫面</button>
+      {isIOS && (
+        <p>
+          要在 iOS 裝置上安裝此應用，請點擊分享按鈕
+          <span role="img" aria-label="分享圖示">
+            {' '}
+            ⎋{' '}
+          </span>
+          然後選擇「新增至主畫面」
+          <span role="img" aria-label="加號圖示">
+            {' '}
+            ➕{' '}
+          </span>。
+        </p>
+      )}
+    </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <PushNotificationManager />
+      <InstallPrompt />
+    </div>
+  )
+}
+```
+
+```jsx switcher
+function InstallPrompt() {
+  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    setIsIOS(
+      /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    );
+
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
+  }, []);
+
+  if (isStandalone) {
+    return null; // 若已安裝則不顯示安裝按鈕
+  }
+
+  return (
+    <div>
+      <h3>安裝應用</h3>
+      <button>新增至主畫面</button>
+      {isIOS && (
+        <p>
+          要在 iOS 裝置上安裝此應用，請點擊分享按鈕
+          <span role="img" aria-label="分享圖示">
+            {' '}
+            ⎋{' '}
+          </span>
+          然後選擇「新增至主畫面」
+          <span role="img" aria-label="加號圖示">
+            {' '}
+            ➕{' '}
+          </span>
+          。
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <div>
+      <PushNotificationManager />
+      <InstallPrompt />
+    </div>
+  );
+}
+```
+
+現在，讓我們建立此檔案所呼叫的 Server Actions。
+
+### 3. 實作 Server Actions
+
+在 `app/actions.ts` 建立新檔案來處理訂閱建立、刪除和發送通知。
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+
+import webpush from 'web-push'
+
+webpush.setVapidDetails(
+  '<mailto:your-email@example.com>',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+)
+
+let subscription: PushSubscription | null = null
+
+export async function subscribeUser(sub: PushSubscription) {
+  subscription = sub
+  // 在生產環境中，您會希望將訂閱儲存至資料庫
+  // 例如：await db.subscriptions.create({ data: sub })
+  return { success: true }
+}
+
+export async function unsubscribeUser() {
+  subscription = null
+  // 在生產環境中，您會希望從資料庫中移除訂閱
+  // 例如：await db.subscriptions.delete({ where: { ... } })
+  return { success: true }
+}
+
+export async function sendNotification(message: string) {
+  if (!subscription) {
+    throw new Error('無可用訂閱')
+  }
+
+  try {
+    await webpush.sendNotification(
+      subscription,
+      JSON.stringify({
+        title: '測試通知',
+        body: message,
+        icon: '/icon.png',
+      })
+    )
+    return { success: true }
+  } catch (error) {
+    console.error('發送推播通知時發生錯誤：', error)
+    return { success: false, error: '發送通知失敗' }
+  }
+}
+```
+
+```jsx filename="app/actions.js" switcher
+'use server';
+
+import webpush from 'web-push';
+
+webpush.setVapidDetails(
+  '<mailto:your-email@example.com>',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+);
+
+let subscription= null;
+
+export async function subscribeUser(sub) {
+  subscription = sub;
+  // 在生產環境中，您會希望將訂閱儲存至資料庫
+  // 例如：await db.subscriptions.create({ data: sub })
+  return { success: true };
+}
+
+export async function unsubscribeUser() {
+  subscription = null;
+  // 在生產環境中，您會希望從資料庫中移除訂閱
+  // 例如：await db.subscriptions.delete({ where: { ... } })
+  return { success: true };
+}
+
+export async function sendNotification(message) {
+  if (!subscription) {
+    throw new Error('無可用訂閱');
+  }
+
+  try {
+    await webpush.sendNotification(
+      subscription,
+      JSON.stringify({
+        title: '測試通知',
+        body: message,
+        icon: '/icon.png',
+      })
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('發送推播通知時發生錯誤：', error);
+    return { success: false, error: '發送通知失敗' };
+  }
+}
+```
+
+發送通知將由我們在第 5 步建立的 service worker 處理。
+
+在生產環境中，您會希望將訂閱儲存至資料庫，以便在伺服器重啟時保持持久性，並管理多個使用者的訂閱。
+
+### 4. 產生 VAPID 金鑰
+
+要使用 Web Push API，您需要產生 [VAPID](https://vapidkeys.com/) 金鑰。最簡單的方法是直接使用 web-push CLI：
+
+首先，全域安裝 web-push：
+
+```bash filename="終端機"
+npm install -g web-push
+```
+
+執行以下指令產生 VAPID 金鑰：
+
+```bash filename="終端機"
+web-push generate-vapid-keys
+```
+
+複製輸出結果並將金鑰貼到您的 `.env` 檔案中：
+
+```.env
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=您的公開金鑰
+VAPID_PRIVATE_KEY=您的私有金鑰
+```
+
+### 5. 建立 Service Worker
+
+建立 `public/sw.js` 檔案作為您的 service worker：
+
+```js filename="public/sw.js"
+self.addEventListener('push', function (event) {
+  if (event.data) {
+    const data = event.data.json()
+    const options = {
+      body: data.body,
+      icon: data.icon || '/icon.png',
+      badge: '/badge.png',
+      vibrate: [100, 50, 100],
+      data: {
+        dateOfArrival: Date.now(),
+        primaryKey: '2',
+      },
+    }
+    event.waitUntil(self.registration.showNotification(data.title, options))
+  }
+})
+
+self.addEventListener('notificationclick', function (event) {
+  console.log('收到通知點擊事件。')
+  event.notification.close()
+  event.waitUntil(clients.openWindow('<https://your-website.com>'))
+})
+```
+
+此 service worker 支援自訂圖片和通知。它處理傳入的推播事件和通知點擊。
+
+- 您可以使用 `icon` 和 `badge` 屬性為通知設定自訂圖示。
+- `vibrate` 模式可調整以在支援裝置上建立自訂震動提示。
+- 可使用 `data` 屬性附加額外資料至通知。
+
+請務必徹底測試您的 service worker，確保它在不同裝置和瀏覽器上按預期運作。同時，請將 `notificationclick` 事件監聽器中的 `'https://your-website.com'` 連結更新為您應用的適當 URL。
+
+### 6. 新增至主畫面
+
+在步驟 2 中定義的 `InstallPrompt` 元件會顯示訊息，指導 iOS 裝置使用者如何將應用程式安裝至主畫面。
+
+要確保您的應用程式可以安裝至行動裝置主畫面，必須滿足以下條件：
+
+1. 有效的網路應用程式清單 (在步驟 1 中建立)
+2. 網站透過 HTTPS 提供服務
+
+現代瀏覽器會在滿足這些條件時，自動向使用者顯示安裝提示。您可以使用 [`beforeinstallprompt`](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeinstallprompt_event) 提供自訂安裝按鈕，但我們不建議這樣做，因為這不具跨瀏覽器和跨平台相容性 (在 Safari iOS 上無法運作)。
+
+### 7. 本地測試
+
+要確保您可以在本地查看通知，請確認：
+
+- 您正在 [使用 HTTPS 本地執行](/docs/app/api-reference/cli/next#using-https-during-development)
+  - 使用 `next dev --experimental-https` 進行測試
+- 您的瀏覽器 (Chrome、Safari、Firefox) 已啟用通知功能
+  - 在本地測試時，接受使用通知的權限請求
+  - 確保瀏覽器全域設定中未停用通知
+  - 如果仍看不到通知，請嘗試使用其他瀏覽器進行除錯
+
+### 8. 保護應用程式安全
+
+安全性是任何網路應用程式的關鍵面向，特別是對於 PWA 而言。Next.js 允許您透過 `next.config.js` 檔案設定安全標頭。例如：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+      {
+        source: '/sw.js',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/javascript; charset=utf-8',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self'",
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+讓我們逐一說明這些選項：
+
+1. 全域標頭 (套用至所有路由)：
+   1. `X-Content-Type-Options: nosniff`：防止 MIME 類型探測，降低惡意檔案上傳的風險。
+   2. `X-Frame-Options: DENY`：防止您的網站被嵌入 iframe 中，保護免受點擊劫持攻擊。
+   3. `Referrer-Policy: strict-origin-when-cross-origin`：控制請求中包含的參照來源資訊量，平衡安全性和功能性。
+2. 服務工作者專用標頭：
+   1. `Content-Type: application/javascript; charset=utf-8`：確保服務工作者被正確解析為 JavaScript。
+   2. `Cache-Control: no-cache, no-store, must-revalidate`：防止服務工作者被快取，確保使用者總是取得最新版本。
+   3. `Content-Security-Policy: default-src 'self'; script-src 'self'`：為服務工作者實作嚴格的內容安全政策，僅允許來自相同來源的腳本。
+
+深入了解如何使用 Next.js 定義 [內容安全政策](/docs/app/guides/content-security-policy)。
+
+## 後續步驟
+
+1. **探索 PWA 功能**：PWA 可以利用各種網路 API 來提供進階功能。考慮探索背景同步、定期背景同步或檔案系統存取 API 等功能來增強您的應用程式。如需靈感和最新 PWA 功能資訊，可參考 [What PWA Can Do Today](https://whatpwacando.today/) 等資源。
+2. **靜態匯出**：如果您的應用程式不需要執行伺服器，而是使用靜態檔案匯出，您可以更新 Next.js 設定來啟用此變更。詳情請參閱 [Next.js 靜態匯出文件](/docs/app/guides/static-exports)。但您需要從伺服器動作轉為呼叫外部 API，並將定義的標頭移至您的代理伺服器。
+3. **離線支援**：要提供離線功能，其中一個選項是使用 [Serwist](https://github.com/serwist/serwist) 與 Next.js 整合。您可以在其 [文件](https://github.com/serwist/serwist/tree/main/examples/next-basic) 中找到如何將 Serwist 與 Next.js 整合的範例。**注意**：此外掛目前需要 webpack 設定。
+4. **安全考量**：確保您的服務工作者受到適當保護。這包括使用 HTTPS、驗證推送訊息的來源，以及實作適當的錯誤處理。
+5. **使用者體驗**：考慮實作漸進增強技術，確保即使使用者的瀏覽器不支援某些 PWA 功能，您的應用程式仍能良好運作。

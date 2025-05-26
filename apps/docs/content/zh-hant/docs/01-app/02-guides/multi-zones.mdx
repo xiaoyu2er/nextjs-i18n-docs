@@ -1,0 +1,144 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T20:38:21.182Z
+title: 如何使用多區域 (Multi-zones) 和 Next.js 建構微前端
+nav_title: 多區域
+description: 學習如何透過 Next.js 多區域功能 (Multi-Zones) 建構微前端，將多個 Next.js 應用程式部署在單一網域下。
+---
+
+{/* 此文件內容同時適用於 App 和 Pages 路由。您可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於 Pages 路由的內容。任何共享內容不應包裹在元件中。*/}
+
+<details open>
+  <summary>範例</summary>
+
+- [使用多區域](https://github.com/vercel/next.js/tree/canary/examples/with-zones)
+
+</details>
+
+多區域 (Multi-Zones) 是一種微前端架構方法，可將大型應用程式按路徑拆分為多個較小的 Next.js 應用程式。當應用程式中存在彼此無關的頁面集合時特別有用。透過將這些頁面移至獨立區域（即獨立的應用程式），您可以減少每個應用程式的大小，從而提升建置速度並移除僅適用於特定區域的程式碼。由於應用程式彼此解耦，多區域也允許網域上的其他應用程式使用各自選擇的框架。
+
+舉例來說，假設您有以下頁面集合需要拆分：
+
+- `/blog/*` 所有部落格文章
+- `/dashboard/*` 使用者登入儀表板後的所有頁面
+- `/*` 網站其餘未被其他區域涵蓋的部分
+
+透過多區域支援，您可以建立三個應用程式，它們都在同一個網域下運作且對使用者呈現一致的外觀，但每個應用程式都可以獨立開發和部署。
+
+<Image
+  alt="三個區域：A、B、C。展示不同區域間路由的硬導航 (hard navigation)，以及同一區域內路由的軟導航 (soft navigation)"
+  srcLight="/docs/light/multi-zones.png"
+  srcDark="/docs/dark/multi-zones.png"
+  width="1600"
+  height="750"
+/>
+
+在同一區域內的頁面間導航會執行軟導航 (soft navigation)，這種導航方式無需重新載入頁面。例如，在此圖表中，從 `/` 導航至 `/products` 就是軟導航。
+
+從一個區域的頁面導航至另一個區域的頁面（例如從 `/` 導航至 `/dashboard`）則會執行硬導航 (hard navigation)，卸載當前頁面的資源並載入新頁面的資源。經常一起造訪的頁面應放在同一區域內，以避免硬導航。
+
+## 如何定義區域
+
+區域就是一個普通的 Next.js 應用程式，您只需額外設定 [assetPrefix](/docs/app/api-reference/config/next-config-js/assetPrefix) 以避免與其他區域的頁面和靜態檔案產生衝突。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+}
+```
+
+Next.js 資源（如 JavaScript 和 CSS）會加上 `assetPrefix` 前綴，確保不會與其他區域的資源衝突。這些資源將在每個區域的 `/assetPrefix/_next/...` 路徑下提供服務。
+
+處理所有未被路由至其他更特定區域的路徑的預設應用程式則不需要設定 `assetPrefix`。
+
+在 Next.js 15 之前的版本中，您可能還需要額外的重寫規則來處理靜態資源。這在 Next.js 15 中已不再需要。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/blog-static/_next/:path+',
+          destination: '/_next/:path+',
+        },
+      ],
+    }
+  },
+}
+```
+
+## 如何將請求路由至正確區域
+
+設定好多區域後，您需要將路徑路由至正確的區域，因為它們由不同的應用程式提供服務。您可以使用任何 HTTP 代理來實現這一點，但也可以使用其中一個 Next.js 應用程式來路由整個網域的請求。
+
+要使用 Next.js 應用程式路由至正確區域，您可以使用 [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites)。對於由不同區域服務的每個路徑，您需要新增一條重寫規則，將該路徑發送至其他區域的網域，同時也需要重寫靜態資源的請求。例如：
+
+```js filename="next.config.js"
+async rewrites() {
+    return [
+        {
+            source: '/blog',
+            destination: `${process.env.BLOG_DOMAIN}/blog`,
+        },
+        {
+            source: '/blog/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog/:path+`,
+        },
+        {
+            source: '/blog-static/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog-static/:path+`,
+        }
+    ];
+}
+```
+
+`destination` 應指向由該區域提供服務的 URL，包括協定和網域。這通常應指向該區域的生產網域，但也可用於在本地開發時將請求路由至 `localhost`。
+
+> **須知**：URL 路徑在區域間應保持唯一。例如，兩個區域都試圖服務 `/blog` 會導致路由衝突。
+
+### 使用中介軟體 (middleware) 路由請求
+
+建議透過 [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites) 路由請求以最小化請求的延遲開銷，但在需要動態決策路由時（例如在遷移期間使用功能標誌決定路徑應路由至何處），也可以使用中介軟體。
+
+```js filename="middleware.js"
+export async function middleware(request) {
+  const { pathname, search } = req.nextUrl;
+  if (pathname === '/your-path' && myFeatureFlag.isEnabled()) {
+    return NextResponse.rewrite(`${rewriteDomain}${pathname}${search});
+  }
+}
+```
+
+## 區域間的連結
+
+連結至不同區域的路徑應使用 `a` 標籤而非 Next.js 的 [`<Link>`](/docs/pages/api-reference/components/link) 元件。這是因為 Next.js 會嘗試預取並對 `<Link>` 元件中的任何相對路徑執行軟導航，這在跨區域時無法運作。
+
+## 共享程式碼
+
+組成不同區域的 Next.js 應用程式可以存放在任何程式碼庫中。然而，將這些區域放在 [monorepo](https://en.wikipedia.org/wiki/Monorepo) 中通常更方便於共享程式碼。對於存放在不同程式碼庫的區域，也可以透過公開或私有的 NPM 套件共享程式碼。
+
+由於不同區域的頁面可能在不同時間發布，功能標誌 (feature flags) 可用於協調不同區域間功能的啟用或停用。
+
+<AppOnly>
+
+## 伺服器動作 (Server Actions)
+
+當在多區域中使用 [伺服器動作 (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) 時，您必須明確允許使用者面向的來源 (origin)，因為您的使用者面向網域可能服務多個應用程式。在 `next.config.js` 檔案中新增以下設定：
+
+```js filename="next.config.js"
+const nextConfig = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['your-production-domain.com'],
+    },
+  },
+}
+```
+
+詳見 [`serverActions.allowedOrigins`](/docs/app/api-reference/config/next-config-js/serverActions#allowedorigins) 以獲取更多資訊。
+
+</AppOnly>

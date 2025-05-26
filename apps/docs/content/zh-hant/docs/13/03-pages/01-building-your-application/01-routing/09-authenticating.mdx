@@ -1,0 +1,143 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:37:51.753Z
+title: 身份驗證
+description: 了解 Next.js 應用中的身份驗證模式並探索幾個範例。
+---
+
+身份驗證 (Authentication) 用於確認使用者身份，而授權 (Authorization) 則控制使用者能訪問的內容。Next.js 支援多種身份驗證模式，每種模式針對不同的使用情境設計。本頁將逐一介紹這些模式，幫助您根據需求做出選擇。
+
+## 身份驗證模式
+
+選擇身份驗證模式的第一步是了解您所需的[資料獲取策略](/docs/pages/building-your-application/data-fetching)。接著我們可以確定哪些身份驗證供應商支援該策略。主要有兩種模式：
+
+- 使用[靜態生成 (Static Generation)](/docs/pages/building-your-application/rendering/static-site-generation) 在伺服器端渲染載入狀態，然後在客戶端獲取使用者資料。
+- 透過[伺服器端渲染 (Server-side Rendering)](/docs/pages/building-your-application/rendering/server-side-rendering) 獲取使用者資料，避免出現未驗證內容的閃爍。
+
+### 驗證靜態生成頁面
+
+當頁面沒有阻塞性資料需求時，Next.js 會自動判定該頁面為靜態頁面。這表示頁面中不存在 [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) 和 `getInitialProps`。此時您的頁面可以先從伺服器渲染載入狀態，然後在客戶端獲取使用者資料。
+
+這種模式的優勢在於頁面可以透過全球 CDN 提供服務，並使用 [`next/link`](/docs/pages/api-reference/components/link) 進行預載。實際上，這能縮短 TTI ([互動時間](https://web.dev/interactive/))。
+
+以下是一個個人資料頁面的範例。它會先渲染載入骨架圖，當使用者資料請求完成後，顯示使用者名稱：
+
+```jsx filename="pages/profile.js"
+import useUser from '../lib/useUser'
+import Layout from '../components/Layout'
+
+const Profile = () => {
+  // 在客戶端獲取使用者資料
+  const { user } = useUser({ redirectTo: '/login' })
+
+  // 伺服器端渲染載入狀態
+  if (!user || user.isLoggedIn === false) {
+    return <Layout>載入中...</Layout>
+  }
+
+  // 當使用者請求完成後，顯示使用者資料
+  return (
+    <Layout>
+      <h1>您的個人資料</h1>
+      <pre>{JSON.stringify(user, null, 2)}</pre>
+    </Layout>
+  )
+}
+
+export default Profile
+```
+
+您可以查看[實際運作的範例](https://iron-session-example.vercel.app/)。參考 [`with-iron-session`](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session) 範例了解其運作原理。
+
+### 驗證伺服器端渲染頁面
+
+如果您從頁面中匯出名為 [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) 的 `async` 函數，Next.js 會在每次請求時使用該函數返回的資料預先渲染頁面。
+
+```jsx
+export async function getServerSideProps(context) {
+  return {
+    props: {}, // 將作為 props 傳遞給頁面元件
+  }
+}
+```
+
+讓我們將個人資料範例改為使用[伺服器端渲染](/docs/pages/building-your-application/rendering/server-side-rendering)。如果有會話存在，將 `user` 作為 prop 傳遞給頁面中的 `Profile` 元件。請注意[此範例](https://iron-session-example.vercel.app/)中沒有載入骨架圖。
+
+```jsx filename="pages/profile.js"
+import withSession from '../lib/session'
+import Layout from '../components/Layout'
+
+export const getServerSideProps = withSession(async function ({ req, res }) {
+  const { user } = req.session
+
+  if (!user) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    }
+  }
+
+  return {
+    props: { user },
+  }
+})
+
+const Profile = ({ user }) => {
+  // 顯示使用者資料。無需載入狀態
+  return (
+    <Layout>
+      <h1>您的個人資料</h1>
+      <pre>{JSON.stringify(user, null, 2)}</pre>
+    </Layout>
+  )
+}
+
+export default Profile
+```
+
+這種模式的優勢在於能避免在重新導向前出現未驗證內容的閃爍。需要注意的是，在 `getServerSideProps` 中獲取使用者資料會阻塞渲染，直到身份驗證供應商的請求完成。為避免造成瓶頸並增加 TTFB ([首字節時間](https://web.dev/time-to-first-byte/))，您應確保身份驗證查詢速度夠快。否則，請考慮使用[靜態生成](#authenticating-statically-generated-pages)。
+
+## 身份驗證供應商
+
+現在我們已討論了身份驗證模式，接下來看看具體的供應商及其在 Next.js 中的使用方式。
+
+### 使用自有資料庫
+
+<details open>
+  <summary>範例</summary>
+
+- [with-iron-session](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session)
+- [next-auth-example](https://github.com/nextauthjs/next-auth-example)
+
+</details>
+
+如果您已有包含使用者資料的資料庫，可能會想使用與供應商無關的開源解決方案：
+
+- 如需低階、加密且無狀態的會話工具，請使用 [`iron-session`](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session)。
+- 如需功能完整的身份驗證系統，包含內建供應商 (Google、Facebook、GitHub...)、JWT、JWE、電子郵件/密碼、魔法連結等，請使用 [`next-auth`](https://github.com/nextauthjs/next-auth-example)。
+
+這兩種函式庫都支援上述身份驗證模式。如果您對 [Passport](http://www.passportjs.org/) 感興趣，我們也提供了使用安全加密 cookie 的範例：
+
+- [with-passport](https://github.com/vercel/next.js/tree/canary/examples/with-passport)
+- [with-passport-and-next-connect](https://github.com/vercel/next.js/tree/canary/examples/with-passport-and-next-connect)
+
+### 其他供應商
+
+如需查看其他身份驗證供應商的範例，請參閱 [examples 資料夾](https://github.com/vercel/next.js/tree/canary/examples)。
+
+<details open>
+  <summary>範例</summary>
+
+- [Auth0](https://github.com/vercel/next.js/tree/canary/examples/auth0)
+- [Clerk](https://github.com/vercel/next.js/tree/canary/examples/with-clerk)
+- [Firebase](https://github.com/vercel/next.js/tree/canary/examples/with-firebase-authentication)
+- [Magic](https://github.com/vercel/next.js/tree/canary/examples/with-magic)
+- [Nhost](https://github.com/vercel/next.js/tree/canary/examples/with-nhost-auth-realtime-graphql)
+- [Ory](https://github.com/vercel/examples/tree/main/solutions/auth-with-ory)
+- [Supabase](https://github.com/vercel/next.js/tree/canary/examples/with-supabase)
+- [Supertokens](https://github.com/vercel/next.js/tree/canary/examples/with-supertokens)
+- [Userbase](https://github.com/vercel/next.js/tree/canary/examples/with-userbase)
+
+</details>

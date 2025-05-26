@@ -1,0 +1,375 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-05-25T21:52:25.925Z
+title: 資料獲取、快取與重新驗證
+nav_title: 獲取、快取與重新驗證
+description: 學習如何在您的 Next.js 應用程式中獲取、快取和重新驗證資料。
+---
+
+資料獲取是任何應用程式的核心部分。本頁面將介紹如何在 React 和 Next.js 中獲取、快取和重新驗證資料。
+
+有四種方式可以獲取資料：
+
+1. [在伺服器端使用 `fetch`](#在伺服器端使用-fetch-獲取資料)
+2. [在伺服器端使用第三方函式庫](#在伺服器端使用第三方函式庫獲取資料)
+3. [在客戶端透過路由處理器](#在客戶端使用路由處理器獲取資料)
+4. [在客戶端使用第三方函式庫](#在客戶端使用路由處理器獲取資料)
+
+## 在伺服器端使用 `fetch` 獲取資料
+
+Next.js 擴展了原生的 [`fetch` Web API](https://developer.mozilla.org/docs/Web/API/Fetch_API)，允許您為伺服器端的每個 fetch 請求配置[快取](#快取資料)和[重新驗證](#重新驗證資料)行為。React 擴展了 `fetch` 功能，在渲染 React 元件樹時自動[記憶化](/docs/app/building-your-application/data-fetching/patterns#fetching-data-where-its-needed) fetch 請求。
+
+您可以在[伺服器元件](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md)中使用 `fetch` 搭配 [`async`/`await`](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md)，也可以在[路由處理器](/docs/app/building-your-application/routing/route-handlers)和[伺服器動作](/docs/app/building-your-application/data-fetching/forms-and-mutations)中使用。
+
+例如：
+
+```tsx filename="app/page.tsx" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // 返回值*不會*被序列化
+  // 您可以返回 Date、Map、Set 等
+
+  if (!res.ok) {
+    // 這將觸發最近的 `error.js` 錯誤邊界
+    throw new Error('Failed to fetch data')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+```jsx filename="app/page.js" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // 返回值*不會*被序列化
+  // 您可以返回 Date、Map、Set 等
+
+  if (!res.ok) {
+    // 這將觸發最近的 `error.js` 錯誤邊界
+    throw new Error('Failed to fetch data')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+> **須知事項**：
+>
+> - Next.js 提供了在伺服器元件中獲取資料時可能需要的實用函式，例如 [`cookies`](/docs/app/api-reference/functions/cookies) 和 [`headers`](/docs/app/api-reference/functions/headers)。這些函式會導致路由動態渲染，因為它們依賴於請求時的資訊。
+> - 在路由處理器中，`fetch` 請求不會被記憶化，因為路由處理器不是 React 元件樹的一部分。
+> - 要在 TypeScript 的伺服器元件中使用 `async`/`await`，您需要使用 TypeScript `5.1.3` 或更高版本以及 `@types/react` `18.2.8` 或更高版本。
+
+### 快取資料
+
+快取可以儲存資料，這樣就不需要在每次請求時都從資料來源重新獲取。
+
+預設情況下，Next.js 會自動將 `fetch` 的返回值快取在伺服器的[資料快取](/docs/app/building-your-application/caching#data-cache)中。這意味著資料可以在建置時或請求時獲取、快取，並在每次資料請求時重複使用。
+
+```js
+// 'force-cache' 是預設值，可以省略
+fetch('https://...', { cache: 'force-cache' })
+```
+
+使用 `POST` 方法的 `fetch` 請求也會自動快取。除非它位於使用 `POST` 方法的[路由處理器](/docs/app/building-your-application/routing/route-handlers)中，否則不會被快取。
+
+> **什麼是資料快取？**
+>
+> 資料快取是一個持久的 [HTTP 快取](https://developer.mozilla.org/docs/Web/HTTP/Caching)。根據您的平台，快取可以自動擴展並[跨多個區域共享](https://vercel.com/docs/infrastructure/data-cache)。
+>
+> 了解更多關於[資料快取](/docs/app/building-your-application/caching#data-cache)的資訊。
+
+### 重新驗證資料
+
+重新驗證是清除資料快取並重新獲取最新資料的過程。這在您的資料變更且您希望確保顯示最新資訊時非常有用。
+
+快取的資料可以通過兩種方式重新驗證：
+
+- **基於時間的重新驗證**：在經過一定時間後自動重新驗證資料。這適用於變更不頻繁且即時性不那麼關鍵的資料。
+- **按需重新驗證**：根據事件（例如表單提交）手動重新驗證資料。按需重新驗證可以使用基於標籤或路徑的方法來一次性重新驗證一組資料。這適用於您希望盡快顯示最新資料的情況（例如，當您的無頭 CMS 內容更新時）。
+
+#### 基於時間的重新驗證
+
+要按時間間隔重新驗證資料，您可以使用 `fetch` 的 `next.revalidate` 選項來設定資源的快取生命週期（以秒為單位）。
+
+```js
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+或者，要重新驗證路由區段中的所有 `fetch` 請求，您可以使用[區段配置選項](/docs/app/api-reference/file-conventions/route-segment-config)。
+
+```jsx filename="layout.js | page.js"
+export const revalidate = 3600 // 最多每小時重新驗證一次
+```
+
+如果在靜態渲染的路由中有多個 fetch 請求，且每個請求有不同的重新驗證頻率，則所有請求將使用最短的時間。對於動態渲染的路由，每個 `fetch` 請求將獨立重新驗證。
+
+了解更多關於[基於時間的重新驗證](/docs/app/building-your-application/caching#time-based-revalidation)。
+
+#### 按需重新驗證
+
+可以在路由處理器或伺服器動作中通過路徑 ([`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)) 或快取標籤 ([`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)) 按需重新驗證資料。
+
+Next.js 有一個快取標籤系統，用於跨路由使 `fetch` 請求失效。
+
+1. 使用 `fetch` 時，您可以選擇用一個或多個標籤標記快取條目。
+2. 然後，您可以呼叫 `revalidateTag` 來重新驗證與該標籤關聯的所有條目。
+
+例如，以下 `fetch` 請求添加了快取標籤 `collection`：
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+如果使用路由處理器，您應該建立一個只有您的 Next.js 應用知道的秘密令牌。此秘密將用於防止未經授權的重新驗證嘗試。例如，您可以通過以下 URL 結構存取路由（手動或通過 webhook）：
+
+```bash filename="URL"
+https://<your-site.com>/api/revalidate?tag=collection&secret=<token>
+```
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { NextRequest } from 'next/server'
+import { revalidateTag } from 'next/cache'
+
+// 例如，一個 webhook 到 `your-website.com/api/revalidate?tag=collection&secret=<token>`
+export async function POST(request: NextRequest) {
+  const secret = request.nextUrl.searchParams.get('secret')
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (secret !== process.env.MY_SECRET_TOKEN) {
+    return Response.json({ message: 'Invalid secret' }, { status: 401 })
+  }
+
+  if (!tag) {
+    return Response.json({ message: 'Missing tag param' }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidateTag } from 'next/cache'
+
+// 例如，一個 webhook 到 `your-website.com/api/revalidate?tag=collection&secret=<token>`
+export async function POST(request) {
+  const secret = request.nextUrl.searchParams.get('secret')
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (secret !== process.env.MY_SECRET_TOKEN) {
+    return Response.json({ message: 'Invalid secret' }, { status: 401 })
+  }
+
+  if (!tag) {
+    return Response.json({ message: 'Missing tag param' }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+或者，您可以使用 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) 來重新驗證與路徑關聯的所有資料。
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { NextRequest } from 'next/server'
+import { revalidatePath } from 'next/cache'
+
+export async function POST(request: NextRequest) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (!path) {
+    return Response.json({ message: 'Missing path param' }, { status: 400 })
+  }
+
+  revalidatePath(path)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function POST(request) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (!path) {
+    return Response.json({ message: 'Missing path param' }, { status: 400 })
+  }
+
+  revalidatePath(path)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+了解更多關於[按需重新驗證](/docs/app/building-your-application/caching#on-demand-revalidation)。
+
+#### 錯誤處理與重新驗證
+
+如果在嘗試重新驗證資料時拋出錯誤，則將繼續從快取中提供最後一次成功生成的資料。在後續請求中，Next.js 將重試重新驗證資料。
+
+### 選擇退出資料快取
+
+`fetch` 請求在以下情況下**不會**被快取：
+
+- 在 `fetch` 請求中添加了 `cache: 'no-store'`。
+- 在個別 `fetch` 請求中添加了 `revalidate: 0` 選項。
+- `fetch` 請求位於使用 `POST` 方法的路由處理器中。
+- `fetch` 請求在使用 `headers` 或 `cookies` 之後。
+- 使用了 `const dynamic = 'force-dynamic'` 路由區段選項。
+- `fetchCache` 路由區段選項配置為預設跳過快取。
+- `fetch` 請求使用 `Authorization` 或 `Cookie` 標頭，並且在元件樹中有未快取的請求在其上方。
+
+#### 個別 `fetch` 請求
+
+要為個別 `fetch` 請求選擇退出快取，您可以將 `fetch` 中的 `cache` 選項設為 `'no-store'`。這將在每次請求時動態獲取資料。
+
+```js filename="layout.js | page.js"
+fetch('https://...', { cache: 'no-store' })
+```
+
+查看所有可用的 `cache` 選項，請參閱 [`fetch` API 參考](/docs/app/api-reference/functions/fetch)。
+
+#### 多個 `fetch` 請求
+
+如果在路由區段（例如佈局或頁面）中有多個 `fetch` 請求，您可以使用[區段配置選項](/docs/app/api-reference/file-conventions/route-segment-config)來配置該區段中所有資料請求的快取行為。
+
+例如，使用 `const dynamic = 'force-dynamic'` 將導致所有資料在請求時獲取，並且該區段將被動態渲染。
+
+```js filename="layout.js | page.js"
+// 添加
+export const dynamic = 'force-dynamic'
+```
+
+有大量的區段配置選項，讓您可以精細控制路由區段的靜態和動態行為。詳情請參閱[API 參考](/docs/app/api-reference/file-conventions/route-segment-config)。
+
+## 在伺服器端使用第三方函式庫獲取資料
+
+在使用不支援或未公開 `fetch` 的第三方函式庫（例如資料庫、CMS 或 ORM 客戶端）時，您可以使用[路由區段配置選項](/docs/app/api-reference/file-conventions/route-segment-config)和 React 的 `cache` 函式來配置這些請求的快取和重新驗證行為。
+
+資料是否被快取取決於路由區段是[靜態還是動態渲染](/docs/app/building-your-application/rendering/server-components#server-rendering-strategies)。如果區段是靜態的（預設值），則請求的輸出將作為路由區段的一部分被快取和重新驗證。如果區段是動態的，則請求的輸出將**不會**被快取，並將在渲染區段時於每次請求中重新獲取。
+
+> **須知事項**：
+>
+> Next.js 正在開發一個 API `unstable_cache`，用於配置個別第三方請求的快取和重新驗證行為。
+
+### 範例
+
+在以下範例中：
+
+- `revalidate` 選項設為 `3600`，意味著資料將被快取並最多每小時重新驗證一次。
+- React 的 `cache` 函式用於[記憶化](/docs/app/building-your-application/caching#request-memoization)資料請求。
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+
+export const revalidate = 3600 // 最多每小時重新驗證一次資料
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+
+export const revalidate = 3600 // 最多每小時重新驗證一次資料
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+儘管 `getItem` 函式被呼叫了兩次，但只會向資料庫發送一個查詢。
+
+```tsx filename="app/item/[id]/layout.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Layout({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/layout.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Layout({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Page({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+## 在客戶端使用路由處理器獲取資料
+
+如果需要在客戶端元件中獲取資料，您可以從客戶端呼叫[路由處理器](/docs/app/building-your-application/routing/route-handlers)。路由處理器在伺服器端執行並將資料返回給客戶端。這在您不想向客戶端暴露敏感資訊（例如 API 令牌）時非常有用。
+
+請參閱[路由處理器](/docs/app/building-your-application/routing/route-handlers)文件以獲取範例。
+
+> **伺服器元件與路由處理器**
+>
+> 由於伺服器元件在伺服器端渲染，您不需要從伺服器元件呼叫路由處理器來獲取資料。相反，您可以直接在伺服器元件中獲取資料。
+
+## 在客戶端使用第三方函式庫獲取資料
+
+您也可以使用第三方函式庫（例如 [SWR](https://swr.vercel.app/) 或 [React Query](https://tanstack.com/query/latest)）在客戶端獲取資料。這些函式庫提供了自己的 API 來記憶化請求、快取、重新驗證和變更資料。
+
+> **未來 API**：
+>
+> `use` 是一個 React 函式，**接受並處理**由函式返回的 promise。目前**不建議**在客戶端元件中將 `fetch` 包裝在 `use` 中，這可能會觸發多次重新渲染。在 [React RFC](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md#usepromise) 中了解更多關於 `use` 的資訊。
