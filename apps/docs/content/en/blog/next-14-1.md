@@ -1,0 +1,266 @@
+---
+title: Next.js 14.1
+description: >-
+  Next.js 14 includes improvements to self-hosting, error messages, parallel and
+  intercepted routes, Turbopack, and more.
+author:
+  - name: Jiachi Liu
+    image: /static/team/jiachi.png
+  - name: Jimmy Lai
+    image: /static/team/jimmy.jpg
+date: 2024-01-18T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-1/twitter-card.png
+---
+
+Next.js 14.1 includes developer experience improvements including:
+
+*   [**Improved Self-Hosting:**](#improved-self-hosting) New documentation and custom cache handler
+*   [**Turbopack Improvements:**](#turbopack-improvements) 5,600 tests passing for `next dev --turbo`
+*   [**DX Improvements:**](#developer-experience-improvements) Improved error messages, `pushState` and `replaceState` support
+*   [**Parallel & Intercepted Routes:**](#parallel--intercepted-routes) 20 bug fixes based on your feedback
+*   [**`next/image` Improvements:**](#nextimage-support-for-picture-and-art-direction) `<picture>`, art direction, and dark mode support
+
+Upgrade today or get started with:
+
+```bash filename="Terminal"
+npx create-next-app@latest
+```
+
+[Improved Self-Hosting](#improved-self-hosting)
+-----------------------------------------------
+
+We've heard your feedback for improved clarity on how to self-host Next.js with a Node.js server, Docker container, or static export. We've overhauled our self-hosting documentation on:
+
+*   [Runtime environment variables](/docs/app/building-your-application/deploying#environment-variables)
+*   [Custom cache configuration for ISR](/docs/app/building-your-application/deploying#caching-and-isr)
+*   [Custom image optimization](/docs/app/building-your-application/deploying#image-optimization)
+*   [Middleware](/docs/app/building-your-application/deploying#middleware)
+
+With Next.js 14.1, we've also stabilized providing custom cache handlers for Incremental Static Regeneration and the more granular Data Cache for the App Router:
+
+```js filename="next.config.js"
+module.exports = {
+  cacheHandler: require.resolve('./cache-handler.js'),
+  cacheMaxMemorySize: 0, // disable default in-memory caching
+};
+```
+
+Using this configuration when self-hosting is important when using container orchestration platforms like Kubernetes, where each pod will have a copy of the cache. Using a custom cache handler will allow you to ensure consistency across all pods hosting your Next.js application.
+
+For instance, you can save the cached values anywhere, like Redis or Memcached. We'd like to thank [`@neshca`](https://github.com/caching-tools/next-shared-cache) for their [Redis cache handler adapter](https://github.com/vercel/next.js/tree/canary/examples/cache-handler-redis) and example.
+
+[Turbopack Improvements](#turbopack-improvements)
+-------------------------------------------------
+
+We're continuing to focus on the reliability and performance of local Next.js development:
+
+*   **Reliability:** Turbopack passing the entire Next.js development test suite and dogfooding Vercel's applications
+*   **Performance:** Improving Turbopack initial compile times and Fast Refresh times
+*   **Memory Usage:** Improving Turbopack memory usage
+
+We plan to stabilize `next dev --turbo` in an upcoming release with it still being opt-in.
+
+### [Reliability](#reliability)
+
+Next.js with Turbopack now passes **5,600 development tests (94%)**, 600 more since the last update. You can follow the progress on [areweturboyet.com](https://areweturboyet.com/).
+
+We have continued dogfooding `next dev --turbo` on all Vercel's Next.js applications, including [vercel.com](http://vercel.com) and [v0.dev](http://v0.dev). All engineers working on these applications are using Turbopack daily.
+
+We've found and fixed a number of issues for very large Next.js applications using Turbopack. For these fixes, we've added new tests to the existing development test suites in Next.js.
+
+### [Performance](#performance)
+
+For `vercel.com`, a large Next.js application, we've seen:
+
+*   Up to **76.7% faster** local server startup
+*   Up to **96.3% faster** code updates with Fast Refresh
+*   Up to **45.8% faster** initial route compile without caching (Turbopack does not have disk caching yet)
+
+In [v0.dev](http://v0.dev), we identified an opportunity to optimize the way React Client Components are discovered and bundled in Turbopack - resulting in **up to 61.5%** faster initial compile time. This performance improvement was also observed in [vercel.com](http://vercel.com).
+
+### [Future Improvements](#future-improvements)
+
+Turbopack currently has in-memory caching, which improves incremental compilation times for Fast Refresh.
+
+However, the cache is currently not preserved when restarting the Next.js development server. The next big step for Turbopack performance is **disk caching**, which will allow the cache to be preserved when restating the development server.
+
+[Developer Experience Improvements](#developer-experience-improvements)
+-----------------------------------------------------------------------
+
+### [Improved Error Messages and Fast Refresh](#improved-error-messages-and-fast-refresh)
+
+We know how critical clear error messages are to your local development experience. We've made a number of fixes to improve the quality of stack traces and error messages you see when running `next dev`.
+
+*   Errors that previously displayed bundler errors like `webpack-internal` now properly display the source code of the error and the affected file.
+*   After seeing an error in a client component, and then fixing the error in your editor, the Fast Refresh did not clear the error screen. It required a hard reload. We've fixed a number of these instances. For example, trying to export `metadata` from a Client Component.
+
+For example, this was a previous error message:
+
+An example of an error from a fetch call in Next.js 14.
+
+Next.js 14.1 has improved this to:
+
+Errors from fetch calls during rendering now display the source code of the error and the affected file.
+
+### [`window.history.pushState` and `window.history.replaceState`](#windowhistorypushstate-and-windowhistoryreplacestate)
+
+The App Router now allows the usage of the native [`pushState`](https://developer.mozilla.org/en-US/docs/Web/API/History/pushState) and [`replaceState`](https://developer.mozilla.org/en-US/docs/Web/API/History/replaceState) methods to update the browser's history stack without reloading the page.
+
+`pushState` and `replaceState` calls integrate into the Next.js App Router, allowing you to sync with [`usePathname`](/docs/app/api-reference/functions/use-pathname) and [`useSearchParams`](/docs/app/api-reference/functions/use-search-params).
+
+This is helpful when needing to immediately update the URL when saving state like filters, sort order, or other information desired to persist across reloads.
+
+```
+'use client';
+ 
+import { useSearchParams } from 'next/navigation';
+ 
+export default function SortProducts() {
+  const searchParams = useSearchParams();
+ 
+  function updateSorting(sortOrder: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('sort', sortOrder);
+    window.history.pushState(null, '', `?${params.toString()}`);
+  }
+ 
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Sort Ascending</button>
+      <button onClick={() => updateSorting('desc')}>Sort Descending</button>
+    </>
+  );
+}
+```
+
+Learn more about using the [native History API](/docs/app/building-your-application/routing/linking-and-navigating#using-the-native-history-api) with Next.js.
+
+### [Data Cache Logging](#data-cache-logging)
+
+For improved observability of your cached data in your Next.js application when running `next dev`, we've made a number of improvements to the `logging` [configuration option](/docs/app/api-reference/next-config-js/logging).
+
+You can now display whether there was a cache `HIT` or `SKIP` and the full URL requested:
+
+```bash filename="Terminal"
+GET / 200 in 48ms
+ ✓ Compiled /fetch-cache in 117ms
+ GET /fetch-cache 200 in 165ms
+  │ GET https://api.vercel.app/products/1 200 in 14ms (cache: HIT)
+ ✓ Compiled /fetch-no-store in 150ms
+ GET /fetch-no-store 200 in 548ms
+  │ GET https://api.vercel.app/products/1 200 in 345ms (cache: SKIP)
+  │  │  Cache missed reason: (cache: no-store)
+```
+
+This can be enabled through `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
+};
+```
+
+[`next/image` support for `<picture>` and Art Direction](#nextimage-support-for-picture-and-art-direction)
+----------------------------------------------------------------------------------------------------------
+
+The Next.js Image component now supports more advanced use cases through `getImageProps()` (stable) which don't require using `<Image>` directly. This includes:
+
+*   Working with [`background-image`](https://developer.mozilla.org/docs/Web/CSS/background-image) or [`image-set`](https://developer.mozilla.org/docs/Web/CSS/image/image-set)
+*   Working with canvas [`context.drawImage()`](https://developer.mozilla.org/docs/Web/API/Canvas_API/Tutorial/Using_images) or `new Image()`
+*   Working with [`<picture>`](https://developer.mozilla.org/docs/Web/HTML/Element/picture) media queries to implement [Art Direction](https://developer.mozilla.org/docs/Learn/HTML/Multimedia_and_embedding/Responsive_images#art_direction) or Light/Dark Mode images
+
+```
+import { getImageProps } from 'next/image';
+ 
+export default function Page() {
+  const common = { alt: 'Hero', width: 800, height: 400 };
+  const {
+    props: { srcSet: dark },
+  } = getImageProps({ ...common, src: '/dark.png' });
+  const {
+    props: { srcSet: light, ...rest },
+  } = getImageProps({ ...common, src: '/light.png' });
+ 
+  return (
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcSet={dark} />
+      <source media="(prefers-color-scheme: light)" srcSet={light} />
+      <img {...rest} />
+    </picture>
+  );
+}
+```
+
+Learn more about [`getImageProps()`](/docs/app/api-reference/components/image#getimageprops).
+
+[Parallel & Intercepted Routes](#parallel--intercepted-routes)
+--------------------------------------------------------------
+
+In Next.js 14.1, we've made **20 improvements** to Parallel & Intercepted Routes.
+
+For the past two releases, we've been focused on improving performance and reliability of Next.js. We've now been able to make many improvements to [Parallel](https://nextjs.org/docs/app/building-your-application/routing/parallel-routes) & [Intercepted Routes](https://nextjs.org/docs/app/building-your-application/routing/intercepting-routes) based on your feedback. Notably, we've added support for catch-all routes and Server Actions.
+
+*   **Parallel Routes** allow you to simultaneously or conditionally render one or more pages in the same layout. For highly dynamic sections of an app, such as dashboards and feeds on social sites, Parallel Routes can be used to implement complex routing patterns.
+*   **Intercepted Routes** allow you to load a route from another part of your application within the current layout. For example, when clicking on a photo in a feed, you can display the photo in a modal, overlaying the feed. In this case, Next.js intercepts the `/photo/123` route, masks the URL, and overlays it over `/feed`.
+
+Learn more about [Parallel](https://nextjs.org/docs/app/building-your-application/routing/parallel-routes) & [Intercepted Routes](https://nextjs.org/docs/app/building-your-application/routing/intercepting-routes) or [view an example](https://github.com/vercel/nextgram).
+
+[Other Improvements](#other-improvements)
+-----------------------------------------
+
+Since `14.0`, we've fixed a number of highly upvoted bugs from the community.
+
+We've also recently published videos [explaining caching](https://www.youtube.com/watch?v=VBlSe8tvg4U) and some [common mistakes with the App Router](https://www.youtube.com/watch?v=RBM03RihZVs) that you might find helpful.
+
+*   **\[Docs\]** New documentation on [Redirecting](https://nextjs.org/docs/app/building-your-application/routing/redirecting)
+*   **\[Docs\]** New documentation on [Testing](https://nextjs.org/docs/app/building-your-application/testing)
+*   **\[Docs\]** New documentation with a [Production Checklist](https://nextjs.org/docs/app/building-your-application/deploying/production-checklist)
+*   **\[Feature\]** Add `<GoogleAnalytics />` component to `next/third-parties` ([Docs](https://nextjs.org/docs/app/building-your-application/optimizing/third-party-libraries#google-analytics))
+*   **\[Improvement\]** `create-next-app` is now smaller and faster to install ([PR](https://github.com/vercel/next.js/pull/58030))
+*   **\[Improvement\]** Nested routes throwing errors can still be caught be `global-error` ([PR](https://github.com/vercel/next.js/pull/60539))
+*   **\[Improvement\]** `redirect` now respects `basePath` when used in a server action ([PR](https://github.com/vercel/next.js/pull/60184))
+*   **\[Improvement\]** Fix `next/script` and `beforeInteractive` usage with App Router ([PR](https://github.com/vercel/next.js/pull/59779))
+*   **\[Improvement\]** Automatically transpile `@aws-sdk` and `lodash` for faster route startup ([PR](https://github.com/vercel/front/pull/27895))
+*   **\[Improvement\]** Fix flash of unstyled content with `next dev` and `next/font` ([PR](https://github.com/vercel/next.js/pull/60175))
+*   **\[Improvement\]** Propagate `notFound` errors past a segment's error boundary ([PR](https://github.com/vercel/next.js/pull/60567))
+*   **\[Improvement\]** Fix serving public files from locale domains with Pages Router i18n ([PR](https://github.com/vercel/next.js/pull/60749))
+*   **\[Improvement\]** Error if an invalidate `revalidate` value is passed ([PR](https://github.com/vercel/next.js/pull/59822))
+*   **\[Improvement\]** Fix path issues on linux machines when build created on windows ([PR](https://github.com/vercel/next.js/pull/60116))
+*   **\[Improvement\]** Fix Fast Refresh / HMR when using a multi-zone app with `basePath` ([PR](https://github.com/vercel/next.js/pull/59471))
+*   **\[Improvement\]** Improve graceful shutdown from termination signals ([PR](https://github.com/vercel/next.js/pull/60059))
+*   **\[Improvement\]** Modal routes clash when intercepting from different routes ([PR](https://github.com/vercel/next.js/pull/59861))
+*   **\[Improvement\]** Fix intercepting routes when using `basePath` config ([PR](https://github.com/vercel/next.js/issues/52624))
+*   **\[Improvement\]** Show warning when a missing parallel slot results in 404 ([PR](https://github.com/vercel/next.js/pull/60186))
+*   **\[Improvement\]** Improve intercepted routes when used with catch-all routes ([PR](https://github.com/vercel/next.js/issues/59784))
+*   **\[Improvement\]** Improve intercepted routes when used with `revalidatePath` ([PR](https://github.com/vercel/next.js/issues/54173))
+*   **\[Improvement\]** Fix usage of `@children` slots with parallel routes ([PR](https://github.com/vercel/next.js/pull/60288))
+*   **\[Improvement\]** Fix Fix TypeError when using params with parallel routes ([PR](https://github.com/vercel/next.js/issues/59711))
+*   **\[Improvement\]** Fix catch-all route normalization for default parallel routes ([PR](https://github.com/vercel/next.js/pull/60240))
+*   **\[Improvement\]** Fix display of parallel routes in the `next build` summary ([PR](https://github.com/vercel/next.js/issues/59775))
+*   **\[Improvement\]** Fix for route parameters when using intercepted routes ([PR](https://github.com/vercel/next.js/issues/59782))
+*   **\[Improvement\]** Improve deeply nested parallel/intercepted routes ([PR](https://github.com/vercel/next.js/issues/58660))
+*   **\[Improvement\]** Fix 404 with intercepted routes paired with route groups ([PR](https://github.com/vercel/next.js/pull/59752))
+*   **\[Improvement\]** Fix parallel routes with server actions / revalidating router cache ([PR](https://github.com/vercel/next.js/pull/59585))
+*   **\[Improvement\]** Fix usage of `rewrites` with an intercepted route ([PR](https://github.com/vercel/next.js/pull/59168))
+*   **\[Improvement\]** Server Actions now work from third-party libraries ([PR](https://github.com/vercel/next.js/pull/59569))
+*   **\[Improvement\]** Next.js can now be used within an ESM package ([PR](https://github.com/vercel/next.js/pull/59852))
+*   **\[Improvement\]** Barrel file optimizations for libraries like Material UI ([PR](https://github.com/vercel/next.js/issues/59804))
+*   **\[Improvement\]** Builds will now fail on incorrect usage of `useSearchParams` without `Suspense` ([PR](https://github.com/vercel/next.js/pull/60840))
+
+[Contributors](#contributors)
+-----------------------------
+
+Next.js is the result of the combined work of over 3,000 individual developers, industry partners like Google and Meta, and our core team at Vercel. Join the community on [GitHub Discussions](https://github.com/vercel/next.js/discussions), [Reddit](https://www.reddit.com/r/nextjs/), and [Discord](https://nextjs.org/discord).
+
+This release was brought to you by:
+
+*   The **Next.js** team: [Andrew](https://github.com/acdlite), [Balazs](https://github.com/balazsorban44), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sebastian](https://github.com/sebmarkbage), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens), [Wyatt](https://github.com/wyattjoh), and [Zack](https://github.com/ztanner).
+*   The **Turbopack** team: [Donny](https://github.com/kdy1), [Leah](https://github.com/forsakenharmony), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra), and [Will](https://github.com/wbinnssmith).
+*   **Next.js Docs**: [Delba](https://github.com/delbaoliveira), [Steph](https://github.com/StephDietz), [Michael](https://github.com/manovotny), and [Lee](https://github.com/leerob).
+
+And the contributions of: @OlehDutchenko, @eps1lon, @ebidel, @janicklas-ralph, @JohnPhamous, @chentsulin, @akawalsky, @BlankParticle, @dvoytenko, @smaeda-ks, @kenji-webdev, @rv-david, @icyJoseph, @dijonmusters, @A7med3bdulBaset, @jenewland1999, @mknichel, @kdy1, @housseindjirdeh, @max-programming, @redbmk, @SSakibHossain10, @jamesmillerburgess, @minaelee, @officialrajdeepsingh, @LorisSigrist, @yesl-kim, @StevenKamwaza, @manovotny, @mcexit, @remcohaszing, @ryo-manba, @TranquilMarmot, @vinaykulk621, @haritssr, @divquan, @IgorVaryvoda, @LukeSchlangen, @RiskyMH, @ash2048, @ManuWeb3, @msgadi, @dhayab, @ShahriarKh, @jvandenaardweg, @DestroyerXyz, @SwitchBladeAK, @ianmacartney, @justinh00k, @tiborsaas, @ArianHamdi, @li-jia-nan, @aramikuto, @jquinc30, @samcx, @Haosik, @AkifumiSato, @arnabsen, @nfroidure, @clbn, @siddtheone, @zbauman3, @anthonyshew, @alexfradiani, @CalebBarnes, @adk96r, @pacexy, @hichemfantar, @michaldudak, @redonkulus, @k-taro56, @mhughdo, @tknickman, @shumakmanohar, @vordgi, @hamirmahal, @gaspar09, @JCharante, @sjoerdvanBommel, @mass2527, @N-Ziermann, @tordans, @davidthorand, @rmathew8-gh, @chriskrogh, @shogunsea, @auipga, @SukkaW, @agustints, @OXXD, @clarencepenz, @better-salmon, @808vita, @coltonehrman, @tksst, @hugo-syn, @JakobJingleheimer, @Willem-Jaap, @brandonnorsworthy, @jaehunn, @jridgewell, @gtjamesa, @mugi-uno, @kentobento, @vivianyentran, @empflow, @samennis1, @mkcy3, @suhaotian, @imevanc, @d3lm, @amannn, @hallatore, @Dylan700, @mpsq, @mdio, @christianvuerings, @karlhorky, @simonhaenisch, @olci34, @zce, @LavaToaster, @rishabhpoddar, @jirihofman, @codercor, @devjiwonchoi, @JackieLi565, @thoushif, @pkellner, @jpfifer, @quisido, @tomfa, @raphaelbadia, @j9141997, @hongaar, @MadCcc, @luismulinari, @dumb-programmer, @nonoakij, @franky47, @robbertstevens, @bryndyment, @marcosmartini, @functino, @Anisi, @AdonisAgelis, @seangray-dev, @prkagrawal, @heloineto, @kn327, @ihommani, @MrNiceRicee, @falsepopsky, @thomasballinger, @tmilewski, @Vadman97, @dnhn, @RodrigoTomeES, @sadikkuzu, @gffuma, @Schniz, @joulev, @Athrun-Judah, @rasvanjaya21, @rashidul0405, @nguyenbry, @Mwimwii, @molebox, @mrr11k, @philwolstenholme, @IgorKowalczyk, @Zoe-Bot, @HanCiHu, @JackHowa, @goncy, @hirotomoyamada, @pveyes, @yeskunall, @ChendayUP, @hmaesta, @ajz003, @its-kunal, @joelhooks, @blurrah, @tariknh, @Vinlock, @Nayeem-XTREME, @aziyatali, @aspehler, and @moka-ayumu.

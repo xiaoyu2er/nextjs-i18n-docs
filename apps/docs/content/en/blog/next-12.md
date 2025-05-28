@@ -1,0 +1,265 @@
+---
+title: Next.js 12
+description: >-
+  Next.js 12 introduces a brand-new Rust compiler, Middleware (beta), React 18
+  Support, Native ESM Support, URL Imports, React Server Components (alpha), and
+  more!
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: DongYoon Kang
+    image: /static/team/kdy.jpg
+  - name: Gerald Monaco
+    image: /static/team/gerald.jpg
+  - name: Javi Velasco
+    image: /static/team/javi.jpg
+  - name: Jiachi Liu
+    image: /static/team/jiachi.png
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Kara Erickson
+    image: /static/team/kara.jpg
+  - name: Maia Teegarden
+    image: /static/team/maia.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Steven
+    image: /static/team/styfle.png
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2021-10-26T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-12/twitter-card.png
+---
+
+As we announced at [Next.js Conf](https://nextjs.org/conf), Next.js 12 is our biggest release ever:
+
+*   [**Rust Compiler**](#faster-builds-and-fast-refresh-with-rust-compiler): ~3x faster Fast Refresh and ~5x faster builds
+*   [**Middleware (beta)**](#introducing-middleware): Enabling full flexibility in Next.js with code over configuration
+*   [**React 18 Support**](#preparing-for-react-18): Native Next.js APIs are now supported, as well as Suspense
+*   [**`<Image />` AVIF Support**](#smaller-images-using-avif): Opt-in for 20% smaller images
+*   [**Bot-aware ISR Fallback**](#bot-aware-isr-fallback): Optimized SEO for web crawlers
+*   [**Native ES Modules Support**](#es-modules-support-and-url-imports): Aligning with the standardized module system
+*   [**URL Imports (alpha)**](#url-imports): Import packages from any URL, no installs required
+*   [**React Server Components (alpha)**](#react-server-components): Try it today, including SSR streaming
+
+Update today by running `npm i next@latest`.
+
+[Faster builds and Fast Refresh with Rust compiler](#faster-builds-and-fast-refresh-with-rust-compiler)
+-------------------------------------------------------------------------------------------------------
+
+We want to make every Next.js application build faster for production, and get instant feedback in local development. Next.js 12 includes a brand new Rust compiler that takes advantage of native compilation.
+
+Our Rust compiler is built on [**SWC**](http://swc.rs/), an open platform for the next generation of fast tooling. We've optimized bundling and compiling with ~**3x faster refresh** locally and ~**5x faster builds** for production. Other improvements and features include:
+
+Results from using the new Rust compiler with large Next.js codebases.
+
+*   **Further speed improvements for large codebases:** We've validated the Rust compiler with some of the largest Next.js codebases in the world.
+*   **Improved observability into performance:** Next.js now outputs Fast Refresh timing in the console for both client and server compilation, including the number of modules and files compiled.
+*   **Underlying webpack improvements:** We've made numerous improvements to webpack, including optimizing Fast Refresh and making on-demand entries more reliable.
+
+Compilation using Rust is **17x faster than Babel** and enabled by default using Next.js 12, replacing transforming JavaScript and TypeScript files. This meant we had to port the Babel transformations in Next.js to Rust, including a **brand new CSS parser in Rust** used to implement the `styled-jsx` transform.
+
+The new Rust compiler is backwards compatible. If you have an existing Babel configuration, you will automatically be opted out. We have plans to port parsing for popular libraries like `styled-components`, `emotion`, and `relay` soon. If you're using a custom Babel setup, [please share your configuration](https://github.com/vercel/next.js/discussions/30174).
+
+You can also opt-in to using the Rust compiler for minification. This is **7x faster than Terser**. Minification is opt-in until it’s thoroughly validated as it replaces multi-year infrastructure.
+
+```js filename="next.config.js"
+module.exports = {
+  swcMinify: true,
+};
+```
+
+On top of hiring [DongYoon Kang](https://twitter.com/kdy1dev), the creator of SWC, and [Maia Teegarden](https://twitter.com/padmaia), a contributor to [Parcel](https://parceljs.org/), we are continuing to invest in the Rust ecosystem. If you have experience working with Rust, [please apply to join our team](https://vercel.com/careers).
+
+For more information, [watch our demo](https://www.youtube.com/watch?v=_WNeAubn92U) from Next.js Conf.
+
+[Introducing Middleware](#introducing-middleware)
+-------------------------------------------------
+
+Middleware enables you to use code over configuration. This gives you full flexibility in Next.js because you can run code before a request is completed. Based on the user's incoming request, you can modify the response by rewriting, redirecting, adding headers, or even streaming HTML.
+
+Middleware gives you complete flexibility inside Next.js.
+
+Middleware can be used for anything that shares logic for a set of pages, including:
+
+*   [Authentication](https://vercel.com/templates/next.js/jwt-authentication)
+*   [Bot protection](https://vercel.com/templates/next.js/bot-protection-datadome)
+*   [Redirects](https://vercel.com/templates/next.js/edge-redirects-upstash)
+*   [Rewrites](https://vercel.com/templates/next.js/hostname-rewrites)
+*   [Feature flags and A/B tests](https://vercel.com/templates/next.js/ab-testing-simple)
+*   [Advanced i18n routing requirements](https://vercel.com/templates/next.js/edge-functions-i18n)
+*   And [more](https://vercel.com/templates?type=edge-functions)!
+
+Middleware uses a strict runtime that supports standard Web APIs like **`fetch`**. This works out of the box using `next start`, as well as on Edge platforms like Vercel, which use [Edge Middleware](http://www.vercel.com/edge).
+
+To use Middleware in Next.js, you can create a file `pages/_middleware.js`. In this example, we use the standard Web API Response ([MDN](https://developer.mozilla.org/docs/Web/API/Response)):
+
+```js filename="pages/_middleware.js"
+export function middleware(req, ev) {
+  return new Response('Hello, world!');
+}
+```
+
+For more information, [watch our demo](https://www.youtube.com/watch?v=WlP2TB2ORL4) from Next.js Conf and [check out the documentation](/docs/pages/building-your-application/routing/middleware).
+
+[Preparing for React 18](#preparing-for-react-18)
+-------------------------------------------------
+
+[React 18](https://reactjs.org/blog/2021/06/08/the-plan-for-react-18.html) will add features like Suspense, automatic batching of updates, APIs like `startTransition`, and a new streaming API for server rendering with support for `React.lazy`.
+
+We've been working closely with the React team at Facebook to prepare Next.js for React 18 as it moves towards a stable release. We're making these features available to try today in Next.js 12 under an experimental flag.
+
+```bash filename="Terminal"
+npm install react@alpha react-dom@alpha
+```
+
+### [Server-Side Streaming](#server-side-streaming)
+
+Concurrent features in [React 18](https://reactjs.org/blog/2021/06/08/the-plan-for-react-18.html) include built-in support for server-side Suspense and SSR streaming support. This allows you to server-render pages using HTTP streaming. This is an experimental feature in Next.js 12, but once enabled, SSR will use the same strict runtime as Middleware.
+
+To enable, use the experimental flag `concurrentFeatures: true`:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    concurrentFeatures: true,
+  },
+};
+```
+
+### [React Server Components](#react-server-components)
+
+React Server Components allow us to render everything, including the components themselves, on the server. This is fundamentally different from server-side rendering where you're pre-generating HTML on the server. With Server Components, there's **zero client-side JavaScript needed**, making page rendering faster. This improves the user experience of your application, pairing the best parts of server-rendering with client-side interactivity.
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    concurrentFeatures: true,
+    serverComponents: true,
+  },
+};
+```
+
+Next.js now enables you to do data fetching at _the component level_, all expressed as JSX. By using React Server components, we can simplify things. Special functions like `getServerSideProps` or `getStaticProps` are no longer needed. This aligns with the React Hooks model of colocating data fetching with your components.
+
+You can rename any Next.js page to `.server.js` to create a Server Component and import client components directly inside your Server Components. These client components will hydrate and become interactive, so you add functionality like upvotes.
+
+We're currently working on server-side Suspense, selective hydration, and streaming rendering in Next.js and will share our progress in a future blog post.
+
+Special thanks to our collaborators [Kara Erickson](https://twitter.com/karaforthewin) and [Gerald Monaco](https://twitter.com/devknoll) on the [Google Aurora](https://web.dev/introducing-aurora/) team for their work on React 18 and Server Components.
+
+For more information, [watch our demo](https://www.youtube.com/watch?v=WlP2TB2ORL4) from Next.js Conf and [check out the documentation](https://vercel.link/react-18).
+
+[ES Modules Support and URL Imports](#es-modules-support-and-url-imports)
+-------------------------------------------------------------------------
+
+ES modules bring an official, standardized module system to JavaScript. They're supported by all major browsers as well as Node.js.
+
+This standard pushes the web ecosystem forward by enabling smaller package sizes and JavaScript bundles, ultimately leading to a better user experience. As the JavaScript ecosystem transitions from Common JS (the old standard) to ES modules, we're committed to helping developers incrementally adopt these improvements without unnecessary breaking changes.
+
+Starting with [Next.js 11.1](https://nextjs.org/blog/next-11-1), we added experimental support for [ES modules](https://nodejs.org/docs/latest/api/esm.html) being prioritized over CommonJS modules. In Next.js 12, this is now the default. Importing NPM modules that only provide CommonJS is still supported.
+
+[URL Imports](#url-imports)
+---------------------------
+
+Next.js 12 includes experimental support for importing ES Modules through URLs, no install or separate build step is required.
+
+URL imports allow you to use _any_ package directly through a URL. This enables Next.js to process remote HTTP(S) resources exactly like local dependencies.
+
+If a URL import is detected, Next.js will generate a `next.lock` file to track remote resources. URL imports are cached locally to ensure you can still work offline. Next.js supports both client and server URL imports.
+
+To opt-in, add the allowed URL prefixes inside `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    urlImports: ['https://cdn.skypack.dev'],
+  },
+};
+```
+
+Then, you can import modules directly from URLs:
+
+```
+import confetti from 'https://cdn.skypack.dev/canvas-confetti';
+```
+
+Any CDN that serves ES modules will work, including no-code and design tools like Framer:
+
+*   [Skypack](https://skypack.dev)
+*   [esm.sh](https://esm.sh/)
+*   [jsDelivr](https://www.jsdelivr.com/)
+*   [JSPM](https://jspm.org/)
+*   [unpkg](https://unpkg.com/)
+
+For more information, [watch our demo](https://www.youtube.com/watch?v=_WNeAubn92U) from Next.js Conf and [check out the documentation](/docs/pages/api-reference/next-config-js/urlImports).
+
+[Bot-Aware ISR Fallback](#bot-aware-isr-fallback)
+-------------------------------------------------
+
+Currently, [Incremental Static Regeneration](https://vercel.com/docs/concepts/incremental-static-regeneration/overview) with `fallback: true` renders a fallback state before rendering the page contents on the first request to a page that was not generated yet. To block the page from loading (server-rendering), you would need to use `fallback: 'blocking'`.
+
+In Next.js 12, [web crawlers (e.g. search bots)](https://nextjs.org/learn/seo/introduction-to-seo/webcrawlers) will automatically server-render ISR pages using `fallback: true`, while still serving the previous behavior of the fallback state to non-crawler User-Agents. This prevents crawlers from indexing loading states.
+
+[Smaller images using AVIF](#smaller-images-using-avif)
+-------------------------------------------------------
+
+The built-in Image Optimization API now supports AVIF images, enabling 20% smaller images compared to WebP.
+
+AVIF images can take longer to optimize compared to WebP, so we're making this feature opt-in using the new `images.formats` property in `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
+};
+```
+
+This list of formats is used to determine the optimized image format on-demand using the request's `Accept` header. Since AVIF is first, it will be served if the [browser supports AVIF](https://caniuse.com/avif). If not, WebP will be served if the [browser supports WebP](https://caniuse.com/webp). If neither format is supported, the original image format will be served.
+
+[Output File Tracing](#output-file-tracing)
+-------------------------------------------
+
+In Next.js 8, we introduced the `target` option. This allowed for outputting Next.js pages as standalone JavaScript bundles by bundling all dependencies using webpack during the build. We quickly realized this wasn't ideal and instead created `@vercel/nft`. `@vercel/nft` has been used for over 2 years on all deployments on the Vercel platform.
+
+Now, we're bringing these improvements directly into the Next.js framework by default, **for all deployment platforms**, providing a significantly improved approach over the `target` option.
+
+Next.js 12 automatically traces which files are needed by each page and API route using `@vercel/nft`, and outputs these trace results next to the `next build` output, allowing integrators to leverage the traces Next.js provides automatically.
+
+These changes also optimize applications deploying using tools like Docker through `next start`. By leveraging `@vercel/nft`, we will be able to make the Next.js output standalone in the future. No dependencies will be required to be installed to run the application, massively reducing the Docker image size.
+
+Bringing `@vercel/nft` into Next.js supersedes the `target` approach, making `target` deprecated in Next.js 12. [Check out the documentation](/docs/pages/api-reference/next-config-js/output) for more info.
+
+[Other Improvements](#other-improvements)
+-----------------------------------------
+
+*   Adding `pages/_app.js` or `pages/_document.js` to your application now automatically replaces the built-in version without requiring a reboot of the Next.js CLI.
+*   The ESLint integration now supports [single-file linting](https://github.com/vercel/next.js/pull/28042) in `next lint` with the `--file` flag.
+*   Next.js 12 now supports setting a custom `tsconfig.json` path.
+*   `next.config.mjs` is now supported for writing the configuration as ES modules.
+*   In-flight requests are now de-duped for getStaticProps.
+*   Checking for static pages now runs using a shared worker pool.
+*   Fast Refresh now uses a WebSocket connection instead of a EventSource connection.
+
+[Breaking Changes](#breaking-changes)
+-------------------------------------
+
+*   After making webpack 5 the default in [Next.js 11](https://nextjs.org/blog/next-11#webpack-5), we've now officially removed webpack 4. We've worked closely with the community to ensure a smooth transition to webpack 5.
+*   `target` in `next.config.js` is no longer needed.
+*   `next/image` now uses a `span` as the wrapping element instead of a `div`.
+*   The minimum Node.js version has been bumped from `12.0.0` to `12.22.0`, which is the first version of Node.js with native ES modules support.
+
+To learn more, check out the [upgrade guide](/docs/pages/building-your-application/upgrading).
+
+[Community](#community)
+-----------------------
+
+Five years ago, we released Next.js to the public. We set out to build a zero-configuration React framework that simplifies your developer experience. Looking back, it's incredible to see how the community has grown, and what we've been able to ship together. Let's keep going.
+
+Next.js is the result of the combined work of **over 1,800 individual developers**, industry partners like Google and Facebook, and our core team.
+
+This release was brought to you by the contributions of: @ka2n, @housseindjirdeh, @rojserbest, @lobsterkatie, @thibautsabot, @javivelasco, @sokra, @rishabhpoddar, @kdy1, @huozhi, @georgegach, @ionut-botizan, @paul-creates, @TimBarley, @kimizuy, @devknoll, @matamatanot, @christianvuerings, @pgrodrigues, @mohamedbhy, @AlfonzAlfonz, @kara, @molebox, @angelopoole, @oste, @genetschneider, @jantimon, @kyliau, @mxschmitt, @PhattOZ, @finn-orsini, @kriswuollett, @harryheman, @GustavoEdinger, @AryanBeezadhur, @Blevs, @colevscode, @atcastle, @ijjk, @velocity23, @jonowu, @timneutkens, @whitep4nth3r, @micro-chipset, @TyMick, @padmaia, @arthurdenner, @vitorbal, @zNeb, @jacksonhardaker, @shuding, @kylemh, @Bundy-Mundi, @ctjlewis, @thien-do, @leerob, @Dev-CasperTheGhost, @janicklas-ralph, @rezathematic, @KonstHardy, @fracture91, @lorensr, @Sheraff, @HaNdTriX, @emilio, @oluan, @ddzieduch, @colinclerk, @x4th, @volcareso, @oiva, @sinchang, @scottrepreneur, @smakosh, @catnose99, @adrienharnay, @donsn, @andersonleite, @msp5382, @tim-hanssen, @appsplash99, @alexvilchis, @RobEasthope, @royal, @Perry-Olsson, @well-balanced, @mrmckeb, @buraksakalli, @espipj, @prateekbh, @AleksaC, @eungyeole, and @rgabs
