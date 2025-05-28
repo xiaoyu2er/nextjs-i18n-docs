@@ -1,5 +1,5 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { Book } from 'lucide-react';
+import { AlbumIcon, Book } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 
@@ -20,6 +20,13 @@ export const useBaseOptions = () => {
         icon: <Book />,
         text: t('doc'),
         url: '/docs/',
+      },
+
+      {
+        icon: <AlbumIcon />,
+        text: t('blog'),
+        url: '/blog',
+        active: 'nested-url',
       },
     ],
   } as BaseLayoutProps;

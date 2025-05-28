@@ -1,4 +1,5 @@
 import {
+  defineCollections,
   defineConfig,
   defineDocs,
   frontmatterSchema,
@@ -38,6 +39,23 @@ export const docs = defineDocs({
   meta: {
     schema: metaSchema,
   },
+});
+
+export const blog = defineCollections({
+  type: 'doc',
+  dir: `content/${process.env.LOCALE}/blog`,
+  async: true,
+  schema: frontmatterSchema.extend({
+    author: z
+      .object({
+        name: z.string().optional(),
+        image: z.string().optional(),
+      })
+      .array()
+      .optional(),
+    date: z.date(),
+    image: z.string().url().optional(),
+  }),
 });
 
 export default defineConfig({
