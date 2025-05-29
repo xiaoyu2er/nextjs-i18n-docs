@@ -34,8 +34,7 @@ export default function HomePage() {
             {t('getStarted')}
           </Link>
           <Link
-            href="https://nextjs.org/learn"
-            target="_blank"
+            href="/learn"
             className="px-6 py-3 rounded-lg bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-700 text-black dark:text-white font-semibold text-lg shadow hover:bg-gray-100 dark:hover:bg-gray-800 transition"
           >
             {t('learn')}
