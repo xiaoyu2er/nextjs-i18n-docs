@@ -1,0 +1,218 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:56:49.030Z
+title: Next.js 14.2
+description: >-
+  Next.js 14.2 包含開發環境、生產環境與快取機制的改進。
+  包括新增配置選項、Turbopack 測試通過率達 99%，以及其他更新。
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2024-04-11T17:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/twitter-card.png
+---
+
+Next.js 14.2 包含開發環境、生產環境與快取機制的改進。
+
+*   [**開發環境 Turbopack (候選版本):**](#turbopack-for-development-release-candidate) `next dev --turbo` 測試通過率達 99.8%。
+*   [**建置與生產環境改進:**](#build-and-production-improvements) 降低建置記憶體使用量與 CSS 最佳化。
+*   [**快取機制改進:**](#caching-improvements) 可透過 `staleTimes` 配置失效週期。
+*   [**錯誤開發體驗改進:**](#errors-dx-improvements) 強化 hydration 不匹配錯誤提示與設計更新。
+
+立即升級或開始使用：
+
+```bash filename="Terminal"
+npx create-next-app@latest
+```
+
+[開發環境 Turbopack (候選版本)](#turbopack-for-development-release-candidate)
+---------------------------------------------------------------------------------------------
+
+過去幾個月，我們持續改進 Turbopack 的本地開發效能。在 14.2 版本中，Turbopack **候選版本** 現已可用於本地開發：
+
+*   [整合測試](https://areweturboyet.com/) 通過率達 **99.8%**。
+*   我們已驗證 Next.js 應用中最常用的 300 個 `npm` 套件能與 Turbopack 編譯相容。
+*   所有 [Next.js 範例](https://github.com/vercel/next.js/tree/canary/examples) 皆支援 Turbopack。
+*   我們整合了 [Lightning CSS](https://lightningcss.dev/)，這是一個用 Rust 編寫的高速 CSS 打包與壓縮工具。
+
+我們已在 Vercel 的應用中廣泛使用 Turbopack 進行內部測試。以大型 Next.js 應用 `vercel.com` 為例，我們觀察到：
+
+*   本地伺服器啟動速度提升最高達 **76.7%**。
+*   使用 Fast Refresh 時程式碼更新速度提升最高達 **96.3%**。
+*   無快取情況下初始路由編譯速度提升最高達 **45.8%** (Turbopack 目前尚未實現磁碟快取)。
+
+Turbopack 仍為選用功能，您可透過以下指令試用：
+
+```bash filename="Terminal"
+next dev --turbo
+```
+
+我們現階段將專注於改善記憶體使用量、實現持久化快取，以及 `next build --turbo`。
+
+*   **記憶體使用量** - 我們建立了底層工具來分析記憶體使用情況。您現在可以 [生成追蹤檔](/docs/architecture/turbopack#generating-trace-files)，其中包含效能指標與廣泛的記憶體使用資訊。這些追蹤檔讓我們無需存取您的應用原始碼即可調查效能與記憶體問題。
+*   **持久化快取** - 我們正在評估最佳架構方案，預計在未來版本中分享更多細節。
+*   **`next build`** - 雖然 Turbopack 尚未支援建置流程，但已有 **74.7%** 的測試通過。您可於 [areweturboyet.com/build](https://areweturboyet.com/build) 追蹤進度。
+
+如需查看 Turbopack 的 [支援功能](/docs/architecture/turbopack#supported-features) 與 [未支援功能](/docs/architecture/turbopack#unsupported-features) 清單，請參閱我們的 [文件](/docs/architecture/turbopack)。
+
+[建置與生產環境改進](#build-and-production-improvements)
+-----------------------------------------------------------------------
+
+除了 Turbopack 的打包改進外，我們也致力提升所有 Next.js 應用 (包含 Pages 與 App Router) 的整體建置與生產效能。
+
+### [Tree-shaking](#tree-shaking)
+
+我們針對 Server Components 與 Client Components 的邊界進行了最佳化，實現未使用匯出的 tree-shaking。例如，從標記 `"use client"` 的檔案中導入單一 `Icon` 元件時，將不再包含該套件中的所有其他圖示。這能大幅減少生產環境 JavaScript 套件體積。
+
+在 `react-aria-components` 等熱門套件上測試此最佳化後，最終套件體積減少 **51.3%**。
+
+> **注意：** 此最佳化目前不適用於 barrel 檔案。您可暫時使用 [`optimizePackageImports`](/docs/app/api-reference/next-config-js/optimizePackageImports) 配置選項：
+> 
+> ```ts filename="next.config.ts"
+> module.exports = {
+>   experimental: {
+>     optimizePackageImports: ['package-name'],
+>   },
+> };
+> ```
+
+### [建置記憶體使用量](#build-memory-usage)
+
+針對超大型 Next.js 應用，我們發現生產環境建置時會發生記憶體不足崩潰 (OOM)。調查使用者回報與重現案例後，我們確認根本原因在於過度打包與壓縮 (Next.js 會產生較少但體積更大且含重複程式碼的 JavaScript 檔案)。我們已重構打包邏輯並針對這些情況最佳化編譯器。
+
+初步測試顯示，在最小化的 Next.js 應用上，記憶體使用量與快取檔案大小平均從 **2.2GB 降至 190MB 以下**。
+
+為方便除錯記憶體效能，我們在 `next build` 中新增了 `--experimental-debug-memory-usage` 旗標。詳情請參閱 [文件](/docs/app/building-your-application/optimizing/memory-usage)。
+
+### [CSS](#css)
+
+我們更新了生產環境建置時的 CSS 最佳化方式，透過分塊處理 CSS 來避免頁面導航時的樣式衝突。
+
+CSS 分塊的順序與合併現在由導入順序決定。例如，`base-button.module.css` 會排在 `page.module.css` 之前：
+
+```tsx filename="base-button.tsx"
+import styles from './base-button.module.css';
+ 
+export function BaseButton() {
+  return <button className={styles.primary} />;
+}
+```
+
+```tsx filename="page.tsx"
+import { BaseButton } from './base-button';
+import styles from './page.module.css';
+ 
+export function Page() {
+  return <BaseButton className={styles.primary} />;
+}
+```
+
+為維持正確的 CSS 順序，我們建議：
+
+*   優先使用 [CSS Modules](/docs/app/building-your-application/styling/css-modules) 而非 [全域樣式](/docs/app/building-your-application/styling/css-modules#global-styles)。
+*   每個 JS/TS 檔案只導入一個 CSS Module。
+*   若使用全域類名，請在同一個 JS/TS 檔案中導入全域樣式。
+
+我們預期此變更不會對大多數應用造成負面影響。但若升級後發現樣式異常，請依照 [文件](/docs/app/building-your-application/styling/css#ordering-and-merging) 建議檢查 CSS 導入順序。
+
+[快取機制改進](#caching-improvements)
+---------------------------------------------
+
+快取是構建快速可靠網頁應用的關鍵環節。執行資料變更時，使用者與開發者都期望快取能即時更新以反映最新變動。我們持續探索如何改進 App Router 中的 Next.js 快取體驗。
+
+### [`staleTimes` (實驗性功能)](#staletimes-experimental)
+
+[用戶端路由快取](/docs/app/building-your-application/caching#data-cache-and-client-side-router-cache) 是設計來透過快取已訪問與預獲取路由以提供快速導覽體驗的快取層。
+
+根據社群回饋，我們新增了實驗性 `staleTimes` 選項，允許配置 [用戶端路由快取](/docs/app/building-your-application/caching#router-cache) 的失效週期。
+
+預設情況下，預獲取路由 (使用不含 `prefetch` 屬性的 `<Link>` 元件) 會快取 30 秒，若 `prefetch` 屬性設為 `true` 則快取 5 分鐘。您可透過在 `next.config.js` 中定義自訂 [重新驗證時間](/docs/app/building-your-application/caching#duration-3) 來覆寫預設值：
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+`staleTimes` 旨在改善當前希望更精確控制快取策略的使用者體驗，但並非完整解決方案。在未來版本中，我們將專注於改進整體快取語義並提供更靈活的方案。
+
+詳情請參閱 [文件](/docs/app/api-reference/next-config-js/staleTimes) 中有關 `staleTimes` 的說明。
+
+### [平行路由與攔截式路由](#parallel-and-intercepting-routes)
+
+我們持續改進[平行路由](/docs/app/building-your-application/routing/parallel-routes)與[攔截式路由](/docs/app/building-your-application/routing/intercepting-routes)，現在強化了與客戶端路由快取 (Client-side Router Cache) 的整合。
+
+* 當平行路由與攔截式路由呼叫[伺服器動作 (Server Actions)](/docs/app/api-reference/functions/server-actions) 並搭配 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) 或 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) 時，將會重新驗證快取並刷新可見的插槽 (slots)，同時維持使用者當前的視圖。
+* 同樣地，呼叫 [`router.refresh`](/docs/app/building-your-application/caching#routerrefresh) 現在能正確刷新可見插槽，同時保持當前視圖。
+
+[錯誤處理開發體驗改進](#errors-dx-improvements)
+-------------------------------------------------
+
+在 14.1 版本中，我們開始著手[改進錯誤訊息與堆疊追蹤的可讀性](/blog/next-14-1#improved-error-messages-and-fast-refresh)，這項工作持續到 14.2 版本，現在包含更完善的錯誤訊息、應用路由 (App Router) 與頁面路由 (Pages Router) 的錯誤覆蓋層設計改進、支援深淺色模式，以及更清晰的 `dev` 與 `build` 日誌。
+
+舉例來說，React 水合錯誤 (Hydration errors) 是社群中常見的困惑來源。雖然我們已改進功能幫助使用者找出水合不匹配的根源（如下所示），我們仍持續與 React 團隊合作，改進底層錯誤訊息並顯示錯誤發生的檔案名稱。
+
+**改版前：**
+
+![Next.js 14.2 版本前的錯誤覆蓋層範例](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/error-overlay-before.png)
+
+Next.js 14.2 版本前的錯誤覆蓋層範例。
+
+**改版後：**
+
+![Next.js 14.2 版本後的錯誤覆蓋層範例](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/error-overlay-after.png)
+
+Next.js 14.2 版本後的錯誤覆蓋層範例。
+
+[React 19](#react-19)
+---------------------
+
+二月份時，React 團隊宣布即將發布[React 19](https://react.dev/blog/2024/02/15/react-labs-what-we-have-been-working-on-february-2024#the-next-major-version-of-react)。為了準備 React 19，我們正致力於將最新功能與改進整合至 Next.js，並計劃發布一個主要版本來統籌這些變更。
+
+像是 Actions 及其相關鉤子 (hooks) 等新功能，原本已在 Next.js 中透過[React canary 頻道](https://react.dev/blog/2023/05/03/react-canaries)提供，現在將開放給所有 React 應用程式（包括純客戶端應用程式）使用。我們期待這些功能能在 React 生態系中獲得廣泛採用。
+
+[其他改進](#other-improvements)
+-----------------------------------------
+
+* **\[文件\]** 新增影片最佳化文件 ([PR](https://github.com/vercel/next.js/pull/60574))。
+* **\[文件\]** 新增 `instrumentation.ts` 文件 ([PR](https://github.com/vercel/next.js/pull/61403))。
+* **\[功能\]** `next/image` 新增 `overrideSrc` 屬性 ([PR](https://github.com/vercel/next.js/pull/64221))。
+* **\[功能\]** `getStaticProps` 新增 `revalidateReason` 參數 ([PR](https://github.com/vercel/next.js/pull/64258))。
+* **\[改進\]** 重構串流邏輯，減少生產環境中頁面串流時間 ([PR](https://github.com/vercel/next.js/pull/63427))。
+* **\[改進\]** 支援巢狀伺服器動作 (Nested Server Actions) ([PR](https://github.com/vercel/next.js/pull/61001))。
+* **\[改進\]** 支援在地化 (localization) 生成的網站地圖 (Sitemaps) ([PR](https://github.com/vercel/next.js/pull/53765))。
+* **\[改進\]** 開發與建置日誌的視覺優化 ([PR](https://github.com/vercel/next.js/pull/62946))。
+* **\[改進\]** 偏差保護 (Skew protection) 在 Vercel 上已穩定 ([文件](https://vercel.com/docs/skew-protection))。
+* **\[改進\]** 讓 `useSelectedLayoutSegment` 相容於頁面路由 (Pages Router) ([PR](https://github.com/vercel/next.js/pull/62584))。
+* **\[改進\]** 當絕對網址不需要解析時，跳過 `metadataBase` 警告 ([PR](https://github.com/vercel/next.js/pull/61898))。
+* **\[改進\]** 修正部署至 Vercel 時，未啟用 JavaScript 的情況下伺服器動作無法提交的問題 ([PR](https://github.com/vercel/next.js/pull/63978))。
+* **\[改進\]** 修正當觸發伺服器動作後離開參考頁面，或在非活躍的平行路由區段中使用時，動作清單中找不到伺服器動作的錯誤 ([PR](https://github.com/vercel/next.js/pull/64227))。
+* **\[改進\]** 修正 `next/dynamic` 載入的元件中 CSS 導入問題 ([PR](https://github.com/vercel/next.js/pull/64294))。
+* **\[改進\]** 當動態圖片缺少 `unoptimized` 屬性時發出警告 ([PR](https://github.com/vercel/next.js/pull/61045))。
+* **\[改進\]** 當 `images.loaderFile` 未導出預設函式時顯示錯誤訊息 ([PR](https://github.com/vercel/next.js/pull/64036))。
+
+[社群](#community)
+-----------------------
+
+Next.js 現在每月有超過 100 萬活躍開發者。我們感謝社群的支援與貢獻。歡迎加入 [GitHub Discussions](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/) 與 [Discord](/discord) 的討論。
+
+[貢獻者](#contributors)
+-----------------------------
+
+Next.js 是超過 3,000 名獨立開發者、Google 和 Meta 等產業夥伴，以及 Vercel 核心團隊共同努力的成果。此版本由以下人員共同打造：
+
+* **Next.js 團隊**: [Andrew](https://github.com/acdlite)、[Balazs](https://github.com/balazsorban44)、[Ethan](https://github.com/Ethan-Arrowood)、[Janka](https://github.com/lubieowoce)、[Jiachi](https://github.com/huozhi)、[Jimmy](https://github.com/feedthejim)、[JJ](https://github.com/ijjk)、[Josh](https://github.com/gnoff)、[Sam](https://github.com/samcx)、[Sebastian](https://github.com/sebmarkbage)、[Sebbie](https://github.com/eps1lon)、[Shu](https://github.com/shuding)、[Steven](https://github.com/styfle)、[Tim](https://github.com/timneutkens)、[Wyatt](https://github.com/wyattjoh) 與 [Zack](https://github.com/ztanner)。
+* **Turbopack 團隊**: [Donny](https://github.com/kdy1)、[Leah](https://github.com/forsakenharmony)、[Maia](https://github.com/padmaia)、[OJ](https://github.com/kwonoj)、[Tobias](https://github.com/sokra) 與 [Will](https://github.com/wbinnssmith)。
+* **Next.js 文件團隊**: [Delba](https://github.com/delbaoliveira)、[Steph](https://github.com/StephDietz)、[Michael](https://github.com/manovotny)、[Anthony](https://github.com/anthonyshew) 與 [Lee](https://github.com/leerob)。
+
+特別感謝 @taishikato、@JesseKoldewijn、@Evavic44、@feugy、@liamlaverty、@dvoytenko、@SukkaW、@wbinnssmith、@rishabhpoddar、@better-salmon、@ziyafenn、@A7med3bdulBaset、@jasonuc、@yossydev、@Prachi-meon、@InfiniteCodeMonkeys、@ForsakenHarmony、@miketimmerman、@kwonoj、@williamli、@gnoff、@jsteele-stripe、@chungweileong94、@WITS、@sogoagain、@junioryono、@eisafaqiri、@yannbolliger、@aramikuto、@rocketman-21、@kenji-webdev、@michaelpeterswa、@Dannymx、@vpaflah、@zeevo、@chrisweb、@stefangeneralao、@tknickman、@Kikobeats、@ubinatus、@code-haseeb、@hmmChase、@byhow、@DanielRivers、@wojtekmaj、@paramoshkinandrew、@OMikkel、@theitaliandev、@oliviertassinari、@Ishaan2053、@Sandeep-Mani、@alyahmedaly、@Lezzio、@devjiwonchoi、@juliusmarminge、@szmazhr、@eddiejaoude、@itz-Me-Pj、@AndersDJohnson、@gentamura、@tills13、@dijonmusters、@SaiGanesh21、@vordgi、@ryota-murakami、@tszhong0411、@officialrajdeepsingh、@alexpuertasr、@AkifumiSato、@Jonas-PFX、@icyJoseph、@florian-lp、@pbzona、@erfanium、@remcohaszing、@bernardobelchior、@willashe、@kevinmitch14、@smakosh、@mnjongerius、@asobirov、@theoholl、@suu3、@ArianHamdi、@adrianha、@Sina-Abf、@kuzeykose、@meenie、@nphmuller、@javivelasco、@belgattitude、@Svetoslav99、@johnslemmer、@colbyfayock、@mehranmf31、@m-nakamura145、@ryo8000、@aryaemami59、@bestlyg、@jinsoul75、@petrovmiroslav、@nattui、@zhuyedev、@dongwonnn、@nhducit、@flotwig、@Schmavery、@abhinaypandey02、@rvetere、@coffeecupjapan、@cjimmy、@Soheiljafarnejad、@jantimon、@zengspr、@wesbos、@neomad1337、@MaxLeiter 與 @devr77 的協助！

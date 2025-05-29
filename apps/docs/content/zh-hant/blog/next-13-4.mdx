@@ -1,0 +1,463 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T20:00:00.277Z
+title: Next.js 13.4
+description: >-
+  Next.js 13.4 將應用程式路由 (App Router) 轉為穩定版，Turbopack 進入測試版，並引入伺服器動作 (Server Actions) 的實驗性支援。
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2023-05-04T18:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-4/twitter-card.png
+---
+
+Next.js 13.4 是一個基礎性版本，標誌著應用程式路由 (App Router) 進入穩定階段：
+
+*   [**應用程式路由 (穩定版)**](#nextjs-app-router):
+    *   React 伺服器元件 (Server Components)
+    *   巢狀路由與佈局 (Nested Routes & Layouts)
+    *   簡化的資料獲取 (Simplified Data Fetching)
+    *   串流與暫停 (Streaming & Suspense)
+    *   內建 SEO 支援 (Built-in SEO Support)
+*   [**Turbopack (測試版)**](#turbopack-beta)：本地開發伺服器，速度更快且穩定性提升
+*   [**伺服器動作 (Alpha 版)**](#server-actions-alpha)：無需客戶端 JavaScript 即可在伺服器端變更資料
+
+自六個月前 [Next.js 13](/blog/next-13) 發布以來，我們一直專注於為 Next.js 的未來奠定基礎——應用程式路由 (App Router)——以一種可以逐步採用且不會造成不必要破壞性變更的方式。
+
+今天，隨著 13.4 版本的發布，您現在可以開始在生產環境中採用應用程式路由。
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+[Next.js 應用程式路由](#nextjs-app-router)
+----------------------------------------
+
+我們在 2016 年發布 Next.js，旨在提供一種簡單的方式來實現 React 應用的伺服器渲染，目標是創造一個更動態、個性化和全球化的網絡。
+
+[在最初的公告文章中](https://vercel.com/blog/next)，我們分享了 Next.js 的一些設計原則：
+
+*   **零配置。使用檔案系統作為 API**
+*   **僅限 JavaScript。一切皆為函式**
+*   **自動伺服器渲染與程式碼分割**
+*   **資料獲取由開發者決定**
+
+如今 Next.js 已六歲。我們的原始設計原則依然保持不變——隨著 Next.js 被更多開發者和公司採用，我們一直在努力對框架進行基礎性升級，以更好地實現這些原則。
+
+我們一直在開發 Next.js 的下一代版本，今天隨著 `13.4` 的發布，這一代版本已穩定並可供採用。本文將分享更多關於我們對應用程式路由的設計決策和選擇。
+
+### [零配置。使用檔案系統作為 API](#zero-setup-use-the-filesystem-as-an-api)
+
+[基於檔案系統的路由](/docs/app/building-your-application/routing) 一直是 Next.js 的核心功能。在我們最初的公告中，我們展示了這個從單一 React 元件創建路由的範例：
+
+```js filename="pages/about.js"
+// 頁面路由 (Pages Router)
+ 
+import React from 'react';
+export default () => <h1>About us</h1>;
+```
+
+無需額外配置。只需將檔案放入 `pages/` 目錄，Next.js 路由會處理其餘部分。我們仍然喜歡這種簡單的路由方式。但隨著框架使用量的增長，開發者希望用它構建的界面類型也隨之增加。
+
+開發者要求改進對定義佈局 (layouts)、將 UI 片段嵌套為佈局以及更靈活地定義載入和錯誤狀態的支援。這在現有的 Next.js 路由中並不容易實現。
+
+框架的每個部分都必須圍繞路由設計。頁面轉換、資料獲取、快取、變更和重新驗證資料、串流、樣式化內容等等。
+
+為了使我們的路由與串流相容，並解決這些對佈局增強支援的請求，我們開始構建新版本的路由。
+
+這是我們在發布 [佈局 RFC](/blog/layouts-rfc) 後的初步成果。
+
+```js filename="app/layout.js"
+// 新功能：應用程式路由 ✨
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+```js filename="app/page.js"
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>;
+}
+```
+
+比您在這裡看到的更重要的是您 _沒有_ 看到的東西。這個新路由（可以通過 `app/` 目錄逐步採用）具有完全不同的架構，建立在 [React 伺服器元件](/docs/getting-started/react-essentials) 和 [暫停 (Suspense)](/docs/app/building-your-application/routing/loading-ui-and-streaming) 的基礎上。
+
+這個基礎讓我們能夠移除最初為擴展 React 原語而開發的 Next.js 特定 API。例如，您不再需要使用自定義的 `_app` 檔案來定制全域共享佈局：
+
+```js filename="pages/_app.js"
+// 頁面路由 (Pages Router)
+ 
+// 這個「全域佈局」包裹所有路由。無法組合其他佈局元件，
+// 也無法從此檔案獲取全域資料。
+export default function MyApp({ Component, pageProps }) {
+  return <Component {...pageProps} />;
+}
+```
+
+使用頁面路由 (Pages Router) 時，佈局無法組合，資料獲取也無法與元件放在一起。新的應用程式路由現在支援這些功能。
+
+```js filename="app/layout.js"
+// 新功能：應用程式路由 ✨
+// 根佈局在整個應用程式中共享
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+```js filename="app/dashboard/layout.js"
+// 佈局可以嵌套和組合
+export default function DashboardLayout({ children }) {
+  return (
+    <section>
+      <h1>Dashboard</h1>
+      {children}
+    </section>
+  );
+}
+```
+
+使用頁面路由時，`_document` 用於定制來自伺服器的初始負載。
+
+```js filename="pages/_document.js"
+// 頁面路由 (Pages Router)
+ 
+// 此檔案允許您為伺服器請求定制 <html> 和 <body> 標籤，
+// 但添加了框架特定功能而非直接編寫 HTML 元素。
+import { Html, Head, Main, NextScript } from 'next/document';
+ 
+export default function Document() {
+  return (
+    <Html>
+      <Head />
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  );
+}
+```
+
+使用應用程式路由時，您不再需要從 Next.js 導入 `<Html>`、`<Head>` 和 `<Body>`。相反，您只需使用 React。
+
+```js filename="app/layout.js"
+// 新功能：應用程式路由 ✨
+// 根佈局在整個應用程式中共享
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+構建新的檔案系統路由的時機也是解決我們路由系統中許多其他相關功能請求的正確時機。例如：
+
+*   以前，您只能從外部 npm 套件（如元件庫）在 `_app.js` 中導入全域樣式表。這不是理想的開發體驗。使用應用程式路由，您可以在任何元件中導入（並共置）任何 CSS 檔案。
+*   以前，選擇使用 Next.js 的伺服器端渲染（通過 `getServerSideProps`）意味著在整個頁面水合 (hydrated) 之前，與應用程式的互動會被阻止。使用應用程式路由，我們重構了架構，深度整合了 React 暫停 (Suspense)，這意味著我們可以選擇性地水合頁面的部分內容，而不會阻止 UI 中的其他元件變得可互動。內容可以從伺服器即時串流，提高頁面的感知載入性能。
+
+[路由](/docs/app/building-your-application/routing) 是 Next.js 運作的核心。但它不僅僅是路由本身，而是它如何整合框架的其他部分——例如 [資料獲取](/docs/app/building-your-application/data-fetching)。
+
+### [僅限 JavaScript。一切皆為函式](#only-javascript-everything-is-a-function)
+
+Next.js 和 React 開發者希望編寫 JavaScript 和 TypeScript 程式碼並組合應用程式元件。從我們最初的公告中：
+
+```js filename="pages/index.js"
+import React from 'react';
+import Head from 'next/head';
+ 
+export default () => (
+  <div>
+    <Head>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+    </Head>
+    <h1>Hi. I'm mobile-ready!</h1>
+  </div>
+);
+```
+
+> 在未來的 Next.js 版本中，我們添加了一個開發體驗改進，自動為您導入 React。
+
+這個元件封裝了可以在應用程式中任何地方重用和組合的邏輯。與檔案系統路由配對，這意味著一種簡單的方式來開始構建感覺像編寫 JavaScript 和 HTML 的 React 應用程式。
+
+例如，如果您想獲取一些資料，原始版本的 Next.js 看起來像這樣：
+
+```js filename="pages/index.js"
+import React from 'react';
+import 'isomorphic-fetch';
+ 
+export default class extends React.Component {
+  static async getInitialProps() {
+    const res = await fetch('https://api.company.com/user/123');
+    const data = await res.json();
+    return { username: data.profile.username };
+  }
+}
+```
+
+> 在未來的 Next.js 版本中，我們添加了一個開發體驗改進，對 fetch 進行了 polyfill，因此您不需要導入 `isomorphic-fetch` 或 `node-fetch`，並且可以在客戶端和伺服器上使用 Web `fetch API`。
+
+隨著採用率的增長和框架的成熟，我們探索了新的資料獲取模式。
+
+`getInitialProps` 同時在伺服器 _和_ 客戶端運行。這個 API 擴展了 React 元件，允許您創建一個 `Promise` 並將結果轉發到元件的 `props`。
+
+雖然 `getInitialProps` 今天仍然有效，但我們根據客戶反饋迭代了下一代資料獲取 API：`getServerSideProps` 和 `getStaticProps`。
+
+```js filename="pages/index.js"
+// 生成路由的靜態版本
+export async function getStaticProps(context) {
+  return { props: {} };
+}
+// 或動態伺服器渲染路由
+export async function getServerSideProps(context) {
+  return { props: {} };
+}
+```
+
+這些 API 更清楚地表明您的程式碼在哪裡運行，無論是客戶端還是伺服器，並允許 Next.js 應用程式進行 [自動靜態優化](/docs/pages/building-your-application/rendering/automatic-static-optimization)。此外，它允許 [靜態導出](/docs/app/building-your-application/deploying/static-exports)，使 Next.js 能夠部署到不支援伺服器的地方（例如 AWS S3 儲存桶）。
+
+然而，這並不是「僅限 JavaScript」，我們希望更貼近我們的原始設計原則。
+
+自 Next.js 創建以來，我們一直與 Meta 的 React 核心團隊密切合作，在 React 原語之上構建框架功能。我們的合作，加上 React 核心團隊多年的研究和開發，使 Next.js 有機會通過最新版本的 React 架構（包括 [伺服器元件](/docs/getting-started/react-essentials)）實現我們的目標。
+
+使用應用程式路由，您可以使用熟悉的 `async` 和 `await` 語法 [獲取資料](/docs/app/building-your-application/data-fetching)。沒有新的 API 需要學習。預設情況下，所有元件都是 React 伺服器元件，因此資料獲取安全地在伺服器上進行。例如：
+
+```js filename="app/page.js"
+export default async function Page() {
+  const res = await fetch('https://api.example.com/...');
+  // 返回值 *不* 會被序列化
+  // 您可以使用 Date、Map、Set 等
+  const data = res.json();
+ 
+  return '...';
+}
+```
+
+關鍵在於，「資料獲取由開發者決定」的原則得以實現。您可以獲取資料並組合 _任何_ 元件。不僅是第一方元件，還包括伺服器元件生態系統中的 _任何_ 元件，例如 [Twitter 嵌入](https://github.com/vercel-labs/react-tweet) `react-tweet`，它被設計為與伺服器元件整合並完全在伺服器上運行。
+
+```js filename="app/page.js"
+import { Tweet } from 'react-tweet';
+ 
+export default async function Page() {
+  return <Tweet id="790942692909916160" />;
+}
+```
+
+由於路由與 [React 暫停 (Suspense)](https://react.dev/reference/react/Suspense) 整合，您可以在內容載入時更流暢地顯示後備內容，並按需逐步顯示內容。
+
+```js filename="app/page.js"
+import { Suspense } from 'react';
+import { PostFeed, Weather } from './components';
+ 
+export default function Page() {
+  return (
+    <section>
+      <Suspense fallback={<p>Loading feed...</p>}>
+        <PostFeed />
+      </Suspense>
+      <Suspense fallback={<p>Loading weather...</p>}>
+        <Weather />
+      </Suspense>
+    </section>
+  );
+}
+```
+
+此外，路由將頁面導航標記為 [轉換 (transitions)](https://react.dev/reference/react/useTransition)，使路由轉換可中斷。
+
+### [自動伺服器渲染與程式碼分割](#automatic-server-rendering-and-code-splitting)
+
+當我們創建 Next.js 時，開發者仍需手動配置 webpack、babel 和其他工具才能運行 React 應用程式。在自訂解決方案中，通常不會實作伺服器渲染或程式碼分割等進一步優化。Next.js 和其他 React 框架創建了一個抽象層來實作並強制執行這些最佳實踐。
+
+基於路由的程式碼分割意味著 `pages/` 目錄中的每個檔案都會被分割成獨立的 JavaScript 套件，有助於減少檔案系統並提升初始頁面載入效能。
+
+這對於伺服器渲染的應用程式以及使用 Next.js 的單頁應用程式都有益處，因為後者通常在應用程式啟動時載入單一大型 JavaScript 套件。然而，要實作元件層級的程式碼分割，開發者需要使用 `next/dynamic` 來動態導入元件。
+
+```tsx filename="app/page.tsx"
+import dynamic from 'next/dynamic';
+ 
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  loading: () => <p>Loading...</p>,
+});
+ 
+export default function Home() {
+  return <DynamicHeader />;
+}
+```
+
+使用 App Router 時，伺服器元件不會包含在瀏覽器的 JavaScript 套件中。[客戶端元件](/docs/getting-started/react-essentials#client-components)預設會自動進行程式碼分割（使用 Next.js 中的 webpack 或 Turbopack）。此外，由於整個路由架構支援串流和 Suspense，您可以逐步將 UI 的部分從伺服器發送到客戶端。
+
+例如，您可以透過條件邏輯來分割整個程式碼路徑。在此範例中，您不需要為未登入的使用者載入儀表板的客戶端 JavaScript。
+
+```tsx filename="app/layout.tsx"
+import { getUser } from './auth';
+import { Dashboard, Landing } from './components';
+ 
+export default async function Layout() {
+  const isLoggedIn = await getUser();
+  return isLoggedIn ? <Dashboard /> : <Landing />;
+}
+```
+
+[Turbopack (Beta)](#turbopack-beta)
+-----------------------------------
+
+[Turbopack](https://nextjs.org/docs/app/api-reference/turbopack) 是我們正在透過 Next.js 測試和穩定的新打包工具，它能加速您在 Next.js 應用程式上的本地迭代（透過 `next dev --turbo`），並即將支援生產環境建置（`next build --turbo`）。
+
+自 Next.js 13 的 alpha 版本發布以來，隨著我們修復錯誤並增加對缺失功能的支援，其採用率穩步成長。我們已在 [Vercel.com](https://vercel.com) 和許多 Vercel 客戶的大型 Next.js 網站上使用 Turbopack，以收集回饋並提升穩定性。我們感謝社群在測試和向團隊報告錯誤方面的支援。
+
+六個月後的現在，我們已準備好進入 beta 階段。
+
+Turbopack 尚未完全支援 webpack 和 Next.js 的所有功能。我們正在 [此議題](https://github.com/vercel/next.js/issues/49174) 中追蹤這些功能的支援進度。然而，現在應已支援大多數使用情境。我們推出此 beta 版本的目標是繼續解決因採用率增加而產生的剩餘錯誤，並為未來版本的穩定性做準備。
+
+我們對改善 Turbopack 的增量引擎和快取層的投資，不僅會加速本地開發，也將很快提升生產環境建置速度。請期待未來的 Next.js 版本，您將能執行 `next build --turbo` 來實現即時建置。
+
+立即在 Next.js 13.4 中試用 [Turbopack](/docs/architecture/turbopack) beta 版，指令為 `next dev --turbo`。
+
+[伺服器動作 (Alpha)](#server-actions-alpha)
+-----------------------------------------------
+
+React 生態系統在表單、管理表單狀態以及資料快取和重新驗證方面有許多創新和探索。隨著時間推移，React 對這些模式有了更多明確的建議。例如，推薦使用 ["非受控元件"](https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components) 來管理表單狀態。
+
+目前的解決方案生態系統要麼是可重複使用的客戶端解決方案，要麼是框架內建的基礎功能。直到現在，還沒有一種方式能組合伺服器變更和資料基礎功能。React 團隊 [一直在努力](https://react.dev/blog/2023/03/22/react-labs-what-we-have-been-working-on-march-2023) 開發一個官方的變更解決方案。
+
+我們很高興宣布 Next.js 對實驗性 **伺服器動作** 的支援，讓您能在伺服器上變更資料，直接呼叫函數而 _無需_ 建立中間的 API 層。
+
+```tsx
+import kv from './kv';
+ 
+export default function Page({ params }) {
+  async function increment() {
+    'use server';
+    await kv.incr(`post:id:${params.id}`);
+  }
+ 
+  return (
+    <form action={increment}>
+      <button type="submit">Like</button>
+    </form>
+  );
+}
+```
+
+透過伺服器動作，您可以擁有強大的伺服器優先資料變更功能、更少的客戶端 JavaScript，以及漸進增強的表單。
+
+```tsx
+import db from './db';
+import { redirect } from 'next/navigation';
+ 
+async function create(formData: FormData) {
+  'use server';
+  const post = await db.post.insert({
+    title: formData.get('title'),
+    content: formData.get('content'),
+  });
+  redirect(`/blog/${post.slug}`);
+}
+ 
+export default function Page() {
+  return (
+    <form action={create}>
+      <input type="text" name="title" />
+      <textarea name="content" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+Next.js 中的伺服器動作設計用於與其他資料生命週期深度整合，包括 Next.js 快取、增量靜態再生 (ISR) 和客戶端路由。
+
+透過新 API `revalidatePath` 和 `revalidateTag` 重新驗證資料，意味著變更、重新渲染頁面或重新導向可以在 **一次網路往返** 中完成，確保客戶端顯示正確的資料，即使上游提供者速度較慢。
+
+```tsx
+import db from './db';
+import { revalidateTag } from 'next/cache';
+ 
+async function update(formData: FormData) {
+  'use server';
+  await db.post.update({
+    title: formData.get('title'),
+  });
+  revalidateTag('posts');
+}
+ 
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['posts'] } });
+  const data = await res.json();
+  // ...
+}
+```
+
+伺服器動作設計為可組合的。React 社群中的任何人都可以建構和發布伺服器動作，並在生態系統中分發它們。就像伺服器元件一樣，我們對客戶端和伺服器的新時代可組合基礎功能感到興奮。
+
+[伺服器動作](/docs/app/building-your-application/data-fetching/server-actions) 現已在 Next.js 13.4 的 alpha 版本中提供。透過選擇使用伺服器動作，Next.js 將使用 React 的實驗性發布頻道。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    serverActions: true,
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+[其他改進](#other-improvements)
+-----------------------------------------
+
+*   [草稿模式](/docs/app/building-your-application/configuring/draft-mode)：從您的無頭 CMS 獲取並渲染草稿內容。草稿模式在 `pages` 和 `app` 中均可使用。我們增強並簡化了現有的預覽模式 API，該 API 仍適用於 `pages`。預覽模式 _不適用_ 於 `app` — 您應使用草稿模式。
+
+[常見問題](#frequently-asked-questions)
+---------------------------------------------------------
+
+### [App Router 的穩定性意味著什麼？](#what-does-app-router-stability-mean)
+
+將 App Router 標記為穩定並不意味著我們的工作已完成。穩定性意味著 App Router 的核心已準備好用於生產環境，並已透過我們內部的測試以及許多 Next.js 早期採用者的驗證。
+
+未來我們仍會進行更多優化，包括讓伺服器動作達到完全穩定。對我們來說，推動核心穩定性非常重要，這能幫助社群更清楚地了解他們現在應該從哪裡開始學習和建構應用程式。
+
+App Router 建立在 React `canary` 頻道之上，該頻道現在已準備好讓框架採用如伺服器元件等功能。[了解更多](https://react.dev/blog/2023/05/03/react-canaries)。
+
+### [這對 Next.js beta 文件意味著什麼？](#what-does-this-mean-for-the-nextjs-beta-docs)
+
+從今天開始，我們建議使用 App Router 建構新的應用程式。用於解釋 App Router 並從頭改寫的 Next.js beta 文件現已合併回 [穩定的 Next.js 文件](/docs)。您現在可以輕鬆切換 App 或 Pages Router。
+
+我們建議閱讀 [App Router 增量採用指南](/docs/app/building-your-application/upgrading/app-router-migration) 以了解如何採用 App Router。
+
+### [Pages Router 會消失嗎？](#is-the-pages-router-going-away)
+
+不會。我們承諾在未來多個主要版本中繼續支援 `pages/` 開發，包括錯誤修復、改進和安全修補程式。我們希望確保開發者有足夠的時間在準備好時逐步採用 App Router。
+
+在生產環境中同時使用 `pages/` 和 `app/` 是受支援且鼓勵的。App Router 可以 [按路由基礎](/docs/app/building-your-application/upgrading/app-router-migration) 採用。
+
+### [這是否意味著伺服器元件已「完成」？](#does-this-mean-server-components-are-complete)
+
+Next.js 是選擇基於 React 架構（包括伺服器元件）建構的框架之一。我們希望 App Router 提供的體驗能鼓勵其他框架（或新框架）考慮使用此架構。
+
+此生態系統中仍有模式尚未定義，例如處理無限滾動。目前，我們建議在生態系統成長和函式庫創建或更新時，使用客戶端解決方案來處理這些模式。
+
+[社群](#community)
+-----------------------
+
+Next.js 是超過 2,600 名獨立開發者、Google 和 Meta 等產業合作夥伴以及 Vercel 核心團隊共同努力的成果。加入 [GitHub Discussions](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/) 和 [Discord](/discord) 上的社群。
+
+此版本由以下人員共同打造：
+
+*   **Next.js** 團隊：[Andrew](https://github.com/acdlite)、[Balazs](https://github.com/balazsorban44)、[Jan](https://github.com/jankaifer)、[Jiachi](https://github.com/huozhi)、[Jimmy](https://github.com/feedthejim)、[JJ](https://github.com/ijjk)、[Josh](https://github.com/gnoff)、[Sebastian](https://github.com/sebmarkbage)、[Shu](https://github.com/shuding)、[Steven](https://github.com/styfle)、[Tim](https://github.com/timneutkens) 和 [Wyatt](https://github.com/wyattjoh)。
+*   **Turbopack** 團隊：[Alex](https://github.com/alexkirsz)、[Donny](https://github.com/kdy1)、[Justin](https://github.com/jridgewell)、[Leah](https://github.com/forsakenharmony)、[Maia](https://github.com/padmaia)、[OJ](https://github.com/kwonoj)、[Tobias](https://github.com/sokra) 和 [Will](https://github.com/wbinnssmith)。
+
+以及以下貢獻者：@shuding、@huozhi、@wyattfry、@styfle、@sreetamdas、@afonsojramos、@timneutkens、@alexkirsz、@chriswdmr、@jankaifer、@pn-code、@kdy1、@sokra、@kwonoj、@martin-wahlberg、@Kikobeats、@JTaylor0196、@sebmarkbage、@ijjk、@gnoff、@jridgewell、@sagarpreet-xflowpay、@balazsorban44、@cprussin、@ForsakenHarmony、@li-jia-nan、@dciug、@albertothedev、@DuCanhGH、@feedthejim、@patrick91、@padmaia、@sophiebits、@eps1lon、@reconbot、@acdlite、@cjmling、@nabsul、@motopods、@hanneslund、@tunamagur0、@devknoll、@apeltop、@maranomynet、@y-tsubuku、@EndangeredMassa、@ykzts、@AviAvinav、@adilansari、@wyattjoh、@charkour、@delbaoliveira、@agadzik、@Just-Moh-it、@rodrigofeijao、@leerob、@juliusmarminge、@koba04、@Phiction、@jessewarren-aa、@ryo-manba、@Yovach 和 @dylanjha。

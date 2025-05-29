@@ -1,0 +1,183 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:53:48.520Z
+title: 'Next.js 5.1：更快的頁面解析、環境配置與更多功能'
+description: >-
+  Next.js 5.1 新增了環境配置、階段 (phases)、原始碼映射 (source maps) 支援，以及新的 Next.js 插件。
+author:
+  - name: Arunoda Susiripala
+    image: /static/team/arunoda.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2018-03-26T17:29:45.995Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/twitter-card.png
+---
+
+我們很高興推出 Next.js 5.1，此版本新增了環境配置、階段 (phases)、原始碼映射 (source maps) 支援，以及新的 Next.js 插件。
+
+主要效能改進包括：頁面解析速度提升 **102 倍**，錯誤頁面載入更有效率。
+
+升級或安裝請執行：
+
+```bash filename="終端機"
+npm i next@latest react@latest react-dom@latest
+```
+
+> 除了升級 Next.js 外，我們也升級了 peer dependencies `react` 和 `react-dom`
+
+請務必同時升級 [next-plugins](https://github.com/vercel/next-plugins) 如 `@zeit/next-css`、`@zeit/next-sass`、`@zeit/next-less` 或 `@zeit/next-typescript`。
+
+[更快的頁面解析](#faster-page-resolution)
+-------------------------------------------------
+
+得益於 Next.js 5.0 的架構變更，我們能夠[簡化邏輯](https://github.com/vercel/next.js/pull/3776)來根據 URL 路徑解析頁面。這些變更是基於 [@oliviertassinari](https://github.com/oliviertassinari) 的[研究](https://github.com/vercel/next.js/issues/3682)。先前解析頁面平均需要 **2.347 毫秒**，而新邏輯下解析相同頁面平均僅需 **0.023 毫秒**。這為 Next.js 應用中最常調用的方法之一帶來了 **102 倍** 的速度提升。
+
+![每個請求的頁面解析時間。左側為 Next.js 5.0，右側為 Next.js 5.1](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/faster-resolution.png)
+
+每個請求的頁面解析時間。左側為 Next.js 5.0，右側為 Next.js 5.1
+
+[環境配置](#environment-configuration)
+-------------------------------------------------------
+
+典型的 Node.js 環境通常依賴於傳遞環境變數給應用程式，例如：`API_URL=https://api.vercel.com node index.js`，然後您可以在應用程式中使用 `process.env.API_URL` 來獲取 `API_URL`。
+
+由於通用渲染 (universal rendering)，`process.env` 在客戶端不可用。因此 Next.js 5.1 引入了一個新功能：`publicRuntimeConfig` 和 `serverRuntimeConfig`。這些可以在 `next.config.js` 中設置，然後透過 `next/config` 模組來使用。
+
+```js filename="next.config.js"
+module.exports = {
+  serverRuntimeConfig: {
+    // 僅在伺服器端可用
+    mySecret: 'secret',
+  },
+  publicRuntimeConfig: {
+    // 在伺服器和客戶端都可用
+    staticFolder: '/static',
+  },
+};
+```
+
+> `serverRuntimeConfig` 和 `publicRuntimeConfig` 都在 `next.config.js` 中定義
+
+```js filename="pages/index.js"
+import getConfig from 'next/config';
+const { serverRuntimeConfig, publicRuntimeConfig } = getConfig();
+ 
+console.log(serverRuntimeConfig.mySecret); // 僅在伺服器端可用
+console.log(publicRuntimeConfig.staticFolder); // 在伺服器和客戶端都可用
+ 
+export default function Index() {
+  return (
+    <div>
+      <img src={`${publicRuntimeConfig.staticFolder}/logo.png`} />
+    </div>
+  );
+}
+```
+
+> 使用 `next/config` 模組的 `getConfig` 方法來獲取配置值
+
+[改進的錯誤處理](#improved-error-handling)
+---------------------------------------------------
+
+先前 Next.js 有一個特殊的錯誤處理機制，用於檢測載入頁面 bundle 時的伺服器錯誤。頁面 bundle 是在客戶端載入頁面的 JavaScript 檔案，例如 `/_next/-/page/index.js`。
+
+如果發生錯誤（例如建置 ID 不匹配），頁面 bundle 仍會以 200 HTTP 狀態碼返回，但內容會是 Next.js 伺服器生成的錯誤 JSON 表示。這樣做的原因是客戶端錯誤處理不僅依賴於頁面是否為 404。這個解決方案運作良好，直到您嘗試將資源上傳到不支援 fallback 的靜態檔案主機或 CDN。
+
+在 Next.js 5.1 中，我們[完全重構了](https://github.com/vercel/next.js/pull/3849)錯誤處理邏輯。當頁面 bundle 返回 404 HTTP 狀態時，路由器會自動檢測並重新載入頁面，以確保在[多區域 (multi-zones)](https://github.com/vercel/next.js#multi-zones) 之間導航仍可進行。
+
+在重寫此邏輯時，我們[移除了 `Router.onAppUpdated` 鉤子](https://github.com/vercel/next.js/blob/canary/errors/no-on-app-updated-hook.md)，該鉤子主要用於觸發頁面重新載入。現在頁面會自動重新載入。
+
+此外，我們新增了一組新的[整合測試](https://github.com/vercel/next.js/pull/3895)來驗證開發模式下的錯誤恢復，以避免未來版本中錯誤恢復功能的退化。
+
+[階段 / 配置函數](#phases--config-function)
+----------------------------------------------------
+
+一些 [next-plugins](https://github.com/vercel/next-plugins) 如 [`@zeit/next-css`](https://github.com/vercel/next-plugins/tree/master/packages/next-css) 僅在 Next.js 處於開發模式或執行 `next build` 時需要。
+
+您現在可以匯出一個返回配置物件的函數，而不是直接匯出物件。
+
+```
+module.exports = (phase, { defaultConfig }) => config;
+```
+
+> `next.config.js` 匯出一個返回用戶配置的函數
+
+匯出函數可以讓您存取 Next.js 運行的 `phase`，例如開發、生產、建置、匯出。這允許插件僅在需要時載入，同時也提供了存取預設配置的能力。
+
+我們引入了一個名為 [`next/constants`](https://github.com/vercel/next.js/blob/canary/lib/constants.js) 的新模組，其中包含常用常數，包括階段 (phases)。
+
+```
+const {PHASE_DEVELOPMENT_SERVER} = require('next/constants')
+module.exports = (phase, {defaultConfig}){
+  if(phase === PHASE_DEVELOPMENT_SERVER) {
+    return { /* 僅開發階段的配置選項 */ }
+  }
+ 
+  return { /* 除開發階段外的所有階段配置選項 */ }
+}
+```
+
+> 檢查開發階段的 `next.config.js`
+
+[改進的生產環境原始碼映射生成](#improved-production-source-map-generation)
+---------------------------------------------------------------------------------------
+
+隨著 [Next.js 5](/blog/next-5) 引入通用 webpack，為生產環境添加原始碼映射 (source maps) 變得非常簡單，只需在 `next.config.js` 中添加幾行：
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    if (!dev) {
+      config.devtool = 'source-map';
+      for (const plugin of config.plugins) {
+        if (plugin['constructor']['name'] === 'UglifyJsPlugin') {
+          plugin.options.sourceMap = true;
+          break;
+        }
+      }
+    }
+    return config;
+  },
+};
+```
+
+> 在 `next.config.js` 中手動啟用原始碼映射
+
+[@zeit/next-source-maps](https://github.com/vercel/next-plugins/tree/master/packages/next-source-maps) 可以添加到專案中來自動啟用生產環境原始碼映射，在 `next.config.js` 中添加以下內容：
+
+```
+const withSourceMaps = require('@zeit/next-source-maps');
+module.exports = withSourceMaps();
+```
+
+> 使用 `@zeit/next-source-maps` 在 `next.config.js` 中啟用原始碼映射
+
+這使得除了 `app.js` 之外的所有檔案都能輸出原始碼映射。原因是 `app.js` 由多個檔案（`manifest.js` 和 `commons.js`）與 webpack 插件組合而成。這導致 webpack 無法為組合後的檔案生成原始碼映射。
+
+感謝 [@ptomasroos](https://github.com/ptomasroos) 的[拉取請求](https://github.com/vercel/next.js/pull/3793)，`app.js` 檔案被 `main.js` 取代。該檔案將包含先前編譯到 `manifest.js` 和 `commons.js` 的代碼，webpack 將為 `main.js` 生成原始碼映射。原始碼映射會自動提供，允許外部錯誤追蹤工具在檢測到錯誤時顯示實際檔案和行號。
+
+![原始碼顯示在原始碼面板中](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/sourcemap.png)
+
+原始碼顯示在原始碼面板中
+
+[新插件 / 現有插件改進](#new-plugins--improvements-to-existing-ones)
+------------------------------------------------------------------------------------------
+
+我們引入了兩個新的官方插件。[@zeit/next-bundle-analyzer](https://github.com/vercel/next-plugins/tree/master/packages/next-bundle-analyzer) 可以輕鬆設置 `webpack-bundle-analyzer` 來分別分析伺服器端和客戶端 bundle。
+
+此外，官方 [`css`](https://github.com/vercel/next-plugins/tree/master/packages/next-css)、[`less`](https://github.com/vercel/next-plugins/tree/master/packages/next-less) 和 [`sass`](https://github.com/vercel/next-plugins/tree/master/packages/next-sass) 插件在熱重載和打包方面有許多改進。例如，開發模式下不再出現未樣式化內容的閃爍 (flash of unstyled content)，子元件中的樣式也會被正確載入。
+
+[社群](#community)
+-----------------------
+
+您現在可以在 [GitHub](https://github.com/vercel/next.js/discussions) 上找到 Next.js 社群。最近那裡發布了一份[使用 Next.js 的知名公司清單](https://github.com/vercel/next.js/discussions/10640)。歡迎在討論串中分享您的專案。
+
+[致謝](#thank-you)
+-----------------------
+
+我們要感謝所有為此版本貢獻 Next.js 的人。無論是貢獻核心功能，還是擴展和改進我們不斷增長的[範例目錄](https://github.com/vercel/next.js/tree/canary/examples)。
+
+如果您想開始貢獻 Next.js，可以查看標記為 [good first issue](https://github.com/vercel/next.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22) 或 [help wanted](https://github.com/vercel/next.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22) 的議題。
+
+特別感謝 Trulia 提供關於環境配置和新錯誤頁面處理的寶貴反饋。

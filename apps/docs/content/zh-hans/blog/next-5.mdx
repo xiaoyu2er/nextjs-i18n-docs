@@ -1,0 +1,361 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:35:50.146Z
+title: 'Next.js 5：通用 Webpack、CSS 导入、插件与多区域部署'
+description: 'Next.js 5 专注于提升大型应用的可扩展性、组合能力与性能表现'
+author:
+  - name: Arunoda Susiripala
+    image: /static/team/arunoda.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2018-02-05T19:10:43.056Z
+image: 'https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/twitter-card.png'
+---
+
+我们非常高兴向全球开发者推出 Next.js 5.0 版本，该版本已立即发布至 npm。升级方式如下：
+
+```bash filename="终端"
+npm i next@latest react@latest react-dom@latest
+```
+
+> 除了升级 Next.js 外，还需同步升级其 peer 依赖项 `react` 和 `react-dom`
+
+Next.js 是用于构建通用服务端渲染（或静态预渲染）React.js 应用的工具包。无论项目规模大小，只需执行 `next` 命令即可开始开发。（[了解更多](https://vercel.com/blog/next)）
+
+每个新版本发布时，我们都坚持保持向后兼容性，提供平滑的升级路径，仅在绝对必要时才进行 API 变更。Next.js 5.0 也不例外。
+
+但在底层架构上，Next.js 已进行彻底改造以实现更强大的用例和扩展性。我们首先让 Next.js 的服务端和客户端代码共享统一的 Webpack 构建管道。
+
+[通用 Webpack 与 Next 插件](#universal-webpack-and-next-plugins)
+-------------------------------------------------------------------------
+
+Next.js 整合了 Webpack、Babel 和 Uglify 等强大工具，并为终端用户提供极其简单的接口：`next`（开发）、`next build`（生产构建）、`next start`（运行服务）或 `next export`（静态文件预渲染）。
+
+早期我们就决定为这些工具的配置提供强大的扩展点。我们不仅追求易用性，更希望开发者能灵活扩展工具链。
+
+例如，您可以通过在 `next.config.js` 中配置 `webpack` 属性来[扩展 Next.js 的 webpack 配置](https://github.com/vercel/next.js#customizing-webpack-config)。
+
+由于 webpack 在生产和开发环境下的执行方式不同，我们当时决定将其设计为**装饰默认配置的函数**：
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    // 修改配置
+    return config;
+  },
+};
+```
+
+> 可选 `next.config.js` 文件的示例
+
+但此前 Webpack 仅作用于客户端（浏览器）代码包，无法利用这套强大工具链处理服务端渲染。
+
+现在，我们很高兴地宣布：经过大规模代码重构，我们已实现**通用 Webpack 支持**。
+
+对开发者而言，唯一变化是上述装饰函数会新增 `isServer` 参数。这一新特性意味着您现在可以使用丰富的 Webpack loader 生态系统。
+
+### [CSS、LESS、SASS、SCSS 与 CSS 模块](#css-less-sass-scss-and-css-modules)
+
+最受期待的功能之一就是支持导入 CSS 文件并利用 Webpack loader：
+
+```
+import './index.css';
+ 
+export default function Index() {
+  return (
+    <div>
+      <p>我爱 CSS！</p>
+    </div>
+  );
+}
+```
+
+> 通过通用 Webpack 实现 CSS 导入的页面示例（`pages/index.js`）
+
+要实现此功能，您需要将所需 loader 作为 peer 依赖安装：
+
+```bash filename="终端"
+npm i --save css-loader style-loader postcss-loader
+```
+
+> Next.js 允许自由选择所需 loader 并按需升级版本
+
+然后在配置中扩展 loader 设置。在 `next.config.js` 中：
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, options) {
+    const { dev, isServer } = options;
+    const extractCSSPlugin = new ExtractTextPlugin({
+      filename: 'static/style.css',
+      disable: dev,
+    });
+    config.module.rules.push({
+      test: /\\.css$/,
+      use: cssLoaderConfig(extractCSSPlugin, {
+        cssModules,
+        dev,
+        isServer,
+      }),
+    });
+    return config;
+  },
+};
+```
+
+> 直接扩展 webpack 配置赋予您极大的灵活性和控制权
+
+虽然我们通常推荐使用组件级样式方案（如[内置的 `styled-jsx` babel 插件](https://github.com/vercel/next.js#built-in-css-support)），但 CSS loader 具有重要优势：便于复用现有 CSS 代码库，极大简化旧代码迁移至 Next.js 的过程。
+
+为了避免默认启用所有可能的特性和 loader，我们推出了 [**Next.js 插件**](https://github.com/vercel/next-plugins)——这些是**装饰配置的简单函数**。无需像前文那样手动扩展配置，只需：
+
+```
+const withCss = require('next-css');
+module.exports = withCss({
+  /* 额外的可选配置 */
+});
+```
+
+> 只需引入 `next-css` 即可启用 `.css` 文件导入
+
+了解更多关于 [CSS Loader](https://github.com/vercel/next-plugins/tree/master/packages/next-css) 在 Next.JS 中的用法，或参考我们已为您准备的插件包：
+
+Loader
+
+插件包
+
+CSS
+
+[next-css](https://github.com/vercel/next-plugins/tree/master/packages/next-css)
+
+LESS
+
+[next-less](https://github.com/vercel/next-plugins/tree/master/packages/next-less)
+
+SASS
+
+[next-sass](https://github.com/vercel/next-plugins/tree/master/packages/next-sass)
+
+我们的目标是让社区能够发展和维护一个实用的扩展生态系统。为此，我们开放了 [next-plugins](https://github.com/vercel/next-plugins) 单体仓库供 Next.js 社区共同维护。欢迎提交 PR！
+
+### [TypeScript 支持](#typescript-support)
+
+TypeScript 是 JavaScript 生态中[增长最快](https://stateofjs.com/2017/flavors/results)的技术之一，甚至已获得 [Babel 7 官方支持](https://github.com/babel/babel/tree/master/packages/babel-preset-typescript)。这意味着只需[自定义 .babelrc](https://github.com/vercel/next.js#customizing-babel-config)，Next.js 就能天然支持 TypeScript。
+
+同时，得益于通用 Webpack 支持，您现在就能获得完整的 TypeScript 支持！
+
+可以这样扩展 webpack 配置：
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, options) {
+    const { dir, defaultLoaders } = options;
+    config.resolve.extensions.push('.ts', '.tsx');
+    config.module.rules.push({
+      test: /\\.+(ts|tsx)$/,
+      include: [dir],
+      exclude: /node_modules/,
+      use: [
+        defaultLoaders.babel,
+        { loader: 'ts-loader', options: { transpileOnly: true } },
+      ],
+    });
+    return config;
+  },
+};
+```
+
+> 只需启用 `ts-loader` 即可
+
+与 CSS loader 和预处理器类似，TypeScript 支持也是被强烈要求的功能。为了像其他 loader 那样轻松集成，我们现在提供了 [`next-typescript` 插件](/)，您可以在 `next.config.js` 中引入：
+
+```js filename="next.config.js"
+const withTs = require('next-typescript');
+module.exports = withTs({
+  /* 额外配置 */
+});
+```
+
+> 插件可以轻松组合：它们只是函数
+
+### [更好的 React 替代库与模块重载支持](#better-support-for-react-altlibs--module-overloading)
+
+近年来出现了许多 React 的替代实现，其中值得关注的有 \[`preact`\]([https://preactjs.com/](https://preactjs.com/))、[`nervjs`](https://github.com/NervJS/nerv) 和 [`inferno`](https://github.com/infernojs/inferno)。
+
+还有一些库专注于替换 DOM 渲染器，如 [`react-dom-lite`](https://github.com/jquense/react-dom-lite)，它通过略微降低浏览器兼容性来实现更小的 React 构建包。
+
+通用 Webpack 支持使得**将这些库作为替代方案集成更加简单**。与其他插件类似，使用 preact 只需：
+
+```bash filename="终端"
+npm i @zeit/next-preact preact preact-compat
+```
+
+> 安装 preact 插件及其必要 peer 依赖
+
+```
+const withPreact = require('@zeit/next-preact');
+module.exports = withPreact();
+```
+
+> 适配 preact 的新 `next.config.js` 配置
+
+查看简洁的 [@zeit/next-preact](https://github.com/vercel/next-plugins/tree/master/packages/next-preact) 模块或创建您自己的插件！
+
+### [生产环境可选外部源映射 (Optional External Sourcemaps in Production)](#optional-external-sourcemaps-in-production)
+
+现在 Next.js 同时使用 webpack 处理客户端和服务器端代码，只需简单调整配置即可在生产构建中启用源映射。
+
+开发环境下源映射会自动启用，因此我们为生产环境进行如下配置：
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    if (!dev) {
+      config.devtool = 'source-map';
+    }
+    return config;
+  },
+};
+```
+
+> 我们只需在非开发环境下以不同方式配置 `devtool` 选项
+
+[多应用区域 (Zones)](#zones)
+---------------
+
+Next.js 的[最初目标](https://deck.vercel.app)之一就是恢复并保持 Web 的简洁性。
+
+服务端渲染 (SSR)、简单通用的数据获取方式，以及基于文件系统结构的声明式页面，都是我们基于这一理念引入的特性。
+
+Web 服务和网站的一个常被忽视的特点是它们天然的**可组合性与可扩展性**。
+
+例如，`mydomain.com/settings` 和 `mydomain.com/` 可以是两个完全独立的应用，分别部署、独立扩展，甚至运行同一软件的不同版本。
+
+只需通过[简单配置](/docs/pages/building-your-application/configuring/absolute-imports-and-module-aliases)后端路由层或面向公网的负载均衡器，就能将它们**无缝衔接**成统一的用户体验。现在我们很高兴能支持**组合多个 Next.js 构建的应用**，通过常规 `<Link>` 组件相互连接。我们称此特性为**多应用区域 (Zones)**。
+
+以部署在 [Vercel](https://vercel.com) 的两个独立 Next.js 应用为例：
+
+*   [https://front.vercel.app](https://front.vercel.app)
+*   [https://zeit-docs-zbqbsrucga.vercel.app/docs](https://zeit-docs-zbqbsrucga.vercel.app/docs) [https://zeit-docs-zbqbsrucga.vercel.app/api](https://zeit-docs-zbqbsrucga.vercel.app/api)
+
+![两个页面体验无缝衔接，但实际属于独立应用](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/zones.png)
+
+在重构文档系统时，我们希望让社区贡献尽可能简单。
+
+我们将文档"微站点"拆分到[独立仓库](https://github.com/vercel/docs)。每当有拉取请求提交变更时，系统会自动隔离部署：
+
+![每当 PR 内发生变更时，我们的机器人会自动部署](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/github.png)
+
+最终形成**两个区域**，通过[路径别名功能](/docs/pages/building-your-application/configuring/absolute-imports-and-module-aliases)整合到父域名 `https://vercel.com` 下。配置示例如下：
+
+```
+{
+  "rules": [
+    { "pathname": "/docs", "dest": "our-docs.vercel.app" },
+    { "pathname": "/api", "dest": "our-docs.vercel.app" },
+    { "dest": "my-main-website.vercel.app" }
+  ]
+}
+```
+
+> 这些简单规则允许你将微服务和区域组合在一起
+
+最后只需执行 `now alias` 命令：
+
+```bash filename="Terminal"
+now alias -r rules.json my-domain.com
+```
+
+我们的使命是让部署尽可能通用和开放。为辅助本地开发，我们最近开源了 `micro-proxy` 工具，它兼容上述配置格式。
+
+你也可以通过 Nginx、HAProxy 或 API Gateway 等方案实现区域整合。
+
+[更快的生产构建速度 (Faster Production Build Times)](#faster-production-build-times)
+---------------------------------------------------------------
+
+我们认为开发者体验与用户体验相辅相成。代码变更、测试和部署效率越高，功能迭代和缺陷修复就越快，最终提升整体用户体验。
+
+因此我们持续优化系统基础构件的性能表现。
+
+在 Next.js 5.0 中，我们重新审视了 `next build` 命令——这是部署生产环境或[静态导出](/docs/pages/building-your-application/deploying/static-exports)前必须执行的步骤。
+
+很高兴地宣布，对于包含数千组件的 vercel.com 应用，Next.js 5.0 实现了**生产构建速度提升 23.6%** 的显著改进：
+
+![主应用生产构建现在减少了 38 秒](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/build.png)
+
+[动态导入的缓存优化 (Improved Caching for Dynamic Imports)](#improved-caching-for-dynamic-imports)
+-----------------------------------------------------------------------------
+
+使用动态 `import()` 时，WebPack 会识别为新的代码分割入口点。
+
+构建时会为对应模块子树生成独立包。
+
+在 Next.js 5.0 之前，动态包的 URL 格式如下：
+
+```
+/_next/1517592683901/webpack/chunks/components_hello1_1345d10fc951cd6717c5676c467579a6.js
+```
+
+现在，我们改用子树内容的哈希值作为地址标识：
+
+```
+/_next/webpack/chunks/components_hello1_1345d10fc951cd6717c5676c467579a6-b7874680a9e21fb6eb89.js
+```
+
+这意味着跨部署时，用户无需重复下载已使用过的代码。
+
+[片段支持 (Fragments)](#fragments)
+-----------------------
+
+Next.js 构建了顶层 `<Document>` 组件随每个页面服务端渲染。[重写此组件](/)可完全控制标记结构，支持诸多[高级用例](https://github.com/vercel/next.js/tree/canary/examples)。
+
+初始标记包含 Next.js 需要在客户端执行的脚本列表。自定义 `_document` 如下所示：
+
+```js filename="pages/_document.js"
+import Document, { Head, Main, NextScript } from 'next/document';
+export default class extends Document {
+  render() {
+    return (
+      <html>
+        <Head />
+        <body>
+          <Main />
+          <NextScript />
+        </body>
+      </html>
+    );
+  }
+}
+```
+
+> `Document` 允许你自定义页面的完整服务端渲染输出
+
+此前我们不得不将脚本包裹在 `<div>` 中。
+
+Next.js 5.0 开始支持 `Fragment`，实现了**更轻量的页面**输出，同时完全掌控页面样式，不再有多余标记。
+
+[更精准的错误提示 (More Accurate Errors)](#more-accurate-errors)
+---------------------------------------------
+
+Node.js 不支持源映射，服务器端错误的堆栈跟踪指向的是编译后的代码。
+
+Next 5 改进了服务端源映射支持。服务端渲染时的错误现在能准确定位到函数和行号。
+
+![错误现在能显示正确的行号、文件和函数名](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/errors.png)
+
+[结语 (Conclusion)](#conclusion)
+-------------------------
+
+通用 Webpack 架构巩固了 Next.js 基础，使其更具前瞻性。基本上不再存在哪些插件或加载器适用于 Next.js 的人为区分。
+
+秉承**零配置**理念，我们推出 [Next 插件集](https://github.com/vercel/next-plugins)，这是社区共享的功能扩展方案库，无需手动调整配置即可自动扩展 Next.js 功能。
+
+由此我们支持了所有 CSS 解决方案、TypeScript 等编译到 JS 的语言，以及 [Nerv](https://github.com/NervJS/nerv) 等 React 替代方案，只需添加模块并在 `next.config.js` 中声明即可。简洁而不失透明。
+
+多应用区域支持互连不同代码库甚至不同服务器的 Next.js 应用。这是我们"团队可扩展性"改进的重要里程碑。
+
+Next.js 因此成为适合多团队维护的大型应用选择。团队可以并行部署改进，减少错误影响范围，加快迭代速度，甚至尝试除核心功能外的不同技术，例如[多种状态管理](https://github.com/vercel/next.js/tree/canary/examples)或数据获取方案。
+
+我们要特别感谢 Deep Varma 和 [Trulia](https://trulia.com) 工程团队，他们的关键见解、代码和测试为这个功能的设计做出了贡献。
+
+与往常一样，这个版本的发布离不开众多开源贡献者和我们出色的社区。

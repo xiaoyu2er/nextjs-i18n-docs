@@ -1,0 +1,297 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:57:53.860Z
+title: Next.js 14
+description: >-
+  Next.js 14 包含效能提升、伺服器動作 (Server Actions) 的穩定性改進、一個教授 App Router 的新課程，以及更多更新。
+author:
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2023-10-26T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14/twitter-card.png
+---
+
+正如我們在 [Next.js Conf](https://nextjs.org/conf) 上所宣布的，Next.js 14 是我們最聚焦的版本，包含：
+
+*   [**Turbopack**](#nextjs-compiler-turbocharged)：App & Pages Router 通過 5,000 項測試
+    *   **53% 更快的**本地伺服器啟動速度
+    *   **94% 更快的**程式碼更新（透過 Fast Refresh）
+*   [**伺服器動作 (Server Actions)（穩定版）**](#forms-and-mutations)：漸進式增強資料變更
+    *   與快取 (caching) 和重新驗證 (revalidating) 整合
+    *   簡單的函式呼叫，或原生支援表單操作
+*   [**部分預渲染 (Partial Prerendering)（預覽版）**](#partial-prerendering-preview)：快速的初始靜態回應 + 串流動態內容
+*   [**Next.js Learn（新功能）**](#nextjs-learn-course)：免費課程教授 App Router、身份驗證 (authentication)、資料庫等內容。
+
+立即升級或開始使用：
+
+```bash filename="Terminal"
+npx create-next-app@latest
+```
+
+[Next.js 編譯器：效能提升](#nextjs-compiler-turbocharged)
+---------------------------------------------------------------
+
+自 Next.js 13 以來，我們一直在努力提升 Pages 和 App Router 的本地開發效能。
+
+先前，我們重寫了 `next dev` 和 Next.js 的其他部分來支援這項工作。後來我們改變了策略，改為更漸進式的改進。這意味著我們基於 Rust 的編譯器將很快達到穩定狀態，因為我們首先專注於支援所有 Next.js 功能。
+
+現在，`next dev` 的 5,000 項整合測試已通過 [Turbopack](https://nextjs.org/docs/app/api-reference/turbopack)（我們的底層 Rust 引擎）。這些測試包含 7 年來的錯誤修正和重現案例。
+
+在測試大型 Next.js 應用程式 `vercel.com` 時，我們觀察到：
+
+*   本地伺服器啟動速度**最高提升 53.3%**
+*   程式碼更新（透過 Fast Refresh）**最高提升 94.7%**
+
+此效能基準是大型應用程式（和大型模組圖）實際改進的結果。目前 `next dev` 的測試通過率已達 90%，使用 `next dev --turbo` 時，您應該能持續體驗到更快且更可靠的效能。
+
+一旦測試通過率達到 100%，我們將在接下來的次要版本中將 Turbopack 標記為穩定版。我們也會繼續支援使用 webpack 進行自訂配置和生態系外掛。
+
+您可以在 [areweturboyet.com](https://areweturboyet.com) 追蹤測試通過率。
+
+[表單與資料變更](#forms-and-mutations)
+-------------------------------------------
+
+Next.js 9 引入了 API 路由 (API Routes)——一種在您的前端程式碼旁快速建立後端端點的方式。
+
+例如，您可以在 `api/` 目錄中建立一個新檔案：
+
+```ts filename="pages/api/submit.ts"
+import type { NextApiRequest, NextApiResponse } from 'next';
+ 
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
+  const data = req.body;
+  const id = await createItem(data);
+  res.status(200).json({ id });
+}
+```
+
+然後，在客戶端，您可以使用 React 和 `onSubmit` 等事件處理器來向您的 API 路由發送 `fetch` 請求。
+
+```tsx filename="pages/index.tsx"
+import { FormEvent } from 'react';
+ 
+export default function Page() {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+ 
+    const formData = new FormData(event.currentTarget);
+    const response = await fetch('/api/submit', {
+      method: 'POST',
+      body: formData,
+    });
+ 
+    // 如有需要，處理回應
+    const data = await response.json();
+    // ...
+  }
+ 
+  return (
+    <form onSubmit={onSubmit}>
+      <input type="text" name="name" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+現在，Next.js 14 希望簡化開發者撰寫資料變更的體驗。此外，我們也希望改善使用者在網路連線緩慢或從低效能裝置提交表單時的使用體驗。
+
+### [伺服器動作 (Server Actions)（穩定版）](#server-actions-stable)
+
+如果您不需要手動建立 API 路由呢？相反，您可以定義一個在伺服器上安全執行的函式，並直接從您的 React 元件呼叫它。
+
+App Router 建立在 React `canary` 頻道上，該頻道[對框架來說是穩定的](https://react.dev/blog/2023/05/03/react-canaries)，可採用新功能。截至 v14，Next.js 已升級至最新的 React `canary`，其中包含穩定的伺服器動作 (Server Actions)。
+
+Pages Router 的先前範例可以簡化為一個檔案：
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  async function create(formData: FormData) {
+    'use server';
+    const id = await createItem(formData);
+  }
+ 
+  return (
+    <form action={create}>
+      <input type="text" name="name" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+對於過去使用過以伺服器為中心的框架的開發者來說，伺服器動作應該會感到熟悉。它建立在表單和 [FormData Web API](https://developer.mozilla.org/en-US/docs/Web/API/FormData) 等網路基礎上。
+
+雖然透過表單使用伺服器動作有助於漸進式增強，但這並非必要條件。您也可以直接將其作為函式呼叫，無需表單。使用 TypeScript 時，這將為您提供客戶端和伺服器之間的完整端到端類型安全。
+
+資料變更、頁面重新渲染或重新導向可以在**一次網路往返**中完成，確保客戶端顯示正確的資料，即使上游提供者速度緩慢。此外，您可以組合和重複使用不同的動作，包括在同一路由中包含多個動作。
+
+### [快取、重新驗證、重新導向等功能](#caching-revalidating-redirecting-and-more)
+
+伺服器動作深度整合到整個 App Router 模型中。您可以：
+
+*   使用 `revalidatePath()` 或 `revalidateTag()` 重新驗證快取資料
+*   透過 `redirect()` 重新導向至不同路由
+*   透過 `cookies()` 設定和讀取 cookie
+*   使用 `useOptimistic()` 處理樂觀 UI 更新
+*   使用 `useFormState()` 捕捉並顯示伺服器錯誤
+*   使用 `useFormStatus()` 在客戶端顯示載入狀態
+
+了解更多關於[使用伺服器動作的表單與資料變更](https://nextjs.org/docs/app/building-your-application/data-fetching/forms-and-mutations)，或關於[安全模型](https://nextjs.org/blog/security-nextjs-server-components-actions)和伺服器元件與伺服器動作的最佳實踐。
+
+[部分預渲染 (Partial Prerendering)（預覽版）](#partial-prerendering-preview)
+---------------------------------------------------------------
+
+我們想分享部分預渲染的預覽——這是一種針對動態內容的編譯器優化，提供快速的初始靜態回應——我們正在為 Next.js 開發此功能。
+
+部分預渲染建立在十年來對伺服器端渲染 (SSR)、靜態網站生成 (SSG) 和增量靜態重新驗證 (ISR) 的研究和開發基礎上。
+
+### [動機](#motivation)
+
+我們聽到了您的反饋。目前有太多執行環境、配置選項和渲染方法需要考慮。您希望擁有靜態的速度和可靠性，同時也支援完全動態、個人化的回應。
+
+在全球範圍內擁有出色的效能**和**個人化不應以複雜性為代價。
+
+我們的挑戰是創造更好的開發者體驗，簡化現有模型，而不需要開發者學習新的 API。雖然伺服器端內容的部分快取已經存在，但這些方法仍需滿足我們所追求的開發者體驗和可組合性目標。
+
+**部分預渲染不需要學習新的 API。**
+
+### [建立在 React Suspense 上](#built-on-react-suspense)
+
+部分預渲染由您的 Suspense 邊界定義。以下是它的運作方式。考慮以下電子商務頁面：
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  return (
+    <main>
+      <header>
+        <h1>My Store</h1>
+        <Suspense fallback={<CartSkeleton />}>
+          <ShoppingCart />
+        </Suspense>
+      </header>
+      <Banner />
+      <Suspense fallback={<ProductListSkeleton />}>
+        <Recommendations />
+      </Suspense>
+      <NewProducts />
+    </main>
+  );
+}
+```
+
+啟用部分預渲染後，此頁面會根據您的 `<Suspense />` 邊界生成一個靜態外殼 (static shell)。React Suspense 的 `fallback` 會被預先渲染。
+
+外殼中的 Suspense fallback 隨後會被動態元件取代，例如讀取 cookie 來確定購物車，或根據使用者顯示橫幅。
+
+當發出請求時，靜態 HTML 外殼會立即提供：
+
+```
+<main>
+  <header>
+    <h1>My Store</h1>
+    <div class="cart-skeleton">
+      <!-- Hole -->
+    </div>
+  </header>
+  <div class="banner" />
+  <div class="product-list-skeleton">
+    <!-- Hole -->
+  </div>
+  <section class="new-products" />
+</main>
+```
+
+由於 `<ShoppingCart />` 會從 `cookies` 讀取使用者會話，此元件會作為靜態外殼的同一個 HTTP 請求的一部分串流進來。不需要額外的網路往返。
+
+```tsx filename="app/cart.tsx"
+import { cookies } from 'next/headers'
+ 
+export default function ShoppingCart() {
+  const cookieStore = cookies()
+  const session = cookieStore.get('session')
+  return ...
+}
+```
+
+為了擁有最細粒度的靜態外殼，可能需要添加額外的 Suspense 邊界。然而，如果您已經在使用 `loading.js`，這是一個隱含的 Suspense 邊界，因此無需更改即可生成靜態外殼。
+
+### [即將推出](#coming-soon)
+
+部分預渲染 (Partial Prerendering) 功能正在積極開發中。我們將在接下來的次要版本中分享更多更新。
+
+[元數據改進](#metadata-improvements)
+-----------------------------------------------
+
+在您的頁面內容能從伺服器串流之前，有關視口 (viewport)、色彩方案 (color scheme) 和主題 (theme) 的重要元數據需要先發送到瀏覽器。
+
+確保這些 `meta` 標籤與初始頁面內容一起發送，有助於提供流暢的使用者體驗，防止頁面因主題顏色變化而閃爍，或因視口變更導致版面位移。
+
+在 Next.js 14 中，我們已將阻塞性 (blocking) 與非阻塞性 (non-blocking) 元數據分離。只有一小部分元數據選項是阻塞性的，我們希望確保非阻塞性元數據不會阻礙部分預渲染頁面提供靜態外殼 (static shell)。
+
+以下元數據選項現已棄用，將在未來的重大版本中從 `metadata` 移除：
+
+*   `viewport`：設定視口的初始縮放和其他屬性
+*   `colorScheme`：設定視口支援的模式（亮色/暗色）
+*   `themeColor`：設定視口周圍瀏覽器外框的渲染顏色
+
+從 Next.js 14 開始，新增了 [`viewport` 和 `generateViewport`](https://nextjs.org/docs/app/api-reference/functions/generate-viewport) 選項來取代上述功能。所有其他 `metadata` 選項保持不變。
+
+您可以立即開始採用這些新 API。現有的 `metadata` 選項仍可繼續使用。
+
+[Next.js 學習課程](#nextjs-learn-course)
+--------------------------------------------
+
+今天我們在 [Next.js Learn](https://nextjs.org/learn) 上發布了一個全新的免費課程。本課程內容包括：
+
+*   Next.js 應用路由器 (App Router)
+*   樣式設計與 Tailwind CSS
+*   優化字體與圖片
+*   建立佈局 (Layouts) 與頁面 (Pages)
+*   頁面間導航
+*   設定 Postgres 資料庫
+*   使用伺服器元件 (Server Components) 獲取資料
+*   靜態與動態渲染 (Static and Dynamic Rendering)
+*   串流 (Streaming)
+*   部分預渲染 (Partial Prerendering)（選修）
+*   新增搜尋與分頁功能
+*   資料變更 (Mutating Data)
+*   錯誤處理
+*   提升無障礙性 (Accessibility)
+*   新增身份驗證 (Authentication)
+*   新增元數據 (Metadata)
+
+Next.js Learn 已幫助數百萬開發者學習該框架的基礎知識，我們迫不及待想聽聽您對新課程的反饋。立即前往 [nextjs.org/learn](https://nextjs.org/learn) 開始學習。
+
+[其他變更](#other-changes)
+-------------------------------
+
+*   **[重大變更]** 最低 Node.js 版本現在為 `18.17`
+*   **[重大變更]** 移除 `next-swc` 的 WASM 建置目標 ([PR](https://github.com/vercel/next.js/pull/57437))
+*   **[重大變更]** 停止支援 `@next/font`，改為使用 `next/font` ([代碼修改工具](https://nextjs.org/docs/app/building-your-application/upgrading/codemods#built-in-next-font))
+*   **[重大變更]** 將 `ImageResponse` 的導入路徑從 `next/server` 改為 `next/og` ([代碼修改工具](https://nextjs.org/docs/app/building-your-application/upgrading/codemods#next-og-import))
+*   **[重大變更]** 移除 `next export` 指令，改為使用 `output: 'export'` 配置 ([文件](https://nextjs.org/docs/app/building-your-application/deploying/static-exports))
+*   **[棄用]** `next/image` 的 `onLoadingComplete` 已棄用，改用 [`onLoad`](https://nextjs.org/docs/app/api-reference/components/image#onload)
+*   **[棄用]** `next/image` 的 `domains` 已棄用，改用 [`remotePatterns`](https://nextjs.org/docs/app/api-reference/components/image#remotepatterns)
+*   **[功能]** 可啟用更詳細的 `fetch` 快取記錄 ([文件](https://nextjs.org/docs/app/api-reference/next-config-js/logging))
+*   **[改進]** 基本 `create-next-app` 應用程式的函式大小減少 80%
+*   **[改進]** 開發時使用 `edge` 運行時 (runtime) 的記憶體管理增強
+
+[貢獻者](#contributors)
+-----------------------------
+
+Next.js 是超過 2,900 位獨立開發者、Google 和 Meta 等產業合作夥伴，以及 Vercel 核心團隊共同努力的成果。歡迎加入 [GitHub Discussions](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/) 和 [Discord](/discord) 社群。
+
+本次發布由以下成員共同完成：
+
+*   **Next.js** 團隊：[Andrew](https://github.com/acdlite)、[Balazs](https://github.com/balazsorban44)、[Jiachi](https://github.com/huozhi)、[Jimmy](https://github.com/feedthejim)、[JJ](https://github.com/ijjk)、[Josh](https://github.com/gnoff)、[Sebastian](https://github.com/sebmarkbage)、[Shu](https://github.com/shuding)、[Steven](https://github.com/styfle)、[Tim](https://github.com/timneutkens)、[Wyatt](https://github.com/wyattjoh) 和 [Zack](https://github.com/ztanner)。
+*   **Turbopack** 團隊：[Donny](https://github.com/kdy1)、[Justin](https://github.com/jridgewell)、[Leah](https://github.com/forsakenharmony)、[Maia](https://github.com/padmaia)、[OJ](https://github.com/kwonoj)、[Tobias](https://github.com/sokra) 和 [Will](https://github.com/wbinnssmith)。
+*   **Next.js Learn**：[Delba](https://github.com/delbaoliveira)、[Steph](https://github.com/StephDietz)、[Emil](https://github.com/emilkowalski)、[Balazs](https://github.com/balazsorban44)、[Hector](https://github.com/dizzyup) 和 [Amy](https://github.com/timeyoutakeit)。
+
+以及以下貢獻者：@05lazy、@0xadada、@2-NOW、@aarnadlr、@aaronbrown-vercel、@aaronjy、@abayomi185、@abe1272001、@abhiyandhakal、@abstractvector、@acdlite、@adamjmcgrath、@AdamKatzDev、@adamrhunter、@ademilter、@adictonator、@adilansari、@adtc、@afonsojramos、@agadzik、@agrattan0820、@akd-io、@AkifumiSato、@akshaynox、@alainkaiser、@alantoa、@albertothedev、@AldeonMoriak、@aleksa-codes、@alexanderbluhm、@alexkirsz、@alfred-mountfield、@alpha-xek、@andarist、@Andarist、@andrii-bodnar、@andykenward、@angel1254mc、@anonrig、@anthonyshew、@AntoineBourin、@anujssstw、@apeltop、@aralroca、@aretrace、@artdevgame、@artechventure、@arturbien、@Aryan9592、@AviAvinav、@aziyatali、@BaffinLee、@Banbarashik、@bencmbrook、@benjie、@bennettdams、@bertho-zero、@bigyanse、@Bitbbot、@blue-devil1134、@bot08、@bottxiang、@Bowens20832、@bre30kra69cs、@BrennanColberg、@brkalow、@BrodaNoel、@Brooooooklyn、@brunoeduardodev、@brvnonascimento、@carlos-menezes、@cassidoo、@cattmote、@cesarkohl、@chanceaclark、@charkour、@charlesbdudley、@chibicode、@chrisipanaque、@ChristianIvicevic、@chriswdmr、@chunsch、@ciruz、@cjmling、@clive-h-townsend、@colinhacks、@colinking、@coreyleelarson、@Cow258、@cprussin、@craigwheeler、@cramforce、@cravend、@cristobaldominguez95、@ctjlewis、@cvolant、@cxa、@danger-ahead、@daniel-web-developer、@danmindru、@dante-robinson、@darshanjain-entrepreneur、@darshkpatel、@davecarlson、@David0z、@davidnx、@dciug、@delbaoliveira、@denchance、@DerTimonius、@devagrawal09、@DevEsteves、@devjiwonchoi、@devknoll、@DevLab2425、@devvspaces、@didemkkaslan、@dijonmusters、@dirheimerb、@djreillo、@dlehmhus、@doinki、@dpnolte、@Drblessing、@dtinth、@ducanhgh、@DuCanhGH、@ductnn、@duncanogle、@dunklesToast、@DustinsCode、@dvakatsiienko、@dvoytenko、@dylanjha、@ecklf、@EndangeredMassa、@eps1lon、@ericfennis、@escwxyz、@Ethan-Arrowood、@ethanmick、@ethomson、@fantaasm、@feikerwu、@ferdingler、@FernandVEYRIER、@feugy、@fgiuliani、@fomichroman、@Fonger、@ForsakenHarmony、@franktronics、@FSaldanha、@fsansalvadore、@furkanmavili、@g12i、@gabschne、@gaojude、@gdborton、@gergelyke、@gfgabrielfranca、@gidgudgod、@Gladowar、@Gnadhi、@gnoff、@goguda、@greatSumini、@gruz0、@Guilleo03、@gustavostz、@hanneslund、@HarshaVardhanReddyDuvvuru、@haschikeks、@Heidar-An、@heyitsuzair、@hiddenest、@hiro0218、@hotters、@hsrvms、@hu0p、@hughlilly、@HurSungYun、@hustLer2k、@iamarpitpatidar、@ianldgs、@ianmacartney、@iaurg、@ibash、@ibrahemid、@idoob、@iiegor、@ikryvorotenko、@imranbarbhuiya、@ingovals、@inokawa、@insik-han、@isaackatayev、@ishaqibrahimbot、@ismaelrumzan、@itsmingjie、@ivanhofer、@IvanKiral、@jacobsfletch、@jakemstar、@jamespearson、@JanCizmar、@janicklas-ralph、@jankaifer、@JanKaifer、@jantimon、@jaredpalmer、@javivelasco、@jayair、@jaykch、@Jeffrey-Zutt、@jenewland1999、@jeremydouglas、@JesseKoldewijn、@jessewarren-aa、@jimcresswell、@jiwooIncludeJeong、@jocarrd、@joefreeman、@JohnAdib、@JohnAlbin、@JohnDaly、@johnnyomair、@johnta0、@joliss、@jomeswang、@joostdecock、@Josehower、@josephcsoti、@josh、@joshuabaker、@JoshuaKGoldberg、@joshuaslate、@joulev、@jsteele-stripe、@JTaylor0196、@JuanM04、@jueungrace、@juliusmarminge、@Juneezee、@Just-Moh-it、@juzhiyuan、@jyunhanlin、@kaguya3222、@karlhorky、@kevinmitch14、@keyz、@kijikunnn、@kikobeats、@Kikobeats、@kleintorres、@koba04、@koenpunt、@koltong、@konomae、@kosai106、@krmeda、@kvnang、@kwonoj、@ky1ejs、@kylemcd、@labyrinthitis、@lachlanjc、@lacymorrow、@laityned、@Lantianyou、@leerob、@leodr、@leoortizz、@li-jia-nan、@loettz、@lorenzobloedow、@lubakravche、@lucasassisrosa、@lucasconstantino、@lucgagan、@LukeSchlangen、@LuudJanssen、@lycuid、@M3kH、@m7yue、@manovotny、@maranomynet、@marcus-rise、@MarDi66、@MarkAtOmniux、@martin-wahlberg、@masnormen、@matepapp、@matthew-heath、@mattpr、@maxleiter、@MaxLeiter、@maxproske、@meenie、@meesvandongen、@mhmdrioaf、@michaeloliverx、@mike-plummer、@MiLk、@milovangudelj、@Mingyu-Song、@mirismaili、@mkcy3、@mknichel、@mltsy、@mmaaaaz、@mnajdova、@moetazaneta、@mohanraj-r、@molebox、@morganfeeney、@motopods、@mPaella、@mrkldshv、@mrxbox98、@nabsul、@nathanhammond、@nbouvrette、@nekochantaiwan、@nfinished、@Nick-Mazuk、@nickmccurdy、@niedziolkamichal、@niko20、@nikolovlazar、@nivak-monarch、@nk980113、@nnnnoel、@nocell、@notrab、@nroland013、@nuta、@nutlope、@obusk、@okcoker、@oliviertassinari、@omarhoumz、@opnay、@orionmiz、@ossan-engineer、@patrick91、@pauek、@peraltafederico、@Phiction、@pn-code、@pyjun01、@pythagoras-yamamoto、@qrohlf、@raisedadead、@reconbot、@reshmi-sriram、@reyrodrigez、@ricardofiorani、@rightones、@riqwan、@rishabhpoddar、@rjsdnql123、@rodrigofeijao、@runjuu、@Ryan-Dia、@ryo-manba、@s0h311、@sagarpreet-xflowpay、@sairajchouhan、@samdenty、@samsisle、@sanjaiyan-dev、@saseungmin、@SCG82、@schehata、@Schniz、@sepiropht、@serkanbektas、@sferadev、@ShaunFerris、@shivanshubisht、@shozibabbas、@silvioprog、@simonswiss、@simPod、@sivtu、@SleeplessOne1917、@smaeda-ks、@sonam-serchan、@SonMooSans、@soonoo、@sophiebits、@souporserious、@sp00ls、@sqve、@sreetamdas、@stafyniaksacha、@starunaway、@steebchen、@stefanprobst、@steppefox、@steven-tey、@suhaotian、@sukkaw、@SukkaW、@superbahbi、@SuttonJack、@svarunid、@swaminator、@swarnava、@syedtaqi95、@taep96、@taylorbryant、@teobler、@Terro216、@theevilhead、@thepatrick00、@therealrinku、@thomasballinger、@thorwebdev、@tibi1220、@tim-hanssen、@timeyoutakeit、@tka5、@tknickman、@tomryanx、@trigaten、@tristndev、@tunamagur0、@tvthatsme、@tyhopp、@tyler-lutz、@UnknownMonk、@v1k1、@valentincostam、@valentinh、@valentinpolitov、@vamcs、@vasucp1207、@vicsantizo、@vinaykulk621、@vincenthongzy、@visshaljagtap、@vladikoff、@wherehows、@WhoAmIRUS、@WilderDev、@Willem-Jaap、@williamli、@wiredacorn、@wiscaksono、@wojtekolek、@ws-jm、@wxh06、@wyattfry、@wyattjoh、@xiaolou86、@y-tsubuku、@yagogmaisp、@yangshun、@yasath、@Yash-Singh1、@yigithanyucedag、@ykzts、@Yovach、@yutsuten、@yyuemii、@zek、@zekicaneksi、@zignis 和 @zlrlyy

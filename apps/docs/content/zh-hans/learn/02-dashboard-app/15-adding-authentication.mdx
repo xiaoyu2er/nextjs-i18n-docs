@@ -1,0 +1,472 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-05-29T19:49:27.632Z
+title: 添加身份验证
+headline: '应用路由：添加身份验证'
+description: >-
+  使用 NextAuth.js、服务器操作和中间件为仪表板路由添加身份验证保护。
+image: 'https://nextjs.org/api/learn-og?title=Adding%20Authentication&amp;chapter=15'
+---
+
+在上一章节中，您通过添加表单验证和改进可访问性完成了发票路由的构建。本章将学习如何为仪表板添加身份验证功能。
+
+[什么是身份验证？](#what-is-authentication)
+--------------------------------------------------
+
+身份验证是现代网络应用的核心组成部分，用于验证用户身份的真实性。
+
+安全的网站通常会采用多种方式验证用户身份。例如，在输入用户名和密码后，网站可能会向您的设备发送验证码，或使用 Google Authenticator 等外部应用进行二次验证。这种双重验证 (2FA) 机制能有效提升安全性——即使密码泄露，攻击者也无法通过没有动态令牌的设备登录您的账户。
+
+### [身份验证与授权](#authentication-vs-authorization)
+
+在 Web 开发中，身份验证和授权具有不同功能：
+
+*   **身份验证** 确认用户身份的真实性，通常通过用户名/密码等凭证进行验证
+*   **授权** 是在身份验证之后的步骤，决定用户有权访问应用的哪些部分
+
+简而言之，身份验证解决"你是谁"的问题，而授权解决"你能做什么"的问题。
+
+[创建登录路由](#creating-the-login-route)
+-----------------------------------------------------
+
+首先在应用中创建 `/login` 路由，并粘贴以下代码：
+
+```tsx filename="/app/login/page.tsx"
+import AcmeLogo from '@/app/ui/acme-logo';
+import LoginForm from '@/app/ui/login-form';
+import { Suspense } from 'react';
+ 
+export default function LoginPage() {
+  return (
+    <main className="flex items-center justify-center md:h-screen">
+      <div className="relative mx-auto flex w-full max-w-[400px] flex-col space-y-2.5 p-4 md:-mt-32">
+        <div className="flex h-20 w-full items-end rounded-lg bg-blue-500 p-3 md:h-36">
+          <div className="w-32 text-white md:w-36">
+            <AcmeLogo />
+          </div>
+        </div>
+        <Suspense>
+          <LoginForm />
+        </Suspense>
+      </div>
+    </main>
+  );
+}
+```
+
+注意此页面导入的 `<LoginForm />` 组件将在本章后续更新。该组件使用 React `<Suspense>` 包裹，因为它需要访问请求中的信息（URL 搜索参数）。
+
+[NextAuth.js](#nextauthjs)
+--------------------------
+
+我们将使用 [NextAuth.js](https://nextjs.authjs.dev/) 为应用添加身份验证功能。NextAuth.js 抽象了会话管理、登录/登出等复杂逻辑。虽然您可以手动实现这些功能，但过程既耗时又容易出错。NextAuth.js 为 Next.js 应用提供了一站式身份验证解决方案。
+
+[设置 NextAuth.js](#setting-up-nextauthjs)
+------------------------------------------------
+
+通过以下命令安装 NextAuth.js：
+
+```bash filename="Terminal"
+pnpm i next-auth@beta
+```
+
+这里安装的是 NextAuth.js 的 `beta` 版本，兼容 Next.js 14+。
+
+接下来生成应用密钥用于加密 cookies 保障会话安全：
+
+```bash filename="Terminal"
+# macOS
+openssl rand -base64 32
+# Windows 可使用 https://generate-secret.vercel.app/32
+```
+
+然后在 `.env` 文件中添加密钥：
+
+```bash {1} filename=".env"
+AUTH_SECRET=your-secret-key
+```
+
+生产环境需在 Vercel 项目中同步更新环境变量，参考 [环境变量配置指南](https://vercel.com/docs/environment-variables)。
+
+### [添加页面选项](#adding-the-pages-option)
+
+在项目根目录创建 `auth.config.ts` 文件，导出包含 NextAuth.js 配置的 `authConfig` 对象：
+
+```ts filename="/auth.config.ts"
+import type { NextAuthConfig } from 'next-auth';
+ 
+export const authConfig = {
+  pages: {
+    signIn: '/login',
+  },
+} satisfies NextAuthConfig;
+```
+
+通过 `pages` 选项可自定义登录/登出页面的路由。虽然非必需，但设置 `signIn: '/login'` 后用户将被重定向至自定义登录页而非默认页面。
+
+[使用 Next.js 中间件保护路由](#protecting-your-routes-with-nextjs-middleware)
+------------------------------------------------------------------------------------------------
+
+添加路由保护逻辑防止未登录用户访问仪表板：
+
+```ts {7,8,9,10,11,12,13,14,15,16,17,18,19,20,21} filename="/auth.config.ts"
+import type { NextAuthConfig } from 'next-auth';
+ 
+export const authConfig = {
+  pages: {
+    signIn: '/login',
+  },
+  callbacks: {
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user;
+      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
+      if (isOnDashboard) {
+        if (isLoggedIn) return true;
+        return false; // 未认证用户重定向至登录页
+      } else if (isLoggedIn) {
+        return Response.redirect(new URL('/dashboard', nextUrl));
+      }
+      return true;
+    },
+  },
+  providers: [], // 暂时为空数组
+} satisfies NextAuthConfig;
+```
+
+`authorized` 回调函数通过 [Next.js 中间件](/docs/app/building-your-application/routing/middleware) 验证请求权限，在请求完成前执行并接收包含 `auth` (用户会话) 和 `request` (请求对象) 的参数。
+
+`providers` 数组用于配置登录方式，目前为空数组，后续将在 [添加凭证提供者](#adding-the-credentials-provider) 部分详细介绍。
+
+在项目根目录创建 `middleware.ts` 文件：
+
+```ts filename="/middleware.ts"
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+ 
+export default NextAuth(authConfig).auth;
+ 
+export const config = {
+  // https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+};
+```
+
+这里使用 `authConfig` 初始化 NextAuth.js 并导出 `auth` 属性，同时通过 `matcher` 指定中间件运行的路径。
+
+使用中间件的优势在于：受保护路由会在渲染前完成身份验证，既提升安全性又优化性能。
+
+### [密码哈希](#password-hashing)
+
+存储密码前进行 **哈希处理** 是安全最佳实践。哈希将密码转换为固定长度的随机字符串，即使数据泄露也能提供安全保障。
+
+数据库初始化时已使用 `bcrypt` 包对密码进行哈希存储。本章后续将再次使用它验证用户输入密码与数据库记录的匹配性。由于 `bcrypt` 依赖 Node.js API（Next.js 中间件不可用），需要创建单独文件：
+
+```ts filename="/auth.ts"
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+});
+```
+
+### [添加凭证提供者](#adding-the-credentials-provider)
+
+在 NextAuth.js 中添加 `providers` 配置。虽然支持 Google/GitHub 等登录方式，本章重点介绍 [凭证提供者](https://authjs.dev/getting-started/providers/credentials-tutorial)：
+
+```ts {3,7} filename="/auth.ts"
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+import Credentials from 'next-auth/providers/credentials';
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [Credentials({})],
+});
+```
+
+> **须知：**
+> 
+> 其他登录方式如 [OAuth](https://authjs.dev/getting-started/providers/oauth-tutorial) 或 [邮件登录](https://authjs.dev/getting-started/providers/email-tutorial)，完整列表参见 [NextAuth.js 文档](https://authjs.dev/getting-started/providers)。
+
+### [实现登录功能](#adding-the-sign-in-functionality)
+
+通过 `authorize` 函数处理认证逻辑，类似服务端操作，使用 `zod` 验证邮箱密码后检查用户是否存在：
+
+```ts {4,9,10,11,12,13,14,15} filename="/auth.ts"
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+import Credentials from 'next-auth/providers/credentials';
+import { z } from 'zod';
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        const parsedCredentials = z
+          .object({ email: z.string().email(), password: z.string().min(6) })
+          .safeParse(credentials);
+      },
+    }),
+  ],
+});
+```
+
+验证凭证后创建 `getUser` 函数查询数据库：
+
+```ts {5,6,7,9,10,11,12,13,14,15,16,17,28,29,30,31} filename="/auth.ts"
+import NextAuth from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
+import { authConfig } from './auth.config';
+import { z } from 'zod';
+import type { User } from '@/app/lib/definitions';
+import bcrypt from 'bcrypt';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+async function getUser(email: string): Promise<User | undefined> {
+  try {
+    const user = await sql<User[]>`SELECT * FROM users WHERE email=${email}`;
+    return user[0];
+  } catch (error) {
+    console.error('Failed to fetch user:', error);
+    throw new Error('Failed to fetch user.');
+  }
+}
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        const parsedCredentials = z
+          .object({ email: z.string().email(), password: z.string().min(6) })
+          .safeParse(credentials);
+ 
+        if (parsedCredentials.success) {
+          const { email, password } = parsedCredentials.data;
+          const user = await getUser(email);
+          if (!user) return null;
+        }
+ 
+        return null;
+      },
+    }),
+  ],
+});
+```
+
+最后通过 `bcrypt.compare` 验证密码匹配性：
+
+```ts {7,22,24,27,28} filename="/auth.ts"
+import NextAuth from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
+import { authConfig } from './auth.config';
+import { z } from 'zod';
+import type { User } from '@/app/lib/definitions';
+import bcrypt from 'bcrypt';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+// ...
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        // ...
+ 
+        if (parsedCredentials.success) {
+          const { email, password } = parsedCredentials.data;
+          const user = await getUser(email);
+          if (!user) return null;
+          const passwordsMatch = await bcrypt.compare(password, user.password);
+ 
+          if (passwordsMatch) return user;
+        }
+ 
+        console.log('Invalid credentials');
+        return null;
+      },
+    }),
+  ],
+});
+```
+
+密码匹配时返回用户对象，否则返回 `null` 阻止登录。
+
+### [更新登录表单](#updating-the-login-form)
+
+现在您需要将认证逻辑与登录表单连接。在 `actions.ts` 文件中，创建一个名为 `authenticate` 的新操作。该操作应从 `auth.ts` 导入 `signIn` 函数：
+
+```ts filename="/app/lib/actions.ts"
+'use server';
+ 
+import { signIn } from '@/auth';
+import { AuthError } from 'next-auth';
+ 
+// ...
+ 
+export async function authenticate(
+  prevState: string | undefined,
+  formData: FormData,
+) {
+  try {
+    await signIn('credentials', formData);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      switch (error.type) {
+        case 'CredentialsSignin':
+          return 'Invalid credentials.';
+        default:
+          return 'Something went wrong.';
+      }
+    }
+    throw error;
+  }
+}
+```
+
+如果出现 `'CredentialsSignin'` 错误，您需要显示相应的错误消息。您可以在 [NextAuth.js 文档](https://errors.authjs.dev) 中了解更多关于错误的信息。
+
+最后，在您的 `login-form.tsx` 组件中，可以使用 React 的 `useActionState` 来调用服务器操作、处理表单错误并显示表单的待处理状态：
+
+```tsx {1,11,12,13,16,17,18,19,20,21,24,70,71,72,73,79,80,81,82,83,84} filename="app/ui/login-form.tsx"
+'use client';
+ 
+import { lusitana } from '@/app/ui/fonts';
+import {
+  AtSymbolIcon,
+  KeyIcon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/24/outline';
+import { ArrowRightIcon } from '@heroicons/react/20/solid';
+import { Button } from '@/app/ui/button';
+import { useActionState } from 'react';
+import { authenticate } from '@/app/lib/actions';
+import { useSearchParams } from 'next/navigation';
+ 
+export default function LoginForm() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const [errorMessage, formAction, isPending] = useActionState(
+    authenticate,
+    undefined,
+  );
+ 
+  return (
+    <form action={formAction} className="space-y-3">
+      <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8">
+        <h1 className={`${lusitana.className} mb-3 text-2xl`}>
+          Please log in to continue.
+        </h1>
+        <div className="w-full">
+          <div>
+            <label
+              className="mb-3 mt-5 block text-xs font-medium text-gray-900"
+              htmlFor="email"
+            >
+              Email
+            </label>
+            <div className="relative">
+              <input
+                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+                id="email"
+                type="email"
+                name="email"
+                placeholder="Enter your email address"
+                required
+              />
+              <AtSymbolIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <label
+              className="mb-3 mt-5 block text-xs font-medium text-gray-900"
+              htmlFor="password"
+            >
+              Password
+            </label>
+            <div className="relative">
+              <input
+                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+                id="password"
+                type="password"
+                name="password"
+                placeholder="Enter password"
+                required
+                minLength={6}
+              />
+              <KeyIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+            </div>
+          </div>
+        </div>
+        <input type="hidden" name="redirectTo" value={callbackUrl} />
+        <Button className="mt-4 w-full" aria-disabled={isPending}>
+          Log in <ArrowRightIcon className="ml-auto h-5 w-5 text-gray-50" />
+        </Button>
+        <div
+          className="flex h-8 items-end space-x-1"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {errorMessage && (
+            <>
+              <ExclamationCircleIcon className="h-5 w-5 text-red-500" />
+              <p className="text-sm text-red-500">{errorMessage}</p>
+            </>
+          )}
+        </div>
+      </div>
+    </form>
+  );
+}
+```
+
+[添加退出功能](#adding-the-logout-functionality)
+-------------------------------------------------------------------
+
+要为 `<SideNav />` 添加退出功能，请在 `<form>` 元素中调用 `auth.ts` 中的 `signOut` 函数：
+
+```tsx {5,15,16,17,18} filename="/ui/dashboard/sidenav.tsx"
+import Link from 'next/link';
+import NavLinks from '@/app/ui/dashboard/nav-links';
+import AcmeLogo from '@/app/ui/acme-logo';
+import { PowerIcon } from '@heroicons/react/24/outline';
+import { signOut } from '@/auth';
+ 
+export default function SideNav() {
+  return (
+    <div className="flex h-full flex-col px-3 py-4 md:px-2">
+      // ...
+      <div className="flex grow flex-row justify-between space-x-2 md:flex-col md:space-x-0 md:space-y-2">
+        <NavLinks />
+        <div className="hidden h-auto w-full grow rounded-md bg-gray-50 md:block"></div>
+        <form
+          action={async () => {
+            'use server';
+            await signOut({ redirectTo: '/' });
+          }}
+        >
+          <button className="flex h-[48px] grow items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 md:flex-none md:justify-start md:p-2 md:px-3">
+            <PowerIcon className="w-6" />
+            <div className="hidden md:block">Sign Out</div>
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+```
+
+[尝试使用](#try-it-out)
+-------------------------
+
+现在可以尝试一下。您应该能够使用以下凭证登录和退出应用程序：
+
+*   邮箱：`user@nextmail.com`
+*   密码：`123456`

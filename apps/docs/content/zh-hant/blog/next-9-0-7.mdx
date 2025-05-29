@@ -1,0 +1,255 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:53:50.930Z
+title: Next.js 9.0.7
+description: >-
+  Next.js 9.0 版本已於約兩個月前發布。此後，我們持續推出了 7 個較小但相當重要的更新版本。讓我們深入探討這些版本為您的網站和應用程式帶來了哪些改進，且完全沒有破壞性變更。
+author:
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Joe Haddad
+    image: /static/team/timer.jpg
+  - name: Luis Alvarez
+    image: /static/team/lfades.jpg
+  - name: Lukáš Huvar
+    image: /static/team/huvik.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-09-30T14:47:09.956Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-0-7/twitter-card.png
+---
+
+Next.js 9.0 版本已於約兩個月前發布。此後，我們持續推出了 7 個較小但相當重要的更新版本：[9.0.1](https://github.com/vercel/next.js/releases/tag/v9.0.1)、[9.0.2](https://github.com/vercel/next.js/releases/tag/v9.0.2)、[9.0.3](https://github.com/vercel/next.js/releases/tag/v9.0.3)、[9.0.4](https://github.com/vercel/next.js/releases/tag/v9.0.4)、[9.0.5](https://github.com/vercel/next.js/releases/tag/v9.0.5)、[9.0.6](https://github.com/vercel/next.js/releases/tag/v9.0.6) 和 [9.0.7](https://github.com/vercel/next.js/releases/tag/v9.0.7)。
+
+讓我們深入探討這些版本為您的網站和應用程式帶來了哪些改進，且完全沒有破壞性變更。
+
+*   **[Windows 環境下的並行處理改進](#improved-concurrency-in-windows-environments)**：`next build` 程序現在於 Windows 上更可靠，並能更好地並行處理工作。
+*   **[預設啟用 Gzip 壓縮](#gzip-compression-by-default)**：現在預設加入 Gzip 壓縮以減少所需的優化步驟。
+*   **[僅針對活躍頁面的 TypeScript 報告](#typescript-report-on-active-pages-only)**：內建的 TypeScript 支援擴展為僅監控活躍頁面的變更，使其更快更可靠。
+*   **[遙測功能](#telemetry)**：將幫助我們專注於優化 Next.js 的哪些部分，並驗證優化是否達到預期效果。
+*   **[改進的 `next/head` 元素追蹤](#improved-nexthead-element-tracking)**：移除了 `next-head` 類別，使實現某些驗證工具更為容易。
+*   **[防止在頁面目錄中放置非頁面檔案](#preventing-non-pages-in-the-pages-directory)**：透過防止意外發布非頁面檔案，優化應用程式安全性和 `next build` 時間。
+*   **[執行時期改進](#runtime-improvements)**：當 Next.js 的某些部分未被使用時，例如 `next/dynamic`，它們將不再在執行時期被要求載入，從而減少套件大小。
+
+### [Windows 環境下的並行處理改進](#improved-concurrency-in-windows-environments)
+
+Next.js 在 `next build` 過程中許多地方進行並行工作。主要用途是使用 Terser 並行壓縮建置輸出。
+
+先前，這項工作是透過名為 `worker-farm` 的套件在多個 CPU 上處理的。然而，我們注意到許多 Windows 用戶已透過自訂 webpack 配置停用了壓縮功能。進一步檢查後，我們發現 `worker-farm` 在 Windows 機器上無法穩定運作。
+
+為解決此問題，我們從 `worker-farm` 遷移至 `jest-worker`。這確保了建置在 macOS、Linux 和 Windows 機器上同樣可靠且一致。
+
+`jest-worker`，顧名思義，是 Jest 測試執行器的一部分。它是 Jest 用來並行化測試案例的套件。這意味著該套件經過充分測試、可靠且維護良好。
+
+`jest-worker` 還支援 [`worker_threads`](https://github.com/facebook/jest/tree/master/packages/jest-worker#experimental-worker)，這是 Node 12 中的新功能。與 `child_process` 不同，`worker_threads` 可以共享記憶體——這意味著在新版 Node 上建置時間更快。
+
+透過切換到 `jest-worker`，我們能夠為 Windows 用戶重新啟用建置並行處理。
+
+### [預設啟用 Gzip 壓縮](#gzip-compression-by-default)
+
+在調查公司為何使用自訂伺服器時，我們發現最常見的原因是為了壓縮。公司會添加一個名為 `compression` 的 Express 中介軟體，用於處理 HTTP 回應的 Gzip 壓縮。
+
+此中介軟體壓縮回應，從而減少傳送給用戶的位元組數。通常，這應該由像 Nginx 這樣的反向代理處理。反向代理將 CPU 密集型工作從單線程的 Node 程序中移除。
+
+然而，在檢查網路上 Next.js 的使用情況時，我們發現很大一部分公司沒有配置任何壓縮。
+
+在像 [Vercel](https://vercel.com) 這樣的平台上，`gzip` 和 `brotli` 會在代理層級自動處理。
+
+當自行託管時，公司必須自行添加 gzip（透過 `compression` 或反向代理）。
+
+從 Next.js 9.0.4 開始，當使用 `next start` 或自訂 `server.js` 時，預設包含 `gzip` 壓縮。
+
+`brotli` 支援[即將推出](https://github.com/expressjs/compression/pull/150)，因為 Node.js 現在原生支援 Brotli。
+
+如果您的應用程式已透過自訂伺服器啟用壓縮，Next.js 將不會添加自己的壓縮器。
+
+Next.js 預設不包含對無伺服器目標的壓縮，因為在使用無伺服器目標時，資源是單獨上傳的，不透過 Node.js 提供服務。
+
+如果您部署在像 [Vercel](https://vercel.com) 這樣處理壓縮的平台上，則無需任何變更。
+
+### [僅針對活躍頁面的 TypeScript 報告](#typescript-report-on-active-pages-only)
+
+Next.js 9 包含了對 TypeScript 的內建支援。只需將單個頁面從 `.js` 重新命名為 `.tsx`。Next.js 將自動處理或引導您完成任何剩餘的設定。
+
+Next.js 還透過在開發過程中並行運行 `tsc --watch` 來處理類型檢查。在開發過程中，Next.js 有一個稱為[按需條目](https://nextjs.org/blog/next-8#improved-on-demand-entries)的概念。此功能僅編譯您正在積極處理的頁面。
+
+![按需條目流程](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/flow.jpg)
+
+按需條目流程
+
+自 9.0.4 起，Next.js 現在僅報告由按需條目主動編譯的頁面的類型錯誤。這減少了在專注於特定頁面集時的大量類型檢查噪音。
+
+完整的應用程式類型檢查仍在 `next build` 期間運行，或可以由您的編輯器處理。
+
+### [遙測功能](#telemetry)
+
+Next.js 已發布近 3 年，在這 3 年中，該框架從新功能到為所有用戶提供更好的預設值，都有了顯著的成長。
+
+我們改進這個過程的方式一直是非常手動的。
+
+Vercel 有一些大型的 Next.js 應用程式。例如，[vercel.com](https://vercel.com)、[vercel.com/docs](https://vercel.com/docs) 和 [https://nextjs.org](https://nextjs.org)。我們一直在 Vercel 內部[自食其果](https://en.wikipedia.org/wiki/Eating_your_own_dog_food)使用 Next.js，並根據我們的經驗改進 Next.js。
+
+除此之外，我們積極與社區互動以收集反饋。您可能之前曾與 Tim 交談過，提供有關您在公司如何使用 Next.js 的反饋。
+
+例如，如果您使用自訂伺服器、自訂 webpack 配置等。這些反饋對於引導 Next.js 的功能開發極為寶貴。
+
+然而，這種方法存在一個問題，即我們只能從一部分用戶那裡收集反饋。這部分用戶可能與您/您的公司有不同的需求和用例。
+
+一個例子是導入 CSS 文件，這不是標準做法，但似乎有相當一部分用戶在使用這種方式，無論是透過 `next-css`（或 Sass/Less），還是自訂配置。如果我們知道有多少百分比的用戶使用這種特定方法，我們可以優先改進它。
+
+因此，我們引入了一種匿名、更自動化的方法來收集這些反饋點，以便我們在不久的將來能進一步改進 Next.js。
+
+這也將使我們能夠驗證對框架的改進是否提高了所有應用程式的基準。
+
+您可以在 [nextjs.org/telemetry](https://nextjs.org/telemetry) 上閱讀更多關於遙測的資訊。如果您不想參與，您也可以在那裡找到如何選擇退出的方法。
+
+### [建置反饋與活動指示點](#build-feedback-with-dots-indicating-activity)
+
+在與 Next.js 用戶交談時，一個小的反饋是有時看起來 `next build` 沒有做任何事情，主要是視覺上。
+
+為了解決這個問題，我們在運行 `next build` 時向控制台輸出添加了一個載入指示器。此輸出提供了命令仍在運行的視覺指示，並且程序沒有凍結。
+
+我們計劃在可能的情況下擴展此建置輸出，以顯示更多建置階段。
+
+新的建置指示點
+
+### [改進的 `next/head` 元素追蹤](#improved-nexthead-element-tracking)
+
+Next.js 提供了一種內建的方式來管理 `<head>` 元素，因為它負責渲染您的應用程式的 HTML。此 API 透過 `next/head` 模組公開。
+
+例如，為頁面添加標題：
+
+```js filename="pages/index.js"
+import Head from 'next/head';
+ 
+export default function MyPage() {
+  return (
+    <>
+      <Head>
+        <title>My Title</title>
+      </Head>
+      <h1>Hello World</h1>
+    </>
+  );
+}
+```
+
+當渲染為 HTML 時，Next.js 將收集在 `<Head>` 內渲染的所有組件，並將標籤渲染到頁面的 `<head>` 中。
+
+然而，Next.js 允許使用 `<Link>` 組件進行單頁應用程式 (SPA) 類型的路由轉換。
+
+當您點擊 `<Link>` 時，Next.js 將獲取渲染頁面所需的 JavaScript 文件。然後，它將渲染與該文件關聯的 React 組件。
+
+因為此轉換發生在客戶端，我們必須清理從前一頁注入的 `<head>` 元素，否則過時的元素可能會出現在另一頁上。
+
+以前，Next.js 透過向每個 `<Head>` 提供的元素添加一個類別名稱來追蹤這些元素。
+
+以上述例子為例，`<head>` 看起來像：
+
+```
+<head>
+  <title class="next-head">My Title</title>
+</head>
+```
+
+這種解決方案效果很好，因為每個透過 `next/head` 注入的元素都被清楚地標記並且易於清理。
+
+然而，一小部分用戶報告了問題，即元素上的額外 `class` 屬性有時會使從外部服務添加的腳本無法驗證。
+
+來自 Google Chrome 團隊的 [Gerald Monaco](https://github.com/devknoll) [提出了一種方法](https://github.com/vercel/next.js/pull/8020)，可以在不需要元素上的類別名稱的情況下保留清理行為。
+
+新的行為是 Next.js 將插入一個額外的 `<meta>` 標籤，保存它（`next/head`）渲染的元素數量。有了這個，Next.js 可以使用計數來清理現有元素。
+
+因此，這種方法減少了當多個元素注入到頁面的 `<head>` 時的初始 HTML 負載大小。
+
+### [防止在頁面目錄中放置非頁面檔案](#preventing-non-pages-in-the-pages-directory)
+
+當開始使用 Next.js 時，您做的第一件事就是創建一個 `pages` 目錄。
+
+慣例是 `pages` 目錄中的每個文件都會成為應用程式中的一個路由。一個簡單的例子是 `pages/about.js` 成為 `/about`。
+
+隨著時間的推移，我們偶爾收到報告，用戶的應用程式，無論大小，建置性能都很差。
+
+進一步調查後發現，這些用戶在 `pages` 目錄中創建了他們的整個組件結構。
+
+由於 `pages` 目錄中的每個文件都被視為頁面，每個組件都被編譯為應用程式中的頁面。這導致了大量的建置時間開銷，為無效頁面生成 2+ 個 JavaScript 文件。
+
+此外，這將部分影響 Next.js 決定如何生成代碼分割塊。這是因為 Next.js 使用關於跨頁面庫使用的啟發式方法。
+
+因此，我們必須確保用戶不會將此陷阱引入他們的 Next.js 應用程式中。
+
+Next.js 9 現在驗證 `pages` 目錄中的文件是否導出 React 組件。
+
+實際上，這意味著 Next.js 將顯示一條消息，提醒您在 `pages` 目錄中發現了潛在的非頁面文件。
+
+這鼓勵用戶將不是頁面的文件移動到另一個目錄。反過來，開發、生產和代碼分割將更快、更準確。
+
+### [執行時期改進](#runtime-improvements)
+
+Next.js 框架由許多部分組成。其中之一是客戶端執行時期。此執行時期處理水合作用、客戶端路由等。
+
+水合作用，這是此改進的重點，是使伺服器渲染或預渲染的 HTML 具有互動性所必需的。水合作用添加事件處理程序並調用生命週期方法，如 `useEffect()` 或 `componentDidMount`——使您的應用程式為最終用戶做好準備。
+
+此外，Next.js 處理的不僅僅是基本的水合作用——例如，設置客戶端路由器、配置 `next/head`，以及透過 `next/dynamic` 加載額外的應用程式邏輯。
+
+每個這些職責也有其特定的執行時期部分。
+
+在 `next/dynamic` 的情況下，Next.js 必須確保在伺服器上渲染的延遲加載組件在客戶端準備就緒。每次使用 `next/dynamic` 都會生成一個額外的 JavaScript 套件，這些文件必須在水合作用之前加載，以避免水合作用不匹配。
+
+以前，此執行時期總是包含在 Next.js 執行時期套件中。現在，它僅在您的應用程式中使用 `next/dynamic` 時才包含。這意味著對於不使用 `next/dynamic` 的應用程式，下載、解析和執行的 JavaScript 更少。
+
+### [AppTree 支援](#apptree-support)
+
+React 生態系統中的一些庫以非常特定的方式實現伺服器端渲染。最值得注意的是，Apollo 的伺服器端渲染解決方案，稱為 `getDataFromTree`，透過渲染 React 樹並對找到的每個 `Query` 等待結果，然後再次渲染 React 樹來工作。
+
+預設情況下，Next.js 將一些上下文值添加到 React 樹中，例如可以使用 `useRouter` 讀取的路由器。
+
+`with-apollo` 範例過去渲染 React 樹的方式是透過渲染 `<App>` 並嘗試手動填補缺失的屬性。隨著 React Context 的添加，這不再可能，因為上下文提供者是一個單獨的元素。
+
+從 Next.js 9.0.4 開始，一個名為 `AppTree` 的新屬性被添加到 `getInitialProps` 的上下文對象中。它是專門為外部庫必須遍歷整個 React 樹（如 Apollo 的 `getDataFromTree`）的情況添加的。
+
+`with-apollo` 範例已[更新以反映變更](https://github.com/vercel/next.js/blob/v9.0.4/examples/with-apollo/lib/with-apollo-client.js#L20-L34)。如果您已經在應用程式中實現了 Apollo，建議更新到 `AppTree` 方法，以便 `useRouter` 和其他未來添加的 API 在您的 Next.js 應用程式中正常工作。
+
+如果您不使用 Apollo 或類似的庫，我們建議盡量避免使用 AppTree，因為 Next.js 團隊一般不推薦遍歷 React 樹。它增加了相當多的性能開銷，因為 React 樹被渲染多次而不是僅一次。
+
+### [移除 `next-server` 套件](#removal-of-the-next-server-package)
+
+一年前，當我們開始針對無伺服器部署優化 Next.js 時，我們創建了一個名為 `next-server` 的套件。這個套件是實驗性的，與 `next` 套件一同發布。它從未公開記錄，但作為一個實驗，旨在創造最小的 Next.js 伺服器運行環境。
+
+最終，這個套件取得了成功，確實讓生產環境的伺服器運行時變得更小。然而，我們想出了一種創新的新方法，透過 Next.js 編譯器和[靜態分析](https://github.com/vercel/node-file-trace)，讓運行時變得更小。
+
+在此過程中，`next-server` 變得過時，並被[無伺服器目標 (serverless target)](/docs#serverless-deployment) 所取代。這個目標的輸出比使用 `next-server` 套件作為 `next` 的替代方案更加優化。
+
+雖然這個套件已經過時且無法直接使用，但我們仍然保留它。這是因為它包含了一些在套件之間共享的內部程式碼，遷移這些程式碼需要相當大的努力。
+
+我們最近完成了這項工作，將 `next-server` 的程式碼移回 `next` 套件。這意味著 Next.js 框架的所有程式碼現在都位於 `next` 套件中。
+
+這使得初學者和經驗豐富的貢獻者都能更輕鬆地為 Next.js 貢獻。現在有一個統一的編譯過程和構建設置。以前，`next` 和 `next-server` 有各自的設置，並且對哪些程式碼屬於哪個套件有隨意的限制。
+
+### [升級 Next.js](#upgrading-nextjs)
+
+如果您的專案運行在舊版本的 Next.js 上，我們建議升級到 Next.js 9。
+
+在大多數情況下，升級不需要任何更改。您可以按照[升級指南](https://github.com/vercel/next.js/blob/canary/UPGRADING.md#migrating-from-v8-to-v9)確保順利升級。
+
+我們要感謝所有自指南發布以來更新它的社群貢獻者。
+
+### [未來會有什麼？](#whats-coming-in-the-future)
+
+這篇部落格文章中概述的新優化只是我們一直在進行的更廣泛優化和功能的開始。
+
+我們很快就會分享關於正在進行的 RFC 的更新。在此之前，您可以透過 [GitHub 上的 RFC 標籤](https://github.com/vercel/next.js/labels/RFC) 一窺究竟。
+
+這展示了我們一直在研究的一些功能，例如[內建 CSS 支援](https://github.com/vercel/next.js/issues/8626)、[public 目錄支援](https://github.com/vercel/next.js/issues/7177) 和 [src 目錄支援](https://github.com/vercel/next.js/issues/8451)。
+
+### [社群](#community)
+
+我們很高興看到 Next.js 社群的持續成長。
+
+*   我們已經有超過 **800** 位貢獻者提交了至少 1 次提交。
+*   在 GitHub 上，該專案已經獲得了超過 **41,100** 次星標。
+
+自上次重大發布以來，Next.js 社群已經翻倍，擁有超過 10,900 名成員。[加入我們！](https://github.com/vercel/next.js/discussions)
+
+我們對持續的社群貢獻以及來自公司和用戶的外部反饋感到興奮，這些反饋幫助塑造了發布內容。

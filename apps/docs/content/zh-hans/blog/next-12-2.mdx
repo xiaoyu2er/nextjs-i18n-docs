@@ -1,0 +1,271 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:42:07.765Z
+title: Next.js 12.2 版本发布
+description: >-
+  Next.js 12.2 带来了稳定版的中间件 (Middleware) 和按需增量静态再生 (On-Demand ISR)，实验性的边缘服务端渲染 (Edge SSR) 和 API 路由 (API Routes) 等新特性！
+author:
+  - name: Balázs Orbán
+    image: /static/team/balazs.jpg
+  - name: DongYoon Kang
+    image: /static/team/kdy.jpg
+  - name: Javi Velasco
+    image: /static/team/javi.jpg
+  - name: Jiachi Liu
+    image: /static/team/jiachi.png
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Joe Haddad
+    image: /static/team/timer.jpg
+  - name: Maia Teegarden
+    image: /static/team/maia.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Steven
+    image: /static/team/styfle.png
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2022-06-28T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-12-2/twitter-card.png
+---
+
+我们通过 12.2 版本为 Next.js 的未来奠定基础：
+
+*   [**中间件（稳定版）**](#middleware-stable)：为整个应用实现动态路由
+*   [**按需增量静态再生（稳定版）**](#on-demand-incremental-static-regeneration-stable)：无需重新部署即可更新内容
+*   [**边缘 API 路由（实验性）**](#edge-api-routes-experimental)：高性能 API 端点
+*   [**边缘服务端渲染（实验性）**](#edge-server-rendering-experimental)：在边缘节点进行服务端渲染
+*   [**SWC 插件（实验性）**](#swc-plugins-experimental)：通过自定义插件扩展编译功能
+*   [**`next/image` 改进**](#improvements-to-nextimage)：包括全新的 `next/future/image` 组件
+
+立即通过运行 `npm i next@latest` 进行更新。
+
+[中间件（稳定版）](#middleware-stable)
+-----------------------------------------
+
+我们很高兴地宣布中间件在 12.2 版本中已稳定，并根据用户反馈改进了 API。
+
+中间件允许您在请求完成前运行代码。根据传入的请求，您可以通过重写、重定向、添加标头或设置 cookie 来修改响应。
+
+```ts filename="middleware.ts"
+import { NextRequest, NextResponse } from 'next/server';
+ 
+// 如果传入请求包含 "beta" cookie
+// 则将请求重写至 /beta
+export function middleware(req: NextRequest) {
+  const isInBeta = JSON.parse(req.cookies.get('beta') || 'false');
+  req.nextUrl.pathname = isInBeta ? '/beta' : '/';
+  return NextResponse.rewrite(req.nextUrl);
+}
+ 
+// 支持单个匹配值或匹配数组
+export const config = {
+  matcher: '/',
+};
+```
+
+要升级至中间件的最新 API 变更，请参阅 [迁移指南](/docs/messages/middleware-upgrade-guide)。
+
+您可以在 [Vercel 上免费试用](https://vercel.com/edge) 中间件，或使用 `next start` [自托管时](/docs/pages/building-your-application/deploying#self-hosting) 体验该功能。
+
+[按需增量静态再生（稳定版）](#on-demand-incremental-static-regeneration-stable)
+-------------------------------------------------------------------------------------------------------
+
+按需增量静态再生 (ISR) 允许您无需重新部署即可更新站点内容。当无头 CMS 或电商平台中的数据变更时，您可以立即轻松更新站点。这是社区最期待的功能之一，我们很高兴它现已稳定。
+
+```js filename="pages/api/revalidate.js"
+export default async function handler(req, res) {
+  // 检查密钥以确认这是有效请求
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: '无效令牌' });
+  }
+ 
+  try {
+    await res.revalidate('/path-to-revalidate');
+    return res.json({ revalidated: true });
+  } catch (err) {
+    // 如果出现错误，Next.js 将继续
+    // 显示最后成功生成的页面
+    return res.status(500).send('重新验证时出错');
+  }
+}
+```
+
+增量静态再生适用于所有支持 [Next.js 构建 API](/docs/pages/building-your-application/deploying#nextjs-build-api) (`next build`) 的提供商。部署至 [Vercel](https://vercel.com/) 时，按需重新验证在将页面推送至边缘节点后约 300 毫秒内即可全局生效。
+
+了解更多信息，请 [查看文档](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) 或 [观看演示](https://on-demand-isr.vercel.app/) 了解按需重新验证的实际效果。
+
+[边缘 API 路由（实验性）](#edge-api-routes-experimental)
+---------------------------------------------------------------
+
+Next.js 现在也支持在 API 路由中使用 [边缘运行时](/docs/pages/api-reference/edge)。边缘运行时比 Node.js 更轻量，可实现快速启动以降低延迟。此外，边缘 API 路由支持从服务器流式传输响应。
+
+您可以在 `config` 中为 API 路由设置运行时，指定 `nodejs`（默认）或 `experimental-edge`：
+
+```js filename="pages/api/hello.js"
+import type { NextRequest } from 'next/server';
+ 
+export default (req: NextRequest) => {
+  return new Response(`Hello, from ${req.url} I'm now an Edge API Route!`);
+};
+ 
+export const config = {
+  runtime: 'experimental-edge',
+};
+```
+
+由于边缘运行时较为轻量，为适应快速启动存在一些限制——例如不支持 `fs` 等 Node.js 特定 API。因此，API 路由的默认运行时仍为 `nodejs`。
+
+了解更多信息，请 [查看文档](/docs/pages/building-your-application/routing/api-routes)。
+
+[边缘服务端渲染（实验性）](#edge-server-rendering-experimental)
+---------------------------------------------------------------------------
+
+Next.js 现在支持使用 [边缘运行时](/docs/pages/api-reference/edge) 进行服务端渲染。
+
+如上所述，边缘运行时比 Node.js 更轻量，可实现快速启动以降低延迟。与 React 18 结合使用时，它支持页面的流式服务端渲染。
+
+Next.js 默认使用 Node.js 作为服务端渲染页面的运行时。从 12.2 开始，如果您使用 React 18，可以选择使用边缘运行时。
+
+您可以在 `next.config.js` 中全局设置运行时，指定 `nodejs` 或 `experimental-edge`：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    runtime: 'experimental-edge',
+  },
+};
+```
+
+更改默认页面运行时会影响所有页面，包括 [SSR 流式传输](/docs/app/building-your-application/routing/loading-ui-and-streaming) 和 [服务器组件](/docs/getting-started/react-essentials) 功能。您也可以通过导出 `runtime` 配置在每个页面基础上覆盖此默认值：
+
+```js filename="pages/index.js"
+export const config = {
+  runtime: 'nodejs',
+};
+ 
+export default function Home() {}
+```
+
+您可以通过在运行时查看 `process.env.NEXT_RUNTIME` 环境变量，以及在 webpack 编译期间检查 `options.nextRuntime` 变量来检测正在使用的运行时。
+
+了解更多信息，请 [查看文档](/docs/pages/building-your-application/rendering/edge-and-nodejs-runtimes)。
+
+[`next/image` 改进](#improvements-to-nextimage)
+----------------------------------------------------------
+
+### [`next/future/image` 组件（实验性）](#nextfutureimage-component-experimental)
+
+我们听取了您对当前 Image 组件的反馈，很高兴分享新版 `next/image` 的早期预览。这个经过改进的新图像组件需要更少的客户端 JavaScript，并简化了图像样式设置：
+
+*   渲染单个 `<img>` 而不需要 `<div>` 或 `<span>` 包装器
+*   添加了对标准 `style` 属性的支持
+*   移除了 `layout`、`objectFit` 和 `objectPosition` 属性，改用 `style` 或 `className`
+*   移除了 `IntersectionObserver` 实现，改用 [原生懒加载](https://caniuse.com/loading-lazy-attr)
+*   移除了 `loader` 配置，改用 `loader` 属性
+*   注意：暂不支持 `fill` 模式，因此需要提供 `width` 和 `height` 属性
+
+这提高了性能，因为原生 `loading="lazy"` 不需要等待 React 水合和客户端 JavaScript 执行。
+
+了解更多信息，请 [查看文档](/docs/pages/building-your-application/optimizing/images)。
+
+### [远程模式（实验性）](#remote-patterns-experimental)
+
+`next/image` 现在支持实验性配置选项 `remotePatterns`，允许您在使用内置图像优化 API 时为远程图像指定通配符。这提供了比现有 [`images.domains`](http://images.domains) 配置更强大的匹配能力，后者仅对域名进行精确匹配。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    images: {
+      remotePatterns: [
+        {
+          // `src` 属性的主机名必须以 `.example.com` 结尾，
+          // 否则将返回 400 Bad Request
+          protocol: 'https',
+          hostname: '**.example.com',
+        },
+      ],
+    },
+  },
+};
+```
+
+了解更多信息，请 [查看文档](/docs/pages/api-reference/components/image#remotepatterns)。
+
+### [禁用图片优化](#disable-image-optimization)
+
+零配置的图片优化 API 会阻止使用 `next export`，因为它需要服务器根据请求实时优化图片。在此之前，目标使用 `next export` 的用户需要配置 `loader` 以使用第三方图片优化服务，但如果没有可用的服务提供商，则没有明确的解决方案。从今天开始，`next export` 用户可以通过一个新的配置属性为所有 `next/image` 实例禁用图片优化：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    images: {
+      unoptimized: true,
+    },
+  },
+};
+```
+
+[SWC 插件（实验性）](#swc-plugins-experimental)
+-------------------------------------------------------
+
+[Next.js 编译器](/docs/architecture/nextjs-compiler) 使用 [SWC](https://swc.rs/) 来转换和压缩生产环境的 JavaScript 代码。SWC 在 Next.js 12.0 中引入，旨在提升本地开发和构建性能。
+
+现在，你可以添加插件（使用 WebAssembly 编写）来自定义编译期间的 SWC 转换行为：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcPlugins: [
+      ['css-variable/swc', { displayName: true, basePath: __dirname }],
+    ],
+  },
+};
+```
+
+更多信息请[查看文档](https://github.com/vercel/next.js/blob/canary/docs/architecture/nextjs-compiler.md#experimental-swc-plugin-support)。
+
+[React 18 支持改进](#react-18-support-improvements)
+---------------------------------------------------------------
+
+*   改进了对 CSS-in-JS 库（如 `styled-components` 和 `emotion`）的支持，升级体验更流畅且无破坏性变更。
+*   现在完全支持 AMP 和 HTML 后优化（CSS、字体优化）。
+*   `next/head` 现在支持 React 18。
+*   Next.js 的路由播报器（用于向屏幕阅读器和其他辅助技术正确播报页面切换）现在支持 React 18。
+
+[其他改进](#other-improvements)
+-----------------------------------------
+
+*   在 Next.js 编译器中支持 Emotion 转换。现在支持 `@emotion/babel-plugin` 的大部分功能，除非你使用 `importMap`，否则可以移除该插件。更多信息请[查看文档](/docs/architecture/nextjs-compiler#emotion)。
+*   通过允许自定义默认选项（包括 `cssProp` 选项），改进了 Next.js 编译器对 `styled-components` 转换的支持。更多信息请[查看文档](/docs/architecture/nextjs-compiler#styled-components)。
+*   更好地支持 JavaScript ES 模块，因此像 `next/image` 和 `next/link` 这样的组件可以正确通过 `import` 导入。
+*   `next/link` 不再需要手动添加 `<a>` 作为子元素。现在你可以[以向后兼容的方式启用此行为](https://github.com/vercel/next.js/pull/36436)。
+*   我们添加了实验性支持，通过修改 `browsersList` 仅分发现代 JavaScript。你可以在 `next.config.js` 的 `experimental` 选项中设置 `browsersListForSwc: true` 和 `legacyBrowsers: false` 来启用此行为。
+*   新的 `@swc/helpers` 优化避免了跨包的重复代码，在最小配置下减少了约 `2KB` 的包大小，在大型应用中效果更显著。
+*   我们显著减少了 Next.js 的安装体积。通过将我们的 monorepo 迁移到 `pnpm`，我们得以在创建预编译版本时移除重复的包。这使得安装体积减少了 14MB。
+*   在我们持续改进 Next.js 自托管能力的努力中，我们将实验性的 `outputStandalone: true` 配置稳定为 `output: 'standalone'`。此配置通过仅包含必要的文件/资源（包括移除在构建部署包中安装所有 `node_modules` 的需求）大幅减少了部署体积。你可以在我们的 [`with-docker` 示例](https://github.com/vercel/next.js/blob/canary/examples/with-docker/README.md)中查看此配置的实际效果。
+
+[布局 RFC 与高级路由支持](#layouts-rfc--advanced-routing-support)
+--------------------------------------------------------------------------------
+
+如果你错过了，上个月我们发布了[布局 RFC](/blog/layouts-rfc)——这是自 2016 年 Next.js 推出以来最大的更新，包括：
+
+*   **嵌套布局**：通过嵌套路由构建复杂应用。
+*   **为服务端组件设计**：针对子树导航优化。
+*   **改进的数据获取**：在布局中获取数据，避免瀑布流问题。
+*   **使用 React 18 特性**：流式传输、过渡和 Suspense。
+*   **客户端和服务端路由**：以服务端为中心的路由，同时具备类似 SPA 的行为。
+*   **100% 渐进式采用**：无破坏性变更，可逐步采用。
+*   **高级路由约定**：离屏缓存、即时过渡等。
+
+更多信息请[查看 RFC](/blog/layouts-rfc) 或[提供反馈](https://github.com/vercel/next.js/discussions/37136)。
+
+[感谢贡献者](#thank-you-contributors)
+--------------------------------------------------
+
+Next.js 是 **超过 2,000 名独立开发者**、行业合作伙伴（如 Google Chrome 和 Meta）以及 Vercel 核心团队共同努力的成果。
+
+本次发布的贡献者包括：@huozhi, @ijjk, @kwonoj, @ViolanteCodes, @akrabdev, @timneutkens, @jpveilleux, @stigkj, @jgoping, @oof2win2, @Brooooooklyn, @CGamesPlay, @lfades, @molebox, @steven-tey, @SukkaW, @Kikobeats, @balazsorban44, @erikbrinkman, @therealmarzouq, @remcohaszing, @perkinsjr, @shuding, @hanneslund, @housseindjirdeh, @RobertKeyser, @styfle, @htunnicliff, @lukeshumard, @sagnik3, @pixelass, @JoshuaKGoldberg, @rishabhpoddar, @nguyenyou, @kdy1, @sidwebworks, @gnoff, @gaspar09, @feugy, @mfix-stripe, @javivelasco, @Chastrlove, @goncharov-vlad, @NaveenDA, @Firfi, @idkwhojamesis, @FLCN-16, @icyJoseph, @ElijahPepe, @elskwid, @irvile, @Munawwar, @ykolbin, @hulufei, @baruchadi, @imadatyatalah, @await-ovo, @menosprezzi, @gazs, @Exortions, @rubens-lopes, @woochul2, @stefee, @stmtk1, @jlarmstrongiv, @MaedahBatool, @jameshfisher, @fabienheureux, @TxHawks, @mattbrandlysonos, @iggyzap, @src200, @AkifumiSato, @hermanskurichin, @kamilogorek, @ben-xD, @dawsonbooth, @Josehower, @crutchcorn, @ericmatthys, @CharlesStover, @charlypoly, @apmatthews, @naingaungphyo, @alexandrutasica, @stefanprobst, @dc7290, @DilwoarH, @tommarshall, @stanhong, @leerob, @appsbytom, @sshyam-gupta, @saulloalmeida, @indicozy, @ArianHamdi, @Clariity, @sebastianbenz, @7iomka, @gr-qft, @Schniz, @dgagn, @sokra, @okbel, @tbvjaos510, @dmvjs, @PepijnSenders, @JohnPhamous, @kyliau, @eric-burel, @alabhyajindal, @jsjoeio, @vorcigernix, @clearlyTHUYDOAN, @splatterxl, @manovotny, @maxproske, @nvh95, @frankievalentine, @nuta, @bagpyp, @dfelsie, @qqpann, @atcastle, @jsimonrichard, @mass2527, @ekamkohli, @Yuddomack, @tonyspiro, @saurabhmehta1601, @banner4422, @falsepopsky, @jantimon, @henriqueholtz, @ilfa, @matteobruni, @ryscheng, @hoonoh, @ForsakenHarmony, @william-keller, @AleksaC, @Miikis, @zakiego, @radunemerenco, @AliYusuf95, 和 @dominiksipowicz。

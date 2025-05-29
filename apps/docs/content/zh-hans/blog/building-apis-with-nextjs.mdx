@@ -1,0 +1,394 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:45:05.986Z
+title: 使用 Next.js 构建 API
+description: 学习如何使用 Next.js 构建 API。
+author:
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+date: 2025-02-28T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/building-apis-with-nextjs/twitter-card.png
+---
+
+本指南将介绍如何使用 Next.js 构建 API，包括项目设置、理解应用路由 (App Router) 和路由处理器 (Route Handlers)、处理多种 HTTP 方法、实现动态路由、创建可复用的中间件逻辑，以及决定何时需要搭建专用 API 层。
+
+*   [1. 开始使用](#1-开始使用)
+    *   [1.1 创建 Next.js 应用](#11-创建-nextjs-应用)
+    *   [1.2 应用路由 vs. 页面路由](#12-应用路由-vs-页面路由)
+*   [2. 为何（以及何时）使用 Next.js 构建 API](#2-为何以及何时使用-nextjs-构建-api)
+*   [3. 使用路由处理器创建 API](#3-使用路由处理器创建-api)
+    *   [3.1 基础文件设置](#31-基础文件设置)
+    *   [3.2 在单个文件中处理多个 HTTP 方法](#32-在单个文件中处理多个-http-方法)
+*   [4. 使用 Web API](#4-使用-web-api)
+    *   [4.1 直接使用 Request 和 Response](#41-直接使用-request--response)
+    *   [4.2 查询参数](#42-查询参数)
+    *   [4.3 请求头和 Cookie](#43-请求头和-cookie)
+*   [5. 动态路由](#5-动态路由)
+*   [6. 将 Next.js 用作代理或转发层](#6-将-nextjs-用作代理或转发层)
+*   [7. 构建共享的“中间件”逻辑](#7-构建共享的中间件逻辑)
+*   [8. 部署与“SPA 模式”注意事项](#8-部署与-spa-模式-注意事项)
+    *   [8.1 标准 Node.js 部署](#81-标准-nodejs-部署)
+    *   [8.2 SPA/静态导出](#82-spa静态导出)
+    *   [8.3 在 Vercel 上部署 API](#83-在-vercel-上部署-api)
+*   [9. 何时无需创建 API 端点](#9-何时无需创建-api-端点)
+*   [10. 综合实践](#10-综合实践)
+*   [总结](#总结)
+*   [常见问题](#常见问题)
+    *   [Server Actions 是什么？](#server-actions-是什么)
+    *   [能否在路由处理器中使用 TypeScript？](#能否在路由处理器中使用-typescript)
+    *   [身份验证的最佳实践是什么？](#身份验证的最佳实践是什么)
+
+[1. 开始使用](#1-开始使用)
+-----------------------------------------
+
+### [1.1 创建 Next.js 应用](#11-创建-nextjs-应用)
+
+如果是全新项目，可以通过以下命令创建 Next.js 项目：
+
+```bash filename="终端"
+npx create-next-app@latest --api
+```
+
+> **注意：** `--api` 标志会自动在新项目的 `app/` 文件夹中包含一个示例 `route.ts` 文件，展示如何创建 API 端点。
+
+### [1.2 应用路由 vs. 页面路由](#12-应用路由-vs-页面路由)
+
+*   **页面路由 (Pages Router)**：Next.js 历史上使用 `pages/api/*` 处理 API。这种方式依赖 Node.js 的请求/响应对象和类似 Express 的 API。
+*   **应用路由 (App Router)（默认）**：Next.js 13 引入的应用路由完全拥抱 Web 标准的 Request/Response API。现在可以将 `route.ts` 或 `route.js` 文件放在 `app/` 目录的任何位置，而不再局限于 `pages/api/*`。
+
+> **为何切换？** 应用路由的“路由处理器”基于 [Web 平台的 Request/Response API](https://developer.mozilla.org/en-US/docs/Web/API)，而非 Node.js 特有的 API。这简化了学习过程，减少了摩擦，并有助于在不同工具间复用知识。
+
+[2. 为何（以及何时）使用 Next.js 构建 API](#2-为何以及何时使用-nextjs-构建-api)
+------------------------------------------------------------------------------------------
+
+1.  **为多客户端提供公共 API**
+    
+    *   可以构建一个公共 API，供 Next.js Web 应用、独立的移动应用或任何第三方服务使用。例如，可以在 React 网站和 React Native 移动应用中同时从 `/api/users` 获取数据。
+2.  **代理现有后端**
+    
+    *   有时需要将外部[微服务](https://vercel.com/blog/how-vercel-adopted-microfrontends)隐藏或整合到单个端点后。Next.js 路由处理器可以作为代理或中间层连接到现有后端。例如，可以拦截请求、处理身份验证、转换数据，然后将请求传递给上游 API。
+3.  **Webhook 和集成**
+    
+    *   如果接收外部回调或 Webhook（如来自 Stripe、GitHub、Twilio），可以通过路由处理器处理它们。
+4.  **自定义身份验证**
+    
+    *   如果需要会话、令牌或其他身份验证逻辑，可以在 Next.js API 层中存储 Cookie、读取请求头并返回适当的数据。
+
+> **注意：** 如果仅需为 Next.js 应用进行服务端数据获取（且无需对外共享数据），服务端组件 (Server Components) 可能足以在渲染时直接获取数据——无需单独的 API 层。
+
+[3. 使用路由处理器创建 API](#3-使用路由处理器创建-api)
+---------------------------------------------------------------------------------
+
+### [3.1 基础文件设置](#31-基础文件设置)
+
+在应用路由 (`app/`) 中，创建一个代表路由的文件夹，并在其中添加 `route.ts` 文件。
+
+例如，创建 `/api/users` 端点：
+
+```
+app
+└── api
+    └── users
+        └── route.ts
+```
+
+### [3.2 在单个文件中处理多个 HTTP 方法](#32-在单个文件中处理多个-http-方法)
+
+与页面路由的 API 路由（仅支持单个默认导出）不同，可以在同一个文件中导出代表不同 HTTP 方法的多个函数。
+
+```ts filename="app/api/users/route.ts"
+export async function GET(request: Request) {
+  // 例如，从数据库获取数据
+  const users = [
+    { id: 1, name: 'Alice' },
+    { id: 2, name: 'Bob' }
+  ];
+  return new Response(JSON.stringify(users), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+ 
+export async function POST(request: Request) {
+  // 解析请求体
+  const body = await request.json();
+  const { name } = body;
+ 
+  // 例如，将新用户插入数据库
+  const newUser = { id: Date.now(), name };
+ 
+  return new Response(JSON.stringify(newUser), {
+    status: 201,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+```
+
+现在，向 `/api/users` 发送 GET 请求将返回用户列表，而向同一 URL 发送 POST 请求则会插入新用户。
+
+[4. 使用 Web API](#4-使用-web-api)
+-----------------------------------------------------
+
+### [4.1 直接使用 Request 和 Response](#41-直接使用-request--response)
+
+默认情况下，路由处理器方法（`GET`、`POST` 等）接收标准的 [Request](https://developer.mozilla.org/docs/Web/API/Request) 对象，并必须返回标准的 [Response](https://developer.mozilla.org/docs/Web/API/Response) 对象。
+
+### [4.2 查询参数](#42-查询参数)
+
+```ts filename="app/api/search/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const query = searchParams.get('query'); // 例如 `/api/search?query=hello`
+ 
+  return new Response(
+    JSON.stringify({ result: `您搜索的内容是: ${query}` }),
+    {
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+}
+```
+
+### [4.3 请求头和 Cookie](#43-请求头和-cookie)
+
+```ts filename="app/api/auth/route.ts"
+import { NextRequest } from 'next/server';
+import { cookies, headers } from 'next/headers';
+ 
+export async function GET(request: NextRequest) {
+  // 1. 使用 'next/headers' 辅助函数
+  const cookieStore = await cookies();
+  const token = cookieStore.get('token');
+ 
+  const headersList = await headers();
+  const referer = headersList.get('referer');
+ 
+  // 2. 使用标准 Web API
+  const userAgent = request.headers.get('user-agent');
+ 
+  return new Response(JSON.stringify({ token, referer, userAgent }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+```
+
+`cookies()` 和 `headers()` 函数有助于在 Next.js 的其他服务端代码中复用共享逻辑。Next.js 还提供了扩展基础 Web API 的 `NextRequest` 和 `NextResponse`。
+
+[5. 动态路由](#5-动态路由)
+---------------------------------------
+
+要创建动态路径（如 `/api/users/:id`），在文件夹结构中使用**动态段**：
+
+```
+app
+└── api
+    └── users
+        └── [id]
+            └── route.ts
+```
+
+此文件对应类似 `/api/users/123` 的 URL，其中 `123` 会被捕获为参数。
+
+```ts filename="app/api/users/[id]/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const id = (await params).id;
+  // 例如，查询数据库中 ID 为 `id` 的用户
+  return new Response(JSON.stringify({ id, name: `用户 ${id}` }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const id = (await params).id;
+  // 例如，删除数据库中 ID 为 `id` 的用户
+  return new Response(null, { status: 204 });
+}
+```
+
+此处，`params.id` 提供了动态段的值。
+
+[6. 将 Next.js 用作代理或转发层](#6-将-nextjs-用作代理或转发层)
+--------------------------------------------------------------------------------------------------
+
+常见场景是**代理**现有的后端服务。可以在发送到远程服务器或后端之前进行身份验证、处理日志记录或转换数据：
+
+```ts filename="app/api/external/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export async function GET(request: NextRequest) {
+  const response = await fetch('https://example.com/api/data', {
+    // 可选：转发某些请求头、添加身份验证令牌等
+    headers: { Authorization: `Bearer ${process.env.API_TOKEN}` },
+  });
+ 
+  // 转换或转发响应
+  const data = await response.json();
+  const transformed = { ...data, source: '通过-nextjs-代理' };
+ 
+  return new Response(JSON.stringify(transformed), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+```
+
+现在客户端只需调用 `/api/external`，Next.js 会处理其余部分。这也被称为“前端后端”(Backend for Frontend, BFF)。
+
+[7. 构建共享的“中间件”逻辑](#7-构建共享的中间件逻辑)
+-----------------------------------------------------------------------------
+
+如果需要在多个路由处理器中应用相同逻辑（如身份验证检查、日志记录），可以创建封装处理器的可复用函数：
+
+```ts filename="lib/with-auth.ts"
+import { NextRequest } from 'next/server';
+ 
+type Handler = (req: NextRequest, context?: any) => Promise<Response>;
+ 
+export function withAuth(handler: Handler): Handler {
+  return async (req, context) => {
+    const token = req.cookies.get('token')?.value;
+    if (!token) {
+      return new Response(JSON.stringify({ error: '未授权' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+ 
+    // 如果已认证，调用原始处理器
+    return handler(req, context);
+  };
+}
+```
+
+然后在路由处理器中使用：
+
+```ts filename="app/api/secret/route.ts"
+import { NextRequest } from 'next/server';
+import { withAuth } from '@/lib/with-auth';
+ 
+async function secretGET(request: NextRequest) {
+  return new Response(JSON.stringify({ secret: '此处有龙' }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export const GET = withAuth(secretGET);
+```
+
+[8. 部署与“SPA 模式”注意事项](#8-部署与-spa-模式-注意事项)
+-----------------------------------------------------------------------------------------
+
+### [8.1 标准 Node.js 部署](#81-标准-nodejs-部署)
+
+使用 `next start` 的标准 Next.js 服务器部署支持路由处理器、服务端组件、中间件等功能，同时可以利用动态的请求时间信息。
+
+无需额外配置。详见[部署文档](/docs/app/building-your-application/deploying)。
+
+### [8.2 SPA/静态导出](#82-spa静态导出)
+
+Next.js 还支持将整个站点输出为[静态单页应用 (SPA)](/docs/app/building-your-application/upgrading/single-page-applications)。
+
+可通过以下配置启用：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  output: 'export',
+};
+ 
+export default nextConfig;
+```
+
+在**静态导出模式**下，Next.js 会生成纯静态的 HTML、CSS 和 JS。**无法运行服务端代码**（如 API 端点）。如果仍需要 API，必须单独托管（如独立的 Node.js 服务器）。
+
+> **注意：**
+> 
+> *   **GET 路由处理器** [可以静态导出](/docs/app/building-your-application/deploying/static-exports#route-handlers)，前提是不依赖动态请求数据。它们会成为 `out` 文件夹中的静态文件。
+> *   **所有其他服务端功能**（动态请求、重写 Cookie 等）在纯 SPA 导出中**不受支持**。
+
+### [8.3 在 Vercel 上部署 API](#83-deploying-apis-on-vercel)
+
+若要将 Next.js 应用部署至 Vercel，我们提供了 [API 部署指南](https://vercel.com/guides/hosting-backend-apis)。该指南涵盖 Vercel 防火墙的 [程序化速率限制](https://vercel.com/docs/security/vercel-waf/rate-limiting-sdk) 等特性。Vercel 还提供 API 开发中常用的 [定时任务 (Cron Jobs)](https://vercel.com/docs/cron-jobs/manage-cron-jobs) 功能。
+
+[9\. 何时无需创建 API 端点](#9-when-to-skip-creating-an-api-endpoint)
+-------------------------------------------------------------------------------------
+
+通过应用路由的 **React 服务端组件 (Server Components)**，您可以直接在服务端获取数据而无需暴露公共端点：
+
+```tsx filename="app/users/page.tsx"
+// (服务端组件)
+export default async function UsersPage() {
+  // 此 fetch 在服务端运行（此处无需客户端代码）
+  const res = await fetch('https://api.example.com/users');
+  const data = await res.json();
+ 
+  return (
+    <main>
+      <h1>用户列表</h1>
+      <ul>
+        {data.map((user: any) => (
+          <li key={user.id}>{user.name}</li>
+        ))}
+      </ul>
+    </main>
+  );
+}
+```
+
+若数据仅用于 Next.js 应用内部，您可能完全不需要公共 API。
+
+[10\. 完整实现流程](#10-putting-it-all-together)
+-----------------------------------------------------------
+
+1.  **创建新 Next.js 项目**：`npx create-next-app@latest --api`
+2.  **在 `app/` 目录添加路由处理器**（如 `app/api/users/route.ts`）
+3.  **在同一文件中导出 HTTP 方法**（`GET`、`POST`、`PUT`、`DELETE` 等）
+4.  **使用 Web 标准 API** 与 `Request` 对象交互并返回 `Response`
+5.  **构建公共 API**（如需供其他客户端消费数据或代理后端服务）
+6.  **从客户端调用**新 API 路由（如在客户端组件中使用 `fetch('/api/...')`）
+7.  或**完全跳过创建 API**（若服务端组件可直接获取数据）
+8.  **添加共享"中间件"模式**（如 `withAuth()` 用于鉴权等重复逻辑）
+9.  **部署**至支持 Node.js 的环境以使用服务端功能，或**静态导出**（若仅需静态单页应用）
+
+[总结](#conclusion)
+-------------------------
+
+使用 Next.js **应用路由 (App Router)** 和 **路由处理器 (Route Handlers)**，您能以灵活现代的方式直接基于 **Web 平台**构建 API：
+
+*   **创建完整公共 API** 供网页、移动端或第三方客户端共享
+*   **代理并定制化调用**现有外部服务
+*   **实现可复用"中间件"层**用于认证、日志记录等重复逻辑
+*   **动态路由请求**（使用 `[id]` 分段文件夹结构）
+
+[常见问题](#frequently-asked-questions)
+---------------------------------------------------------
+
+### [服务端操作 (Server Actions) 如何使用？](#what-about-server-actions)
+
+您可将 [服务端操作](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) 视为自动生成的 `POST` API 路由，可直接从客户端调用。
+
+它们专为数据变更操作（如创建、更新或删除）设计。调用方式如同普通 JavaScript 函数，无需显式向定义好的 API 路由发起 `fetch` 请求。
+
+虽然底层仍存在网络请求，但您无需显式管理。URL 路径会自动生成且经过 [加密](/docs/app/building-your-application/data-fetching/server-actions-and-mutations#security)，因此无法手动访问类似 `/api/users` 的浏览器路由。
+
+若需同时使用服务端操作和公开 API，建议将核心逻辑移至 [数据访问层 (Data Access Layer)](/blog/security-nextjs-server-components-actions)，并从服务端操作和 API 路由调用相同逻辑。
+
+### [路由处理器支持 TypeScript 吗？](#can-i-use-typescript-with-route-handlers)
+
+支持。您可以在路由文件中定义 `Request` 和 `Response` 类型。详见 [Next.js 的 TypeScript 支持](/docs/app/api-reference/config/typescript)。
+
+### [认证的最佳实践是什么？](#what-are-the-best-practices-for-authentication)
+
+请参阅我们的 [认证文档](/docs/app/building-your-application/authentication)。

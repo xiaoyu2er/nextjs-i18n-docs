@@ -1,0 +1,359 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:53:36.713Z
+title: Next.js 8
+description: >-
+  Next.js 8 引入了無伺服器模式 (Serverless Mode)、更小的打包體積、效能改進等新功能。
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-02-11T08:00:35.009Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/twitter-card.png
+---
+
+我們很榮幸今天推出正式版的 Next.js 8，主要功能包括：
+
+*   [無伺服器 Next.js](#serverless-nextjs)
+*   [大幅減少建置時記憶體使用量](#massive-build-time-memory-usage-reduction)
+*   [建置時環境設定](#build-time-environment-configuration)
+*   [預取效能改進](#prefetch-performance-improvements)
+*   [更小的初始 HTML 大小](#smaller-initial-html-size)
+*   [改進的按需載入條目](#improved-on-demand-entries)
+*   [開發模式下更快的埠監聽](#faster-port-listening-in-development)
+*   [更快的靜態匯出](#faster-static-export)
+*   [Head 元素去重](#head-element-deduplication)
+*   [新增 crossOrigin 設定選項](#new-crossorigin-config-option)
+*   [移除內聯 JavaScript](#removed-inline-javascript)
+*   [API 認證範例](#example-of-api-authentication)
+
+一如既往，我們努力確保所有這些改進都是**完全向下相容的**。對於大多數 Next.js 應用程式，您只需執行：
+
+```bash filename="終端機"
+npm i next@latest react@latest react-dom@latest
+```
+
+我們感謝我們的社群以及所有支持我們成功的人。自從我們上一篇部落格文章以來，我們已經看到像 [AT&T](https://att.com)、[Starbucks](https://www.starbucksreserve.com/en-us) 和 [Twitch](https://m.twitch.tv/) 這樣的公司使用 Next.js 重新推出了他們的公開網站和應用程式。
+
+[無伺服器 Next.js](#serverless-nextjs)
+----------------------------------------
+
+Next.js 的無伺服器目標會從頁面產生無伺服器函數
+
+無伺服器部署通過將您的應用程式拆分為更小的部分（也稱為 **lambda**）來顯著提高可靠性和可擴展性。在 Next.js 的情況下，`pages` 目錄中的每個頁面都會成為一個無伺服器 lambda。
+
+無伺服器有[許多好處](https://vercel.com/docs/serverless-functions/conceptual-model)。參考連結在 Express 的背景下討論了其中一些，但這些原則普遍適用：無伺服器允許分散式故障點、無限擴展性，並且採用「按使用付費」模式非常經濟實惠。
+
+要在 Next.js 中啟用**無伺服器模式**，請在 `next.config.js` 中添加 `serverless` 建置 `target`：
+
+```js filename="next.config.js"
+module.exports = {
+  target: 'serverless',
+};
+```
+
+`serverless` 目標會為每個頁面輸出一個獨立的 lambda。這個檔案完全獨立，不需要任何依賴即可執行：
+
+*   `pages/index.js` => `.next/serverless/pages/index.js`
+*   `pages/about.js` => `.next/serverless/pages/about.js`
+
+Next.js 無伺服器函數的簽名類似於 Node.js HTTP 伺服器回呼：
+
+```
+type Function = (req: http.IncomingMessage, res: http.ServerResponse) => void;
+```
+
+*   [http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage)
+*   [http.ServerResponse](https://nodejs.org/api/http.html#http_class_http_serverresponse)
+*   `void` 表示該函數沒有返回值，相當於 JavaScript 的 `undefined`。呼叫該函數將完成請求。
+
+Next.js 為無伺服器部署提供了低階 API，因為託管平台有不同的函數簽名。通常，您會希望用相容層包裝 Next.js 無伺服器建置的輸出。
+
+例如，如果平台支援 Node.js [http.Server](https://nodejs.org/api/http.html#http_class_http_server) 類別：
+
+```js filename="server.js"
+const http = require('http');
+const page = require('./.next/serverless/about.js');
+const server = new http.Server((req, res) => page.render(req, res));
+server.listen(3000, () => console.log('Listening on http://localhost:3000'));
+```
+
+### [**總結**](#summary)
+
+*   用於實現無伺服器部署的低階 API
+*   `pages` 目錄中的每個頁面都成為一個無伺服器函數 (lambda)
+*   建立最小的無伺服器函數（**50 KB** 基礎 zip 大小）
+*   針對函數的快速[冷啟動](https://vercel.com/docs/serverless-functions/conceptual-model)進行了優化
+*   無伺服器函數具有 0 依賴（它們包含在函數包中）
+*   使用 Node.js 的 [http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage) 和 [http.ServerResponse](https://nodejs.org/api/http.html#http_class_http_serverresponse)
+*   通過在 `next.config.js` 中設定 `target: 'serverless'` 來選擇啟用
+*   `server` 目標仍然完全支援並維護
+*   `publicRuntimeConfig` 和 `serverRuntimeConfig` 在 `serverless` 模式下不支援。請改用建置時設定。
+
+[大幅減少建置時記憶體使用量](#massive-build-time-memory-usage-reduction)
+---------------------------------------------------------------------------------------
+
+我們為 webpack 做出了貢獻，以改進 Next.js（以及整個 webpack 生態系統！）的建置效能和資源利用率。
+
+這項努力使得記憶體使用量最高可減少 **16 倍，且效能沒有任何下降**。
+
+記憶體釋放得更快，且在大量頁面的壓力下，程序不再崩潰。
+
+我們將很快深入介紹我們如何實現這一優化。請關注 [Next.js 部落格](/blog)。
+
+[建置時環境設定](#build-time-environment-configuration)
+-----------------------------------------------------------------------------
+
+在審查 Next.js 應用程式時，我們經常觀察到一個重複出現的模式，即添加 `babel-plugin-transform-define` 或 `webpack.DefinePlugin` 來為應用程式提供設定值。
+
+在 Next.js 8 中，我們在 `next.config.js` 中引入了一個名為 `env` 的新鍵，以向後相容的方式提供相同的功能：
+
+```js filename="next.config.js"
+module.exports = {
+  env: {
+    customKey: 'MyValue',
+  },
+};
+```
+
+這將允許您在程式碼中使用 `process.env.customKey`。例如：
+
+```js filename="pages/index.js"
+export default function IndexPage() {
+  return <h1>The value of customKey is: {process.env.customKey}</h1>;
+}
+```
+
+`process.env.customKey` 將在建置時替換為 `'MyValue'`。
+
+[預取效能改進](#prefetch-performance-improvements)
+-----------------------------------------------------------------------
+
+Next.js 路由器允許您預取頁面以實現更快的導航：
+
+```js filename="pages/index.js"
+import Link from 'next/link';
+ 
+export default function IndexPage() {
+  return (
+    <>
+      <Link href="/about" prefetch>
+        <a>To About Page</a>
+      </Link>
+    </>
+  );
+}
+```
+
+它的工作原理是預取具有 `prefetch` 屬性的每個連結的 JavaScript 包。
+
+在 Next.js 8 之前的版本中，這意味著將 `<script>` 標籤注入到文件 `<body>` 中。
+
+然而，這在開啟頁面時引入了一些開銷，最明顯的是瀏覽器的「載入」指示會顯示得比預期更長，即使頁面已經可以互動。
+
+在 Next.js 8 中，`prefetch` 使用 `<link rel="preload">` 而不是 `<script>` 標籤。它還只在 `onload` 之後開始預取，以允許瀏覽器管理資源。
+
+此外，Next.js 現在檢測 2G 網路和 `navigator.connection.saveData` 模式，以在較慢的網路連接上禁用預取。
+
+[更小的初始 HTML 大小](#smaller-initial-html-size)
+-------------------------------------------------------
+
+由於 Next.js 預渲染 HTML，它將頁面包裝到具有 `<html>`、`<head>`、`<body>` 和渲染頁面所需的 JavaScript 檔案的預設結構中。
+
+在 [Next.js 7 中，我們將初始負載優化到 1.50KB](https://nextjs.org/blog/next-7/#smaller-initial-html-payload)，這比前一版本減少了 7.4%。
+
+我們能夠進一步將初始負載大小減少到 1.16KB，再減少了 23%：
+
+7.0
+
+8.0
+
+差異
+
+文件大小（伺服器渲染）
+
+1.50KB
+
+1.16KB
+
+**23%** _更小_
+
+我們減少大小的主要方式是：
+
+*   移除了頁面初始化的內聯腳本
+*   `/_error` 頁面不再包含在每個頁面載入中
+
+### [按需載入 /\_error](#on-demand-loading-of-_error)
+
+當生產環境中發生錯誤時，會渲染 `/_error` 頁面以顯示發生了錯誤。
+
+自從 Next.js 首次發布以來，`/_error` 頁面腳本標籤一直是初始 HTML 的一部分，這意味著即使沒有運行時錯誤，它也會被載入。
+
+從 Next.js 8 開始，`/_error` 頁面在發生錯誤時按需載入。
+
+這意味著預設情況下需要載入、解析和執行的程式碼更少。
+
+[開發體驗改進](#dx-improvements)
+-----------------------------------
+
+Next.js 的主要目標之一是提供最佳的生產效能和**最佳的開發體驗**。此版本包含許多基於用戶回饋的細微改進。
+
+### [改進的按需載入條目](#improved-on-demand-entries)
+
+開箱即用，Next.js 會自動編譯僅正在積極開發的頁面。Next.js 不會在每次運行 `next dev` 時編譯 pages 目錄中的所有頁面。相反，它會在您訪問頁面時編譯它們。
+
+例如，當訪問 `http://localhost:3000/my-page` 時，`pages/my-page.js` 檔案會按需編譯，然後渲染頁面。
+
+這確保開發人員在啟動開發伺服器時不必等待所有頁面編譯，這在較大的應用程式上可能需要相當長的時間。它保持記憶體使用量低，並且編譯器快速，因為編譯器在打包時不需要考慮所有頁面。
+
+![按需載入條目的流程](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/flow.jpg)
+
+按需載入條目的流程
+
+當頁面在 25 秒內未被訪問時，它將從編譯器的建置快取中清除，以保持編譯器快速並減少記憶體使用量。
+
+Next.js 使用輪詢機制來跟踪正在訪問的頁面。每 5 秒發送一次「on-demand-entries-ping」，讓 Next.js 開發伺服器知道某個頁面正在被訪問。
+
+自從此功能首次發布以來，ping 是使用 `window.fetch` 呼叫完成的，這意味著每次觸發 ping 時，它都會在瀏覽器開發工具的 `console` 和 `network` 選項卡中顯示。
+
+最常請求的功能之一是能夠從瀏覽器開發工具中隱藏這些請求，因為這些請求可能會增加不必要的噪音。
+
+我們很高興地宣布，在 Next.js 8 中，基於 `fetch` 的 ping 已被基於 WebSockets 的方法取代，這意味著 ping 仍然會發生，但只有在檢查 WebSocket 連接時才可見。
+
+特別感謝 [JJ Kasper](https://github.com/ijjk) 在轉換到 WebSockets 方面的合作。
+
+### [開發模式下更快的埠監聽](#faster-port-listening-in-development)
+
+當啟動 Next.js 開發伺服器時，它必須執行一些初始編譯才能處理請求。預設情況下，Next.js 會等待此編譯步驟完成後才啟動 HTTP 伺服器，這意味著如果您運行 `next dev` 然後轉到瀏覽器，有時可能會看到「無法訪問此網站」的消息，因為 HTTP 伺服器尚未開始監聽連接。
+
+在 Next.js 8 中，HTTP 伺服器將在編譯開始之前監聽連接，這意味著如果您在編譯完成之前轉到 `http://localhost:3000/`，請求將等待初始編譯完成後再提供服務，而不必刷新頁面直到它可用。
+
+特別感謝 [Brian Beck](https://github.com/exogen) 實現了此功能。
+
+[更快的靜態匯出](#faster-static-export)
+---------------------------------------------
+
+Next.js 專注於**預渲染**作為實現高效能的手段。預渲染有兩種形式：
+
+*   **伺服器渲染**，其中每個請求觸發一次渲染。因此，最終用戶無需等待任何 JS 下載即可開始使用數據
+*   **靜態渲染**，我們輸出可以直接提供的靜態檔案，無需在伺服器上執行任何程式碼
+
+從 Next.js 8 開始，如果您的機器有多個 CPU，通過 `next export` 進行的靜態渲染將有速度改進。
+
+基於 4 CPU 核心 MacBook 的測試，通過利用所有核心預渲染頁面，匯出速度從大約每秒 25 頁提高到每秒 75 頁。
+
+Next.js 會自動檢測 CPU 核心數量並相應地分配頁面，無需任何程式碼更改。
+
+特別感謝 [Benjamin Kniffler](https://github.com/bkniffler) 實現了此功能。
+
+[Head 元素去重](#head-element-deduplication)
+---------------------------------------------------------
+
+在建置應用程式時，一個常見需求是更新頁面的 `<head>` 元素。例如設置響應式設計的 `<title>` 或 `<meta name="viewport">`。
+
+Next.js 提供了一個內建元件來引入對 `<head>` 的更改：
+
+```js filename="pages/index.js"
+import Head from 'next/head';
+ 
+export default function IndexPage() {
+  return (
+    <>
+      <Head>
+        <title>My page title</title>
+      </Head>
+    </>
+  );
+}
+```
+
+`<Head>` 元件甚至可以在不同的元件中使用多次，例如您的佈局元件可以設置一些預設的 head 標籤。
+
+然而，您可能希望用不同的值覆蓋預設的 head 標籤，在舊版本的 Next.js 中，這會導致標籤在輸出中重複，因為沒有辦法去重標籤。
+
+因此，現在可以為 `<Head>` 元件中的每個元素提供一個 `key` 屬性，這將自動去重具有相同 `key` 值的標籤。
+
+當在兩個標籤上設置 `key="viewport"` 時，只有最後一個會被渲染。
+
+```js filename="pages/index.js"
+import Head from 'next/head';
+export default function IndexPage() {
+  return (
+    <>
+      <Head>
+        <title>My page title</title>
+        <meta
+          name="viewport"
+          content="initial-scale=1.0, width=device-width"
+          key="viewport"
+        />
+      </Head>
+      <Head>
+        <meta
+          name="viewport"
+          content="initial-scale=1.2, width=device-width"
+          key="viewport"
+        />
+      </Head>
+    </>
+  );
+}
+```
+
+[安全性改進](#security-improvements)
+-----------------------------------------------
+
+### [新增 `crossOrigin` 設定選項](#new-crossorigin-config-option)
+
+在 Next.js 6 中，我們引入了在 `pages/_document.js` 中為 `<Head>` 和 `<NextScript>` 添加 `crossOrigin` 屬性的選項，但這並未涵蓋設置 `cross-origin` 的所有用例。
+
+Next.js 有一個客戶端路由器，它會動態注入 `<script>` 標籤，這些標籤在注入時缺少 `cross-origin` 屬性。
+
+為了確保所有 `<script>` 標籤都設置了 `cross-origin`，我們在 `next.config.js` 中引入了一個新的設定選項
+
+```js filename="next.config.js"
+module.exports = {
+  crossOrigin: 'anonymous',
+};
+```
+
+引入此選項的另一個好處是，不再需要自定義 `pages/_document.js` 來在應用程式中設置 `cross-origin`。
+
+先前的行為仍然支援，但會在開發中發出警告，以幫助開發者遷移到新引入的選項。
+
+### [移除內嵌式 Javascript](#removed-inline-javascript)
+
+當使用 Next.js 7 及以下版本時，若要啟用 [內容安全政策 (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP)，使用者必須在政策中包含 `script-src 'unsafe-inline'`，因為 Next.js 會建立一個內嵌的 `<script>` 標籤來傳遞資料，例如將 `getInitialProps` 的結果傳遞到客戶端。
+
+在 Next.js 8 中，我們已將此內嵌的 script 標籤改為 JSON 標籤，以安全地傳輸到客戶端。這意味著 Next.js 不再包含任何內嵌式腳本。
+
+經過謹慎考慮，現在可以使用 `script-src 'self'` 了。
+
+### [API 認證範例](#example-of-api-authentication)
+
+[有史以來最受歡迎的範例之一](https://github.com/vercel/next.js/issues/153)是如何在 Next.js 中針對外部 API（任何 API，任何程式語言）進行認證。
+
+隨著 Next.js 8 的推出，我們也引入了一個新創建的範例：[with-cookie-auth](https://github.com/vercel/next.js/tree/canary/examples/with-cookie-auth)
+
+此範例展示了如何針對外部 Node.js API 進行認證，但所應用的概念適用於任何無狀態 API。
+
+該範例使用 cookie 在伺服器端和客戶端渲染之間共享令牌。
+
+這樣，如果應用程式在伺服器端渲染，它仍然可以代表使用者獲取認證數據。
+
+特別感謝貢獻此範例的 [Juan Olvera](https://github.com/j0lv3r4)。
+
+[社群](#community)
+-----------------------
+
+自從首次發布以來，Next.js 已被用於從財富 500 強公司到個人部落格的所有領域。我們非常高興看到 Next.js 的採用持續增長。
+
+*   我們已有超過 **600 位貢獻者** 提交了至少 1 次提交。
+*   在 GitHub 上，該項目已獲得超過 **34,400 次星標**。
+*   自首次發布以來，已提交了超過 **2600 個拉取請求**。
+
+Next.js 社群擁有超過 **4,570 名成員**。[加入我們！](https://github.com/vercel/next.js/discussions)

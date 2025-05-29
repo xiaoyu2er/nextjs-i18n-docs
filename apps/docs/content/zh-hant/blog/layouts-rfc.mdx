@@ -1,0 +1,909 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-05-29T20:07:08.529Z
+title: 佈局功能提案 (Layouts RFC)
+description: 關於巢狀路由與佈局、客戶端與伺服器端路由、React 18 功能，以及為伺服器元件 (Server Components) 設計的提案。
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2022-05-23T20:30:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/twitter-card.png
+---
+
+此功能提案 (RFC) 概述了 Next.js 自 2016 年推出以來最大規模的更新：
+
+*   **巢狀佈局 (Nested Layouts):** 透過巢狀路由建構複雜應用程式
+*   **為伺服器元件 (Server Components) 設計:** 針對子樹導航進行優化
+*   **改進資料獲取 (Improved Data Fetching):** 在佈局中獲取資料，同時避免瀑布效應
+*   **使用 React 18 功能 (Using React 18 Features):** 串流 (Streaming)、轉場 (Transitions) 和 Suspense
+*   **客戶端與伺服器端路由 (Client and Server Routing):** 以伺服器為中心的路由，同時具備 _類似 SPA_ 的行為
+*   **100% 可漸進式採用 (100% incrementally adoptable):** 無需破壞性變更即可逐步採用
+*   **進階路由模式 (Advanced Routing Patterns):** 平行路由 (Parallel routes)、攔截路由 (Intercepting routes) 等
+
+新的 Next.js 路由系統將基於 [React 18 最新發布的功能](https://reactjs.org/blog/2022/03/29/react-v18.html) 構建。我們計劃引入預設值和慣例，讓您能輕鬆採用這些新功能並充分利用其優勢。
+
+> 此功能提案仍在進行中，我們將在新功能可用時發布公告。若要提供反饋，請參與 [Github Discussions](https://github.com/vercel/next.js/discussions/37136) 的討論。
+
+[目錄](#table-of-contents)
+---------------------------------------
+
+*   [動機](#motivation)
+*   [術語](#terminology)
+*   [當前路由運作方式](#how-routing-currently-works)
+*   [`app` 目錄](#introducing-the-app-router)
+*   [定義路由](#defining-routes)
+*   [佈局](#layouts)
+*   [頁面](#pages)
+*   [React 伺服器元件](#react-server-components)
+*   [資料獲取](#data-fetching)
+*   [路由群組 (新增)](#route-groups)
+*   [以伺服器為中心的路由 (新增)](#server-centric-routing)
+*   [即時載入狀態 (新增)](#instant-loading-states)
+*   [錯誤處理 (新增)](#error-handling)
+*   [模板 (新增)](#templates)
+*   [進階路由模式 (新增)](#advanced-routing-patterns)
+*   [結論](#conclusion)
+
+[動機](#motivation)
+-------------------------
+
+我們從 GitHub、Discord、Reddit 和開發者調查中收集了關於 Next.js 當前路由限制的社群反饋。我們發現：
+
+*   建立佈局的開發者體驗可以改進。應該能輕鬆建立可巢狀、跨路由共享且在導航時保持狀態的佈局。
+*   許多 Next.js 應用程式是儀表板或控制台，這些應用將受益於更進階的路由解決方案。
+
+雖然當前的路由系統自 Next.js 推出以來運作良好，但我們希望讓開發者更容易建構更高性能且功能豐富的網頁應用程式。
+
+作為框架維護者，我們也希望建立一個向後兼容且符合 React 未來發展方向的路由系統。
+
+> **注意:** 部分路由慣例受到 Meta 基於 Relay 的路由器啟發（伺服器元件的某些功能最初在此開發），以及客戶端路由器如 React Router 和 Ember.js。`layout.js` 檔案慣例則受到 SvelteKit 工作的啟發。我們也要感謝 [Cassidy](https://twitter.com/cassidoo) 開啟了 [早期的佈局功能提案](https://github.com/vercel/next.js/discussions/26389)。
+
+[術語](#terminology)
+---------------------------
+
+此功能提案引入了新的路由慣例和語法。術語基於 React 和標準網頁平台術語。在提案中，您會看到這些術語連結回下方的定義。
+
+*   **樹狀結構 (Tree):** 用於可視化層次結構的慣例。例如，具有父子元件的元件樹、資料夾結構等。
+*   **子樹 (Subtree):** 樹狀結構的一部分，從根節點（第一個）開始到葉節點（最後一個）結束。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/terminology.png)
+
+*   **URL 路徑 (URL Path):** URL 中域名之後的部分。
+*   **URL 區段 (URL Segment):** 由斜線分隔的 URL 路徑部分。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/url-anatomy.png)
+
+[當前路由運作方式](#how-routing-currently-works)
+-----------------------------------------------------------
+
+目前，Next.js 使用檔案系統將 [Pages](/docs/pages/building-your-application/routing/pages-and-layouts) 目錄中的個別資料夾和檔案映射到可透過 URL 存取的路由。每個 **頁面 (page)** 檔案導出一個 React 元件，並根據其檔案名稱關聯一個 **路由 (route)**。例如：
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/routing-today.png)
+
+*   **動態路由 (Dynamic Routes):** Next.js 支援 [動態路由](/docs/pages/building-your-application/routing/dynamic-routes)（包括全捕捉變體），使用 `[param].js`、`[...param].js` 和 `[[...param]].js` 慣例。
+*   **佈局 (Layouts):** Next.js 提供對簡單 [基於元件](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern) 的佈局支援，使用元件 [屬性模式](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern#per-page-layouts) 的每頁佈局，以及使用 [自訂應用程式](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern#single-shared-layout-with-custom-app) 的單一全域佈局。
+*   **資料獲取 (Data Fetching):** Next.js 提供資料獲取方法（[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)、[`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)），可用於頁面（路由）層級。這些方法用於決定頁面應靜態生成（[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)）還是伺服器端渲染（[`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)）。此外，您可以使用 [增量靜態再生 (ISR)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) 在建置後建立或更新靜態頁面。
+*   **渲染 (Rendering):** Next.js 提供三種渲染選項：[靜態生成 (Static Generation)](https://nextjs.org/learn/foundations/how-nextjs-works/rendering)、[伺服器端渲染 (Server-Side Rendering)](https://nextjs.org/learn/foundations/how-nextjs-works/rendering) 和 [客戶端渲染 (Client-Side Rendering)](https://nextjs.org/learn/foundations/how-nextjs-works/rendering)。預設情況下，頁面會靜態生成，除非它們有阻塞式資料獲取需求（`getServerSideProps`）。
+
+[介紹 `app` 目錄](#introducing-the-app-directory)
+-----------------------------------------------------------------
+
+為了確保這些新改進可以漸進式採用且避免破壞性變更，我們提議新增一個名為 `app` 的目錄。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/app-folder.png)
+
+`app` 目錄將與 `pages` 目錄並存。您可以逐步將應用程式的部分內容移至新的 `app` 目錄以利用新功能。為了向後兼容，`pages` 目錄的行為將保持不變並繼續支援。
+
+[定義路由](#defining-routes)
+-----------------------------------
+
+您可以使用 `app` 內的 **資料夾** 層級來定義路由。一個 **路由 (route)** 是從 **根資料夾** 到最終 **葉資料夾** 的單一路徑。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/routes.png)
+
+例如，您可以透過在 `app` 目錄中嵌套兩個新資料夾來新增 `/dashboard/settings` 路由。
+
+> **注意:**
+> 
+> *   在此系統中，您將使用資料夾定義路由，使用檔案定義 UI（使用新的檔案慣例如 `layout.js`、`page.js`，以及在提案第二部分中的 `loading.js`）。
+> *   這允許您將自己的專案檔案（UI 元件、測試檔案、故事等）與 `app` 目錄共存。目前這僅能透過 [pageExtensions 配置](/docs/pages/api-reference/next-config-js/pageExtensions#including-non-page-files-in-the-pages-directory) 實現。
+
+### [路由區段](#route-segments)
+
+[子樹](#terminology) 中的每個資料夾代表一個 **路由區段 (route segment)**。每個路由區段映射到 **[URL 路徑](#terminology)** 中的相應 **區段 (segment)**。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-segments.png)
+
+例如，`/dashboard/settings` 路由由 3 個區段組成：
+
+*   根區段 `/`
+*   `dashboard` 區段
+*   `settings` 區段
+
+> **注意**: 選擇 **路由區段 (route segment)** 這個名稱是為了與現有的 [URL 路徑](#terminology) 術語一致。
+
+[佈局](#layouts)
+-------------------
+
+**新檔案慣例:** `layout.js`
+
+到目前為止，我們已使用資料夾來定義應用程式的路由。但空資料夾本身不會執行任何操作。讓我們討論如何使用新的檔案慣例來定義這些路由將渲染的 UI。
+
+**佈局 (layout)** 是在 [子樹](#terminology) 中路由區段之間共享的 UI。佈局不影響 [URL 路徑](#terminology)，並且在用戶在兄弟區段之間導航時不會重新渲染（React 狀態會保留）。
+
+佈局可以透過從 `layout.js` 檔案預設導出一個 React 元件來定義。該元件應接受一個 `children` 屬性，該屬性將填充佈局所包裹的區段。
+
+佈局有兩種類型：
+
+*   **根佈局 (Root layout):** 應用於所有路由
+*   **常規佈局 (Regular layout):** 應用於特定路由
+
+您可以將兩個或多個佈局嵌套在一起形成 **巢狀佈局 (nested layouts)**。
+
+### [根佈局](#root-layout)
+
+您可以透過在 `app` 資料夾內新增 `layout.js` 檔案來建立一個應用於所有路由的根佈局。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/root-layout.png)
+
+> **注意:**
+> 
+> *   根佈局取代了對 [自訂應用程式 (`_app.js`)](/docs/pages/building-your-application/routing/custom-app) 和 [自訂文件 (`_document.js`)](/docs/pages/building-your-application/routing/custom-document) 的需求，因為它應用於所有路由。
+> *   您可以使用根佈局來自訂初始文件結構（例如 `<html>` 和 `<body>` 標籤）。
+> *   您可以在根佈局（和其他佈局）中獲取資料。
+
+### [常規佈局](#regular-layouts)
+
+您也可以透過在特定資料夾中新增 `layout.js` 檔案來建立僅應用於部分應用程式的佈局。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/regular-layouts.png)
+
+例如，您可以在 `dashboard` 資料夾內建立一個 `layout.js` 檔案，該佈局僅應用於 `dashboard` 內的路由區段。
+
+### [嵌套佈局](#nesting-layouts)
+
+佈局預設是 **嵌套的**。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/nested-layouts.png)
+
+例如，如果我們將上述兩個佈局結合。根佈局 (`app/layout.js`) 將應用於 `dashboard` 佈局，後者也將應用於 `dashboard/*` 內的所有路由區段。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/nested-layouts-example.png)
+
+[頁面](#pages)
+---------------
+
+**新檔案慣例:** `page.js`
+
+頁面是路由區段專屬的 UI。您可以透過在資料夾內新增 `page.js` 檔案來建立頁面。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page.png)
+
+例如，要為 `/dashboard/*` 路由建立頁面，您可以在每個資料夾內新增 `page.js` 檔案。當用戶訪問 `/dashboard/settings` 時，Next.js 將渲染 `settings` 資料夾的 `page.js` 檔案，並包裹在 [子樹](#terminology) 中存在的任何佈局中。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page-example.png)
+
+您可以直接在 dashboard 資料夾內建立 `page.js` 檔案以匹配 `/dashboard` 路由。dashboard 佈局也將應用於此頁面：
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page-nested.png)
+
+此路由由 2 個區段組成：
+
+*   根區段 `/`
+*   `dashboard` 區段
+
+> **注意:**
+> 
+> *   要使路由有效，其葉區段必須有頁面。否則，路由將拋出錯誤。
+
+### [佈局與頁面行為](#layout-and-page-behavior)
+
+*   檔案擴展名 `js|jsx|ts|tsx` 可用於頁面和佈局。
+*   頁面元件是 `page.js` 的預設導出。
+*   佈局元件是 `layout.js` 的預設導出。
+*   佈局元件 **必須** 接受 `children` 屬性。
+
+當佈局元件渲染時，`children` 屬性將填充子佈局（如果 [子樹](#terminology) 中存在）或頁面。
+
+可以將其可視化為佈局 [樹狀結構](#terminology)，其中父佈局將選擇最近的子佈局，直到到達頁面。
+
+**範例:**
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/basic-example.png)
+
+```js filename="app/layout.js"
+// 根佈局
+// - 應用於所有路由
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <Header />
+        {children}
+        <Footer />
+      </body>
+    </html>
+  );
+}
+```
+
+```js filename="app/dashboard/layout.js"
+// 常規佈局
+// - 應用於 app/dashboard/* 中的路由區段
+export default function DashboardLayout({ children }) {
+  return (
+    <>
+      <DashboardSidebar />
+      {children}
+    </>
+  );
+}
+```
+
+```js filename="app/dashboard/analytics/page.js"
+// 頁面元件
+// - `app/dashboard/analytics` 區段的 UI
+// - 匹配 `acme.com/dashboard/analytics` URL 路徑
+export default function AnalyticsPage() {
+  return <main>...</main>;
+}
+```
+
+上述佈局和頁面的組合將渲染以下元件層級：
+
+```tsx filename="元件層級"
+<RootLayout>
+  <Header />
+  <DashboardLayout>
+    <DashboardSidebar />
+    <AnalyticsPage>
+      <main>...</main>
+    </AnalyticsPage>
+  </DashboardLayout>
+  <Footer />
+</RootLayout>
+```
+
+[React 伺服器元件](#react-server-components)
+---------------------------------------------------
+
+> **注意:** React 引入了新的元件類型：伺服器元件 (Server)、客戶端元件 (Client)（傳統 React 元件）和共享元件 (Shared)。要了解更多關於這些新類型，我們建議閱讀 React [伺服器元件提案](https://reactjs.org/blog/2020/12/21/data-fetching-with-react-server-components.html)。
+
+透過此提案，您可以開始使用 React 功能，並逐步將 React 伺服器元件引入您的 Next.js 應用程式。
+
+新路由系統的內部也將利用最近發布的 React 功能，如串流 (Streaming)、Suspense 和轉場 (Transitions)。這些是 React 伺服器元件的基礎構件。
+
+### [伺服器元件作為預設](#server-components-as-the-default)
+
+`pages` 和 `app` 目錄之間最大的變化之一是，**預設情況下，`app` 內的檔案將在伺服器端渲染為 React 伺服器元件。**
+
+這將讓您在從 `pages` 遷移到 `app` 時自動採用 React 伺服器元件。
+
+> **注意:** 伺服器元件可用於 `app` 目錄或您自己的資料夾，但為了向後兼容，不能在 `pages` 目錄中使用。
+
+### [用戶端與伺服器元件慣例](#client-and-server-components-convention)
+
+`app` 資料夾將支援伺服器、用戶端與共享元件，您可以在[元件樹中交錯使用這些元件](#interleaving-client-and-server-components-in-a-route)。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/server-components.png)
+
+目前有[正在進行的討論](https://github.com/reactjs/rfcs/pull/189#issuecomment-1116482278)關於如何明確定義用戶端元件與伺服器元件的慣例。我們將遵循此討論的最終決議。
+
+*   目前，伺服器元件可透過在檔案名稱後加上 `.server.js` 來定義。例如 `layout.server.js`
+*   用戶端元件可透過在檔案名稱後加上 `.client.js` 來定義。例如 `page.client.js`
+*   `.js` 檔案會被視為共享元件。由於它們可能在伺服器或用戶端渲染，因此需要遵守各自環境的限制條件。
+
+> **注意：**
+> 
+> *   用戶端與伺服器元件有需要遵守的[限制條件](https://github.com/josephsavona/rfcs/blob/server-components/text/0000-server-components.md#capabilities--constraints-of-server-and-client-components)。在決定使用用戶端或伺服器元件時，我們建議優先使用伺服器元件（預設），直到您確實需要使用用戶端元件為止。
+
+### [Hooks](#hooks)
+
+我們將新增用戶端與伺服器元件專用的 hooks，讓您能存取 headers 物件、cookies、路徑名稱、搜尋參數等。未來我們會提供更詳細的文件說明。
+
+### [渲染環境](#rendering-environments)
+
+透過用戶端與伺服器元件的慣例，您將能精確控制哪些元件會包含在用戶端的 JavaScript 套件中。
+
+預設情況下，`app` 中的路由會使用靜態生成 (Static Generation)，當路由區段使用需要請求內容的[伺服器端 hooks](#hooks) 時，則會切換為動態渲染。
+
+### [在路由中交錯使用用戶端與伺服器元件](#interleaving-client-and-server-components-in-a-route)
+
+在 React 中，禁止在用戶端元件內直接匯入伺服器元件，因為伺服器元件可能包含僅限伺服器使用的程式碼（例如資料庫或檔案系統工具）。
+
+例如，以下方式匯入伺服器元件將無法運作：
+
+```js filename="ClientComponent.js"
+import ServerComponent from './ServerComponent.js';
+ 
+export default function ClientComponent() {
+  return (
+    <>
+      <ServerComponent />
+    </>
+  );
+}
+```
+
+然而，您可以將伺服器元件作為子元件傳遞給用戶端元件。方法是**將它們包裹**在另一個伺服器元件中。例如：
+
+```js filename="ClientComponent.js"
+export default function ClientComponent({ children }) {
+  return (
+    <>
+      <h1>用戶端元件</h1>
+      {children}
+    </>
+  );
+}
+ 
+// ServerComponent.js
+export default function ServerComponent() {
+  return (
+    <>
+      <h1>伺服器元件</h1>
+    </>
+  );
+}
+ 
+// page.js
+// 可以在伺服器元件內匯入用戶端與伺服器元件
+// 因為此元件是在伺服器端渲染的
+import ClientComponent from "./ClientComponent.js";
+import ServerComponent from "./ServerComponent.js";
+ 
+export default function ServerComponentPage() {
+  return (
+    <>
+      <ClientComponent>
+        <ServerComponent />
+      </ClientComponent>
+    </>
+  );
+}
+```
+
+透過這種模式，React 會知道需要在伺服器端先渲染 `ServerComponent`，然後將結果（不包含任何僅限伺服器的程式碼）傳送給用戶端。從用戶端元件的角度來看，它的子元件已經被渲染完成。
+
+在佈局 (layouts) 中，這種模式會透過 `children` prop 來實現，因此您不需要額外建立包裹元件。
+
+例如，`ClientLayout` 元件會接受 `ServerPage` 元件作為其子元件：
+
+```js filename="app/dashboard/layout.js"
+// Dashboard 佈局是用戶端元件
+export default function ClientLayout({ children }) {
+  // 可以在這裡使用 useState / useEffect
+  return (
+    <>
+      <h1>佈局</h1>
+      {children}
+    </>
+  );
+}
+ 
+// Page 是將傳遞給 Dashboard 佈局的伺服器元件
+// app/dashboard/settings/page.js
+export default function ServerPage() {
+  return (
+    <>
+      <h1>頁面</h1>
+    </>
+  );
+}
+```
+
+> **注意：** 這種組合方式是在用戶端元件內渲染伺服器元件的重要模式。它確立了一個需要學習的模式標準，也是我們決定使用 `children` prop 的原因之一。
+
+[資料獲取](#data-fetching)
+-------------------------------
+
+在路由的多個區段中獲取資料將成為可能。這與 `pages` 目錄不同，後者的資料獲取僅限於頁面層級。
+
+### [在佈局中獲取資料](#data-fetching-in-layouts)
+
+您可以在 `layout.js` 檔案中使用 Next.js 的資料獲取方法 `getStaticProps` 或 `getServerSideProps` 來獲取資料。
+
+例如，部落格佈局可以使用 `getStaticProps` 從 CMS 獲取分類，用於填充側邊欄元件：
+
+```js filename="app/blog/layout.js"
+export async function getStaticProps() {
+  const categories = await getCategoriesFromCMS();
+ 
+  return {
+    props: { categories },
+  };
+}
+ 
+export default function BlogLayout({ categories, children }) {
+  return (
+    <>
+      <BlogSidebar categories={categories} />
+      {children}
+    </>
+  );
+}
+```
+
+### [在路由的多個區段中獲取資料](#multiple-data-fetching-methods-in-a-route)
+
+您也可以在路由的多個區段中獲取資料。例如，一個獲取資料的 `layout` 可以包裹一個也獲取自身資料的 `page`。
+
+延續上述部落格範例，單篇文章頁面可以使用 `getStaticProps` 和 `getStaticPaths` 從 CMS 獲取文章資料：
+
+```js filename="app/blog/[slug]/page.js"
+export async function getStaticPaths() {
+  const posts = await getPostSlugsFromCMS();
+ 
+  return {
+    paths: posts.map((post) => ({
+      params: { slug: post.slug },
+    })),
+  };
+}
+ 
+export async function getStaticProps({ params }) {
+  const post = await getPostFromCMS(params.slug);
+ 
+  return {
+    props: { post },
+  };
+}
+ 
+export default function BlogPostPage({ post }) {
+  return <Post post={post} />;
+}
+```
+
+由於 `app/blog/layout.js` 和 `app/blog/[slug]/page.js` 都使用 `getStaticProps`，Next.js 會在建置時將整個 `/blog/[slug]` 路由靜態生成為 **React 伺服器元件**，從而減少用戶端的 JavaScript 並加快 hydration 速度。
+
+靜態生成的路由進一步優化了這一點，因為用戶端導航會重用快取（伺服器元件資料）且不需要重新計算工作，從而減少 CPU 時間，因為您渲染的是伺服器元件的快照。
+
+### [行為與優先級](#behavior-and-priority)
+
+Next.js 資料獲取方法 (`getServerSideProps` 和 `getStaticProps`) 只能在 `app` 資料夾的伺服器元件中使用。單一路由中不同區段的資料獲取方法會相互影響。
+
+在一個區段中使用 `getServerSideProps` 會影響其他區段的 `getStaticProps`。由於請求必須發送到伺服器處理 `getServerSideProps` 區段，伺服器也會渲染任何 `getStaticProps` 區段。它會重用建置時獲取的 props，因此資料仍然是靜態的，但**渲染**會在每次請求時根據 `next build` 時生成的 props 進行。
+
+在一個區段中使用帶有 **revalidate (ISR)** 的 `getStaticProps` 會影響其他區段中帶有 `revalidate` 的 `getStaticProps`。如果一個路由中有兩個重新驗證週期，較短的週期將優先。
+
+> **注意：** 未來可能會優化此行為，以允許在路由中實現更細粒度的資料獲取控制。
+
+### [使用 React 伺服器元件獲取資料](#data-fetching-with-react-server-components)
+
+伺服器端路由、React 伺服器元件、Suspense 和串流的組合對 Next.js 中的資料獲取和渲染有以下影響：
+
+### [平行資料獲取](#parallel-data-fetching)
+
+Next.js 會積極並行啟動資料獲取，以最小化瀑布式請求。例如，如果資料獲取是**順序**進行的，路由中的每個巢狀區段必須等待前一個區段完成後才能開始獲取資料。然而，透過**平行**獲取，每個區段可以同時開始獲取資料。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel.png)
+
+由於渲染可能依賴於 Context，每個區段的渲染會在其資料獲取完成且父區段渲染完成後開始。
+
+未來，透過 Suspense，即使資料尚未完全載入，渲染也可以立即開始。如果在資料可用前讀取資料，將觸發 Suspense。React 會樂觀地開始渲染伺服器元件，在請求完成前就開始，並在請求解析時填入結果。
+
+### [部分獲取與渲染](#partial-fetching-and-rendering)
+
+當在兄弟路由區段之間導航時，Next.js 只會從該區段開始獲取和渲染。不需要重新獲取或重新渲染上層內容。這意味著在共享佈局的頁面中，當使用者在兄弟頁面之間導航時，佈局會保持不變，Next.js 只會從該區段開始獲取和渲染。
+
+這對於 React 伺服器元件特別有用，否則每次導航都會導致整個頁面在伺服器端重新渲染，而不是僅在伺服器端渲染頁面的變更部分。這減少了資料傳輸量和執行時間，從而提高效能。
+
+例如，如果使用者在 `/analytics` 和 `/settings` 頁面之間導航，React 會重新渲染頁面區段但保留佈局：
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/partial-example.png)
+
+> **注意：** 未來可能會強制重新獲取[元件樹](#terminology)中較上層的資料。我們仍在討論此功能的具體實現細節，並將更新 RFC。
+
+[路由群組](#route-groups)
+-----------------------------
+
+`app` 資料夾的層級結構直接對應到 URL 路徑。但透過建立路由群組，可以打破這種模式。路由群組可用於：
+
+*   組織路由而不影響 URL 結構。
+*   將路由區段從佈局中排除。
+*   透過拆分應用程式建立多個根佈局。
+
+### [慣例](#convention)
+
+路由群組可透過將資料夾名稱用括號包裹來建立：`(folderName)`
+
+> **注意：** 路由群組的命名僅用於組織目的，因為它們不會影響 URL 路徑。
+
+**範例：將路由從佈局中排除**
+
+要將路由從佈局中排除，請建立一個新的路由群組（例如 `(shop)`），並將共享相同佈局的路由（例如 `account` 和 `cart`）移至群組中。群組外的路由（例如 `checkout`）將不會共享該佈局。
+
+之前：
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-opt-out-before.png)
+
+之後：
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-opt-out-after.png)
+
+**範例：組織路由而不影響 URL 路徑**
+
+同樣地，為了組織路由，可以建立群組來將相關路由集中管理。括號中的資料夾名稱會從 URL 中省略（例如 `(marketing)` 或 `(shop)`）。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-organisation.png)
+
+**範例：建立多個根佈局**
+
+要建立多個根佈局，請在 `app` 目錄的頂層建立兩個或多個路由群組。這適用於將應用程式分割為具有完全不同 UI 或體驗的部分。每個根佈局的 `<html>`、`<body>` 和 `<head>` 標籤可以單獨自訂。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-multiple-root.png)
+
+[伺服器中心路由](#server-centric-routing)
+-------------------------------------------------
+
+目前，Next.js 使用用戶端路由。在初始載入和後續導航時，會向伺服器發送請求以獲取新頁面的資源。這包括**每個元件的 JavaScript**（包括僅在特定條件下顯示的元件）及其 props（來自 `getServerSideProps` 或 `getStaticProps` 的 JSON 資料）。一旦從伺服器載入 JavaScript 和資料，**React 會在用戶端渲染元件。**
+
+在這個新模型中，Next.js 將使用伺服器中心路由，同時保持用戶端轉場效果。這與在伺服器端評估的**伺服器元件**保持一致。
+
+在導航時，資料會被獲取且 React 會在**伺服器端**渲染元件。伺服器的輸出是給用戶端 React 的特殊指令（不是 HTML 或 JSON），用於更新 DOM。這些指令包含已渲染伺服器元件的**結果**，意味著不需要在瀏覽器中載入該元件的 JavaScript 來渲染結果。
+
+這與目前用戶端元件的預設行為形成對比，後者需要將元件 JavaScript 傳送到瀏覽器以在用戶端渲染。
+
+使用 React 伺服器元件的伺服器中心路由具有以下優點：
+
+*   路由使用與伺服器元件相同的請求（不需要額外的伺服器請求）。
+*   伺服器的工作量減少，因為在路由之間導航時只獲取和渲染變更的區段。
+*   當沒有使用新的用戶端元件時，用戶端導航不會在瀏覽器中載入額外的 JavaScript。
+*   路由器利用新的串流通訊協定，因此可以在所有資料載入前就開始渲染。
+
+當使用者在應用程式中導航時，路由器會將 React 伺服器元件的 _payload_ 結果儲存在用戶端的記憶體快取中。快取按路由區段分割，這允許在任何層級進行快取失效，並確保並行渲染的一致性。這意味著在某些情況下，可以重用先前獲取的區段快取。
+
+> **注意**
+> 
+> *   靜態生成和伺服器端快取可用於優化資料獲取。
+> *   上述資訊描述後續導航的行為。初始載入是不同的過程，涉及伺服器端渲染以生成 HTML。
+> *   雖然用戶端路由在 Next.js 中運作良好，但當潛在路由數量龐大時，它的擴展性不佳，因為用戶端必須下載**路由地圖**。
+> *   總體而言，透過使用 React 伺服器元件，用戶端導航更快，因為我們在瀏覽器中載入和渲染的元件更少。
+
+[即時載入狀態](#instant-loading-states)
+-------------------------------------------------
+
+使用伺服器端路由時，導航發生在資料獲取和渲染**之後**，因此在資料獲取期間顯示載入 UI 非常重要，否則應用程式會顯得無回應。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/server-side-routing.png)
+
+新的路由器將使用 [Suspense](https://reactjs.org/docs/react-api.html#reactsuspense) 來實現即時載入狀態和預設骨架畫面。這意味著可以立即顯示載入 UI，同時載入新區段的內容。一旦伺服器端渲染完成，新內容就會被替換進來。
+
+在渲染過程中：
+
+*   導航到新路由會立即發生。
+*   共享佈局在新路由區段載入時會保持互動性。
+*   導航是可中斷的 - 意味著使用者可以在一個路由的內容載入時導航到其他路由。
+
+### [預設載入骨架畫面](#default-loading-skeletons)
+
+Suspense 邊界將會透過一個稱為 `loading.js` 的新檔案約定在幕後自動處理。
+
+**範例：**
+
+您可以透過在資料夾內新增一個 `loading.js` 檔案來建立預設的載入骨架畫面。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/loading.png)
+
+`loading.js` 應該導出一個 React 元件：
+
+```js filename="loading.js"
+export default function Loading() {
+  return <YourSkeleton />
+}
+ 
+// layout.js
+export default function Layout({children}) {
+  return (
+    <>
+      <Sidebar />
+      {children}
+    </>
+  )
+}
+ 
+// 輸出
+<>
+  <Sidebar />
+  <Suspense fallback={<Loading />}>{children}</Suspense>
+</>
+```
+
+這將導致資料夾中的所有區段都被包裹在一個 suspense 邊界中。當布局首次載入或在兄弟頁面之間導航時，將使用預設的骨架畫面。
+
+[錯誤處理](#error-handling)
+---------------------------------
+
+[錯誤邊界 (Error boundaries)](https://reactjs.org/docs/error-boundaries.html) 是 React 元件，可以捕捉其子元件樹中任何位置的 JavaScript 錯誤。
+
+### [約定](#convention-1)
+
+您可以透過新增一個 `error.js` 檔案並預設導出一個 React 元件來建立一個錯誤邊界，該邊界將捕捉子樹中的錯誤。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/error.png)
+
+如果在該子樹中拋出錯誤，該元件將作為後備顯示。此元件可用於記錄錯誤、顯示有關錯誤的有用資訊，以及嘗試從錯誤中恢復的功能。
+
+由於區段和布局的嵌套性質，建立錯誤邊界可以讓您將錯誤隔離到 UI 的這些部分。在發生錯誤時，邊界上方的布局將保持互動性，並且其狀態將被保留。
+
+```js filename="error.js"
+export default function Error({ error, reset }) {
+  return (
+    <>
+      發生錯誤：{error.message}
+      <button onClick={() => reset()}>重試</button>
+    </>
+  );
+}
+ 
+// layout.js
+export default function Layout({children}) {
+  return (
+    <>
+      <Sidebar />
+      {children}
+    </>
+  )
+}
+ 
+// 輸出
+<>
+  <Sidebar />
+  <ErrorBoundary fallback={<Error />}>{children}</ErrorBoundary>
+</>
+```
+
+> 注意：
+> 
+> *   與 `error.js` 位於同一區段的 `layout.js` 檔案中的錯誤將不會被捕捉，因為自動錯誤邊界包裹的是布局的子元件，而不是布局本身。
+
+[範本](#templates)
+-----------------------
+
+範本與布局類似，它們會包裹每個子布局或頁面。
+
+與跨路由持久化並保持狀態的布局不同，範本會為每個子元件建立一個新實例。這意味著當使用者在共享範本的路由區段之間導航時，會掛載該元件的新實例。
+
+> **注意：** 除非有特定原因需要使用範本，否則我們建議使用布局。
+
+### [約定](#convention-2)
+
+可以透過從 `template.js` 檔案預設導出一個 React 元件來定義範本。該元件應接受一個 `children` 屬性，該屬性將被填充為嵌套區段。
+
+### [範例](#example)
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/template.png)
+
+```js filename="template.js"
+export default function Template({ children }) {
+  return <Container>{children}</Container>;
+}
+```
+
+具有布局和範本的路由區段的渲染輸出將如下所示：
+
+```
+<Layout>
+  {/* 請注意，範本被賦予了一個唯一的 key。 */}
+  <Template key={routeParam}>{children}</Template>
+</Layout>
+```
+
+### [行為](#behavior)
+
+在某些情況下，您可能需要掛載和卸載共享 UI，此時範本會是更合適的選擇。例如：
+
+*   使用 CSS 或動畫庫的進入/退出動畫
+*   依賴 `useEffect` 的功能（例如記錄頁面瀏覽）和 `useState`（例如每頁的反饋表單）
+*   更改預設框架行為。例如，布局內的 suspense 邊界僅在布局首次載入時顯示後備，而不是在切換頁面時。對於範本，後備會在每次導航時顯示。
+
+例如，考慮一個嵌套布局的設計，其中每個子頁面都應該包裹在一個有邊框的容器中。
+
+您可以將容器放在父布局中 (`shop/layout.js`)：
+
+```js filename="shop/layout.js"
+export default function Layout({ children }) {
+  return <div className="container">{children}</div>;
+}
+ 
+// shop/page.js
+export default function Page() {
+  return <div>...</div>;
+}
+ 
+// shop/categories/layout.js
+export default function CategoryLayout({ children }) {
+  return <div>{children}</div>;
+}
+```
+
+但是，當切換頁面時，任何進入/退出動畫都不會播放，因為共享的父布局不會重新渲染。
+
+您可以將容器放在每個嵌套布局或頁面中：
+
+```js filename="shop/layout.js"
+export default function Layout({ children }) {
+  return <div>{children}</div>;
+}
+ 
+// shop/page.js
+export default function Page() {
+  return <div className="container">...</div>;
+}
+ 
+// shop/categories/layout.js
+export default function CategoryLayout({ children }) {
+  return <div className="container">{children}</div>;
+}
+```
+
+但這樣您就必須手動將其放入每個嵌套布局或頁面中，這在更複雜的應用中可能會很繁瑣且容易出錯。
+
+透過此約定，您可以在路由之間共享範本，這些範本會在導航時建立新實例。這意味著 DOM 元素將被重新建立，狀態不會保留，並且效果將重新同步。
+
+[進階路由模式](#advanced-routing-patterns)
+-------------------------------------------------------
+
+我們計劃引入約定來涵蓋邊緣情況，並讓您實現更進階的路由模式。以下是一些我們一直在積極思考的範例：
+
+### [攔截路由](#intercepting-routes)
+
+有時，從其他路由中攔截路由區段可能會很有用。在導航時，URL 將正常更新，但攔截的區段將顯示在當前路由的布局中。
+
+#### [範例](#example-1)
+
+**之前：** 點擊圖片會導向具有自己布局的新路由。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-routes-before.png)
+
+**之後：** 透過攔截路由，點擊圖片現在會在當前路由的布局中載入區段。例如，作為模態框。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-routes-after.png)
+
+要從 `/[username]` 區段攔截 `/photo/[id]` 路由，請在 `/[username]` 資料夾內建立一個重複的 `/photo/[id]` 資料夾，並使用 `(..)` 約定作為前綴。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-route.png)
+
+#### [約定](#convention-3)
+
+*   `(..)` - 將匹配上一級的路由區段（父目錄的兄弟目錄）。類似於相對路徑中的 `../`。
+*   `(..)(..)` - 將匹配上兩級的路由區段。類似於相對路徑中的 `../../`。
+*   `(...)` - 將匹配根目錄中的路由區段。
+
+> **注意：** 刷新或分享頁面將載入具有其預設布局的路由。
+
+### [動態平行路由](#dynamic-parallel-routes)
+
+有時，在同一視圖中顯示兩個或多個葉區段 (`page.js`) 可能會很有用，這些區段可以獨立導航。
+
+例如，在同一個儀表板中有兩個或多個標籤群組。導航一個標籤群組不應影響另一個。在向前和向後導航時，標籤的組合也應正確恢復。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes.png)
+
+#### [約定](#convention-4)
+
+預設情況下，布局接受一個名為 `children` 的屬性，該屬性將包含嵌套布局或頁面。您可以透過建立一個命名的「插槽」（包含 `@` 前綴的資料夾）並將區段嵌套在其中來重命名該屬性。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes-children.png)
+
+進行此更改後，布局將接收一個名為 `customProp` 的屬性，而不是 `children`。
+
+```js filename="analytics/layout.js"
+export default function Layout({ customProp }) {
+  return <>{customProp}</>;
+}
+```
+
+您可以透過在同一層級新增多個命名插槽來建立平行路由。在下面的範例中，`@views` 和 `@audience` 都作為屬性傳遞給分析布局。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes-complete.png)
+
+您可以使用命名插槽同時顯示葉區段。
+
+```js filename="analytics/layout.js"
+export default function Layout({ views, audience }) {
+  return (
+    <>
+      <div>
+        <ViewsNav />
+        {views}
+      </div>
+      <div>
+        <AudienceNav />
+        {audience}
+      </div>
+    </>
+  );
+}
+```
+
+當使用者首次導航到 `/analytics` 時，每個資料夾（`@views` 和 `@audience`）中的 `page.js` 區段都會顯示。
+
+在導航到 `/analytics/subscribers` 時，只有 `@audience` 會更新。同樣，在導航到 `/analytics/impressions` 時，只有 `@views` 會更新。
+
+向前和向後導航將恢復平行路由的正確組合。
+
+[結合攔截和平行路由](#combining-intercepting-and-parallel-routes)
+-----------------------------------------------------------------------------------------
+
+您可以結合攔截和平行路由來實現應用中的特定路由行為。
+
+**範例**
+
+例如，在建立模態框時，您經常需要意識到一些常見的挑戰，例如：
+
+*   模態框無法透過 URL 存取。
+*   刷新頁面時模態框關閉。
+*   向後導航會導向先前的路由，而不是模態框背後的路由。
+*   向前導航不會重新打開模態框。
+
+您可能希望模態框在打開時更新 URL，並且向前/向後導航可以打開和關閉模態框。此外，在分享 URL 時，您可能希望頁面載入時模態框打開並顯示其背後的內容，或者您可能希望頁面載入時不顯示模態框。
+
+社交媒體網站上的照片就是一個很好的例子。通常，照片可以從使用者的動態或個人資料中的模態框存取。但在分享照片時，它們會直接顯示在自己的頁面上。
+
+透過使用約定，我們可以讓模態框行為預設映射到路由行為。
+
+考慮以下資料夾結構：
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-route-modal.png)
+
+使用此模式：
+
+*   `/photo/[id]` 的內容可以透過 URL 在其自己的上下文中存取。也可以從 `/[username]` 路由中的模態框存取。
+*   使用客戶端導航向前和向後導航應該關閉和重新打開模態框。
+*   刷新頁面（伺服器端導航）應將使用者帶到原始的 `/photo/id` 路由，而不是顯示模態框。
+
+在 `/@modal/(..)photo/[id]/page.js` 中，您可以返回包裹在模態元件中的頁面內容。
+
+```js filename="/@modal/(..)photo/[id]/page.js"
+export default function PhotoPage() {
+  const router = useRouter();
+ 
+  return (
+    <Modal
+      // 模態框應始終在頁面載入時顯示
+      isOpen={true}
+      // 關閉模態框應將使用者帶回上一頁
+      onClose={() => router.back()}
+    >
+      {/* 頁面內容 */}
+    </Modal>
+  );
+}
+```
+
+> **注意：** 此解決方案並非在 Next.js 中建立模態框的唯一方法，但旨在展示如何結合約定來實現更複雜的路由行為。
+
+[條件路由](#conditional-routes)
+-----------------------------------------
+
+有時，您可能需要動態資訊（如資料或上下文）來決定顯示哪個路由。您可以使用平行路由來有條件地載入一個路由或另一個路由。
+
+**範例**
+
+```js filename="layout.js"
+export async function getServerSideProps({ params }) {
+  const { accountType } = await fetchAccount(params.slug);
+  return { props: { isUser: accountType === 'user' } };
+}
+ 
+export default function UserOrTeamLayout({ isUser, user, team }) {
+  return <>{isUser ? user : team}</>;
+}
+```
+
+在上面的範例中，您可以根據 slug 返回 `user` 或 `team` 路由。這讓您可以有條件地載入資料，並將子路由匹配到一個選項或另一個選項。
+
+[結論](#conclusion)
+-------------------------
+
+我們對 Next.js 中布局、路由和 React 18 的未來感到興奮。實現工作已經開始，一旦功能可用，我們將宣布。
+
+留下評論並[加入 GitHub Discussions 上的對話](https://github.com/vercel/next.js/discussions/37136)。
