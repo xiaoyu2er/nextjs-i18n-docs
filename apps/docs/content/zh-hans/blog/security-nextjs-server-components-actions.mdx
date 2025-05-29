@@ -1,0 +1,388 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:22:54.798Z
+title: Next.js 安全防护指南
+description: 了解 Next.js 内置的安全防护机制，并获取应用安全审计指南。
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2023-10-23T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/security-nextjs-server-components-actions/twitter-card.png
+---
+
+应用路由中的 React 服务端组件 (RSC) 是一种创新范式，它消除了传统方法中的冗余和潜在风险。由于这一新特性，开发者和安全团队可能会发现难以将现有安全协议与该模型对齐。
+
+本文档旨在指出需要关注的领域、内置的防护机制，并提供应用审计指南。我们将特别关注意外数据暴露的风险。
+
+[选择数据处理模型](#choosing-your-data-handling-model)
+-----------------------------------------------------------------------
+
+[React 服务端组件](/docs/app/building-your-application/rendering/server-components)模糊了服务端与客户端的界限。理解信息在何处处理并最终可用，数据处理至关重要。
+
+首先需要为项目选择合适的数据处理方式：
+
+*   [HTTP API](#http-apis)（推荐现有大型项目/组织使用）
+*   [数据访问层](#data-access-layer)（推荐新项目使用）
+*   [组件级数据访问](#component-level-data-access)（推荐原型设计学习阶段使用）
+
+建议坚持使用一种方式，避免过多混用。这能让代码库中的开发者和安全审计人员明确预期，异常情况会显得可疑。
+
+### [HTTP API](#http-apis)
+
+如果在现有项目中采用服务端组件，推荐默认将运行时服务端组件视为不安全/不可信（类似 SSR 或客户端场景）。不假设存在内部网络或信任区域，工程师可应用零信任原则。与服务端组件中调用 REST 或 GraphQL 等自定义 API 端点（如同在客户端执行），并传递所有 cookies。
+
+若原有 `getStaticProps`/`getServerSideProps` 直接连接数据库，建议统一模型，将这些逻辑移至 API 端点以保持一致性。
+
+需警惕假设内部网络请求安全的访问控制逻辑。
+
+此方式可保留现有组织架构，让专精安全的后端团队延续现有安全实践。若这些团队使用非 JavaScript 语言，此方式同样适用。
+
+通过减少客户端代码发送和低延迟执行固有数据瀑布流，仍能享受服务端组件的诸多优势。
+
+### [数据访问层](#data-access-layer)
+
+对新项目推荐在 JavaScript 代码库中创建独立的数据访问层，统一所有数据访问。此方式确保数据访问一致性，减少授权漏洞，且因集中为单一库更易维护。单一编程语言可能提升团队协作效率，还能通过更低运行时开销获得更好性能，实现请求间内存缓存共享。
+
+构建内部 JavaScript 库，在返回数据前执行自定义访问检查。类似 HTTP 端点但处于同一内存模型。每个 API 都应接收当前用户并验证其数据查看权限。原则是服务端组件函数体只能看到当前请求用户有权访问的数据。
+
+此后遵循常规 API 安全实践。
+
+```tsx filename="data/auth.tsx"
+import { cache } from 'react';
+import { cookies } from 'next/headers';
+ 
+// 缓存辅助方法便于多处获取相同值
+// 无需手动传递。避免从服务端组件向服务端组件传递，
+// 最小化传递给客户端组件的风险
+export const getCurrentUser = cache(async () => {
+  const token = cookies().get('AUTH_TOKEN');
+  const decodedToken = await decryptAndValidate(token);
+  // 不要将密钥令牌或私有信息设为公共字段
+  // 使用类避免意外将整个对象传递给客户端
+  return new User(decodedToken.id);
+});
+```
+
+```tsx filename="data/user-dto.tsx"
+import 'server-only';
+import { getCurrentUser } from './auth';
+ 
+function canSeeUsername(viewer: User) {
+  // 目前是公开信息，但可变更
+  return true;
+}
+ 
+function canSeePhoneNumber(viewer: User, team: string) {
+  // 隐私规则
+  return viewer.isAdmin || team === viewer.team;
+}
+ 
+export async function getProfileDTO(slug: string) {
+  // 不传递值，读取缓存值，同时解决上下文问题且更易实现延迟加载
+ 
+  // 使用支持查询安全模板化的数据库API
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`;
+  const userData = rows[0];
+ 
+  const currentUser = await getCurrentUser();
+ 
+  // 仅返回该查询相关数据而非全部
+  // <https://www.w3.org/2001/tag/doc/APIMinimization>
+  return {
+    username: canSeeUsername(currentUser) ? userData.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, userData.team)
+      ? userData.phonenumber
+      : null,
+  };
+}
+```
+
+这些方法应暴露可直接传输到客户端的安全对象。我们称之为数据传输对象 (DTO) 以明确其可直接被客户端消费。
+
+实践中可能仅被服务端组件消费。这形成了分层结构：安全审计可聚焦数据访问层，而 UI 能快速迭代。更小的攻击面和更少的代码量使安全问题更易捕捉。
+
+```
+import {getProfile} from '../../data/user'
+export async function Page({ params: { slug } }) {
+  // 此页面现在可安全传递该资料对象
+  // 因其不应包含任何敏感信息
+  const profile = await getProfile(slug);
+  ...
+}
+```
+
+密钥可存储在环境变量中，但在此方式中只有数据访问层应访问 `process.env`。
+
+### [组件级数据访问](#component-level-data-access)
+
+另一种方式是直接将数据库查询写入服务端组件。此方式仅适用于快速迭代和原型设计（如小型产品或全员知晓风险的小团队）。
+
+在此方式中需仔细审计 `"use client"` 文件。审计和 PR 审查时，检查所有导出函数：若类型签名接受过于宽泛的对象如 `User`，或包含 `token`/`creditCard` 等属性。即使是 `phoneNumber` 等隐私敏感字段也需额外审查。客户端组件不应接受超出其工作所需的最小数据量。
+
+```
+import Profile from './components/profile.tsx';
+ 
+export async function Page({ params: { slug } }) {
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`;
+  const userData = rows[0];
+  // 暴露风险：这将 userData 所有字段暴露给客户端
+  // 因为我们从服务端组件向客户端传递数据
+  // 类似在 getServerSideProps 中返回 userData
+  return <Profile user={userData} />;
+}
+```
+
+```
+'use client';
+// 不良实践：此 props 接口接受了远超客户端组件所需的数据量
+// 会鼓励服务端组件传递全部数据。更好的方案是接受仅包含
+// 渲染资料所需字段的受限对象
+export default async function Profile({ user }: { user: User }) {
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      ...
+    </div>
+  );
+}
+```
+
+始终使用参数化查询或自动处理的数据库库，避免 SQL 注入攻击。
+
+[服务端专用代码](#server-only)
+---------------------------
+
+仅应在服务端执行的代码可标记为：
+
+```
+import 'server-only';
+```
+
+若客户端组件尝试导入此模块将引发构建错误。这可确保专有/敏感代码或内部业务逻辑不会意外泄露至客户端。
+
+主要数据传输方式是通过 React 服务端组件协议（当向客户端组件传递 props 时自动触发）。此序列化支持 JSON 超集，不支持传输自定义类（将导致错误）。
+
+因此，避免过大对象意外暴露给客户端的技巧是使用 `class` 封装数据访问记录。
+
+在即将发布的 Next.js 14 中，还可通过 `next.config.js` 启用实验性 [React 污染 API](https://react.dev/reference/react/experimental_taintObjectReference)：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    taint: true,
+  },
+};
+```
+
+这允许标记不应直接传递到客户端的对象：
+
+```ts filename="app/data.ts"
+import { experimental_taintObjectReference } from 'react';
+ 
+export async function getUserData(id) {
+  const data = ...;
+  experimental_taintObjectReference(
+    '禁止将用户数据传递给客户端',
+    data
+  );
+  return data;
+}
+```
+
+```tsx filename="app/page.tsx"
+import { getUserData } from './data';
+ 
+export async function Page({ searchParams }) {
+  const userData = getUserData(searchParams.id);
+  return <ClientComponent user={userData} />; // 报错
+}
+```
+
+这不防护从对象提取字段后传递的情况：
+
+```tsx filename="app/page.tsx"
+export async function Page({ searchParams }) {
+  const { name, phone } = getUserData(searchParams.id);
+  // 故意暴露个人数据
+  return <ClientComponent name={name} phoneNumber={phone} />;
+}
+```
+
+对于令牌等唯一字符串，也可使用 [`taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) 阻止原始值传递：
+
+```ts filename="app/data.ts"
+import { experimental_taintObjectReference, experimental_taintUniqueValue } from 'react';
+ 
+export async function getUserData(id) {
+  const data = ...;
+  experimental_taintObjectReference(
+    '禁止将用户数据传递给客户端',
+    data
+  );
+  experimental_taintUniqueValue(
+    '禁止将令牌传递给客户端',
+    data,
+    data.token
+  );
+  return data;
+}
+```
+
+但即使如此也无法阻止派生值传递。
+
+最佳实践是使用数据访问层从源头避免数据进入服务端组件。污染检查通过标记值提供额外防护层，需注意函数和类已被禁止传递给客户端组件。多层防护最小化数据泄露风险。
+
+默认环境变量仅服务端可用。Next.js 约定同时暴露 `NEXT_PUBLIC_` 前缀的变量给客户端，用于暴露应客户端可用的显式配置。
+
+[SSR 与 RSC](#ssr-vs-rsc)
+-------------------------
+
+初始加载时 Next.js 会在服务端同时执行服务端组件和客户端组件以生成 HTML。
+
+服务端组件 (RSC) 在与客户端组件隔离的模块系统中执行，避免意外信息泄露。
+
+通过服务端渲染 (SSR) 的客户端组件应遵循与浏览器客户端相同的安全策略，不应获得任何特权数据或私有 API 访问权限。强烈反对使用全局对象暂存数据等绕过防护的黑客手段。原则是这些代码应在服务端与客户端保持相同执行方式。遵循默认安全实践，若客户端组件导入 `server-only` 模块，Next.js 将使构建失败。
+
+[读取操作](#read)
+-------------
+
+在 Next.js 应用路由中，通过渲染服务端组件页面实现数据库或 API 数据读取。
+
+页面输入包括 URL 中的 searchParams、从 URL 映射的动态参数和 headers。客户端可能篡改这些值，它们不可信且每次读取都需重新验证。例如不应使用 searchParam 跟踪 `?isAdmin=true` 等状态。仅因用户访问 `/[team]/` 不意味着其有权访问该团队，读取数据时需验证。原则是每次读取数据时都应重新检查访问控制和 `cookies()`，不要通过 props 或 params 传递。
+
+渲染服务端组件时永远不应执行写入等副作用。这并非服务端组件特有原则。React 天然通过双重渲染等方式 discourages 客户端组件中的副作用（useEffect 外）。
+
+此外，Next.js 在渲染期间无法设置 cookies 或触发缓存重新验证，这也限制了渲染过程中的写入操作。
+
+例如 `searchParams` 不应用于保存更改或注销等写入操作，应使用服务端动作替代。
+
+这意味着按设计使用时，Next.js 模型永远不会将 GET 请求用于写入操作，这有助于避免大量 CSRF 问题。
+
+Next.js 支持自定义路由处理器 (`route.tsx`)，可在 GET 请求设置 cookies。这被视为逃生舱而非通用模型部分，需显式选择接受 GET 请求。不存在可能意外接收 GET 请求的全局处理器。若创建自定义 GET 处理器，这些可能需要额外审计。
+
+[写入操作](#write)
+---------------
+
+Next.js 应用路由中执行写入或变更的标准方式是使用[服务端动作](/docs/app/building-your-application/data-fetching/forms-and-mutations)。
+
+```ts filename="actions.ts"
+'use server';
+ 
+export function logout() {
+  cookies().delete('AUTH_TOKEN');
+}
+```
+
+`"use server"` 注解会暴露端点，使所有导出函数可被客户端调用。当前标识符是源码位置的哈希值。只要用户获取动作 ID 的句柄，就能用任意参数调用它。
+
+因此这些函数应始终首先验证当前用户是否有权调用该动作，并验证每个参数的完整性。可手动实现或使用 `zod` 等工具。
+
+```ts filename="actions.ts"
+"use server";
+ 
+export async function deletePost(id: number) {
+  if (typeof id !== 'number') {
+    // TypeScript 注解不会被强制执行
+    // 可能需要验证 id 类型
+    throw new Error();
+  }
+  const user = await getCurrentUser();
+  if (!canDeletePost(user, id)) {
+    throw new Error();
+  }
+  ...
+}
+```
+
+### [闭包 (Closures)](#closures)
+
+服务端操作 (Server Actions) 也可以编码在 [闭包](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures) 中。这使得操作可以与渲染时使用的数据快照关联，从而在调用操作时使用这些数据：
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  const publishVersion = await getLatestVersion();
+  async function publish() {
+    "use server";
+    if (publishVersion !== await getLatestVersion()) {
+      throw new Error('发布按钮点击后版本已变更');
+    }
+    ...
+  }
+  return <button action={publish}>发布</button>;
+}
+```
+
+闭包的快照必须发送到客户端，并在调用服务端时回传。
+
+在 Next.js 14 中，闭包捕获的变量会在发送到客户端前使用操作 ID 进行加密。默认情况下，Next.js 项目构建时会自动生成一个私钥。每次重新构建都会生成新的私钥，这意味着每个服务端操作只能针对特定构建版本调用。你可能需要使用 [版本偏差保护 (Skew Protection)](https://vercel.com/blog/version-skew-protection) 来确保在重新部署时始终调用正确版本。
+
+如果需要更频繁轮换或跨多个构建持久化的密钥，可以通过 `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` 环境变量手动配置。
+
+通过对所有闭包捕获变量进行加密，可以避免意外泄露其中的敏感信息。通过签名机制，攻击者更难篡改操作的输入参数。
+
+另一种替代闭包的方式是使用 JavaScript 的 `.bind(...)` 函数。**这些参数不会被加密**。这为性能优化提供了选择退出机制，同时也与客户端 `.bind()` 行为保持一致。
+
+```tsx filename="app/page.tsx"
+async function deletePost(id: number) {
+  "use server";
+  // 验证 ID 及删除权限
+  ...
+}
+ 
+export async function Page({ slug }) {
+  const post = await getPost(slug);
+  return <button action={deletePost.bind(null, post.id)}>
+    删除
+  </button>;
+}
+```
+
+核心原则是：必须始终将服务端操作 (`"use server"`) 的参数列表视为不可信输入，并进行严格验证。
+
+### [CSRF 防护](#csrf)
+
+所有服务端操作都可以通过普通 `<form>` 调用，这可能使其面临 CSRF 攻击风险。在底层实现中，服务端操作始终使用 POST 方法，且仅允许通过该 HTTP 方法调用。这一机制本身就能在现代浏览器中预防大多数 CSRF 漏洞，特别是由于 Same-Site cookies 已成为默认设置。
+
+作为额外防护措施，Next.js 14 中的服务端操作还会比较 `Origin` 标头与 `Host` 标头（或 `X-Forwarded-Host`）。如果不匹配，操作将被拒绝。换句话说，服务端操作只能由托管它的页面所在主机调用。不支持 `Origin` 标头的非常老旧或过时的浏览器可能存在风险。
+
+服务端操作不使用 CSRF 令牌，因此 HTML 净化处理至关重要。
+
+当使用自定义路由处理器 (`route.tsx`) 时，可能需要额外审计，因为 CSRF 保护需要手动实现。传统防护规则在此场景下仍然适用。
+
+[错误处理 (Error Handling)](#error-handling)
+---------------------------------
+
+程序难免出错。当服务端抛出错误时，最终会在客户端代码中重新抛出以便在 UI 中处理。错误信息和堆栈跟踪可能包含敏感信息，例如 `[信用卡号] 不是有效的电话号码`。
+
+在生产模式下，React 不会向客户端发送错误或被拒绝的 Promise。而是发送代表错误的哈希值。该哈希值可用于关联多个相同错误，并将错误与服务端日志对应。React 会用通用错误消息替换原始错误信息。
+
+在开发模式下，服务端错误仍会以明文形式发送到客户端以辅助调试。
+
+对于生产环境，始终以生产模式运行 Next.js 至关重要。开发模式不会针对安全性和性能进行优化。
+
+[自定义路由与中间件 (Custom Routes and Middleware)](#custom-routes-and-middleware)
+-------------------------------------------------------------
+
+[自定义路由处理器](/docs/app/building-your-application/routing/route-handlers) 和 [中间件](/docs/app/building-your-application/routing/middleware) 被视为底层逃生舱口，用于实现其他内置功能无法完成的需求。这也可能引入框架本可防范的潜在风险。能力越大，责任越大。
+
+如前所述，`route.tsx` 路由可以实现自定义 GET 和 POST 处理器，如果实现不当可能会遭受 CSRF 攻击。
+
+中间件可用于限制某些页面的访问权限。通常最佳实践是使用允许列表而非拒绝列表。因为很难穷尽所有可能的数据访问方式，例如存在重写或客户端请求的情况。
+
+举例来说，开发者通常只考虑 HTML 页面。但 Next.js 还支持通过客户端导航加载 RSC/JSON 有效负载。在页面路由 (Pages Router) 中，这曾经通过自定义 URL 实现。
+
+为简化匹配器编写，Next.js 应用路由 (App Router) 始终对初始 HTML、客户端导航和服务端操作使用页面的原始 URL。客户端导航使用 `?_rsc=...` 搜索参数作为缓存破坏器。
+
+服务端操作存在于使用它们的页面上，因此继承相同的访问控制。如果中间件允许读取页面，则也可以调用该页面上的操作。要限制页面上服务端操作的访问，可以禁止该页面的 POST HTTP 方法。
+
+[审计指南 (Audit)](#audit)
+---------------
+
+如果要对 Next.js 应用路由项目进行审计，以下是我们建议重点关注的几个方面：
+
+*   **数据访问层**。是否有完善的独立数据访问层实践？验证数据库包和环境变量是否未在数据访问层之外导入。
+*   **`"use client"` 文件**。组件 props 是否期望接收私有数据？类型签名是否过于宽泛？
+*   **`"use server"` 文件**。操作参数是在操作内部还是数据访问层中进行验证？操作内部是否重新验证用户权限？
+*   **`/[param]/`** 带括号的文件夹表示用户输入。参数是否经过验证？
+*   **`middleware.tsx` 和 `route.tsx`** 具有强大能力。应使用传统技术额外审计这些文件。定期或按照团队软件开发生命周期进行渗透测试或漏洞扫描。

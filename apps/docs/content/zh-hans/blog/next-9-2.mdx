@@ -1,0 +1,243 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:21:52.289Z
+title: Next.js 9.2 版本发布
+description: >-
+  Next.js 9.2 引入了对 CSS 的原生支持、激进的代码分割策略、全捕获动态路由等新特性！
+author:
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Joe Haddad
+    image: /static/team/timer.jpg
+  - name: Luis Alvarez
+    image: /static/team/lfades.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2020-01-15T19:37:43.618Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-2/twitter-card.png
+---
+
+今天我们很高兴地推出 Next.js 9.2，主要特性包括：
+
+*   **[全局样式表的原生 CSS 支持](#built-in-css-support-for-global-stylesheets)**：应用现在可以直接导入 `.css` 文件作为全局样式表。
+*   **[组件级样式的原生 CSS 模块支持](#built-in-css-module-support-for-component-level-styles)**：通过 `.module.css` 命名约定，可以在应用的任何位置导入和使用局部作用域的 CSS。
+*   **[改进的代码分割策略](#improved-code-splitting-strategy)**：Google Chrome 团队深度优化了 Next.js 的代码分割策略，显著减小了客户端包体积。同时最大化利用了 [HTTP/2](https://developers.google.com/web/fundamentals/performance/http2) 来提升页面加载速度，且不影响 HTTP/1.1 性能。
+*   **[全捕获动态路由](#catch-all-dynamic-routes)**：Next.js 动态路由现在支持全捕获路由，可满足更多使用场景，例如基于 CMS 的网站。
+
+所有这些改进都是非破坏性的，完全向后兼容。只需运行以下命令即可更新：
+
+```bash filename="终端"
+npm i next@latest react@latest react-dom@latest
+```
+
+### [全局样式表的原生 CSS 支持](#built-in-css-support-for-global-stylesheets)
+
+Next.js 5 通过名为 `next-css` 的自定义插件引入了 CSS 导入支持，该插件扩展了 Next.js 的行为。
+
+长期以来，我们收到来自企业和 Next.js 用户的一致反馈，表示他们经常需要在应用中添加 `next-css`。
+
+此外，`next-css` 在导入 CSS 时存在一些约束缺失的问题。例如，可以在项目的每个文件中导入 CSS 文件，但这些 CSS 文件会对整个应用产生全局影响。
+
+为了提升开发者体验并解决这些问题，我们开始着手为 Next.js 默认添加 CSS 导入支持。
+
+我们很高兴地宣布，Next.js 现在原生支持将样式表导入到应用中。
+
+要在应用中使用 CSS 导入，请在 `pages/_app.js` 中导入 CSS 文件。
+
+例如，假设项目根目录下有一个名为 `styles.css` 的样式表：
+
+```
+body {
+  padding: 20px 20px 60px;
+  margin: 0;
+}
+```
+
+如果尚未创建 [`pages/_app.js` 文件](/docs/pages/building-your-application/routing/custom-app)，请先创建。
+
+然后导入 `styles.css` 文件：
+
+```js filename="pages/_app.js"
+import '../styles.css';
+ 
+// 在新建的 `pages/_app.js` 文件中必须包含此默认导出。
+export default function MyApp({ Component, pageProps }) {
+  return <Component {...pageProps} />;
+}
+```
+
+由于样式表本质上是全局的，因此必须在[自定义 `<App>` 组件](/docs/pages/building-your-application/routing/custom-app)中导入。这对于避免全局样式的类名冲突和顺序问题非常必要。
+
+在开发环境中，这种样式表表达方式允许你在编辑样式时自动更新页面上的样式。
+
+在生产环境中，所有 CSS 文件会自动合并为一个经过压缩的 `.css` 文件。该 CSS 文件将通过 `<link>` 标签加载，并自动注入到 Next.js 生成的默认 HTML 标记中。
+
+这一新特性完全向后兼容。如果正在使用 `@zeit/next-css` 或其他 CSS 相关插件，该特性会被禁用以避免冲突。
+
+如果当前正在使用 `@zeit/next-css`，建议从 `next.config.js` 和 `package.json` 中移除该插件，升级后即可使用内置的 CSS 支持。
+
+### [组件级样式的原生 CSS 模块支持](#built-in-css-module-support-for-component-level-styles)
+
+Next.js 现在支持使用 `[name].module.css` 文件命名约定的 [CSS 模块](https://github.com/css-modules/css-modules)。
+
+与 Next.js 5 中通过 `next-css` 提供的支持不同，[全局 CSS](#built-in-css-support-for-global-stylesheets) 和 CSS 模块现在可以**共存**——`next-css` 要求应用中的所有 `.css` 文件要么作为全局样式处理，要么作为局部样式处理，但不能同时处理。
+
+CSS 模块通过自动创建唯一的类名来实现 CSS 的局部作用域。这允许你在不同文件中使用相同的 CSS 类名，而无需担心冲突。
+
+这种行为使 CSS 模块成为包含组件级 CSS 的理想方式。CSS 模块文件**可以在应用的任何位置导入**。
+
+例如，假设 `components/` 文件夹中有一个可复用的 `Button` 组件：
+
+首先，创建 `components/Button.module.css`，内容如下：
+
+```
+/*
+无需担心 .error {} 与其他 `.css` 或 `.module.css` 文件冲突！
+*/
+.error {
+  color: white;
+  background-color: red;
+}
+```
+
+然后，创建 `components/Button.js`，导入并使用上述 CSS 文件：
+
+```js filename="components/Button.js"
+import styles from './Button.module.css';
+ 
+export function Button() {
+  return (
+    <button
+      type="button"
+      // 注意 "error" 类是作为导入的 `styles` 对象的一个属性访问的。
+      className={styles.error}
+    >
+      销毁
+    </button>
+  );
+}
+```
+
+CSS 模块是一个_可选_特性，仅对扩展名为 `.module.css` 的文件启用。常规的 [`<link>` 样式表](/docs/pages/api-reference/components/head)和[全局 CSS 文件](#built-in-css-support-for-global-stylesheets)仍然受支持。
+
+在生产环境中，所有 CSS 模块文件会自动合并为**多个经过压缩和代码分割的 `.css` 文件**。这些 `.css` 文件代表了应用中的热执行路径，确保为每个页面加载最少数量的 CSS 以实现绘制。
+
+与上述类似，这一新特性完全向后兼容。如果正在使用 `@zeit/next-css` 或其他 CSS 相关插件，该特性会被禁用以避免冲突。
+
+如果当前正在使用 `@zeit/next-css`，建议从 `next.config.js` 和 `package.json` 中移除该插件，升级后即可使用内置的 CSS 支持。
+
+### [改进的代码分割策略](#improved-code-splitting-strategy)
+
+Next.js 9.2 之前的版本有一组固定的 JavaScript 包需要加载才能使页面交互：
+
+*   页面的 JavaScript 文件
+*   包含公共 JavaScript 的文件
+*   Next.js 客户端运行时包
+*   Webpack 客户端运行时包
+*   动态导入（通过 `next/dynamic` 添加，使用时）
+
+为了使页面交互，所有这些包都必须加载，因为它们相互依赖以在浏览器中启动 React。
+
+由于所有这些包都是应用变得交互所必需的，因此尽可能优化它们非常重要。实际上，这意味着不过度下载应用中其他部分的代码。
+
+因此，Next.js 使用了一个 `commons` 包来存放页面之间的公共 JavaScript。旧的分包策略生成 `commons` 的计算基于使用率启发式。如果一个模块在超过 50% 的页面中使用，它会被标记为公共模块。否则，它会被打包到页面的 JavaScript 文件中。
+
+然而，应用可能包含许多不同类型的页面。例如，营销页面、博客和仪表盘。如果营销页面的数量远多于其他类型的页面，公共模块的计算结果会主要针对营销页面进行优化。
+
+我们的目标是在一个应用中优化所有类型的页面。
+
+[Alex Castle](https://twitter.com/atcastle) [提出了一种新的分包方法](https://github.com/vercel/next.js/issues/7631)，允许多个文件进行优化的公共分包，包括涉及多种页面类型的情况。
+
+今天，我们很高兴地宣布这一新的分包行为在 Next.js 9.2 中默认启用。我们要向 [Google Chrome 团队](/blog/next-9#google-chrome-collaboration) 和 [Alex Castle](https://twitter.com/atcastle) 致以深深的谢意，感谢他们贡献这一变更。这一变更反映了数周的研究、实验室测试、真实世界测试和实施的累积成果。
+
+新的分包实现利用 [HTTP/2](https://developers.google.com/web/fundamentals/performance/http2) 来交付更多数量的小体积分包。
+
+根据新的启发式方法，分包创建包括：
+
+*   每个页面的最小分包。
+*   包含 React、ReactDOM、React 调度程序等的框架分包。
+*   任何超过 160KB（预压缩/预最小化）的 `node_module` 依赖项的库分包。
+*   用于所有页面共享代码的公共分包。
+*   尽可能多的共享分包（由 2 个或更多页面使用），优化整体应用大小和初始加载速度。
+*   Next.js 的客户端运行时。
+*   Webpack 运行时。
+
+让我们看看这在真实应用中的表现：
+
+早期采用的行业合作伙伴 [Barnebys®](https://www.barnebys.com/) 的整体应用大小减少了 23%。
+
+此外，他们最大的 JS 包减少了 30%——从 605kB 降至 425kB——且无需任何代码更改。
+
+另一家行业合作伙伴 [SumUp®](https://sumup.com/) 的最大 JS 包减少了 70%——从 395kB 降至 122kB——同样无需任何代码更改。
+
+#### [最大 JavaScript 包](#largest-javascript-bundle)
+
+之前
+
+之后
+
+变化
+
+Barnebys
+
+605kB
+
+425kB
+
+**减少 30%**
+
+SumUp
+
+395kB
+
+122kB
+
+**减少 70%**
+
+新的分包行为不仅减少了整体和初始加载大小，还优化了后续的客户端导航。[Barnebys®](https://www.barnebys.com/) 在六 (6) 次页面导航后加载的 JavaScript 量减少了 87%：
+
+#### [多次客户端跳转加载的 JavaScript](#javascript-loaded-by-multiple-client-side-transitions)
+
+之前
+
+之后
+
+变化
+
+Barnebys
+
+136kB
+
+18kB
+
+**减少 87%**
+
+这一新行为完全向后兼容。只需升级到最新版本的 Next.js 即可利用这一性能改进。
+
+### [全捕获动态路由](#catch-all-dynamic-routes)
+
+随着 Next.js 9 的发布，我们引入了[动态路由段](https://nextjs.org/blog/next-9#dynamic-route-segments)，旨在简化 Next.js 中的动态段，无需自定义服务器。这一特性已被 Next.js 用户广泛采用。
+
+但仍有一些情况是动态路由段特性未涵盖的。
+
+其中之一是全捕获路由。例如，将通配符如 `/post/**` 路由为一个页面。这对于具有嵌套结构（例如由 CMS 等内容源定义的结构）特别有用。
+
+现在可以使用 `[...name]` 语法创建全捕获动态路由。
+
+例如，`pages/post/[...slug].js` 将匹配 `/post/a`、`/post/a/b`、`/post/a/b/c` 等路径。
+
+`slug` 将在路由查询对象中作为路径部分的数组提供。因此，对于路径 `/post/foo/bar`，查询对象将是 `{ slug: ['foo', 'bar'] }`。
+
+[社区](#community)
+-----------------------
+
+我们非常高兴看到 Next.js 的采用持续增长：
+
+*   我们有超过 **880** 名独立贡献者。
+*   在 GitHub 上，该项目已获得超过 **44,000** 次星标。
+*   [示例目录](https://github.com/vercel/next.js/tree/canary/examples) 包含超过 **220** 个示例。
+
+Next.js 社区现在有超过 **13,800** 名成员。[加入我们！](https://github.com/vercel/next.js/discussions)
+
+我们感谢我们的社区以及所有帮助塑造此版本的外部反馈和贡献。

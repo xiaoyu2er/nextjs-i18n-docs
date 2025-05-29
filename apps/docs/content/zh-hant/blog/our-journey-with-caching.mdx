@@ -1,0 +1,219 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:25:33.263Z
+title: 我們的快取之旅
+description: 了解我們在 Next.js App Router 中實現快取的歷程。
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2024-10-24T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/our-journey-with-caching/twitter-card.png
+---
+
+前端效能優化向來不易。即使在高度優化的應用程式中，最常見的問題往往是客戶端與伺服器之間的通訊瀑布流。在推出 Next.js App Router 時，我們就決心要解決這個問題。為此，我們需要將客戶端發起的 REST 請求移至伺服器端，透過 React 伺服器元件 (Server Components) 在單次往返中完成。這意味著伺服器有時必須保持動態性，犧牲了 Jamstack 優秀的初始載入效能。為權衡這個問題，我們開發了部分預渲染 (partial prerendering) 技術，實現兩全其美的方案。
+
+然而，在此過程中，由於我們提供的快取預設值和控制機制，開發者體驗受到了影響。`fetch()` 的預設行為改為優先考慮效能而預設啟用快取，但這對快速原型設計和高動態性應用造成了困擾。我們對於未使用 `fetch()` 的本地資料庫存取控制不足。雖然有 `unstable_cache()`，但其使用體驗並不理想。這導致了需要引入區段層級配置 (segment-level configs)，例如 `export const dynamic, runtime, fetchCache, dynamicParams, revalidate = ...` 作為應急方案。
+
+當然，我們會繼續支援這些功能以保持向後相容性。但現在，請暫時忘記這些複雜的設定。我們認為已經找到了一個更簡潔的解決方案。
+
+我們一直在研發一個新的實驗模式，這個模式僅基於兩個核心概念：`<Suspense>` 和 `use cache`。
+
+[選擇你的冒險](#choose-your-adventure)
+-----------------------------------------------
+
+首先你會注意到，當你在元件中加入資料獲取邏輯時，現在會收到錯誤提示。
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // error
+}
+ 
+export default async function Page() {
+  return <Component />
+}
+```
+
+當你需要使用資料、cookies、headers、當前時間或隨機值時，現在有兩種選擇：你是希望資料被快取（伺服器端或客戶端）還是在每次請求時執行？這裡以 `fetch()` 為例，但這同樣適用於任何非同步 Node API，例如資料庫或計時器。
+
+[動態模式](#dynamic)
+-------------------
+
+如果你仍在迭代開發或構建高度動態的儀表板，可以將元件包裹在 `<Suspense>` 邊界中。`<Suspense>` 會啟用動態資料獲取和串流功能。
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // no error
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+你也可以在根佈局 (root layout) 中這樣做，或使用 `loading.tsx`。
+
+這確保了應用外殼 (shell) 保持即時載入。你可以繼續在頁面中添加更多資料，預設情況下這些資料都將是動態的。預設情況下不會有任何隱藏的快取。
+
+[靜態模式](#static)
+-----------------
+
+如果你正在構建靜態內容且不需要動態功能，可以使用新的 `use cache` 指令。
+
+```tsx filename="app/page.tsx"
+"use cache"
+ 
+export default async function Page() {
+  return fetch(...) // no error
+}
+```
+
+透過在頁面標記 `use cache`，你表示整個區段應該被快取。這意味著你獲取的任何資料現在都可以被快取，使頁面能夠靜態渲染。靜態內容不需要使用 `<Suspense>` 邊界。你可以向頁面添加更多資料，這些資料都將被快取。
+
+[混合模式](#partial)
+-------------------
+
+你也可以混合使用這兩種模式。例如，可以在根佈局中使用 `use cache` 確保其被快取，而每個佈局或頁面可以獨立決定是否快取。
+
+```tsx filename="app/layout.tsx"
+"use cache"
+ 
+export default async function Layout({ children }) {
+  const response = await fetch(...)
+  const data = await response.json()
+  return <html>
+    <body>
+      <div>{data.notice}</div>
+      {children}
+    </body>
+  </html>
+}
+```
+
+同時在特定頁面中使用動態資料：
+
+```tsx filename="app/page.tsx"
+import { Suspense } from 'react'
+async function Component() {
+  return fetch(...) // no error
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+[快取函式](#cached-functions)
+-------------------------------------
+
+使用這種混合方法時，將快取邏輯更靠近 API 呼叫可能會更方便。
+
+你可以像使用 `use server` 一樣，在任何非同步函式中添加 `use cache`。可以將其視為一種伺服器動作 (Server Action)，但不是呼叫伺服器而是呼叫快取。它支援相同的豐富參數類型和返回值，不僅限於 JSON。快取鍵會自動包含所有參數和閉包，因此無需手動指定快取鍵。
+
+```tsx filename="app/layout.tsx"
+async function getNotice() {
+  "use cache"
+  const response = await fetch(...)
+  const data = await response.json()
+  return data.notice;
+}
+ 
+export default async function Layout({ children }) {
+  return <html>
+    <body>
+      <h1>{await getNotice()}</h1>
+      {children}
+    </body>
+  </html>
+}
+```
+
+由於此佈局中沒有使用其他資料，它可以保持靜態。這種方法的好處是，如果你意外地向佈局添加新的動態資料，會在構建時觸發錯誤，迫使你做出新的選擇。如果你在整個佈局中添加 `use cache`，它將被快取而不會報錯。選擇哪種方法取決於你的使用情境。
+
+[標記快取](#tagging-a-cache)
+-----------------------------------
+
+如果你想透過標籤明確清除快取條目，可以在 `use cache` 函式中使用新的 `cacheTag()` API。
+
+```ts filename="app/utils.ts"
+import { cacheTag } from 'next/cache';
+ 
+async function getNotice() {
+  'use cache';
+  cacheTag('my-tag');
+}
+```
+
+然後，像以前一樣從伺服器動作 (Server Action) 中呼叫 `revalidateTag('my-tag')`。
+
+由於此 API 可以在資料載入後呼叫，你現在可以使用資料來標記快取條目。
+
+```ts filename="app/actions.ts"
+import { unstable_cacheTag as cacheTag } from 'next/cache';
+ 
+async function getBlogPosts(page) {
+  'use cache';
+  const posts = await fetchPosts(page);
+  for (let post of posts) {
+    cacheTag('blog-post-' + post.id);
+  }
+  return posts;
+}
+```
+
+[定義快取生命週期](#defining-the-lifetime-of-a-cache)
+---------------------------------------------------------------------
+
+如果你想控制特定條目或頁面在快取中的存活時間，可以使用 `cacheLife()` API：
+
+```tsx filename="app/page.tsx"
+"use cache"
+import { unstable_cacheLife as cacheLife } from 'next/cache'
+ 
+export default async function Page() {
+  cacheLife("minutes")
+  return ...
+}
+```
+
+預設情況下，它接受以下值：
+
+*   `"seconds"`（秒）
+*   `"minutes"`（分鐘）
+*   `"hours"`（小時）
+*   `"days"`（天）
+*   `"weeks"`（週）
+*   `"max"`（最大值）
+
+選擇最適合你使用情境的大致範圍。無需指定確切數字或計算一週有多少秒（或是毫秒？）。不過，你也可以指定具體值或配置自己的命名快取配置檔。
+
+除了 `revalidate` 外，此 API 還可以控制客戶端快取的過時時間 (stale time) 以及過期時間 (expire)，後者決定了當頁面一段時間沒有太多流量時應該何時過期。
+
+[實驗性功能](#experimental)
+-----------------------------
+
+這仍然是一個非常實驗性的專案。它尚未準備好投入生產環境，仍存在功能缺失和錯誤。特別是，我們知道需要改進這種新型錯誤的錯誤堆疊。然而，如果你喜歡冒險，我們非常歡迎你的早期反饋。
+
+我們將發布更詳細的升級路徑。除了早期的錯誤外，這裡主要的破壞性變更是取消了 `fetch()` 的預設快取行為。也就是說，在這個早期實驗階段，我們建議僅在新專案中進行實驗。如果進展順利，我們希望在一個次要版本中推出可選用的版本，並在未來的主要版本中將其設為預設值。
+
+要試用此功能，你必須使用 Next.js 的 `canary` 版本：
+
+```
+npx create-next-app@canary
+```
+
+你還需要在 `next.config.ts` 中啟用實驗性 dynamicIO 標誌：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  experimental: {
+    dynamicIO: true,
+  }
+};
+ 
+export default nextConfig;
+```
+
+在我們的文件中閱讀更多關於 [`use cache`](/docs/canary/app/api-reference/directives/use-cache)、[`cacheLife`](/docs/canary/app/api-reference/next-config-js/cacheLife) 和 [`cacheTag`](/docs/canary/app/api-reference/functions/cacheTag) 的資訊。

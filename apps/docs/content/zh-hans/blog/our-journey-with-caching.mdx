@@ -1,0 +1,219 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:21:27.889Z
+title: 我们的缓存探索之旅
+description: 了解我们在 Next.js App Router 中关于缓存的探索历程。
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2024-10-24T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/our-journey-with-caching/twitter-card.png
+---
+
+前端性能优化往往充满挑战。即使在高度优化的应用中，客户端-服务器瀑布流仍是最常见的性能瓶颈。在设计 Next.js App Router 时，我们就决心解决这个问题。为此，我们需要通过 React 服务端组件 (Server Components) 将客户端-服务器的 REST 请求转移到服务端，实现单次往返通信。这意味着服务器有时需要动态响应，牺牲了 Jamstack 出色的初始加载性能。我们为此开发了部分预渲染 (partial prerendering) 技术，实现了鱼与熊掌兼得的效果。
+
+然而在这个过程中，我们提供的缓存默认值和控制机制影响了开发者体验。`fetch()` 的默认行为改为优先性能而默认缓存，但这给快速原型开发和高动态性应用带来了困扰。对于不使用 `fetch()` 的本地数据库访问，我们也没有提供足够的控制手段。虽然提供了 `unstable_cache()`，但其易用性欠佳。这最终催生了分段级配置（如 `export const dynamic, runtime, fetchCache, dynamicParams, revalidate = ...`）作为应急方案。
+
+当然，我们会继续支持这些方案以保持向后兼容。但现在，请暂时忘记这些复杂机制——我们有了更简洁的新思路。
+
+我们正在试验一种基于两个核心理念的新模式：`<Suspense>` 和 `use cache`。
+
+[选择你的开发模式](#choose-your-adventure)
+-----------------------------------------------
+
+首先你会注意到，当在组件中添加数据获取时，现在会触发错误提示：
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // 错误
+}
+ 
+export default async function Page() {
+  return <Component />
+}
+```
+
+对于数据、cookies、headers、当前时间或随机值的使用，你现在需要做出选择：希望数据被缓存（服务端或客户端）还是每次请求都重新执行？这里以 `fetch()` 为例，但该规则适用于任何异步 Node API，如数据库或定时器。
+
+[动态模式](#dynamic)
+-------------------
+
+如果你正在迭代开发或构建高动态性的仪表板，可以用 `<Suspense>` 边界包裹组件。`<Suspense>` 会启用动态数据获取和流式传输。
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // 无错误
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+你也可以在根布局中使用此方案，或直接使用 `loading.tsx`。
+
+这能确保应用外壳保持即时响应。你可以继续在页面中添加更多数据，默认情况下它们都会是动态获取的。默认情况下不会进行任何缓存，彻底告别隐藏缓存问题。
+
+[静态模式](#static)
+-----------------
+
+如果要构建静态内容且不需要动态功能，可以使用新的 `use cache` 指令：
+
+```tsx filename="app/page.tsx"
+"use cache"
+ 
+export default async function Page() {
+  return fetch(...) // 无错误
+}
+```
+
+通过标记 `use cache`，你声明整个路由段应该被缓存。这意味着所有数据获取都可以被缓存，使页面能够静态渲染。静态内容不需要使用 `<Suspense>` 边界。在页面中添加更多数据时，它们都会被自动缓存。
+
+[混合模式](#partial)
+-------------------
+
+你还可以混合使用这两种模式。例如在根布局中使用 `use cache` 确保其被缓存，而每个布局或页面可以独立设置缓存策略。
+
+```tsx filename="app/layout.tsx"
+"use cache"
+ 
+export default async function Layout({ children }) {
+  const response = await fetch(...)
+  const data = await response.json()
+  return <html>
+    <body>
+      <div>{data.notice}</div>
+      {children}
+    </body>
+  </html>
+}
+```
+
+同时在特定页面中使用动态数据：
+
+```tsx filename="app/page.tsx"
+import { Suspense } from 'react'
+async function Component() {
+  return fetch(...) // 无错误
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+[缓存函数](#cached-functions)
+-------------------------------------
+
+使用这种混合模式时，将缓存逻辑贴近 API 调用可能更方便。
+
+你可以像使用 `use server` 那样，在任何异步函数中添加 `use cache`。可以将其视为服务端动作 (Server Action)，但不是调用服务端而是调用缓存。它支持同样丰富的参数类型和超出 JSON 范围的返回值。缓存键会自动包含所有参数和闭包，无需手动指定。
+
+```tsx filename="app/layout.tsx"
+async function getNotice() {
+  "use cache"
+  const response = await fetch(...)
+  const data = await response.json()
+  return data.notice;
+}
+ 
+export default async function Layout({ children }) {
+  return <html>
+    <body>
+      <h1>{await getNotice()}</h1>
+      {children}
+    </body>
+  </html>
+}
+```
+
+由于该布局没有使用其他数据，可以保持静态。这种方式的优势在于：如果你意外在布局中添加了新的动态数据，构建时会触发错误，迫使你做出明确选择。如果在整个布局中添加 `use cache`，则会被无错误地缓存。具体选择哪种方式取决于你的使用场景。
+
+[缓存标签](#tagging-a-cache)
+-----------------------------------
+
+如果需要通过标签显式清除缓存条目，可以在 `use cache` 函数中使用新的 `cacheTag()` API：
+
+```ts filename="app/utils.ts"
+import { cacheTag } from 'next/cache';
+ 
+async function getNotice() {
+  'use cache';
+  cacheTag('my-tag');
+}
+```
+
+然后像之前一样，在服务端动作中调用 `revalidateTag('my-tag')`。
+
+由于该 API 可以在数据加载后调用，现在你可以使用数据来标记缓存条目：
+
+```ts filename="app/actions.ts"
+import { unstable_cacheTag as cacheTag } from 'next/cache';
+ 
+async function getBlogPosts(page) {
+  'use cache';
+  const posts = await fetchPosts(page);
+  for (let post of posts) {
+    cacheTag('blog-post-' + post.id);
+  }
+  return posts;
+}
+```
+
+[定义缓存生命周期](#defining-the-lifetime-of-a-cache)
+---------------------------------------------------------------------
+
+如果需要控制特定条目或页面在缓存中的存活时间，可以使用 `cacheLife()` API：
+
+```tsx filename="app/page.tsx"
+"use cache"
+import { unstable_cacheLife as cacheLife } from 'next/cache'
+ 
+export default async function Page() {
+  cacheLife("minutes")
+  return ...
+}
+```
+
+默认支持以下时间单位：
+
+*   `"seconds"`（秒）
+*   `"minutes"`（分钟）
+*   `"hours"`（小时）
+*   `"days"`（天）
+*   `"weeks"`（周）
+*   `"max"`（最大值）
+
+选择最适合你使用场景的粗略范围即可，无需精确计算一周有多少秒（或是毫秒？）。当然，你也可以指定具体值或配置自定义的缓存策略。
+
+除了 `revalidate`，该 API 还可以控制客户端缓存的过期时间 (`stale`) 以及 `expire` 时间（决定页面在长时间未被访问时的过期时间）。
+
+[实验性功能](#experimental)
+-----------------------------
+
+这目前仍是一个实验性项目，尚未达到生产就绪状态，仍存在功能缺失和错误。特别是我们知道需要改进这类新错误的错误堆栈。但如果你勇于尝试，我们非常期待你的早期反馈。
+
+我们将发布更详细的升级路径。除了早期的错误提示外，这里主要的破坏性变更是取消了 `fetch()` 的默认缓存行为。因此我们建议目前仅在全新项目中进行实验。如果进展顺利，我们希望在次要版本中推出可选版本，并在未来的主要版本中设为默认。
+
+要体验这些功能，你需要使用 Next.js 的 `canary` 版本：
+
+```
+npx create-next-app@canary
+```
+
+同时需要在 `next.config.ts` 中启用 experimental.dynamicIO 标志：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  experimental: {
+    dynamicIO: true,
+  }
+};
+ 
+export default nextConfig;
+```
+
+更多关于 [`use cache`](/docs/canary/app/api-reference/directives/use-cache)、[`cacheLife`](/docs/canary/app/api-reference/next-config-js/cacheLife) 和 [`cacheTag`](/docs/canary/app/api-reference/functions/cacheTag) 的详细信息请参阅我们的文档。
