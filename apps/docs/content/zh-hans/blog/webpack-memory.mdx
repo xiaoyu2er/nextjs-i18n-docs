@@ -1,0 +1,71 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:21:02.951Z
+title: Next.js 8 的 Webpack 内存优化
+description: >-
+  近期发布的 Next.js 8 实现了显著的构建时内存占用降低。本文将探讨我们如何帮助社区优化 webpack 性能。
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-02-19T14:00:00.000Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/twitter-card.png
+---
+
+近期发布的 [Next.js 8](/blog/next-8) 实现了显著的构建时内存占用降低。本文将探讨我们如何帮助社区优化 webpack 性能。
+
+Next.js 采用零配置设计，构建于 [webpack](https://webpack.js.org/) 和 [Babel](https://babeljs.io) 等工具之上，旨在让开发者专注于核心应用逻辑。
+
+现代 Web 应用通常包含多个页面，例如首页、博客、仪表盘或商品列表。在 Next.js 中，这些页面对应项目根目录下 `pages` 文件夹中的文件。
+
+例如：`pages/about.js` 文件会自动映射到 `/about` 路由。
+
+该框架的核心设计约束之一是必须同时适配单页面和数千页面场景。
+
+在实现 [Serverless Next.js](/blog/next-8#serverless-nextjs) 时，我们发现当项目包含数百个页面时执行 `next build` 会导致内存占用激增，有时甚至超过 Node.js 约 1.4 GB 的堆内存限制。
+
+我们使用 Chrome 开发者工具对构建过程的内存使用进行分析时，发现 webpack 会一次性分配 **548 MB** 内存块。
+
+内存分配量与页面数量直接相关，意味着更多页面会导致更高内存占用。
+
+![Chrome 开发者工具内存分析器显示一次性分配了 548 MB](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/allocation-before.png)
+
+通过分析内存堆栈追踪，我们定位到导致内存激增的函数。问题源于 [`source.source()` 方法调用](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L334)，该方法会生成结果文件并存入内存。
+
+进一步分析发现 [`compilation.assets`](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L316) 正通过 `asyncLib.forEach` 进行遍历，这意味着[提供的函数](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L317)会同时处理 `compilation.assets` 数组中的所有文件。
+
+举例来说，如果有 100 个页面需要写入磁盘，上述代码会尝试同时生成并写入全部 100 个文件。
+
+解决方案是使用[信号量 (Semaphore)](https://en.wikipedia.org/wiki/Semaphore_\(programming\)) 限制并发写入数量。虽然我们通常使用 [async-sema](https://github.com/vercel/async-sema)，但 webpack 的 [neo-async](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L8) 已提供适用方法：
+
+```
+asyncLib.forEach(compilation.assets, (source, file, callback) => {
+  // 原始代码：所有资源并行处理
+});
+```
+
+```
+asyncLib.forEachLimit(compilation.assets, 15, (source, file, callback) => {
+  // 优化代码：限制最多15个并发
+});
+```
+
+实施并发限制后重新分析，内存分配已分割为 **34 MB** 的小块。
+
+![优化后分析器显示内存分批次分配](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/after-limiting.png)
+
+虽然改进显著，但构建过程仍会出现内存不足。进一步分析发现 [`source.source()` 调用后](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L334) 内存未被及时回收（垃圾回收）。
+
+webpack 资源通常是 [Source 类](https://github.com/webpack/webpack-sources)实例，这些类都实现了生成文件内容的 `source()` 方法。分析显示许多资源是 [`CachedSource`](https://github.com/webpack/webpack-sources#cachedsource) 实例，其特性是调用 `source()` 后会缓存结果直到资源释放。
+
+检查发现 Next.js 使用的 webpack 插件在文件写入后不会调用 `source()`，意味着缓存写入值毫无益处。在与 [Tobias Koppers](https://twitter.com/wSokra) [协作](https://github.com/webpack/webpack/pull/8609)后，webpack [新增了 `output.futureEmitAssets` 选项](https://github.com/webpack/webpack/pull/8642)来启用新的资源写入行为。
+
+最终优化将内存分配降至每次 **_182 KB_**。
+
+![最终优化效果](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/allocation-after.png)
+
+[Next.js 8](/blog/next-8) 已内置所有优化，用户无需额外配置。这些优化已贡献给 webpack 上游，意味着所有 webpack 用户都能受益。
+
+我们将持续优化 Next.js 和 webpack 的内存使用与性能表现。

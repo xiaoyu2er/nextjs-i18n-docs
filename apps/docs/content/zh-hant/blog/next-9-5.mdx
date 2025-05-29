@@ -1,0 +1,398 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:28:14.900Z
+title: Next.js 9.5
+description: >-
+  Next.js 9.5 推出了穩定版增量靜態再生 (Stable Incremental Static Regeneration)、自訂基礎路徑 (Custom Base Path)、重定向與改寫 (Redirects and Rewrites)、Webpack 5 測試版 (Webpack 5 Beta) 等新功能！
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Joe Haddad
+    image: /static/team/timer.jpg
+  - name: Luis Alvarez
+    image: /static/team/lfades.jpg
+  - name: Shu Uesugi
+    image: /static/team/chibicode.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2020-07-27T16:23:33.431Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-5/twitter-card.png
+---
+
+我們很高興今天推出 Next.js 9.5，主要功能包括：
+
+*   **[穩定版增量靜態再生 (Stable Incremental Static Regeneration)](#stable-incremental-static-regeneration)**：部署後以毫秒級速度重新建構靜態頁面
+*   **[可自訂基礎路徑 (Customizable Base Path)](#customizable-base-path)**：輕鬆將 Next.js 專案部署在網域的子路徑下
+*   **[支援改寫、重定向與標頭 (Support for Rewrites, Redirects, and Headers)](#support-for-rewrites-redirects-and-headers)**：改寫虛擬網址、重定向舊網址，並為靜態頁面添加標頭
+*   **[URL 尾隨斜線選項 (Optional Trailing Slash in URLs)](#optional-trailing-slash-in-urls)**：統一強制使用或不使用尾隨斜線
+*   **[頁面套件的持久快取 (Persistent Caching for Page Bundles)](#persistent-caching-for-page-bundles)**：未變更頁面的 JavaScript 檔案現在可跨建構保留
+*   **[快速重新整理增強 (Fast Refresh Enhancements)](#fast-refresh-enhancements)**：提升 Next.js 即時編輯體驗的可靠性
+*   **[生產環境 React 效能分析 (Production React Profiling)](#production-react-profiling)**：新增標誌用於測量專案的渲染「成本」
+*   **[可選的全域捕捉路由 (Optional Catch All Routes)](#optional-catch-all-routes)**：動態路由現在為 SEO 驅動的使用場景提供更多靈活性
+*   **[Webpack 5 支援（測試版）(Webpack 5 Support (beta))](#webpack-5-support-beta)**：可選啟用 Webpack 5 以改善建構大小與速度
+
+[穩定版增量靜態再生 (Stable Incremental Static Regeneration)](#stable-incremental-static-regeneration)
+---------------------------------------------------------------------------------
+
+Next.js 在 [9.3 版本推出靜態網站生成方法](https://nextjs.org/blog/next-9-3#next-gen-static-site-generation-ssg-support) 時就有一個明確目標：我們應該獲得 [靜態化的優勢](https://rauchg.com/2020/2019-in-review#static-is-the-new-dynamic)（永遠快速、永遠在線、[全球複製](https://rauchg.com/2020/static-hoisting#hoist-to-the-edge)），同時對動態資料提供出色的支援，這也是 Next.js 的知名特色。
+
+為了兼得兩者優勢，Next.js 引入了 **增量靜態生成 (Incremental Static Generation)**，讓您可以在網站建構後更新靜態內容。透過在 [`getStaticPaths` 中使用 `fallback: true` 選項](/docs/api-reference/data-fetching/get-static-paths#fallback-false)，您可以在 **執行時期** **註冊新的靜態頁面**。
+
+Next.js 可以透過這種方式按需靜態預渲染無限數量的頁面，無論您的資料集有多大。
+
+今天，我們宣布 **增量靜態再生 (Incremental Static Re-generation)** 的 **正式可用性**，這是一種 **更新現有頁面** 的機制，透過在背景中隨著流量進入重新渲染它們。
+
+受 [stale-while-revalidate](https://tools.ietf.org/html/rfc5861) 啟發，背景再生確保流量服務不中斷，始終從靜態儲存提供，並且新建構的頁面僅在 **生成完成後** 推送。
+
+```
+export async function getStaticProps() {
+  return {
+    props: await getDataFromCMS(),
+    // 我們將嘗試重新生成頁面：
+    // - 當請求進入時
+    // - 最多每秒一次
+    revalidate: 1,
+  };
+}
+```
+
+> revalidate 標誌是秒數，在此期間最多只會發生一次生成，以防止 [快取雪崩 (cache stampede)](https://en.wikipedia.org/wiki/Cache_stampede)。
+
+與傳統 SSR 不同，增量靜態再生確保您保留靜態化的優勢：
+
+*   沒有延遲峰值。頁面始終快速提供。
+*   頁面永遠不會離線。如果背景頁面再生失敗，舊頁面保持不變。
+*   低資料庫和後端負載。頁面最多只會 **並行** 重新計算一次。
+
+增量功能（添加頁面和延遲更新它們）以及 [預覽模式 (preview mode)](/docs/pages/building-your-application/configuring/preview-mode) 現在都已穩定，並且已完全支援 `next start` 和 [Vercel 邊緣平台](https://vercel.com) 開箱即用。
+
+為了展示這項新功能，我們創建了一個範例，展示重新生成一個靜態頁面，該頁面顯示特定 GitHub issue 的各種反應計數：[https://reactions-demo.vercel.app/](https://reactions-demo.vercel.app/)
+
+![在我們點擊表情符號反應後的首次訪問後，背景中會啟動新的頁面生成。整個過程中的每個請求都從靜態快取提供。](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-5/reactions-demo.gif)
+
+在我們點擊表情符號反應後的首次訪問後，背景中會啟動新的頁面生成。整個過程中的每個請求都從靜態快取提供。
+
+接下來，我們將制定一份補充 RFC，以解決兩個額外的增量靜態生成功能：
+
+*   同時重新生成和使多個頁面失效（例如您的部落格索引和某篇部落格文章）
+*   透過監聽事件（例如 CMS 的 webhook）提前重新生成，而非等待使用者流量
+
+更多詳情，請參閱 [`getStaticProps` 文件](/docs/pages/building-your-application/data-fetching#getstaticprops-static-generation)。
+
+[可自訂基礎路徑 (Customizable Base Path)](#customizable-base-path)
+-------------------------------------------------
+
+Next.js 專案並非總是從網域根目錄提供服務。有時您可能希望將 Next.js 專案部署在子路徑下，例如 `/docs`，這樣 Next.js 專案僅涵蓋該網域的子部分。
+
+雖然這在過去是可行的，但需要相當多的額外配置。例如，為每個 `<Link>` 添加前綴，並確保 Next.js 從正確的路徑提供 JavaScript 套件。
+
+為了解決這個痛點，我們引入了一個新的配置選項。`basePath` 讓您可以輕鬆將 Next.js 專案部署在網域的子路徑下。
+
+要開始使用 `basePath`，您可以將其添加到 `next.config.js`：
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+};
+```
+
+配置 `basePath` 後，您的專案將自動從提供的路徑路由。在此例中為 `/docs`。
+
+當使用 `next/link` 或 `next/router` 連結到專案中的其他頁面時，`basePath` 將自動添加前綴。這讓您可以在不更改專案的情況下變更 `basePath`。
+
+一個範例是使用 `next/link` 路由到另一個頁面：
+
+```
+import Link from 'next/link';
+ 
+export default function HomePage() {
+  return (
+    <>
+      <Link href="/documentation-page">
+        <a>Documentation page</a>
+      </Link>
+    </>
+  );
+}
+```
+
+以這種方式使用 `next/link` 將在網頁瀏覽器中渲染以下 HTML：
+
+```
+<a href="/docs/documentation-page">Documentation page</a>
+```
+
+更多詳情，請參閱 [`basePath` 文件](/docs/pages/api-reference/next-config-js/basePath)。
+
+[支援改寫、重定向與標頭 (Support for Rewrites, Redirects, and Headers)](#support-for-rewrites-redirects-and-headers)
+-------------------------------------------------------------------------------------------
+
+### [改寫 (Rewrites)](#rewrites)
+
+在建構 Next.js 專案時，您可能希望將某些路由代理到另一個 URL。例如，如果您想逐步將 Next.js 引入您的技術堆疊，您會希望路由存在於 Next.js 專案中的頁面，然後將未匹配的所有內容路由到您正在遷移的舊專案。
+
+在 Next.js 9.5 中，我們引入了一個名為 `rewrites` 的新配置選項，它允許您將傳入的請求路徑映射到不同的目標路徑，包括外部 URL。
+
+例如，您可能希望將某個路由改寫到 `example.com`：
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      { source: '/backend/:path*', destination: 'https://example.com/:path*' },
+    ];
+  },
+};
+```
+
+在此情況下，`/backend` 下的所有路徑將被路由到 `example.com`。
+
+您還可以檢查您的 Next.js 專案路由是否匹配，然後在沒有匹配時改寫到先前的專案。這對於 **逐步採用 Next.js** 非常有用：
+
+```
+module.exports = {
+  async rewrites() {
+    return [
+      // 在嘗試代理之前檢查 Next.js 專案路由是否匹配
+      {
+        source: '/:path*',
+        destination: '/:path*',
+      },
+      {
+        source: '/:path*',
+        destination: `https://example.com/:path*`,
+      },
+    ];
+  },
+};
+```
+
+在此情況下，我們首先匹配所有路徑。如果沒有匹配，我們代理到 `example.com`，這將是之前的專案。
+
+要了解更多關於 `rewrites` 功能，請參閱 [改寫文件](/docs/pages/api-reference/next-config-js/rewrites)。
+
+### [重定向 (Redirects)](#redirects)
+
+大多數網站至少需要一些重定向。特別是在變更專案路由結構時。例如，將 `/blog` 移動到 `/news` 或類似的過渡。
+
+以前，在 Next.js 專案中設置重定向列表需要設置自訂伺服器或自訂 `_error` 頁面來檢查路由是否設置了重定向。然而，這會導致關鍵的靜態和無伺服器優化失效（通過擁有伺服器）或使用上不夠符合人體工學。
+
+從 Next.js 9.5 開始，您現在可以在 `next.config.js` 的 `redirects` 鍵下創建重定向列表：
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+    ];
+  },
+};
+```
+
+要了解更多關於 `redirects` 功能，請參閱 [重定向文件](/docs/pages/api-reference/next-config-js/redirects)。
+
+### [Headers](#headers)
+
+Next.js 允許您建立同時使用靜態生成 (Static Generation) 和伺服器渲染 (SSR) 的混合專案。透過伺服器渲染，您可以為傳入的請求設定標頭。而對於靜態頁面，在過去是無法設定標頭的。
+
+現在我們在 `next.config.js` 中引入了 `headers` 屬性，適用於所有 Next.js 路由：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Feature-Policy',
+            // 停用麥克風和地理位置功能
+            value: "microphone 'none'; geolocation 'none'",
+          },
+        ],
+      },
+    ];
+  },
+};
+```
+
+`headers` 選項允許您設定常見需要的標頭，例如 [`Feature-Policy`](https://developer.mozilla.org/docs/Web/HTTP/Headers/Feature-Policy) 和 [`Content-Security-Policy`](https://developer.mozilla.org/docs/Web/HTTP/CSP)。
+
+要了解更多關於 `headers` 功能的資訊，請查閱 [headers 文件](/docs/pages/api-reference/next-config-js/headers)。
+
+[URL 中的可選尾部斜線](#optional-trailing-slash-in-urls)
+-------------------------------------------------------------------
+
+當 Next.js 在 3 年前推出時，其預設行為是所有帶有尾部斜線的 URL 都會返回 404 頁面。
+
+雖然這種方式有效，但有些使用者希望能改變此行為。例如，在將現有專案遷移到 Next.js 時，這些專案原先強制要求 URL 必須帶有尾部斜線。
+
+在 Next.js 9.5 中，我們在 `next.config.js` 中引入了一個名為 `trailingSlash` 的新選項。
+
+這個新選項確保 Next.js 會自動處理尾部斜線的行為：
+
+*   自動將帶有尾部斜線的 URL 重新導向至不帶斜線的 URL，例如：從 `/about/` 導向至 `/about`
+*   當 `trailingSlash` 設為 `true` 時，不帶尾部斜線的 URL 會被重新導向至帶有斜線的 URL，例如：從 `/about` 導向至 `/about/`
+*   確保 `next/link` 會自動添加或移除尾部斜線，避免不必要的重新導向
+
+```js filename="next.config.js"
+module.exports = {
+  // 強制使用尾部斜線，預設值為不使用尾部斜線 (false)
+  trailingSlash: true,
+};
+```
+
+要了解更多關於 `trailingSlash` 功能的資訊，請查閱 [trailingSlash 文件](/docs/pages/api-reference/next-config-js/trailingSlash)
+
+[頁面套件的持久快取](#persistent-caching-for-page-bundles)
+---------------------------------------------------------------------------
+
+在撰寫 Next.js 頁面時，所有腳本套件、CSS 樣式表和 HTML 的生成都是完全自動化且對開發者透明的。如果您在 Next.js 9.5 之前檢查生成的 `<script>` 標籤，會發現它們的 URL 遵循以下模式：
+
+```
+/_next/static/ovgxWYrvKyjnlM15qtz7h/pages/about.js
+```
+
+上述路徑中的 `ovgxWYrvKyjnlM15qtz7h` 是我們所稱的 _建置 ID_。雖然這些檔案在邊緣節點和使用者裝置上很容易快取，但在重新建置應用程式後，建置 ID 會改變，導致所有快取失效。
+
+對大多數專案來說，這種取捨是可以接受的，但我們希望進一步優化此行為，讓未變更的頁面不再使瀏覽器快取失效。
+
+[Next.js 9.2 中與 Google Chrome 團隊合作開發的改進程式碼分割策略](https://nextjs.org/blog/next-9-2#improved-code-splitting-strategy)為這些 Next.js 頁面套件生成的改進奠定了基礎。
+
+從 Next.js 9.5 開始，**所有頁面的 JavaScript 套件將使用內容雜湊值而非建置 ID**。這使得在部署之間未變更的頁面可以保留在瀏覽器和邊緣快取中，無需重新下載。
+
+相比之下，這些變更後的 URL 模式如下所示：
+
+```
+/_next/static/chunks/pages/about.qzfS4o5gIEXRME6sTEahL.js
+```
+
+`qzfS4o5gIEXRME6sTEahL` 部分不再是全域建置 ID，而是 `about.js` 套件的確定性雜湊值，只要該部分站點程式碼未變更，它就會保持穩定。此外，**現在它會透過 `Cache-Control: public,max-age=31536000,immutable` 在重新部署時長期快取**，這是 Next.js 自動為您設定的。
+
+[快速刷新 (Fast Refresh) 增強功能](#fast-refresh-enhancements)
+-------------------------------------------------------
+
+我們在 [Next.js 9.4 中引入了快速刷新](https://nextjs.org/blog/next-9-4#fast-refresh)，這是一種新的熱重載體驗，可讓您在編輯 React 元件時立即獲得反饋。
+
+Next.js 9.5 進一步完善了我們的快速刷新實現，並提供了您所需的工具：
+
+*   **易於理解的錯誤**：所有編譯和運行時錯誤都已更新為[僅顯示相關資訊，包括導致錯誤的程式碼框架](https://twitter.com/timer150/status/1263689549898829829)。
+*   **保留元件狀態的開發提示**：Next.js 現在提供有用的提示，確保在盡可能多的情況下，快速刷新能保留您的元件狀態。Next.js 提供的每個提示都是**完全可操作的**，並附有前後範例！
+*   **元件狀態重置時的警告**：當 Next.js 無法在檔案編輯後保留元件狀態時，我們現在會打印詳細警告。此警告將幫助您診斷專案為何必須重置元件狀態，讓您能修復問題並充分發揮快速刷新的潛力。
+*   **新文件**：我們[添加了詳細的文件](/docs/architecture/fast-refresh)，解釋什麼是快速刷新、它的工作原理以及預期行為！該文件還將通過解釋其錯誤恢復機制，教您如何更好地利用快速刷新。
+*   **使用者程式碼疑難排解指南**：新文件還包含[常見疑難排解步驟和提示](/docs/architecture/fast-refresh#tips)，指導您如何在開發中充分利用快速刷新。
+
+[生產環境 React 效能分析](#production-react-profiling)
+---------------------------------------------------------
+
+React 之前引入了[效能分析 API](https://github.com/reactjs/rfcs/pull/51)，可讓您追蹤 React 元件中的效能問題。雖然此功能在開發環境中自動運作，但在生產環境中分析需要使用單獨版本的 ReactDOM。
+
+從 Next.js 9.5 開始，您現在可以在 `next build` 中使用 `--profile` 標記**啟用 React 的生產環境效能分析**：
+
+```
+next build --profile
+```
+
+之後，您可以像在開發環境中一樣使用效能分析工具。
+
+要了解更多關於 React 效能分析的資訊，您可以閱讀[React 團隊關於 React Profiler 的文章](https://reactjs.org/blog/2018/09/10/introducing-the-react-profiler.html)。特別感謝 [TODOrTotev](https://github.com/TodorTotev) 和 [@darshkpatel](https://github.com/darshkpatel) 貢獻此功能。
+
+[可選的全域捕捉路由](#optional-catch-all-routes)
+-------------------------------------------------------
+
+Next.js 9.2 新增了[對全域捕捉動態路由的支援](https://nextjs.org/blog/next-9-2#catch-all-dynamic-routes)，這些路由已被社群廣泛採用於各種用例。全域捕捉路由讓您能靈活地建立由 Headless CMS、GraphQL API、檔案系統等驅動的高度動態路由結構。
+
+在聽取回饋後，我們了解到使用者希望有更多靈活性來_匹配路由的最頂層級別_。今天，我們很高興為這些進階場景推出**可選的全域捕捉動態路由**。
+
+要建立可選的全域捕捉路由，您可以使用 `[[...slug]]` 語法建立頁面。
+
+例如，`pages/blog/[[...slug]].js` 將匹配 `/blog`，以及其下的任何路由，例如：`/blog/a`、`/blog/a/b/c` 等。
+
+與全域捕捉路由一樣，`slug` 將作為路徑部分的陣列提供在[路由查詢物件](/docs/pages/api-reference/functions/use-router#router-object)中。因此，對於路徑 `/blog/foo/bar`，查詢物件將是 `{ slug: ['foo', 'bar'] }`。對於路徑 `/blog`，查詢物件將省略 slug 鍵：`{ }`。
+
+您可以在[我們的文件中了解更多關於可選全域捕捉路由的資訊](/docs/pages/building-your-application/routing/dynamic-routes#optional-catch-all-routes)。
+
+[Webpack 5 支援（測試版）](#webpack-5-support-beta)
+---------------------------------------------------
+
+Webpack 5 目前處於測試階段。它包含一些重大改進：
+
+*   [改進的 Tree-Shaking](https://github.com/webpack/changelog-v5#nested-tree-shaking)：嵌套導出、內部模組和 CommonJS 都能被 tree shaken
+*   [持久快取](https://github.com/webpack/changelog-v5#persistent-caching)：允許重用先前建置的工作
+*   [確定的 chunk 和模組 ID](https://github.com/webpack/changelog-v5#deterministic-chunk-and-module-ids)：解決 webpack 模組 ID 在建置之間變更的情況
+
+我們很高興今天宣布 Next.js 對 webpack 5 的測試版支援。
+
+要試用 webpack 5，您可以在 `package.json` 中使用 [Yarn resolutions](https://classic.yarnpkg.com/en/docs/selective-version-resolutions/)：
+
+```json filename="package.json"
+{
+  "resolutions": {
+    "webpack": "^5.0.0-beta.30"
+  }
+}
+```
+
+Webpack 5 測試版已經在生產環境中部署到 [nextjs.org](http://nextjs.org) 和 [vercel.com](https://vercel.com)。我們鼓勵您逐步試用並在 [GitHub](https://github.com/vercel/next.js/issues/13341) 上回報您的發現。
+
+### [編譯基礎架構改進](#compilation-infrastructure-improvements)
+
+為了支援 webpack 5，我們重寫了大量編譯管線，使其更適合 Next.js：
+
+*   Next.js 不再依賴 `webpack-hot-middleware` 和 `webpack-dev-middleware`，而是直接使用 webpack 並針對 Next.js 專案進行優化。這轉化為更簡單的架構和更快的開發編譯。
+*   [On-demand-entries](https://nextjs.org/blog/next-8#improved-on-demand-entries)（Next.js 在開發期間根據您訪問的頁面進行編譯的系統）也已重寫，現在通過利用專門為我們用例量身定制的新 webpack 行為，變得更加可靠。
+*   [React 快速刷新和 Next.js 錯誤覆蓋](https://nextjs.org/blog/next-9-4#fast-refresh)現在完全兼容 webpack 5
+*   磁碟快取將在未來的測試版中啟用。
+
+### [向後兼容性](#backwards-compatibility)
+
+我們始終致力於確保 Next.js 與先前版本向後兼容。
+
+Webpack 4 將繼續獲得完全支援。我們正與 webpack 團隊密切合作，確保從 webpack 4 遷移到 5 的過程盡可能順利。
+
+如果您的 Next.js 專案沒有自訂 webpack 配置，則無需任何專案變更即可充分利用 webpack 5。
+
+**重要提示：**如果您的專案有[自訂 webpack 配置](/docs/pages/api-reference/next-config-js/webpack)，可能需要進行一些變更才能過渡到 webpack 5。我們建議您密切關注我們的遷移說明，或完全減少對 webpack 擴充功能的使用，以實現無縫的未來升級。
+
+### [macOS 上的改進檔案監視](#improved-file-watching-on-macos)
+
+我們最近發現 webpack 的一個問題：在 macOS 上，檔案監視會在對程式碼進行幾次變更後停止。您必須手動重新啟動專案才能再次看到更新。幾次變更後，這個循環會重複。
+
+此外，我們發現這個問題不僅發生在 Next.js 專案中，還發生在所有基於 webpack 的專案和框架中。
+
+經過幾天的除錯，我們追蹤到問題的根本原因是 webpack 使用的檔案監視實現 chokidar，這是 Node.js 生態系統中廣泛使用的檔案監視實現。
+
+我們向 chokidar 發送了一個[修補程式](https://github.com/paulmillr/chokidar/pull/1018)來解決這個問題。在修補程式發布後，我們與 [Tobias Koppers](https://github.com/sokra) 合作，在[新的 webpack 版本](https://github.com/webpack/webpack/releases/tag/v4.44.0)中推出此修補程式。
+
+當您升級到 Next.js 9.5 時，會自動使用這個修補過的 webpack 版本。
+
+[結論](#conclusion)
+-------------------------
+
+我們很高興看到 Next.js 的持續成長：
+
+*   我們已有超過 **1,200** 位獨立貢獻者**，**自 9.4 版本以來新增了超過 **135** 位新貢獻者。
+*   在 GitHub 上，該專案已獲得超過 **51,100** 次星標。
+
+加入 Next.js 社群，參與 [GitHub Discussions](https://github.com/vercel/next.js/discussions)。Discussions 是一個社群空間，讓您可以與其他 Next.js 使用者聯繫，自由提問或分享您的工作。
+
+例如，您可以從[分享您的專案 URL](https://github.com/vercel/next.js/discussions/10640) 開始。
+
+如果您想回饋但不確定如何做，我們鼓勵您嘗試實驗性功能，例如我們的 Webpack 支援，並回報您的發現！
+
+### [致謝](#credits)
+
+我們感謝我們的社群，包括所有幫助塑造此版本的外部回饋和貢獻。
+
+特別感謝長期 Next.js 社群成員 [Jan Potoms](https://github.com/janpot)，他為此版本的多個功能做出了貢獻。
+
+特別感謝 webpack 的作者 [Tobias Koppers](https://twitter.com/wsokra)，他幫助在 Next.js 中實現了 webpack 5 的支援。
+
+此版本由以下貢獻者共同完成：@chandan-reddy-k, @Timer, @aralroca, @artemisart, @sospedra, @prateekbh, @Prioe, @Janpot, @merceyz, @ijjk, @PavelK27, @marbiano, @MichelleLucero, @thorsten-stripe, @TODOrTotev, @Skn0tt, @lfades, @timneutkens, @akhila-ariyachandra, @chibicode, @rafaelalmeidatk, @kirill-konshin, @jamesvidler, @JeffersonBledsoe, @tylev, @jamesmosier, @filipemarins, @Remeic, @vvo, @timothyis, @jazibsawar, @coetry, @adam-zacharski, @danwilliams, @tywmick, @matamatanot, @goldins, @mvllow, @its-tayo, @sshyam-gupta, @wilbert-abreu, @sebastianbenz, @jaydenseric, @developit, @dylanjha, @darshkpatel, @spinks, @stefanprobst, @moh12594, @jasonmerino, @cristiand391, @HyunSangHan, @mcsdevv, @M1ck0, @hydRAnger, @alexej-d, @valmassoi, @motleydev, @eKhattak, @jpedroschmitz, @JerryGoyal, @bowen31337, @phillip055, @balazsorban44, @chuabingquan, @youhosi, @andresz1, @bell-steven, @areai51, @Wssn, @ndom91, @anthonyshort, @zxzl, @jbowes, @IamLizu, @PascalPixel, @ralphilius, @ysun62, @muslax, @elsigh, @AsherFoster, @botv, @tomdohnal, @christianalfoni, @tomasztunik, @gsimone, @illuminist, @jplew, @OskarKaminski, @RickyAbell, @steph-query, @ericgoe, @MalvinJay, @cristianbote, @Ashikpaul, @jensmeindertsma, @amorriscode, @abhik-b, @awareness481, @LukasPolak, @arvigeus, @romMidnight, @jackyef, @drumm2k, @kuldeepkeshwar, @bogy0, @Belco90, @wawjr3d, @tanmaylaud, @SarKurd, @kevinsproles, @dstotijn, @styfle, @blackwright, @BrunoBernardino, @heyAyushh, @Necmttn, @TrySound, @obedparla, @NyashaNziramasanga, @tonyspiro, @kukicado, @ceorourke, @MehediH, @robintom, @karlhorky, 和 @tcK1!

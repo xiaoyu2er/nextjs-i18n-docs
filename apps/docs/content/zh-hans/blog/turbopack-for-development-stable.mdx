@@ -1,0 +1,253 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:23:31.145Z
+title: Turbopack 开发模式现已稳定
+description: 经过漫长的道路，我们很高兴地宣布 `next dev --turbo` 现已稳定，准备好为您的开发体验提速。
+author:
+  - name: Maia Teegarden
+    image: /static/team/maia.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2024-10-21T16:50:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-for-development-stable/twitter-card.png
+---
+
+经过漫长的等待，我们很高兴地宣布 `next dev --turbo` 现已稳定，准备好为您的开发体验提速。我们已在 [vercel.com](http://vercel.com)、[nextjs.org](http://nextjs.org)、[v0](https://v0.dev) 等所有应用中进行了实践验证，效果显著。
+
+自 8 年前发布以来，Next.js 已被用于构建从周末兴趣项目到复杂企业级应用的各种场景。在 Next.js 最初发布时，webpack 显然是框架打包基础的最佳选择，但随着时间的推移，它已难以满足现代 Web 开发者的需求。我们的社区开始痛苦地发现：等待路由加载、代码变更生效和生产构建部署的过程变得异常缓慢。
+
+我们投入了大量[时间](/blog/next-12#faster-builds-and-fast-refresh-with-rust-compiler)和[精力](/blog/next-13-5#improving-startup-and-fast-refresh-time)优化 webpack，但在某个节点，我们意识到投入产出比已不再理想。我们需要一个能支撑现有 Next.js 生产应用的新基础，同时为未来创新（如 React 服务端组件）做好准备。
+
+以下是新打包工具的核心需求：
+
+*   最小化破坏性变更
+*   同时支持应用路由 (App Router) 和页面路由 (Pages Router)
+*   为各种规模代码库提供更快的编译速度
+*   开发环境构建需贴近生产环境
+*   支持高级生产优化（如模块内的摇树优化）
+*   模块图谱需支持 Node.js 和浏览器等多环境
+*   为维护者和高级用户提供完整的可观测性
+
+我们评估了当时所有现有方案，发现它们都存在与我们的目标和需求不匹配的权衡。因此我们决定从零开始构建专为 Next.js 量身定制的解决方案——这就是 Turbopack 的诞生动机。
+
+我们首先优化了开发体验，这也是本次发布的稳定版核心。通过在 Vercel 内部应用中深度使用 Turbopack，我们显著提升了开发迭代速度。以大型 Next.js 应用 `vercel.com` 为例：
+
+*   本地服务启动速度 **最高提升 76.7%**
+*   Fast Refresh 代码更新速度 **最高提升 96.3%**
+*   无缓存时的初始路由编译速度 **最高提升 45.8%**（Turbopack 暂未实现磁盘缓存）
+
+本文将深入解析这些性能提升的实现原理，同时明确本次发布的具体内容，并展望后续路线图。
+
+[核心亮点](#highlights)
+-------------------------
+
+### [更快的路由初始编译](#faster-initial-compile-of-a-route)
+
+社区反馈最强烈的问题之一是开发环境下路由加载过慢，这源于 webpack 的编译速度瓶颈。虽然 Next.js 采用按需编译路由的策略来降低初始启动时间和内存占用，但单页面加载时的等待仍令人焦躁。
+
+客观而言，webpack 等打包工具底层承担了大量工作。首次编译路由时，打包器从 "入口点"（Next.js 中即 `page.tsx` 及其相关文件如 `layout.tsx`、`loading.tsx` 等）开始解析，通过 `import` 语句构建模块依赖图。这个图谱不仅包含 TypeScript/JavaScript 模块（含 `node_modules`），还涉及 CSS 文件和 `next/image` 的静态资源。
+
+模块收集完成后，打包器将其编译为 JavaScript "chunk"。webpack 的局限在于无法为多环境生成统一模块图，导致 Next.js 必须分别运行服务端和浏览器端两个编译器，存在重复解析等开销。
+
+Turbopack 通过引入目标 "转换"机制解决了这个问题。它允许标记服务端与浏览器环境间的模块转换，从而高效处理服务端组件与客户端组件的混合场景。此外，Turbopack 基于 Rust 构建，天生支持多核并行处理，而 webpack 仅能通过 SWC 实现有限并行化。
+
+在 `vercel.com` 这类大型应用中，Turbopack 的初始编译速度相比 webpack 方案 **最高提升 45.8%**。
+
+### [更快的 Fast Refresh](#faster-fast-refresh)
+
+Fast Refresh（又称热模块替换 HMR）是打包器用于实时更新浏览器当前路由的系统。当 JavaScript 模块超过 30,000 个时，webpack 的更新处理会产生至少 1 秒的固定开销——即使只是修改 CSS 颜色这类微小变更。
+
+这种性能表现无法接受。我们认为增量构建应该只与变更规模相关，而非应用整体大小。Turbopack 通过底层 [Turbo Engine](https://nextjs.org/docs/app/api-reference/turbopack) 实现了细粒度的工作重计算架构，使得 Fast Refresh 速度与变更规模成正比。在 `vercel.com` 等大型应用中，代码更新速度 **最高提升 96.3%**。
+
+### [高级追踪系统](#advanced-tracing)
+
+随着 Next.js 的广泛采用，编译器性能和内存问题的复现变得愈发困难。为此，我们在 Turbopack 中设计了原生插装层，可以记录每个函数的执行时间和内存分配情况。这些追踪数据被写入 `.next` 目录，不包含业务代码，只记录文件路径和处理耗时。
+
+我们还开发了专用的追踪查看器，用于分析性能瓶颈和内存使用情况。虽然主要面向深度技术调查场景，但您现在可以通过[这些指令](/docs/canary/architecture/turbopack#generating-trace-files)生成追踪文件，并使用 `next internal turbo-trace-server` 启动分析服务。[观看视频演示](https://www.youtube.com/watch?v=PGO2szAye7A&t=1s)
+
+### [更稳定的编译耗时](#less-flakiness-in-compile-times)
+
+webpack 的编译时间往往存在较大波动。Turbopack 的底层架构确保了编译耗时差异控制在个位数百分比，为持续优化提供了稳定基准。
+
+### [贴近生产的开发构建](#development-builds-that-closely-match-production)
+
+webpack 方案中，我们不得不接受开发与生产环境的某些差异：例如通过 `style-loader` 注入样式会导致无样式内容闪现 (FOUC)，使用 `eval-source-map` 使调试变得困难。Turbopack 默认生成独立 CSS 文件和[分段源映射 (sections sourcemaps)](https://tc39.es/source-map/#index-map)，既保持开发体验又贴近生产行为。
+
+[稳定版发布](#our-first-stable-release)
+-----------------------------------------------------
+
+两年前，我们随 Next.js 13 首次发布 Turbopack alpha 版。虽然初期结果喜人，但仅支持基础功能。过去一年我们集中实现了缺失的 Next.js 特性，并基于社区反馈专注优化 `next dev` 体验。到去年 Next.js 大会时，90% 的开发测试已通过，Vercel 内部已全面采用 Turbopack。
+
+今年四月发布的 Next.js 14.2 已通过 99.8% 的测试，随后很快达到 100%。我们解决了 npm 包兼容性、Fast Refresh 和错误定位等关键问题。虽然稳定之路漫长，但这源于 Next.js 6,599 个开发测试的严苛要求，以及 Turbopack 全新架构带来的挑战。
+
+现在，Turbopack 已通过所有测试，兼容主流 npm 包，并吸收了早期用户的反馈，我们正式宣布其达到稳定状态。
+
+### [什么是稳定版本？](#什么是稳定版本)
+
+过去这一点曾引发过一些困惑，因此我们将通过本节为 Next.js 社区明确本次发布的内容。
+
+本次发布特别将 `next dev --turbo` 命令标记为稳定版本。生产环境构建 (`next build --turbo`) 尚未支持，但请继续阅读以获取相关进展更新。我们最终计划在 Next.js 之外发布 Turbopack 的独立版本，但首先希望通过提升 Next.js 社区的体验来证明其价值。
+
+除了下一节将介绍的不支持功能外，Turbopack 应兼容 Next.js 的所有稳定功能。需要明确的是，Turbopack 同时支持应用路由 (App Router) 和页面路由 (Pages Router)。实验性功能可能无法与 Turbopack 兼容，但当它们被标记为稳定时，必定会得到支持。
+
+如果您的应用程序进行了 webpack 定制但仅添加了 webpack 加载器 (loader)，您或许已能通过为 Turbopack 配置加载器来使用它。可查阅 [Turbopack 中的 webpack 加载器支持文档](/docs/canary/app/api-reference/next-config-js/turbo#webpack-loaders)。
+
+以下是已验证可与 Turbopack 兼容的 webpack 加载器列表：
+
+*   `@svgr/webpack`
+*   `babel-loader`
+*   `url-loader`
+*   `file-loader`
+*   `raw-loader`
+*   `tsconfig-paths-webpack-plugin` — 开箱即用，无需插件。
+*   大多数其他加载器也能工作，因为我们支持 webpack 加载器 API 的子集。
+
+大多数 CSS 和 CSS-in-JS 库已获支持：
+
+*   已支持
+    *   Tailwind CSS
+    *   @emotion/react
+    *   Sass
+    *   styled-components
+    *   Bootstrap
+    *   Antd
+    *   node-sass
+    *   JSS
+    *   Emotion
+    *   theme-ui（使用 Emotion）
+    *   @chakra-ui/core（搭配 Emotion）
+    *   aphrodite
+*   当前不支持
+    *   Less — 可添加 less-loader。使用 webpack 的 Next.js 本身也不原生支持 Less。
+    *   @vanilla-extract/css — 使用自定义 webpack 插件 — 我们未来将研究支持所需钩子的方案。
+    *   StyleX — 需要 Babel 转换和 `data:` 属性支持 — 我们计划在 `next build --turbo` 稳定后支持 StyleX。
+
+### [性能表现](#性能表现)
+
+需要特别说明的是，当前发布版本的性能已显著优于 webpack，但这并非最终性能数据。我们一直遵循 Kent Beck 的著名公式："先实现，再优化，最后加速"。迄今为止，我们大部分精力都投入在"实现"阶段，因为需要追赶已发展近十年的 Next.js 和 webpack 的成熟生态。
+
+Turbopack 高度依赖其缓存基础设施，但正如您所知，缓存是软件开发中两大难题之一。经验告诉我们，在未明确为缓存设计的架构中添加缓存可能导致不良结果，因此我们甚至为最细粒度的函数启用了缓存。这意味着重建速度极快，但代价是冷启动构建和内存使用量增加，我们正在努力寻求更好的平衡。妙处在于，可以利用前文提到的高级追踪功能来发现效率低下的环节，并分析哪些函数最值得缓存。
+
+过去三个月，我们已取得显著改进。比较 [Next.js 15 RC 2](/blog/next-15-rc2) 与 [15 RC 1](/blog/next-15-rc) 中的 Turbopack 可看出优化效果：
+
+*   **内存** 使用量平均减少 25-35%
+*   对于包含数千个模块的大型页面，**初始编译** 速度提升 30-50%
+
+稳定版 Turbopack 包含内存缓存，但每次重启开发服务器时需重建缓存，对于大型应用可能需要十秒以上。我们特别兴奋的是，在测试磁盘持久缓存时看到了巨大收益，后文将详细介绍。
+
+### [重大变更](#重大变更)
+
+构建自有打包器的核心动机是需要尽可能匹配 webpack 的现有行为，这是当时任何现有解决方案都无法保证的。这包括文件解析方式以及 webpack 的细粒度功能，例如某些 npm 包使用的 [`webpackIgnore` 注释](https://webpack.js.org/api/module-methods/#magic-comments)。
+
+遗憾的是，为保障 Turbopack 及相关 Next.js 实现的未来兼容性，我们不得不移除部分功能。这些功能在使用 webpack 时仍受支持。
+
+以下是主要变更点及其原因：
+
+**不支持 `webpack()` 配置**。Turbopack 不是 webpack，其配置选项结构不同，但支持许多相同功能。具体而言，我们已实现 [webpack 加载器](/docs/app/api-reference/next-config-js/turbo#webpack-loaders) 和 [解析别名](/docs/app/api-reference/next-config-js/turbo#resolve-aliases) 的支持。大多数用于代码转换的 webpack 加载器可开箱即用。某些特殊用途的加载器（如 webpack 子编译器和文件生成）则不受支持。
+
+**`.babelrc` 不会自动转换代码**。Turbopack 默认使用 [SWC](/docs/architecture/nextjs-compiler#why-swc)。您仍可按需添加 `babel-loader`，但我们确保默认配置始终快速且架构合理。即使配置了 `.babelrc`，我们也必须运行 SWC 以处理其他优化，这类似于 webpack 必须运行 `acorn` 解析器进行深度优化。如果在 Turbopack 中使用 SWC 而非 Babel，我们可以解析一次并全程利用相同的抽象语法树 (AST)。
+
+**部分较少使用的 CSS Modules 功能**。我们已将 CSS 处理从 PostCSS 切换至 [Lightning CSS](https://lightningcss.dev/)。这是一个速度显著提升的 CSS 编译器，原生支持 CSS 转换、压缩和 CSS Modules。代价是一些较少使用的功能不再支持，具体包括 `:global` 和 `:local` 伪选择器（其函数变体 `:global()` 和 `:local()` 仍有效）、`@value` 以及 `:import / :export` ICSS 规则。此外，其语法检查比其他 CSS 解析器更严格，会直接指出代码错误而非忽略。
+
+在集成 Lightning CSS 过程中，我们回馈了该项目。例如实现了 CSS Modules 的细粒度选项，可禁用 CSS 网格前缀和 CSS Modules 的 `pure` 模式。这使得从 webpack 的 css-loader 迁移至 Lightning CSS 更为容易。我们还改进了对不支持功能的错误提示。
+
+感谢 Lightning CSS 的作者和维护者 [Devon Govett](https://x.com/devongovett) 持续的项目协作。
+
+**实验性功能**。由于我们专注于 Turbopack 在 Next.js 中的稳定性，决定优先支持 Next.js 中的稳定功能。
+
+完整列表请参阅 [文档页](/docs/canary/architecture/turbopack#unsupported-features)。
+
+[路线图](#路线图)
+-----------------
+
+Turbopack 已取得长足进展，但仍有大量工作待完成。即将推出的两大亮点功能是持久缓存和生产构建。我们预计的发布顺序如下：
+
+*   持久缓存 — 未来小版本
+*   构建测试版 — 未来小版本
+*   构建候选版 — 未来小版本
+*   构建稳定版 — 未来小版本
+*   在 create-next-app 中推荐用于新应用 — 未来小版本
+*   当无自定义 webpack 配置时作为 Next.js 默认选项 — 未来大版本
+
+虽然 webpack 仍将保留在 Next.js 中，但我们预计由于 Turbopack 的优势，大多数 Next.js 应用会选择使用它。待生产构建功能完成后，我们将开始支持常用 webpack 插件。
+
+关于 Turbopack 的长期规划尚不明确，我们希望本文仅聚焦于可预见的未来能稳定交付的内容。虽然只提及两项功能，但其背后涉及大量工作，值得深入探讨。
+
+### [持久缓存（跨重启的快速刷新）](#持久缓存跨重启的快速刷新)
+
+持久缓存意味着将编译器完成的工作存储起来，使其可在开发服务器重启或多轮生产构建间复用。
+
+简言之，Turbopack 避免重复相同工作，即使您重启服务。
+
+如"更快的快速刷新"部分所述，我们构建 [Turbo 引擎](https://nextjs.org/docs/app/api-reference/turbopack) 以确保工作可并行化和缓存，使得文件变更时只需运行相关任务。设想将这种体验扩展到重启场景和路由打开时：无需重复之前开发会话中已完成的工作；设想将快速刷新的优势扩展到之前会话编译的路由和多次 `next build` 构建中。
+
+这正是我们正在开发的：为 [Turbo 引擎](https://nextjs.org/docs/app/api-reference/turbopack) 新增存储层，支持将编译工作持久化到磁盘，并在重启开发服务器或再次构建时恢复。
+
+虽然 Next.js 中 webpack 默认启用了磁盘缓存，但其存在诸多限制。值得注意的是，大部分缓存需从磁盘恢复并读入内存才能工作，且缓存粒度始终不足。例如在 Vercel 的大型应用中，我们发现当 webpack 磁盘缓存增长到一定规模时，其性能甚至可能不如完全重新构建。
+
+与现有 webpack 磁盘缓存不同，Turbopack 的持久缓存真正实现了跨重启的快速刷新体验。首次编译需要 10 秒以上的路由，一旦缓存后从缓存恢复只需不到 500 毫秒。
+
+在 `next build` 使用 Turbopack 时也观察到类似效果：仅重新编译变更文件，其余保持不变。这将 `next build` 各阶段的主要耗时从编译打包转为运行 TypeScript 类型检查。
+
+持久缓存目前仍在开发中，我们希望先通过内部 Next.js 应用验证。初步结果非常乐观，随着持续优化关键路径，性能还将进一步提升。
+
+稳定后将默认启用持久缓存，无需修改代码库即可享受其优势。
+
+如有兴趣参与测试，欢迎联系我们！
+
+### [生产构建](#生产构建)
+
+很高兴分享我们在 Turbopack 生产构建稳定化方面取得重大进展。目前 96% 的生产测试已通过，这是重要里程碑。但在大规模生产环境推荐使用前，仍有部分领域需要完善。
+
+相比开发环境，生产构建面临独特挑战，我们正积极应对。下面将介绍已优化的领域和仍在进行的工作。
+
+### [生产优化](#生产优化)
+
+### [正确性](#正确性)
+
+确保正确性对可靠的生产构建至关重要。当前状态如下：
+
+*   **CSS 分块**：进行中。此功能对拆分 CSS 至小模块至关重要，确保仅加载必要 CSS 并保持规则顺序。
+*   **生产环境 JS 运行时**：已完成。确保 JavaScript 运行时在生产环境中表现符合预期。
+*   **基于内容的文件名哈希**：尚未实现。通过内容生成文件名可实现更高效的浏览器长期缓存。
+
+### [用户体验性能优化](#ux-performance-optimizations)
+
+用户体验性能是实现快速加载和高效资源利用的关键。以下是我们的工作进展：
+
+*   **JS 代码压缩**：已完成。我们实现了 SWC 压缩工具，Next.js 从 13 版本开始已在 webpack 中使用该工具。
+*   **CSS 代码压缩**：已完成。采用 Lightning CSS 进行样式表压缩，这对减小样式文件体积至关重要。
+*   **全局信息（全应用优化）**：已完成。Turbopack 可实施需要了解应用中所有路由信息的优化策略，例如模块 ID 哈希处理。
+*   **Tree Shaking（摇树优化）**：部分完成。目前支持部分摇树优化功能，可帮助消除未使用代码并减小包体积，但以下场景尚未完全支持：
+    *   **动态导入**：对 `next/dynamic` 等动态导入方式的摇树优化有限
+    *   **复杂导出**：特定导出类型，如 `export { foo as "string name" }`
+    *   **非 ES 模块**：CommonJS 模块无法进行摇树优化
+    *   **Barrel 文件**：通过 barrel 文件进行的重导出效率较低，且存在跳过无副作用模块的限制
+    *   **代码碎片化**：某些情况下摇树优化会产生过多碎片，导致包体积效率降低
+*   **模块 ID 哈希（部分支持）**：进行中。当前部分实现了模块 ID 哈希功能，我们正在优化其性能。完全启用后将有效减小最终包体积。
+*   **导出名称混淆**：进行中。通过缩短导出名称来减小最终包体积。
+*   **作用域提升**：尚未实现。该功能将通过合并小型 JavaScript 模块至单一作用域来减小包体积，降低开销并提升性能。
+*   **生产环境 JS 分块优化**：尚未实现。通过 JavaScript 分块来最小化重复代码，这对提升大型应用的加载性能至关重要。
+
+[敬请期待](#stay-tuned)
+-------------------------
+
+我们很高兴能自信地向您推荐 `next dev --turbo` 命令，期待听到它对您开发体验的提升效果。立即试用，亲身体验性能提升。
+
+这只是个开始——持久化缓存和生产环境构建功能即将推出，这将为您的开发流程带来更快的速度和更高的可靠性。
+
+随着我们不断完善功能并优化性能以无缝支持大型应用，我们将持续分享最新进展。请继续关注未来版本更新，我们将努力使 Turbopack 成为开发和生产构建的最佳解决方案。
+
+[贡献者](#contributors)
+-----------------------------
+
+我们衷心感谢数千名开发者在 Turbopack 测试版和候选版阶段参与测试、提交问题报告和验证修复方案。
+
+本次发布的功臣包括：
+
+*   **Turbopack** 团队：[Alex](https://github.com/arlyon)、[Benjamin](https://github.com/bgw)、[Donny](https://github.com/kdy1)、[Justin](https://github.com/jridgewell)、[Leah](https://github.com/forsakenharmony)、[Maia](https://github.com/padmaia)、[Niklas](https://github.com/mischnic)、[OJ](https://github.com/kwonoj)、[Tim](https://github.com/timneutkens)、[Tobias](https://github.com/sokra) 和 [Will](https://github.com/wbinnssmith)
+*   **Next.js** 团队：[Andrew](https://github.com/acdlite)、[Hendrik](https://github.com/unstubbable)、[Janka](https://github.com/lubieowoce)、[Jiachi](https://github.com/huozhi)、[Jimmy](https://github.com/feedthejim)、[Jiwon](https://github.com/devjiwonchoi)、[JJ](https://github.com/ijjk)、[Josh](https://github.com/gnoff)、[Sam](https://github.com/samcx)、[Sebastian](https://github.com/sebmarkbage)、[Sebbie](https://github.com/eps1lon)、[Shu](https://github.com/shuding)、[Wyatt](https://github.com/wyattjoh) 和 [Zack](https://github.com/ztanner)
+*   **Next.js 文档**团队：[Delba](https://github.com/delbaoliveira)、[Rich](https://github.com/molebox)、[Ismael](https://github.com/ismaelrumzan) 和 [Lee](https://github.com/leerob)
