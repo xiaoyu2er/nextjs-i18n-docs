@@ -1,5 +1,12 @@
+import path from 'node:path';
 export const BLOG_INDEX_URL = 'https://nextjs.org/blog';
 export const NEXT_JS_URL = 'https://nextjs.org';
+
+export const CONTENT_DIR = path.join(
+  import.meta.filename,
+  '../../../..',
+  'apps/docs/content/en',
+);
 
 export const userAgents = [
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -23,4 +30,10 @@ export const headers = {
   'upgrade-insecure-requests': '1',
   cookie:
     '__cf_bm=Jx6axE9.9fCxMvkXAMKQH2leCY3QDw8_UUjHWutsStE-1705958633-1-AeQiu1fCUYPAIzNQgyelbRDvALpIMeIURdJf0cJUxO4l0kwnvpvBMiC1TjNsUWMEWCxqRdJfYY9o1pD9vYPCgXY=; _ga=GA1.2.1698023326.1705958634; _gid=GA1.2.33889270.1705958634',
+};
+
+export const crawlerOptions = {
+  maxConnections: 10,
+  userAgents: userAgents,
+  headers: headers,
 };

@@ -1,5 +1,7 @@
 console.log('Crawler package initialized');
 
-import { main } from './blog';
+import { main as blog } from './blog';
+import { main as learn } from './learn';
 
-await main();
+await blog();
+await learn();
