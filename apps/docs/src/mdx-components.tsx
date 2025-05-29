@@ -30,3 +30,15 @@ export function getBlogMDXComponents(
     ...components,
   };
 }
+
+export function getLearnMDXComponents(
+  components?: MDXComponents,
+): MDXComponents {
+  return {
+    ...defaultMdxComponents,
+    Image: BlogImage,
+    // biome-ignore lint/a11y/useAltText: <explanation>
+    img: (props) => <img {...props} />,
+    ...components,
+  };
+}

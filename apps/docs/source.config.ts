@@ -7,8 +7,11 @@ import {
 } from 'fumadocs-mdx/config';
 import { z } from 'zod';
 
+import { transformerMetaHighlight } from '@shikijs/transformers';
+
 import { addMdxContent } from '@/lib/remark-plugins/remark-add-content';
 import { convertCodeMeta } from '@/lib/remark-plugins/remark-convert-code-meta';
+import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
 
 const asyncMode = process.env.MDX_ASYNC === 'true';
 if (!asyncMode && process.env.NODE_ENV === 'development') {
@@ -58,9 +61,29 @@ export const blog = defineCollections({
   }),
 });
 
+export const learn = defineDocs({
+  dir: `content/${process.env.LOCALE}/learn`,
+  docs: {
+    async: asyncMode,
+    schema: frontmatterSchema.extend({
+      image: z.string().url().optional(),
+      headline: z.string().optional(),
+    }),
+  },
+});
+
 export default defineConfig({
   mdxOptions: {
     remarkImageOptions: false,
+    rehypeCodeOptions: {
+      ...rehypeCodeDefaultOptions,
+      transformers: [
+        ...(rehypeCodeDefaultOptions.transformers
+          ? rehypeCodeDefaultOptions.transformers
+          : []),
+        transformerMetaHighlight(),
+      ],
+    },
     remarkPlugins: (v) => [convertCodeMeta, addMdxContent, ...v],
   },
 });

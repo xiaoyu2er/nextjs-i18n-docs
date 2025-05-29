@@ -1,6 +1,6 @@
-import { DocsLayout } from '@/components/layout';
+import { DocsLayout } from '@/app/docs/[[...slug]]/docs.layout';
+import { getPage } from '@/lib/docs';
 import { createMetadata } from '@/lib/metadata';
-import { getPage } from '@/lib/page';
 import { getPageTreePeers } from '@/lib/pageTree';
 import { type Page, type Source, source } from '@/lib/source';
 import { getDocId, getDocUrl, parseDocId } from '@/lib/utils';

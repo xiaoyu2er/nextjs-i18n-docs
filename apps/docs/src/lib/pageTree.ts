@@ -1,6 +1,6 @@
 import type { PageTree } from 'fumadocs-core/server';
 import type { RouterType } from './const';
-import { parseDocId } from './utils';
+import { parseDocId, removeLeadingDigit } from './utils';
 
 /**
  * Get other page tree nodes that lives under the same parent
@@ -143,5 +143,28 @@ export function getDocsLayoutTree(
       }
     }
   }
+  return root;
+}
+
+export function getLearnSidebarTree(
+  tree: PageTree.Root,
+  pathname: string,
+): PageTree.Root {
+  const category = pathname.split('/')[2];
+  const root = cloneRoot(tree);
+  console.log('category', category);
+  for (const node of tree.children) {
+    if (
+      node.type === 'folder' &&
+      node.$id &&
+      removeLeadingDigit(node.$id) === category
+    ) {
+      if (node.index) {
+        root.children.push(node.index);
+      }
+      root.children.push(...node.children);
+    }
+  }
+
   return root;
 }

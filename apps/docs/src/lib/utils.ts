@@ -1,5 +1,9 @@
 import type { Locale } from 'next-intl';
 
+export function removeLeadingDigit(str: string) {
+  return str.replace(/^\d\d-/, '');
+}
+
 /**
  * en/docs/13
  * en/docs/13/app
@@ -126,4 +130,11 @@ export function getDocUrl(slug: string[] | string | undefined) {
     return `/docs/${slug}`;
   }
   return `/docs/${(slug || []).join('/')}`;
+}
+
+export function getLearnUrl(slug: string[] | string | undefined) {
+  if (typeof slug === 'string') {
+    return `/learn/${slug}`;
+  }
+  return `/learn/${(slug || []).join('/')}`;
 }
