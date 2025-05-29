@@ -152,7 +152,6 @@ export function getLearnSidebarTree(
 ): PageTree.Root {
   const category = pathname.split('/')[2];
   const root = cloneRoot(tree);
-  console.log('category', category);
   for (const node of tree.children) {
     if (
       node.type === 'folder' &&
