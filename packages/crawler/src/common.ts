@@ -1,6 +1,8 @@
+import { LANGUAGE_MAP } from '@next-i18n/const';
+import { getFileExtension } from '@next-i18n/utils';
 import TurndownService from 'turndown';
-
 export const CODE_LANGUAGE_SEP = '===CODE_LANGUAGE_SEP===';
+export const CODE_LANGUAGE_SPACE = '===CODE_LANGUAGE_SPACE===';
 
 const turndownService = new TurndownService({
   codeBlockStyle: 'fenced',
@@ -85,21 +87,22 @@ export function modifyCodeBlocks(main: Element) {
           hightlightedLines.push(index + 1); // +1 because line numbers are 1-based
         }
       });
-      let language =
-        fileName.indexOf('.') > -1 ? fileName?.split('.').pop() : 'bash';
-      if (language === 'html') {
-        language = 'jsx'; // Convert HTML to JSX for better compatibility
+      let language = getFileExtension(fileName);
+
+      if (language && LANGUAGE_MAP[language]) {
+        language = LANGUAGE_MAP[language];
+      } else if (fileName && LANGUAGE_MAP[fileName]) {
+        language = LANGUAGE_MAP[fileName];
       }
 
-      const classList = [`language-${language}`];
+      const classList = [`language-${language || 'plaintext'}`];
       if (hightlightedLines.length > 0) {
         classList.push(`{${hightlightedLines.join(',')}}`);
       }
-      const hightlightedLinesString = hightlightedLines.length
-        ? `_{${hightlightedLines.join(',')}}_`
-        : '';
 
-      classList.push(`filename="${fileName}"`);
+      classList.push(
+        `filename="${fileName.replace(/\s/g, CODE_LANGUAGE_SPACE)}"`,
+      );
       codeNode.classList += classList.join(CODE_LANGUAGE_SEP);
     }
   }
@@ -148,5 +151,8 @@ export function modifyImages(main: Element) {
 }
 
 export function convertHtmlToMarkdown(html: string): string {
-  return turndownService.turndown(html).replaceAll(CODE_LANGUAGE_SEP, ' ');
+  return turndownService
+    .turndown(html)
+    .replaceAll(CODE_LANGUAGE_SEP, ' ')
+    .replaceAll(CODE_LANGUAGE_SPACE, ' ');
 }

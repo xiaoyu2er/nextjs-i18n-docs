@@ -1,11 +1,6 @@
+import { LANGUAGE_MAP } from '@next-i18n/const';
 import type { Code, Heading, Paragraph, Root } from 'mdast';
 import { visit } from 'unist-util-visit';
-
-const LANGUAGE_MAP: Record<string, string> = {
-  '.env': 'bash',
-  terminal: 'bash',
-  mjs: 'javascript',
-};
 
 /**
  * Remark plugin that enhances code blocks in the following ways:
