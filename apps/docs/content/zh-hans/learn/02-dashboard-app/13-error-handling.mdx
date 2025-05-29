@@ -1,0 +1,203 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:48:16.866Z
+title: 错误处理
+headline: '应用路由 (App Router)：错误处理'
+description: 使用 error.tsx 和 notFound 优雅地处理错误。
+image: 'https://nextjs.org/api/learn-og?title=Handling%20Errors&amp;chapter=13'
+---
+
+在上一章中，您学习了如何使用服务端操作 (Server Actions) 变更数据。现在让我们看看如何通过 JavaScript 的 `try/catch` 语句和 Next.js 提供的未捕获异常 API 来优雅地处理错误。
+
+[为服务端操作添加 `try/catch`](#adding-trycatch-to-server-actions)
+--------------------------------------------------------------------------
+
+首先，我们为服务端操作添加 JavaScript 的 `try/catch` 语句来实现优雅的错误处理。
+
+如果您熟悉此操作，可以花几分钟更新您的服务端操作代码，或直接复制以下代码：
+
+注意 `redirect` 是在 `try/catch` 块外部调用的。这是因为 `redirect` 的工作原理是通过抛出错误来实现跳转，而这个错误会被 `catch` 块捕获。为了避免这种情况，您可以在 `try/catch` 之后调用 `redirect`。只有当 `try` 执行成功时，才会执行 `redirect` 操作。
+
+我们通过捕获数据库错误并从服务端操作返回友好的错误信息，实现了对这些错误的优雅处理。
+
+如果操作中出现了未捕获的异常会怎样？我们可以通过手动抛出错误来模拟这种情况。例如，在 `deleteInvoice` 操作中，在函数开头抛出一个错误：
+
+```ts {2} filename="/app/lib/actions.ts"
+export async function deleteInvoice(id: string) {
+  throw new Error('删除发票失败');
+ 
+  // 无法到达的代码块
+  await sql`DELETE FROM invoices WHERE id = ${id}`;
+  revalidatePath('/dashboard/invoices');
+}
+```
+
+当您尝试删除发票时，在本地开发环境中会看到这个错误。但在生产环境中，您需要在发生意外情况时向用户展示更友好的错误信息。
+
+这时就需要用到 Next.js 的 [`error.tsx`](https://nextjs.org/docs/app/api-reference/file-conventions/error) 文件。测试完成后，请记得删除这个手动添加的错误，然后再继续下一部分。
+
+[使用 `error.tsx` 处理所有错误](#handling-all-errors-with-errortsx)
+--------------------------------------------------------------------------
+
+`error.tsx` 文件可以为路由段定义一个 UI 边界。它作为未预期错误的**全局捕获**机制，允许您向用户展示备用 UI。
+
+在您的 `/dashboard/invoices` 文件夹中创建一个名为 `error.tsx` 的新文件，并粘贴以下代码：
+
+```tsx filename="/dashboard/invoices/error.tsx"
+'use client';
+ 
+import { useEffect } from 'react';
+ 
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    // 可选：将错误记录到错误报告服务
+    console.error(error);
+  }, [error]);
+ 
+  return (
+    <main className="flex h-full flex-col items-center justify-center">
+      <h2 className="text-center">出错了！</h2>
+      <button
+        className="mt-4 rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-400"
+        onClick={
+          // 尝试通过重新渲染发票路由来恢复
+          () => reset()
+        }
+      >
+        重试
+      </button>
+    </main>
+  );
+}
+```
+
+上述代码有几个需要注意的地方：
+
+*   **"use client"** - `error.tsx` 必须是一个客户端组件 (Client Component)。
+*   它接受两个属性：
+    *   `error`: 这是一个 JavaScript 原生 [`Error`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error) 对象的实例。
+    *   `reset`: 这是一个用于重置错误边界的函数。执行此函数会尝试重新渲染路由段。
+
+当您再次尝试删除发票时，应该会看到以下 UI：
+
+<Image
+  alt="展示所接受属性的 error.tsx 文件"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/error-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/error-page.png"
+  width="960"
+  height="568"
+/>
+
+[使用 `notFound` 函数处理 404 错误](#handling-404-errors-with-the-notfound-function)
+---------------------------------------------------------------------------------------------------
+
+另一种优雅处理错误的方式是使用 `notFound` 函数。`error.tsx` 用于捕获未预期的异常，而 `notFound` 则适用于当您尝试获取不存在的资源时。
+
+例如，访问 [http://localhost:3000/dashboard/invoices/2e94d1ed-d220-449f-9f11-f0bbceed9645/edit](http://localhost:3000/dashboard/invoices/2e94d1ed-d220-449f-9f11-f0bbceed9645/edit)。
+
+这是一个数据库中不存在的虚假 UUID。
+
+您会立即看到 `error.tsx` 生效了，因为这是定义了 `error.tsx` 的 `/invoices` 的子路由。
+
+不过，如果您想更精确地处理，可以显示 404 错误来告知用户他们尝试访问的资源不存在。
+
+您可以通过在 `data.ts` 中的 `fetchInvoiceById` 函数里打印返回的 `invoice` 来确认资源不存在：
+
+```ts {6} filename="/app/lib/data.ts"
+export async function fetchInvoiceById(id: string) {
+  try {
+    // ...
+ 
+    console.log(invoice); // Invoice 是一个空数组 []
+    return invoice[0];
+  } catch (error) {
+    console.error('数据库错误:', error);
+    throw new Error('获取发票失败');
+  }
+}
+```
+
+既然您已经知道数据库中不存在该发票，现在让我们使用 `notFound` 来处理这种情况。导航到 `/dashboard/invoices/[id]/edit/page.tsx`，并从 `'next/navigation'` 导入 `{ notFound }`。
+
+然后，您可以使用条件判断来在发票不存在时调用 `notFound`：
+
+```tsx {3,12,13,14} filename="/dashboard/invoices/[id]/edit/page.tsx"
+import { fetchInvoiceById, fetchCustomers } from '@/app/lib/data';
+import { notFound } from 'next/navigation';
+ 
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
+  const [invoice, customers] = await Promise.all([
+    fetchInvoiceById(id),
+    fetchCustomers(),
+  ]);
+ 
+  if (!invoice) {
+    notFound();
+  }
+ 
+  // ...
+}
+```
+
+接着，为了向用户展示错误 UI，在 `/edit` 文件夹中创建一个 `not-found.tsx` 文件。
+
+<Image
+  alt="edit 文件夹中的 not-found.tsx 文件"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/not-found-file.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/not-found-file.png"
+  width="1600"
+  height="525"
+/>
+
+在 `not-found.tsx` 文件中，粘贴以下代码：
+
+```tsx filename="/dashboard/invoices/[id]/edit/not-found.tsx"
+import Link from 'next/link';
+import { FaceFrownIcon } from '@heroicons/react/24/outline';
+ 
+export default function NotFound() {
+  return (
+    <main className="flex h-full flex-col items-center justify-center gap-2">
+      <FaceFrownIcon className="w-10 text-gray-400" />
+      <h2 className="text-xl font-semibold">404 未找到</h2>
+      <p>找不到请求的发票。</p>
+      <Link
+        href="/dashboard/invoices"
+        className="mt-4 rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-400"
+      >
+        返回
+      </Link>
+    </main>
+  );
+}
+```
+
+刷新路由后，您现在应该能看到以下 UI：
+
+<Image
+  alt="404 未找到页面"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/404-not-found-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/404-not-found-page.png"
+  width="960"
+  height="568"
+/>
+
+需要注意的是，`notFound` 的优先级高于 `error.tsx`，因此在处理更具体的错误时，您可以优先考虑使用它！
+
+[延伸阅读](#further-reading)
+-----------------------------------
+
+要了解更多关于 Next.js 错误处理的内容，请查阅以下文档：
+
+*   [错误处理](https://nextjs.org/docs/app/building-your-application/routing/error-handling)
+*   [`error.js` API 参考](https://nextjs.org/docs/app/api-reference/file-conventions/error)
+*   [`notFound()` API 参考](https://nextjs.org/docs/app/api-reference/functions/not-found)
+*   [`not-found.js` API 参考](https://nextjs.org/docs/app/api-reference/file-conventions/not-found)

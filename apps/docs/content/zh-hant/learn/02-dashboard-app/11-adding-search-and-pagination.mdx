@@ -1,0 +1,558 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-05-29T20:07:53.003Z
+title: 新增搜尋與分頁功能
+headline: 'App Router：新增搜尋與分頁功能'
+description: 使用 Next.js API 為您的儀表板應用程式新增搜尋與分頁功能。
+image: >-
+  https://nextjs.org/api/learn-og?title=Adding%20Search%20and%20Pagination&amp;chapter=11
+---
+
+在上一章中，您透過串流 (streaming) 改善了儀表板的初始載入效能。現在讓我們進入 `/invoices` 頁面，學習如何新增搜尋與分頁功能。
+
+[起始程式碼](#starting-code)
+-------------------------------
+
+在您的 `/dashboard/invoices/page.tsx` 檔案中，貼上以下程式碼：
+
+```tsx filename="/app/dashboard/invoices/page.tsx"
+import Pagination from '@/app/ui/invoices/pagination';
+import Search from '@/app/ui/search';
+import Table from '@/app/ui/invoices/table';
+import { CreateInvoice } from '@/app/ui/invoices/buttons';
+import { lusitana } from '@/app/ui/fonts';
+import { InvoicesTableSkeleton } from '@/app/ui/skeletons';
+import { Suspense } from 'react';
+ 
+export default async function Page() {
+  return (
+    <div className="w-full">
+      <div className="flex w-full items-center justify-between">
+        <h1 className={`${lusitana.className} text-2xl`}>Invoices</h1>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 md:mt-8">
+        <Search placeholder="Search invoices..." />
+        <CreateInvoice />
+      </div>
+      {/*  <Suspense key={query + currentPage} fallback={<InvoicesTableSkeleton />}>
+        <Table query={query} currentPage={currentPage} />
+      </Suspense> */}
+      <div className="mt-5 flex w-full justify-center">
+        {/* <Pagination totalPages={totalPages} /> */}
+      </div>
+    </div>
+  );
+}
+```
+
+花些時間熟悉這個頁面以及您將使用的元件：
+
+1.  `<Search/>` 讓使用者可以搜尋特定發票。
+2.  `<Pagination/>` 讓使用者可以在發票頁面之間導航。
+3.  `<Table/>` 顯示發票。
+
+您的搜尋功能將橫跨客戶端與伺服器端。當使用者在客戶端搜尋發票時，URL 參數將會更新，伺服器會獲取資料，且表格會在伺服器端重新渲染新資料。
+
+[為什麼使用 URL 搜尋參數？](#why-use-url-search-params)
+--------------------------------------------------------
+
+如上所述，您將使用 URL 搜尋參數來管理搜尋狀態。如果您習慣使用客戶端狀態來實現，這種模式可能會很新穎。
+
+使用 URL 參數實現搜尋有幾個好處：
+
+*   **可書籤與分享的 URL**：由於搜尋參數位於 URL 中，使用者可以將應用程式的當前狀態（包括搜尋查詢與篩選條件）加入書籤，以便日後參考或分享。
+*   **伺服器端渲染 (SSR)**：URL 參數可以直接在伺服器端使用來渲染初始狀態，使伺服器渲染更容易處理。
+*   **分析與追蹤**：將搜尋查詢與篩選條件直接放在 URL 中，可以更輕鬆地追蹤使用者行為，而無需額外的客戶端邏輯。
+
+[新增搜尋功能](#adding-the-search-functionality)
+-------------------------------------------------------------------
+
+以下是您將用來實現搜尋功能的 Next.js 客戶端鉤子 (hooks)：
+
+*   **`useSearchParams`** - 讓您可以存取當前 URL 的參數。例如，URL `/dashboard/invoices?page=1&query=pending` 的搜尋參數會像這樣：`{page: '1', query: 'pending'}`。
+*   **`usePathname`** - 讓您讀取當前 URL 的路徑名稱。例如，對於路由 `/dashboard/invoices`，`usePathname` 會回傳 `'/dashboard/invoices'`。
+*   **`useRouter`** - 讓您可以在客戶端元件中以程式方式在路由之間導航。您可以使用[多種方法](/docs/app/api-reference/functions/use-router#userouter)。
+
+以下是實現步驟的快速概述：
+
+1.  捕捉使用者的輸入。
+2.  使用搜尋參數更新 URL。
+3.  保持 URL 與輸入欄位同步。
+4.  更新表格以反映搜尋查詢。
+
+### [1. 捕捉使用者的輸入](#1-capture-the-users-input)
+
+進入 `<Search>` 元件 (`/app/ui/search.tsx`)，您會注意到：
+
+*   `"use client"` - 這是一個客戶端元件，意味著您可以使用事件監聽器與鉤子。
+*   `<input>` - 這是搜尋輸入欄位。
+
+建立一個新的 `handleSearch` 函數，並為 `<input>` 元素新增一個 `onChange` 監聽器。`onChange` 會在輸入值變更時呼叫 `handleSearch`。
+
+```tsx {6,7,8,18,19,20} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+ 
+export default function Search({ placeholder }: { placeholder: string }) {
+  function handleSearch(term: string) {
+    console.log(term);
+  }
+ 
+  return (
+    <div className="relative flex flex-1 flex-shrink-0">
+      <label htmlFor="search" className="sr-only">
+        Search
+      </label>
+      <input
+        className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+        placeholder={placeholder}
+        onChange={(e) => {
+          handleSearch(e.target.value);
+        }}
+      />
+      <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+    </div>
+  );
+}
+```
+
+在瀏覽器的開發者工具中開啟控制台，然後在搜尋欄位中輸入內容，以驗證它是否正常運作。您應該會在瀏覽器控制台中看到搜尋詞被記錄下來。
+
+太好了！您已經捕捉到使用者的搜尋輸入。現在，您需要用搜尋詞更新 URL。
+
+### [2. 使用搜尋參數更新 URL](#2-update-the-url-with-the-search-params)
+
+從 `next/navigation` 匯入 `useSearchParams` 鉤子並將其賦值給一個變數：
+
+```tsx {4,7} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams } from 'next/navigation';
+ 
+export default function Search() {
+  const searchParams = useSearchParams();
+ 
+  function handleSearch(term: string) {
+    console.log(term);
+  }
+  // ...
+}
+```
+
+在 `handleSearch` 中，使用您的 `searchParams` 變數建立一個新的 [`URLSearchParams`](https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams) 實例。
+
+```tsx {10} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams } from 'next/navigation';
+ 
+export default function Search() {
+  const searchParams = useSearchParams();
+ 
+  function handleSearch(term: string) {
+    const params = new URLSearchParams(searchParams);
+  }
+  // ...
+}
+```
+
+`URLSearchParams` 是一個 Web API，提供用於操作 URL 查詢參數的實用方法。您可以使用它來獲取像 `?page=1&query=a` 這樣的參數字串，而不需要建立複雜的字串字面量。
+
+接下來，根據使用者的輸入 `set` 參數字串。如果輸入為空，您會想要 `delete` 它：
+
+```tsx {11,12,13,14,15} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams } from 'next/navigation';
+ 
+export default function Search() {
+  const searchParams = useSearchParams();
+ 
+  function handleSearch(term: string) {
+    const params = new URLSearchParams(searchParams);
+    if (term) {
+      params.set('query', term);
+    } else {
+      params.delete('query');
+    }
+  }
+  // ...
+}
+```
+
+現在您有了查詢字串。您可以使用 Next.js 的 `useRouter` 和 `usePathname` 鉤子來更新 URL。
+
+從 `'next/navigation'` 匯入 `useRouter` 和 `usePathname`，並在 `handleSearch` 中使用 `useRouter()` 的 `replace` 方法：
+
+```tsx {4,8,9,18} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams, usePathname, useRouter } from 'next/navigation';
+ 
+export default function Search() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { replace } = useRouter();
+ 
+  function handleSearch(term: string) {
+    const params = new URLSearchParams(searchParams);
+    if (term) {
+      params.set('query', term);
+    } else {
+      params.delete('query');
+    }
+    replace(`${pathname}?${params.toString()}`);
+  }
+}
+```
+
+以下是發生的事情的分解：
+
+*   `${pathname}` 是當前路徑，在您的案例中是 `"/dashboard/invoices"`。
+*   當使用者在搜尋欄中輸入時，`params.toString()` 會將此輸入轉換為 URL 友好的格式。
+*   `replace(${pathname}?${params.toString()})` 會使用使用者的搜尋資料更新 URL。例如，如果使用者搜尋 "Lee"，則 URL 會變成 `/dashboard/invoices?query=lee`。
+*   由於 Next.js 的客戶端導航（您在[頁面間導航](/learn/dashboard-app/navigating-between-pages)章節中學到的），URL 會在不重新載入頁面的情況下更新。
+
+### [3. 保持 URL 與輸入同步](#3-keeping-the-url-and-input-in-sync)
+
+為了確保輸入欄位與 URL 同步，並在分享時填入內容，您可以透過從 `searchParams` 讀取來為輸入欄位傳遞 `defaultValue`：
+
+```tsx {7} filename="/app/ui/search.tsx"
+<input
+  className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+  placeholder={placeholder}
+  onChange={(e) => {
+    handleSearch(e.target.value);
+  }}
+  defaultValue={searchParams.get('query')?.toString()}
+/>
+```
+
+> **`defaultValue` 與 `value` / 受控與非受控元件**
+> 
+> 如果您使用狀態來管理輸入欄位的值，您會使用 `value` 屬性來使其成為受控元件。這意味著 React 會管理輸入的狀態。
+> 
+> 但是，由於您沒有使用狀態，您可以使用 `defaultValue`。這意味著原生輸入會管理自己的狀態。這是可以的，因為您將搜尋查詢儲存到 URL 而不是狀態中。
+
+### [4. 更新表格](#4-updating-the-table)
+
+最後，您需要更新表格元件以反映搜尋查詢。
+
+回到發票頁面。
+
+頁面元件[接受一個名為 `searchParams` 的 prop](/docs/app/api-reference/file-conventions/page)，因此您可以將當前 URL 參數傳遞給 `<Table>` 元件。
+
+```tsx {9,10,11,12,13,14,15,16,17,28,29,30} filename="/app/dashboard/invoices/page.tsx"
+import Pagination from '@/app/ui/invoices/pagination';
+import Search from '@/app/ui/search';
+import Table from '@/app/ui/invoices/table';
+import { CreateInvoice } from '@/app/ui/invoices/buttons';
+import { lusitana } from '@/app/ui/fonts';
+import { Suspense } from 'react';
+import { InvoicesTableSkeleton } from '@/app/ui/skeletons';
+ 
+export default async function Page(props: {
+  searchParams?: Promise<{
+    query?: string;
+    page?: string;
+  }>;
+}) {
+  const searchParams = await props.searchParams;
+  const query = searchParams?.query || '';
+  const currentPage = Number(searchParams?.page) || 1;
+ 
+  return (
+    <div className="w-full">
+      <div className="flex w-full items-center justify-between">
+        <h1 className={`${lusitana.className} text-2xl`}>Invoices</h1>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 md:mt-8">
+        <Search placeholder="Search invoices..." />
+        <CreateInvoice />
+      </div>
+      <Suspense key={query + currentPage} fallback={<InvoicesTableSkeleton />}>
+        <Table query={query} currentPage={currentPage} />
+      </Suspense>
+      <div className="mt-5 flex w-full justify-center">
+        {/* <Pagination totalPages={totalPages} /> */}
+      </div>
+    </div>
+  );
+}
+```
+
+如果您導覽到 `<Table>` 元件，您會看到兩個 props，`query` 和 `currentPage`，被傳遞給 `fetchFilteredInvoices()` 函數，該函數會回傳符合查詢的發票。
+
+```tsx filename="/app/ui/invoices/table.tsx"
+// ...
+export default async function InvoicesTable({
+  query,
+  currentPage,
+}: {
+  query: string;
+  currentPage: number;
+}) {
+  const invoices = await fetchFilteredInvoices(query, currentPage);
+  // ...
+}
+```
+
+完成這些變更後，請進行測試。如果您搜尋一個詞，您會更新 URL，這會向伺服器發送新請求，伺服器會獲取資料，並且只會回傳符合您查詢的發票。
+
+> **何時使用 `useSearchParams()` 鉤子與 `searchParams` prop？**
+> 
+> 您可能已經注意到您使用了兩種不同的方法來提取搜尋參數。使用哪一種取決於您是在客戶端還是伺服器端工作。
+> 
+> *   `<Search>` 是一個客戶端元件，因此您使用 `useSearchParams()` 鉤子從客戶端存取參數。
+> *   `<Table>` 是一個伺服器元件，它會獲取自己的資料，因此您可以將 `searchParams` prop 從頁面傳遞給元件。
+> 
+> 一般來說，如果您想從客戶端讀取參數，請使用 `useSearchParams()` 鉤子，因為這樣可以避免返回伺服器。
+
+### [最佳實踐：防抖 (Debouncing)](#best-practice-debouncing)
+
+恭喜！你已經使用 Next.js 實現了搜尋功能！但還有一些優化可以做。
+
+在你的 `handleSearch` 函數中，加入以下 `console.log`：
+
+```tsx {2} filename="/app/ui/search.tsx"
+function handleSearch(term: string) {
+  console.log(`Searching... ${term}`);
+ 
+  const params = new URLSearchParams(searchParams);
+  if (term) {
+    params.set('query', term);
+  } else {
+    params.delete('query');
+  }
+  replace(`${pathname}?${params.toString()}`);
+}
+```
+
+然後在搜尋欄輸入 "Delba" 並檢查開發者工具的 console。發生了什麼？
+
+```plaintext filename="Dev Tools Console"
+Searching... D
+Searching... De
+Searching... Del
+Searching... Delb
+Searching... Delba
+```
+
+你正在每次按鍵時更新 URL，因此也在每次按鍵時查詢資料庫！這在我們的應用程式規模小時不是問題，但想像一下如果你的應用程式有數千名使用者，每個使用者每次按鍵都會向資料庫發送新請求。
+
+**防抖 (Debouncing)** 是一種限制函數觸發頻率的程式設計實踐。在我們的案例中，你只希望在使用者停止輸入時才查詢資料庫。
+
+> **防抖的工作原理：**
+> 
+> 1.  **觸發事件**：當應防抖的事件（如搜尋框中的按鍵）發生時，計時器啟動。
+> 2.  **等待**：如果計時器到期前有新事件發生，計時器會重置。
+> 3.  **執行**：如果計時器倒數結束，防抖函數會被執行。
+
+你可以透過幾種方式實現防抖，包括手動建立自己的防抖函數。為了簡單起見，我們將使用一個名為 [`use-debounce`](https://www.npmjs.com/package/use-debounce) 的函式庫。
+
+安裝 `use-debounce`：
+
+```bash filename="Terminal"
+pnpm i use-debounce
+```
+
+在你的 `<Search>` 組件中，導入一個名為 `useDebouncedCallback` 的函數：
+
+```tsx {2,5,15} filename="/app/ui/search.tsx"
+// ...
+import { useDebouncedCallback } from 'use-debounce';
+ 
+// Inside the Search Component...
+const handleSearch = useDebouncedCallback((term) => {
+  console.log(`Searching... ${term}`);
+ 
+  const params = new URLSearchParams(searchParams);
+  if (term) {
+    params.set('query', term);
+  } else {
+    params.delete('query');
+  }
+  replace(`${pathname}?${params.toString()}`);
+}, 300);
+```
+
+這個函數會包裹 `handleSearch` 的內容，並只在使用者停止輸入後的一段特定時間（300 毫秒）後執行程式碼。
+
+現在再次在搜尋欄輸入，並打開開發者工具的 console。你應該會看到以下內容：
+
+```plaintext filename="Dev Tools Console"
+Searching... Delba
+```
+
+透過防抖，你可以減少發送到資料庫的請求數量，從而節省資源。
+
+[加入分頁功能](#adding-pagination)
+---------------------------------------
+
+在引入搜尋功能後，你會注意到表格一次只顯示 6 張發票。這是因為 `data.ts` 中的 `fetchFilteredInvoices()` 函數每頁最多返回 6 張發票。
+
+加入分頁功能可以讓使用者瀏覽不同頁面以查看所有發票。讓我們看看如何像搜尋功能一樣使用 URL 參數來實現分頁。
+
+導航到 `<Pagination/>` 組件，你會注意到它是一個客戶端組件 (Client Component)。你不希望在客戶端獲取資料，因為這會暴露你的資料庫密鑰（記住，你沒有使用 API 層）。相反，你可以在伺服器上獲取資料，並將其作為 prop 傳遞給組件。
+
+在 `/dashboard/invoices/page.tsx` 中，導入一個名為 `fetchInvoicesPages` 的新函數，並將 `searchParams` 中的 `query` 作為參數傳遞：
+
+```tsx {2,15} filename="/app/dashboard/invoices/page.tsx"
+// ...
+import { fetchInvoicesPages } from '@/app/lib/data';
+ 
+export default async function Page(
+  props: {
+    searchParams?: Promise<{
+      query?: string;
+      page?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const query = searchParams?.query || '';
+  const currentPage = Number(searchParams?.page) || 1;
+  const totalPages = await fetchInvoicesPages(query);
+ 
+  return (
+    // ...
+  );
+}
+```
+
+`fetchInvoicesPages` 根據搜尋查詢返回總頁數。例如，如果有 12 張發票符合搜尋查詢，且每頁顯示 6 張發票，則總頁數為 2。
+
+接下來，將 `totalPages` prop 傳遞給 `<Pagination/>` 組件：
+
+```tsx {27} filename="/app/dashboard/invoices/page.tsx"
+// ...
+ 
+export default async function Page(props: {
+  searchParams?: Promise<{
+    query?: string;
+    page?: string;
+  }>;
+}) {
+  const searchParams = await props.searchParams;
+  const query = searchParams?.query || '';
+  const currentPage = Number(searchParams?.page) || 1;
+  const totalPages = await fetchInvoicesPages(query);
+ 
+  return (
+    <div className="w-full">
+      <div className="flex w-full items-center justify-between">
+        <h1 className={`${lusitana.className} text-2xl`}>Invoices</h1>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 md:mt-8">
+        <Search placeholder="Search invoices..." />
+        <CreateInvoice />
+      </div>
+      <Suspense key={query + currentPage} fallback={<InvoicesTableSkeleton />}>
+        <Table query={query} currentPage={currentPage} />
+      </Suspense>
+      <div className="mt-5 flex w-full justify-center">
+        <Pagination totalPages={totalPages} />
+      </div>
+    </div>
+  );
+}
+```
+
+導航到 `<Pagination/>` 組件並導入 `usePathname` 和 `useSearchParams` hooks。我們將使用這些來獲取當前頁面並設置新頁面。確保也取消註解此組件中的程式碼。你的應用程式會暫時崩潰，因為你還沒有實現 `<Pagination/>` 的邏輯。現在讓我們來實現它！
+
+```tsx {7,10,11,12} filename="/app/ui/invoices/pagination.tsx"
+'use client';
+ 
+import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import clsx from 'clsx';
+import Link from 'next/link';
+import { generatePagination } from '@/app/lib/utils';
+import { usePathname, useSearchParams } from 'next/navigation';
+ 
+export default function Pagination({ totalPages }: { totalPages: number }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentPage = Number(searchParams.get('page')) || 1;
+ 
+  // ...
+}
+```
+
+接下來，在 `<Pagination>` 組件中創建一個名為 `createPageURL` 的新函數。與搜尋功能類似，你將使用 `URLSearchParams` 來設置新頁碼，並使用 `pathName` 來創建 URL 字串。
+
+```tsx {14,15,16,17,18} filename="/app/ui/invoices/pagination.tsx"
+'use client';
+ 
+import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import clsx from 'clsx';
+import Link from 'next/link';
+import { generatePagination } from '@/app/lib/utils';
+import { usePathname, useSearchParams } from 'next/navigation';
+ 
+export default function Pagination({ totalPages }: { totalPages: number }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentPage = Number(searchParams.get('page')) || 1;
+ 
+  const createPageURL = (pageNumber: number | string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', pageNumber.toString());
+    return `${pathname}?${params.toString()}`;
+  };
+ 
+  // ...
+}
+```
+
+以下是發生的事情的分解：
+
+*   `createPageURL` 創建當前搜尋參數的實例。
+*   然後，它將 "page" 參數更新為提供的頁碼。
+*   最後，它使用路徑名稱和更新後的搜尋參數構建完整的 URL。
+
+`<Pagination>` 組件的其餘部分處理樣式和不同狀態（第一頁、最後一頁、活動頁面、禁用狀態等）。我們不會在本課程中詳細討論這些，但你可以自由查看程式碼，了解 `createPageURL` 在哪裡被調用。
+
+最後，當使用者輸入新的搜尋查詢時，你希望將頁碼重置為 1。你可以通過更新 `<Search>` 組件中的 `handleSearch` 函數來實現這一點：
+
+```tsx {14} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useDebouncedCallback } from 'use-debounce';
+ 
+export default function Search({ placeholder }: { placeholder: string }) {
+  const searchParams = useSearchParams();
+  const { replace } = useRouter();
+  const pathname = usePathname();
+ 
+  const handleSearch = useDebouncedCallback((term) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', '1');
+    if (term) {
+      params.set('query', term);
+    } else {
+      params.delete('query');
+    }
+    replace(`${pathname}?${params.toString()}`);
+  }, 300);
+ 
+```
+
+[總結](#summary)
+-------------------
+
+恭喜！你剛剛使用 URL 搜尋參數和 Next.js API 實現了搜尋和分頁功能。
+
+總結一下，在本章中：
+
+*   你使用 URL 搜尋參數而非客戶端狀態來處理搜尋和分頁。
+*   你在伺服器上獲取資料。
+*   你使用 `useRouter` router hook 來實現更流暢的客戶端轉換。
+
+這些模式可能與你在使用客戶端 React 時習慣的方式不同，但希望你現在能更好地理解使用 URL 搜尋參數並將這種狀態提升到伺服器的好處。

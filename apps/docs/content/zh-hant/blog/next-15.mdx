@@ -1,0 +1,570 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:59:36.944Z
+title: Next.js 15
+description: >-
+  Next.js 15 帶來了 React 19 支援、快取改進、Turbopack 開發環境的穩定版本、新 API 等功能。
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Jimmy Lai
+    image: /static/team/jimmy.jpg
+  - name: Rich Haines
+    image: /static/team/rich.jpg
+date: 2024-10-21T17:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15/twitter-card.png
+---
+
+Next.js 15 已正式穩定並準備投入生產環境。此版本基於 [RC1](/blog/next-15-rc) 和 [RC2](/blog/next-15-rc2) 的更新，我們在穩定性的基礎上加入了一些令人興奮的新功能。立即嘗試 Next.js 15：
+
+```bash filename="terminal"
+# 使用新的自動升級 CLI
+npx @next/codemod@canary upgrade latest
+ 
+# ...或手動升級
+npm install next@latest react@rc react-dom@rc
+```
+
+我們也很高興在本週四（10 月 24 日）的 [Next.js Conf](/conf) 上分享更多未來計劃。
+
+以下是 Next.js 15 的新功能：
+
+*   [**`@next/codemod` CLI：**](#smooth-upgrades-with-nextcodemod-cli) 輕鬆升級至最新版 Next.js 和 React。
+*   [**非同步請求 API（重大變更）：**](#async-request-apis-breaking-change) 邁向簡化渲染與快取模型的第一步。
+*   [**快取語意（重大變更）：**](#caching-semantics) `fetch` 請求、`GET` 路由處理器和客戶端導航預設不再快取。
+*   [**React 19 支援：**](#react-19) 支援 React 19、React 編譯器（實驗性）和改進的水合錯誤處理。
+*   [**Turbopack 開發環境（穩定版）：**](#turbopack-dev) 效能與穩定性改進。
+*   [**靜態路由指示器：**](#static-route-indicator) 開發期間顯示靜態路由的新視覺指示器。
+*   [**`unstable_after` API（實驗性）：**](#executing-code-after-a-response-with-unstable_after-experimental) 在回應串流完成後執行程式碼。
+*   [**`instrumentation.js` API（穩定版）：**](#instrumentationjs-stable) 用於伺服器生命週期可觀測性的新 API。
+*   [**增強的表單（`next/form`）：**](#form-component) 透過客戶端導航增強 HTML 表單功能。
+*   [**`next.config`：**](#support-for-nextconfigts) 支援 `next.config.ts` 的 TypeScript 設定。
+*   [**自託管改進：**](#improvements-for-self-hosting) 更完善的 `Cache-Control` 標頭控制。
+*   [**伺服器動作安全性：**](#enhanced-security-for-server-actions) 不可猜測的端點與移除未使用的動作。
+*   [**外部套件打包（穩定版）：**](#optimizing-bundling-of-external-packages-stable) 為 App 和 Pages Router 提供新的設定選項。
+*   [**ESLint 9 支援：**](#eslint-9-support) 新增對 ESLint 9 的支援。
+*   [**開發與建置效能：**](#development-and-build-improvements) 改進建置時間與更快的 Fast Refresh。
+
+[使用 `@next/codemod` CLI 輕鬆升級](#smooth-upgrades-with-nextcodemod-cli)
+---------------------------------------------------------------------------------
+
+每個 Next.js 主要版本都包含 codemod（自動化程式碼轉換工具），協助自動化處理重大變更的升級。
+
+為了讓升級更順暢，我們發布了增強版 codemod CLI：
+
+```bash filename="Terminal"
+npx @next/codemod@canary upgrade latest
+```
+
+此工具可協助您將程式碼庫升級至最新穩定版或預發布版本。CLI 會更新您的依賴項、顯示可用的 codemod，並引導您進行應用。
+
+`canary` 標籤使用最新版的 codemod，而 `latest` 指定 Next.js 版本。即使您要升級至最新版 Next.js，我們仍建議使用 canary 版的 codemod，因為我們計劃根據您的回饋持續改進此工具。
+
+了解更多關於 [Next.js codemod CLI](/docs/app/building-your-application/upgrading/codemods)。
+
+[非同步請求 API（重大變更）](#async-request-apis-breaking-change)
+---------------------------------------------------------------------------
+
+在傳統的伺服器端渲染 (SSR) 中，伺服器會等待請求後才渲染任何內容。然而，並非所有元件都依賴請求特定的資料，因此等待請求來渲染它們是不必要的。理想情況下，伺服器應在請求到達前盡可能準備好內容。為實現這一點，並為未來優化奠定基礎，我們需要知道何時等待請求。
+
+因此，我們正在將依賴請求特定資料的 API（如 `headers`、`cookies`、`params` 和 `searchParams`）轉變為**非同步**。
+
+```
+import { cookies } from 'next/headers';
+ 
+export async function AdminPanel() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('token');
+ 
+  // ...
+}
+```
+
+這是**重大變更**，影響以下 API：
+
+*   `cookies`
+*   `headers`
+*   `draftMode`
+*   `layout.js`、`page.js`、`route.js`、`default.js`、`generateMetadata` 和 `generateViewport` 中的 `params`
+*   `page.js` 中的 `searchParams`
+
+為簡化遷移，這些 API 可暫時以同步方式存取，但在開發和生產環境中會顯示警告，直到下一個主要版本。我們提供 [codemod](/docs/app/building-your-application/upgrading/codemods) 來自動化遷移：
+
+```bash filename="Terminal"
+npx @next/codemod@canary next-async-request-api .
+```
+
+若 codemod 無法完全遷移您的程式碼，請閱讀 [升級指南](/docs/app/building-your-application/upgrading/version-15)。我們也提供了 [範例](https://github.com/leerob/next-saas-starter/pull/62) 說明如何將 Next.js 應用遷移至新 API。
+
+[快取語意](#caching-semantics)
+---------------------------------------
+
+Next.js App Router 推出時採用了預設的快取策略。這些設計旨在提供最佳效能，同時允許在需要時選擇退出。
+
+根據您的回饋，我們重新評估了 [快取啟發式方法](https://x.com/feedthejim/status/1785242054773145636) 及其與 Partial Prerendering (PPR) 等專案和使用 `fetch` 的第三方函式庫的互動。
+
+在 Next.js 15 中，我們將 `GET` 路由處理器和客戶端路由快取的預設行為從「預設快取」改為「預設不快取」。若您想保留先前的行為，仍可選擇啟用快取。
+
+我們將在未來幾個月持續改進 Next.js 的快取功能，並很快分享更多細節。
+
+### [`GET` 路由處理器預設不再快取](#get-route-handlers-are-no-longer-cached-by-default)
+
+在 Next 14 中，使用 `GET` HTTP 方法的路由處理器預設會被快取，除非它們使用動態函式或動態設定選項。在 Next.js 15 中，`GET` 函式**預設不進行快取**。
+
+您仍可透過靜態路由設定選項（如 `export dynamic = 'force-static'`）選擇啟用快取。
+
+特殊路由處理器如 [`sitemap.ts`](/docs/app/api-reference/file-conventions/metadata/sitemap)、[`opengraph-image.tsx`](/docs/app/api-reference/file-conventions/metadata/opengraph-image) 和 [`icon.tsx`](/docs/app/api-reference/file-conventions/metadata/app-icons)，以及其他 [中繼資料檔案](/docs/app/api-reference/file-conventions/metadata) 預設仍為靜態，除非它們使用動態函式或動態設定選項。
+
+### [客戶端路由快取預設不再快取頁面元件](#client-router-cache-no-longer-caches-page-components-by-default)
+
+在 Next.js 14.2.0 中，我們引入了實驗性的 [`staleTimes`](/docs/app/api-reference/next-config-js/staleTimes) 標誌，允許自訂設定 [路由快取](/docs/app/building-your-application/caching#client-side-router-cache)。
+
+在 Next.js 15 中，此標誌仍可使用，但我們將預設行為改為頁面區段的 `staleTime` 為 `0`。這表示當您在應用中導航時，客戶端將始終反映導航過程中啟用的頁面元件的最新資料。然而，以下重要行為保持不變：
+
+*   共享的佈局資料不會從伺服器重新獲取，以繼續支援 [部分渲染](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering)。
+*   返回/前進導航仍會從快取恢復，以確保瀏覽器能恢復滾動位置。
+*   [`loading.js`](/docs/app/api-reference/file-conventions/loading) 仍會快取 5 分鐘（或 `staleTimes.static` 設定的值）。
+
+您可以透過以下設定選擇啟用先前的客戶端路由快取行為：
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+    },
+  },
+};
+ 
+export default nextConfig;
+```
+
+[React 19](#react-19)
+---------------------
+
+作為 Next.js 15 發布的一部分，我們決定與即將發布的 React 19 保持一致。
+
+在版本 15 中，App Router 使用 React 19 RC，同時根據社群回饋，我們也為 Pages Router 提供了 React 18 的向後相容性。若您使用 Pages Router，這讓您可以在準備好時升級至 React 19。
+
+儘管 React 19 仍處於 RC 階段，但我們在真實應用中的廣泛測試以及與 React 團隊的密切合作，讓我們對其穩定性充滿信心。核心的重大變更已充分測試，不會影響現有的 App Router 使用者。因此，我們決定現在發布 Next.js 15 穩定版，讓您的專案為 React 19 正式版做好準備。
+
+為確保過渡盡可能順利，我們提供了 [codemod 和自動化工具](#smooth-upgrades-with-codemod-cli) 協助簡化遷移過程。
+
+閱讀 [Next.js 15 升級指南](/docs/app/building-your-application/upgrading/version-15)、[React 19 升級指南](https://react.dev/blog/2024/04/25/react-19-upgrade-guide)，並觀看 [React Conf 主題演講](https://www.youtube.com/live/T8TZQ6k4SLE?t=1788) 以了解更多。
+
+### [Pages Router 使用 React 18](#pages-router-on-react-18)
+
+Next.js 15 為 Pages Router 提供了 React 18 的向後相容性，讓使用者能繼續使用 React 18，同時享受 Next.js 15 的改進。
+
+自第一個候選版本 (RC1) 以來，根據社群回饋，我們調整了重點以納入對 React 18 的支援。這種靈活性讓您在使用 Pages Router 和 React 18 的同時採用 Next.js 15，為您的升級路徑提供更多控制。
+
+> **注意：** 雖然可以在同一應用中同時執行 Pages Router（使用 React 18）和 App Router（使用 React 19），但我們不建議這種設定。這樣做可能導致不可預測的行為和類型不一致，因為兩個版本之間的底層 API 和渲染邏輯可能無法完全對齊。
+
+### [React 編譯器（實驗性）](#react-compiler-experimental)
+
+[React 編譯器](https://react.dev/learn/react-compiler) 是 Meta 的 React 團隊創建的新實驗性編譯器。該編譯器透過對純 JavaScript 語意和 [React 規則](https://react.dev/reference/rules) 的深入理解，能深度理解您的程式碼，從而為程式碼添加自動優化。編譯器減少了開發者需手動進行的記憶化工作（如使用 `useMemo` 和 `useCallback` API），使程式碼更簡單、更易維護且更不易出錯。
+
+Next.js 15 新增了對 [React 編譯器](https://react.dev/learn/react-compiler) 的支援。了解更多關於 React 編譯器及其 [可用的 Next.js 設定選項](https://react.dev/learn/react-compiler#usage-with-nextjs)。
+
+> **注意：** React 編譯器目前僅作為 Babel 插件提供，這會導致開發和建置時間變慢。
+
+### [水合錯誤改進](#hydration-error-improvements)
+
+Next.js 14.1 針對錯誤訊息和水合錯誤[進行了改進](/blog/next-14-1#improved-error-messages-and-fast-refresh)。Next.js 15 在此基礎上進一步增強，提供了改進版的水合錯誤視圖。現在水合錯誤會顯示錯誤的原始碼，並提供解決問題的建議。
+
+例如，以下是 Next.js 14.1 中先前的水合錯誤訊息：
+
+<Image
+  alt="Next.js 14.1 中的水合錯誤訊息"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc/hydration-error-before-light.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc/hydration-error-before-dark.png"
+  width="962"
+  height="517"
+/>
+
+Next.js 15 已將其改進為：
+
+<Image
+  alt="Next.js 15 中改進的水合錯誤訊息"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc/hydration-error-after-light.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc/hydration-error-after-dark.png"
+  width="960"
+  height="654"
+/>
+
+[Turbopack 開發模式](#turbopack-dev)
+-------------------------------
+
+我們很高興宣布 `next dev --turbo` 現在已**穩定並準備就緒**，可加速您的開發體驗。我們已將其用於 [vercel.com](https://vercel.com)、[nextjs.org](https://nextjs.org)、[v0](https://v0.dev) 等所有應用程式的迭代開發，並取得了顯著成效。
+
+以大型 Next.js 應用程式 `vercel.com` 為例，我們觀察到：
+
+*  本地伺服器啟動速度**最高提升 76.7%**
+*  使用 Fast Refresh 時，程式碼更新速度**最高提升 96.3%**
+*  初始路由編譯速度（無快取情況下）**最高提升 45.8%**（Turbopack 目前尚未支援磁碟快取）
+
+您可以在我們的新[部落格文章](/blog/turbopack-for-development-stable)中了解更多關於 Turbopack 開發模式的資訊。
+
+[靜態路由指示器](#static-route-indicator)
+-------------------------------------------------
+
+Next.js 現在會在開發期間顯示靜態路由指示器，幫助您識別哪些路由是靜態或動態的。這個視覺提示讓您更容易透過了解頁面渲染方式來優化效能。
+
+<Image
+  alt=""
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc2/static-route-light.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc2/static-route-dark.png"
+  width="1720"
+  height="516"
+/>
+
+您也可以使用 [next build](/docs/app/api-reference/cli/next#next-build-options) 輸出來查看所有路由的渲染策略。
+
+此更新是我們持續增強 Next.js 可觀測性的一部分，讓開發者能更輕鬆地監控、除錯和優化應用程式。我們也正在開發專用的開發者工具，更多細節將很快公布。
+
+了解更多關於[靜態路由指示器](/docs/app/api-reference/next-config-js/devIndicators#appisrstatus-static-indicator)的資訊，該功能可被停用。
+
+[使用 `unstable_after` 在響應後執行程式碼（實驗性）](#executing-code-after-a-response-with-unstable_after-experimental)
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+在處理使用者請求時，伺服器通常會執行與計算響應直接相關的任務。然而，您可能需要執行如日誌記錄、分析和其他外部系統同步等任務。
+
+由於這些任務與響應無直接關聯，使用者不應等待它們完成。將工作延遲到響應使用者後執行會面臨挑戰，因為無伺服器函式在響應關閉後會立即停止計算。
+
+`after()` 是一個新的實驗性 API，透過允許您安排在響應串流結束後處理工作，解決了這個問題，使次要任務能在不阻塞主要響應的情況下執行。
+
+要使用它，請在 `next.config.js` 中添加 `experimental.after`：
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    after: true,
+  },
+};
+ 
+export default nextConfig;
+```
+
+然後，在伺服器元件、伺服器動作、路由處理程式或中介軟體中導入該函式。
+
+```
+import { unstable_after as after } from 'next/server';
+import { log } from '@/app/utils';
+ 
+export default function Layout({ children }) {
+  // 次要任務
+  after(() => {
+    log();
+  });
+ 
+  // 主要任務
+  return <>{children}</>;
+}
+```
+
+了解更多關於 [`unstable_after`](/docs/app/api-reference/functions/unstable_after) 的資訊。
+
+[`instrumentation.js`（穩定版）](#instrumentationjs-stable)
+----------------------------------------------------------
+
+`instrumentation` 檔案與 `register()` API 允許使用者接入 Next.js 伺服器生命週期，以監控效能、追蹤錯誤來源，並與 [OpenTelemetry](https://opentelemetry.io/) 等可觀測性庫深度整合。
+
+此功能現已**穩定**，可移除 `experimental.instrumentationHook` 配置選項。
+
+此外，我們與 [Sentry](https://sentry.io/) 合作設計了一個新的 `onRequestError` 鉤子，可用於：
+
+*   捕獲伺服器上所有拋出錯誤的重要上下文，包括：
+    *   路由器：Pages Router 或 App Router
+    *   伺服器上下文：伺服器元件、伺服器動作、路由處理程式或中介軟體
+*   將錯誤報告給您喜愛的可觀測性提供者。
+
+```
+export async function onRequestError(err, request, context) {
+  await fetch('https://...', {
+    method: 'POST',
+    body: JSON.stringify({ message: err.message, request, context }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export async function register() {
+  // 初始化您喜愛的可觀測性提供者 SDK
+}
+```
+
+了解更多關於 `onRequestError` [函式](/docs/app/api-reference/file-conventions/instrumentation#onrequesterror-optional)的資訊。
+
+[`<Form>` 元件](#form-component)
+-------------------------------------
+
+新的 `<Form>` 元件擴展了 HTML `<form>` 元素，新增了[預取 (prefetching)](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching)、[客戶端導航 (client-side navigation)](/docs/app/building-your-application/routing/linking-and-navigating#5-soft-navigation) 和漸進增強功能。
+
+它適用於導向新頁面的表單，例如導向結果頁面的搜尋表單。
+
+```jsx filename="app/page.jsx"
+import Form from 'next/form';
+ 
+export default function Page() {
+  return (
+    <Form action="/search">
+      <input name="query" />
+      <button type="submit">提交</button>
+    </Form>
+  );
+}
+```
+
+`<Form>` 元件提供以下功能：
+
+*   **預取**：當表單在視野中時，會預先載入 [layout](/docs/app/api-reference/file-conventions/layout) 和 [loading](/docs/app/api-reference/file-conventions/loading) UI，使導航更快速。
+*   **客戶端導航**：提交時，共享佈局和客戶端狀態會被保留。
+*   **漸進增強**：如果 JavaScript 尚未載入，表單仍可透過全頁導航正常運作。
+
+以往，實現這些功能需要大量手動樣板程式碼。例如：
+
+範例
+
+```
+// 注意：此為示範用途的簡化程式碼。
+// 不建議在生產程式碼中使用。
+ 
+'use client'
+ 
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+ 
+export default function Form(props) {
+  const action = props.action
+  const router = useRouter()
+ 
+  useEffect(() => {
+    // 如果表單目標是 URL，則預取它
+    if (typeof action === 'string') {
+      router.prefetch(action)
+    }
+  }, [action, router])
+ 
+  function onSubmit(event) {
+    event.preventDefault()
+ 
+    // 獲取所有表單欄位並觸發 `router.push`，資料以 URL 編碼形式傳遞
+    const formData = new FormData(event.currentTarget)
+    const data = new URLSearchParams()
+ 
+    for (const [name, value] of formData) {
+      data.append(name, value as string)
+    }
+ 
+    router.push(`${action}?${data.toString()}`)
+  }
+ 
+  if (typeof action === 'string') {
+    return <form onSubmit={onSubmit} {...props} />
+  }
+ 
+  return <form {...props} />
+}
+```
+
+了解更多關於 [`<Form>` 元件](/docs/app/api-reference/components/form)的資訊。
+
+[支援 `next.config.ts`](#support-for-nextconfigts)
+---------------------------------------------------------
+
+Next.js 現在支援 TypeScript 的 `next.config.ts` 檔案類型，並提供 `NextConfig` 類型以實現自動完成和類型安全的選項：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  /* 在此配置選項 */
+};
+ 
+export default nextConfig;
+```
+
+了解更多關於 Next.js 中的 [TypeScript 支援](/docs/app/building-your-application/configuring/typescript#type-checking-nextconfigts)資訊。
+
+[自託管改進](#improvements-for-self-hosting)
+---------------------------------------------------------------
+
+自託管應用程式時，您可能需要更多控制 `Cache-Control` 指令。
+
+一個常見情況是控制 ISR 頁面的 `stale-while-revalidate` 週期。我們實施了兩項改進：
+
+1.  您現在可以在 `next.config` 中配置 [`expireTime`](/docs/app/api-reference/next-config-js/expireTime) 值。這先前是 `experimental.swrDelta` 選項。
+2.  將預設值更新為一年，確保大多數 CDN 能完全按照預期應用 `stale-while-revalidate` 語義。
+
+我們也不再使用預設值覆蓋自訂的 `Cache-Control` 值，允許完全控制並確保與任何 CDN 設定的相容性。
+
+最後，我們改進了自託管時的圖片優化。先前，我們建議您安裝 `sharp` 以在 Next.js 伺服器上優化圖片。此建議有時會被忽略。在 Next.js 15 中，您不再需要手動安裝 `sharp` — 當使用 `next start` 或以 [standalone 輸出模式](/docs/app/api-reference/next-config-js/output) 執行時，Next.js 會自動使用 `sharp`。
+
+要了解更多，請查看我們關於自託管 Next.js 的新[示範和教學影片](https://x.com/leeerob/status/1843796169173995544)。
+
+[伺服器動作的安全性增強](#enhanced-security-for-server-actions)
+-----------------------------------------------------------------------------
+
+[伺服器動作 (Server Actions)](https://react.dev/reference/rsc/server-actions) 是可從客戶端呼叫的伺服器端函式。它們透過在檔案頂部添加 `'use server'` 指令並導出一個非同步函式來定義。
+
+即使伺服器動作或工具函式未在程式碼的其他地方導入，它仍然是一個可公開存取的 HTTP 端點。雖然這種行為在技術上是正確的，但它可能導致這些函式被無意中暴露。
+
+為了提高安全性，我們引入了以下增強功能：
+
+*   **無用程式碼消除 (Dead code elimination)**：未使用的伺服器動作不會將其 ID 暴露給客戶端 JavaScript 套件，減少套件大小並提升效能。
+*   **安全動作 ID**：Next.js 現在會建立不可預測、非確定性的 ID，允許客戶端引用和呼叫伺服器動作。這些 ID 會在構建之間定期重新計算以增強安全性。
+
+```
+// app/actions.js
+'use server';
+ 
+// 此動作**有**在我們的應用程式中使用，因此 Next.js
+// 會建立一個安全 ID，允許客戶端引用
+// 並呼叫此伺服器動作。
+export async function updateUserAction(formData) {}
+ 
+// 此動作**未**在我們的應用程式中使用，因此 Next.js
+// 會在 `next build` 期間自動移除這段程式碼
+// 並且不會建立公開端點。
+export async function deleteUserAction(formData) {}
+```
+
+您仍應將伺服器動作視為公開的 HTTP 端點。了解更多關於[保護伺服器動作](/blog/security-nextjs-server-components-actions#write)的資訊。
+
+[優化外部套件打包（穩定版）](#optimizing-bundling-of-external-packages-stable)
+-----------------------------------------------------------------------------------------------------
+
+打包外部套件可以改善應用程式的冷啟動效能。在 **App Router** 中，外部套件預設會被打包，您可以使用新的 [`serverExternalPackages`](/docs/app/api-reference/next-config-js/serverExternalPackages) 配置選項選擇退出特定套件。
+
+在 **Pages Router** 中，外部套件預設不會被打包，但您可以使用現有的 [`transpilePackages`](/docs/pages/api-reference/next-config-js/transpilePackages) 選項提供要打包的套件清單。使用此配置選項時，您需要指定每個套件。
+
+為了統一 App 和 Pages Router 的配置，我們引入了一個新選項 [`bundlePagesRouterDependencies`](/docs/pages/api-reference/next-config-js/bundlePagesRouterDependencies)，以匹配 App Router 的預設自動打包行為。然後，您可以根據需要使用 [`serverExternalPackages`](/docs/app/api-reference/next-config-js/serverExternalPackages) 選擇退出特定套件。
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  // 在 Pages Router 中自動打包外部套件：
+  bundlePagesRouterDependencies: true,
+  // 為 App 和 Pages Router 選擇退出特定套件的打包：
+  serverExternalPackages: ['package-name'],
+};
+ 
+export default nextConfig;
+```
+
+了解更多關於[優化外部套件](/docs/app/building-your-application/optimizing/package-bundling)的資訊。
+
+[ESLint 9 支援](#eslint-9-support)
+-------------------------------------
+
+Next.js 15 還引入了對 [ESLint 9](https://eslint.org/blog/2024/04/eslint-v9.0.0-released) 的支援，ESLint 8 將於 2024 年 10 月 5 日終止支援。
+
+為了確保平穩過渡，Next.js 保持向後相容性，這意味著您可以繼續使用 ESLint 8 或 9。
+
+如果您升級到 ESLint 9，且我們檢測到您尚未採用 [新的配置格式](https://eslint.org/blog/2024/04/eslint-v9.0.0-released/#flat-config-is-now-the-default-and-has-some-changes)，Next.js 會自動應用 `ESLINT_USE_FLAT_CONFIG=false` 逃生艙以簡化遷移。
+
+此外，執行 `next lint` 時，將移除如 `—ext` 和 `—ignore-path` 等已棄用的選項。請注意，ESLint 最終將在 ESLint 10 中禁止這些舊配置，因此我們建議您盡快開始遷移。
+
+有關這些變更的更多詳細資訊，請查看 [遷移指南](https://eslint.org/docs/latest/use/migrate-to-9.0.0)。
+
+作為此更新的一部分，我們還將 `eslint-plugin-react-hooks` 升級至 `v5.0.0`，其中引入了 React Hooks 使用的新規則。您可以在 [eslint-plugin-react-hooks@5.0.0 的變更日誌](https://github.com/facebook/react/releases/tag/eslint-plugin-react-hooks%405.0.0) 中查看所有變更。
+
+[開發與構建改進](#development-and-build-improvements)
+-------------------------------------------------------------------------
+
+### [伺服器元件 HMR](#server-components-hmr)
+
+在開發過程中，伺服器元件會在儲存時重新執行。這意味著，對您的 API 端點或第三方服務的任何 `fetch` 請求也會被呼叫。
+
+為了提高本地開發效能並減少計費 API 呼叫的潛在成本，我們現在確保熱模組替換 (HMR) 可以重複使用先前渲染的 `fetch` 回應。
+
+了解更多關於 [伺服器元件 HMR 快取](/docs/app/api-reference/next-config-js/serverComponentsHmrCache) 的資訊。
+
+### [App Router 的靜態生成加速](#faster-static-generation-for-the-app-router)
+
+我們優化了靜態生成流程以提升建置速度，特別是針對含有慢速網路請求的頁面。
+
+先前，我們的靜態優化流程會渲染頁面兩次——第一次是為客戶端導航生成資料，第二次則是為初始頁面訪問渲染 HTML。現在，我們重複利用第一次渲染的結果，省去第二次處理，從而減少工作量並縮短建置時間。
+
+此外，靜態生成工作現已跨頁面共享 `fetch` 快取。若 `fetch` 呼叫未選擇退出快取，其結果將由同一工作處理的其他頁面重複使用。這減少了對相同資料的重複請求次數。
+
+### [進階靜態生成控制（實驗性功能）](#advanced-static-generation-control-experimental)
+
+我們新增了實驗性支援，讓進階使用情境能更精確控制靜態生成流程。
+
+除非有特定需求，否則建議維持當前預設值，因為這些選項可能導致資源使用量增加，並因並行處理量提升而引發記憶體不足錯誤。
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    // Next.js 在建置失敗前會重試失敗頁面生成的次數
+    staticGenerationRetryCount: 1
+    // 每個工作處理的頁面數量上限
+    staticGenerationMaxConcurrency: 8
+    // 啟動新導出工作前所需的最小頁面數
+    staticGenerationMinPagesPerWorker: 25
+  },
+}
+ 
+export default nextConfig;
+```
+
+了解更多關於[靜態生成選項](/docs/app/api-reference/next-config-js/staticGeneration)的資訊。
+
+[其他變更](#other-changes)
+-------------------------------
+
+*   **\[重大變更\]** next/image：移除 `squoosh`，改以 `sharp` 作為選用依賴項 ([PR](https://github.com/vercel/next.js/pull/63321))
+*   **\[重大變更\]** next/image：預設 `Content-Disposition` 改為 `attachment` ([PR](https://github.com/vercel/next.js/pull/65631))
+*   **\[重大變更\]** next/image：當 `src` 含有前導或尾隨空格時將拋出錯誤 ([PR](https://github.com/vercel/next.js/pull/65637))
+*   **\[重大變更\]** Middleware：套用 `react-server` 條件以限制不建議的 React API 導入 ([PR](https://github.com/vercel/next.js/pull/65424))
+*   **\[重大變更\]** next/font：移除對外部 `@next/font` 套件的支援 ([PR](https://github.com/vercel/next.js/pull/65601))
+*   **\[重大變更\]** next/font：移除 `font-family` 雜湊處理 ([PR](https://github.com/vercel/next.js/pull/53608))
+*   **\[重大變更\]** 快取機制：`force-dynamic` 現在會為 fetch 快取設定 `no-store` 預設值 ([PR](https://github.com/vercel/next.js/pull/64145))
+*   **\[重大變更\]** 設定：預設啟用 `swcMinify` ([PR](https://github.com/vercel/next.js/pull/65579))、`missingSuspenseWithCSRBailout` ([PR](https://github.com/vercel/next.js/pull/65688)) 和 `outputFileTracing` ([PR](https://github.com/vercel/next.js/pull/65579)) 行為，並移除已棄用選項
+*   **\[重大變更\]** 移除 Speed Insights 的自動檢測功能（現需使用專用套件 [@vercel/speed-insights](https://www.npmjs.com/package/@vercel/speed-insights)）([PR](https://github.com/vercel/next.js/pull/64199))
+*   **\[重大變更\]** 移除動態網站地圖路由的 `.xml` 副檔名，並統一開發與生產環境的網站地圖 URL ([PR](https://github.com/vercel/next.js/pull/65507))
+*   **\[重大變更\]** 我們已棄用在 App Router 中使用 `export const runtime = "experimental-edge"`，使用者應改用 `export const runtime = "edge"`。我們提供了 [codemod 工具](/docs/app/building-your-application/upgrading/codemods#app-dir-runtime-config-experimental-edge)來執行此轉換 ([PR](https://github.com/vercel/next.js/pull/70480))
+*   **\[重大變更\]** 在渲染過程中呼叫 `revalidateTag` 和 `revalidatePath` 現在會拋出錯誤 ([PR](https://github.com/vercel/next.js/pull/71093))
+*   **\[重大變更\]** `instrumentation.js` 和 `middleware.js` 檔案現在會使用內建的 React 套件 ([PR](https://github.com/vercel/next.js/pull/69619))
+*   **\[重大變更\]** 最低要求的 Node.js 版本已更新至 18.18.0 ([PR](https://github.com/vercel/next.js/pull/67274))
+*   **\[重大變更\]** `next/dynamic`：已移除棄用的 `suspense` 屬性，且在 App Router 中使用時不再插入空的 Suspense 邊界 ([PR](https://github.com/vercel/next.js/pull/67014))
+*   **\[重大變更\]** 在 Edge Runtime 解析模組時，將不再套用 `worker` 模組條件 ([PR](https://github.com/vercel/next.js/pull/66808))
+*   **\[重大變更\]** 禁止在 Server Components 中使用 `next/dynamic` 的 `ssr: false` 選項 ([PR](https://github.com/vercel/next.js/pull/70378))
+*   **\[改進\]** Metadata：更新了在 Vercel 上託管時 `metadataBase` 的環境變數後備值 ([PR](https://github.com/vercel/next.js/pull/65089))
+*   **\[改進\]** 修復混合命名空間與命名導入時的 `optimizePackageImports` 樹搖優化問題 ([PR](https://github.com/vercel/next.js/pull/64894))
+*   **\[改進\]** Parallel Routes：為未匹配的 catch-all 路由提供所有已知參數 ([PR](https://github.com/vercel/next.js/pull/65063))
+*   **\[改進\]** 設定項 `bundlePagesExternals` 已穩定並更名為 `bundlePagesRouterDependencies`
+*   **\[改進\]** 設定項 `serverComponentsExternalPackages` 已穩定並更名為 `serverExternalPackages`
+*   **\[改進\]** create-next-app：新專案預設忽略所有 `.env` 檔案 ([PR](https://github.com/vercel/next.js/pull/61920))
+*   **\[改進\]** `outputFileTracingRoot`、`outputFileTracingIncludes` 和 `outputFileTracingExcludes` 已從實驗性功能升級為穩定功能 ([PR](https://github.com/vercel/next.js/pull/68464))
+*   **\[改進\]** 避免將全域 CSS 檔案與樹狀結構深處的 CSS 模組檔案合併 ([PR](https://github.com/vercel/next.js/pull/67373))
+*   **\[改進\]** 現在可透過 `NEXT_CACHE_HANDLER_PATH` 環境變數指定快取處理器 ([PR](https://github.com/vercel/next.js/pull/70537/))
+*   **\[改進\]** Pages Router 現在同時支援 React 18 和 React 19 ([PR](https://github.com/vercel/next.js/pull/69484))
+*   **\[改進\]** 若啟用檢查器，錯誤疊加層現在會顯示複製 Node.js Inspector URL 的按鈕 ([PR](https://github.com/vercel/next.js/pull/69357))
+*   **\[改進\]** App Router 的客戶端預取現在使用 `priority` 屬性 ([PR](https://github.com/vercel/next.js/pull/67356))
+*   **\[改進\]** Next.js 現在提供 `unstable_rethrow` 函式以在 App Router 中重新拋出 Next.js 內部錯誤 ([PR](https://github.com/vercel/next.js/pull/65831))
+*   **\[改進\]** `unstable_after` 現在可用於靜態頁面 ([PR](https://github.com/vercel/next.js/pull/71231))
+*   **\[改進\]** 若在 SSR 期間使用 `next/dynamic` 元件，將預先取得該區塊 ([PR](https://github.com/vercel/next.js/pull/65486))
+*   **\[改進\]** App Router 現在支援 `esmExternals` 選項 ([PR](https://github.com/vercel/next.js/pull/65041))
+*   **\[改進\]** 可使用 `experimental.allowDevelopmentBuild` 選項允許在 `next build` 時使用 `NODE_ENV=development` 進行除錯 ([PR](https://github.com/vercel/next.js/pull/65463))
+*   **\[改進\]** Pages Router 中已停用 Server Action 轉換功能 ([PR](https://github.com/vercel/next.js/pull/71028))
+*   **\[改進\]** 建置工作現會在退出時防止建置程序卡住 ([PR](https://github.com/vercel/next.js/pull/70997))
+*   **\[改進\]** 從 Server Action 重新導向時，現在會正確套用重新驗證 ([PR](https://github.com/vercel/next.js/pull/70715))
+*   **\[改進\]** Edge Runtime 上現在能正確處理平行路由的動態參數 ([PR](https://github.com/vercel/next.js/pull/70667))
+*   **\[改進\]** 靜態頁面在初始載入後現在會遵守 staleTime ([PR](https://github.com/vercel/next.js/pull/70640))
+*   **\[改進\]** 更新 `vercel/og` 並修復記憶體洩漏問題 ([PR](https://github.com/vercel/next.js/pull/70214))
+*   **\[改進\]** 更新時序修補以支援使用如 `msw` 等套件進行 API 模擬 ([PR](https://github.com/vercel/next.js/pull/68193))
+*   **\[改進\]** 預渲染頁面應使用靜態 staleTime ([PR](https://github.com/vercel/next.js/pull/67868))
+
+了解更多詳情，請查閱[升級指南](/docs/app/building-your-application/upgrading/version-15)。
+
+[貢獻者](#contributors)
+-----------------------------
+
+Next.js 是超過 3,000 名獨立開發者、Google 和 Meta 等產業夥伴，以及 Vercel 核心團隊共同努力的成果。此版本由以下成員共同打造：
+
+*   **Next.js** 團隊：[Andrew](https://github.com/acdlite)、[Hendrik](https://github.com/unstubbable)、[Janka](https://github.com/lubieowoce)、[Jiachi](https://github.com/huozhi)、[Jimmy](https://github.com/feedthejim)、[Jiwon](https://github.com/devjiwonchoi)、[JJ](https://github.com/ijjk)、[Josh](https://github.com/gnoff)、[Sam](https://github.com/samcx)、[Sebastian](https://github.com/sebmarkbage)、[Sebbie](https://github.com/eps1lon)、[Shu](https://github.com/shuding)、[Wyatt](https://github.com/wyattjoh) 和 [Zack](https://github.com/ztanner)。
+*   **Turbopack** 團隊：[Alex](https://github.com/arlyon)、[Benjamin](https://github.com/bgw)、[Donny](https://github.com/kdy1)、[Maia](https://github.com/padmaia)、[Niklas](https://github.com/mischnic)、[Tim](https://github.com/timneutkens)、[Tobias](https://github.com/sokra) 和 [Will](https://github.com/wbinnssmith)。
+*   **Next.js 文件** 團隊：[Delba](https://github.com/delbaoliveira)、[Rich](https://github.com/molebox)、[Ismael](https://github.com/ismaelrumzan) 和 [Lee](https://github.com/leerob)。
+
+特別感謝 @AbhiShake1、@Aerilym、@AhmedBaset、@AnaTofuZ、@Arindam200、@Arinji2、@ArnaudFavier、@ArnoldVanN、@Auxdible、@B33fb0n3、@Bhavya031、@Bjornnyborg、@BunsDev、@CannonLock、@CrutchTheClutch、@DeepakBalaraman、@DerTimonius、@Develliot、@EffectDoplera、@Ehren12、@Ethan-Arrowood、@FluxCapacitor2、@ForsakenHarmony、@Francoscopic、@Gomah、@GyoHeon、@Hemanshu-Upadhyay、@HristovCodes、@HughHzyb、@IAmKushagraSharma、@IDNK2203、@IGassmann、@ImDR、@IncognitoTGT、@Jaaneek、@JamBalaya56562、@Jeffrey-Zutt、@JohnGemstone、@JoshuaKGoldberg、@Julian-Louis、@Juneezee、@KagamiChan、@Kahitar、@KeisukeNagakawa、@KentoMoriwaki、@Kikobeats、@KonkenBonken、@Kuboczoch、@Lada496、@LichuAcu、@LorisSigrist、@Lsnsh、@Luk-z、@Luluno01、@M-YasirGhaffar、@Maaz-Ahmed007、@Manoj-M-S、@ManuLpz4、@Marukome0743、@MaxLeiter、@MehfoozurRehman、@MildTomato、@MonstraG、@N2D4、@NavidNourani、@Nayeem-XTREME、@Netail、@NilsJacobsen、@Ocheretovich、@OlyaPolya、@PapatMayuri、@PaulAsjes、@PlagueFPS、@ProchaLu、@Pyr33x、@QiuranHu、@RiskyMH、@Sam-Phillemon9493、@Sayakie、@Shruthireddy04、@SouthLink、@Strift、@SukkaW、@Teddir、@Tim-Zj、@TrevorSayre、@Unsleeping、@Willem-Jaap、@a89529294、@abdull-haseeb、@abhi12299、@acdlite、@actopas、@adcichowski、@adiguno、@agadzik、@ah100101、@akazwz、@aktoriukas、@aldosch、@alessiomaffeis、@allanchau、@alpedia0、@amannn、@amikofalvy、@anatoliik-lyft、@anay-208、@andrii-bodnar、@anku255、@ankur-dwivedi、@aralroca、@archanaagivale30、@arlyon、@atik-persei、@avdeev、@baeharam、@balazsorban44、@bangseongbeom、@begalinsaf、@bennettdams、@bewinsnw、@bgw、@blvdmitry、@bobaaaaa、@boris-szl、@bosconian-dynamics、@brekk、@brianshano、@cfrank、@chandanpasunoori、@chentsulin、@chogyejin、@chrisjstott、@christian-bromann、@codeSTACKr、@coderfin、@coltonehrman、@controversial、@coopbri、@creativoma、@crebelskydico、@crutchcorn、@darthmaim、@datner、@davidsa03、@delbaoliveira、@devjiwonchoi、@devnyxie、@dhruv-kaushik、@dineshh-m、@diogocapela、@dnhn、@domdomegg、@domin-mnd、@dvoytenko、@ebCrypto、@ekremkenter、@emmerich、@flybayer、@floriangosse、@forsakenharmony、@francoscopic、@frys、@gabrielrolfsen、@gaojude、@gdborton、@greatvivek11、@gnoff、@guisehn、@GyoHeon、@hamirmahal、@hiro0218、@hirotomoyamada、@housseindjirdeh、@hungdoansy、@huozhi、@hwangstar156、@iampoul、@ianmacartney、@icyJoseph、@ijjk、@imddc、@imranolas、@iscekic、@jantimon、@jaredhan418、@jeanmax1me、@jericopulvera、@jjm2317、@jlbovenzo、@joelhooks、@joeshub、@jonathan-ingram、@jonluca、@jontewks、@joostmeijles、@jophy-ye、@jordienr、@jordyfontoura、@kahlstrm、@karlhorky、@karlkeefer、@kartheesan05、@kdy1、@kenji-webdev、@kevva、@khawajaJunaid、@kidonng、@kiner-tang、@kippmr、@kjac、@kjugi、@kshehadeh、@kutsan、@kwonoj、@kxlow、@leerob、@lforst、@li-jia-nan、@liby、@lonr、@lorensr、@lovell、@lubieowoce、@luciancah、@luismiramirez、@lukahartwig、@lumirlumir、@luojiyin1987、@mamuso、@manovotny、@marlier、@mauroaccornero、@maxhaomh、@mayank1513、@mcnaveen、@md-rejoyan-islam、@mehmetozguldev、@mert-duzgun、@mirasayon、@mischnic、@mknichel、@mobeigi、@molebox、@mratlamwala、@mud-ali、@n-ii-ma、@n1ckoates、@nattui、@nauvalazhar、@neila-a、@neoFinch、@niketchandivade、@nisabmohd、@none23、@notomo、@notrab、@nsams、@nurullah、@okoyecharles、@omahs、@paarthmadan、@pathliving、@pavelglac、@penicillin0、@phryneas、@pkiv、@pnutmath、@qqww08、@r34son、@raeyoung-kim、@remcohaszing、@remorses、@rezamauliadi、@rishabhpoddar、@ronanru、@royalfig、@rubyisrust、@ryan-nauman、@ryohidaka、@ryota-murakami、@s-ekai、@saltcod、@samcx、@samijaber、@sean-rallycry、@sebmarkbage、@shubh73、@shuding、@sirTangale、@sleevezip、@slimbde、@soedirgo、@sokra、@sommeeeer、@sopranopillow、@souporserious、@srkirkland、@steadily-worked、@steveluscher、@stipsan、@styfle、@stylessh、@syi0808、@symant233、@tariknh、@theoludwig、@timfish、@timfuhrmann、@timneutkens、@tknickman、@todor0v、@tokkiyaa、@torresgol10、@tranvanhieu01012002、@txxxxc、@typeofweb、@unflxw、@unstubbable、@versecafe、@vicb、@vkryachko、@wbinnssmith、@webtinax、@weicheng95、@wesbos、@whatisagi、@wiesson、@woutvanderploeg、@wyattjoh、@xiaohanyu、@xixixao、@xugetsu、@yosefbeder、@ypessoa、@ytori、@yunsii、@yurivangeffen、@z0n、@zce、@zhawtof、@zsh77 和 @ztanner 的協助！

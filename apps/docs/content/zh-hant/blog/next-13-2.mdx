@@ -1,0 +1,372 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-05-29T20:00:01.533Z
+title: Next.js 13.2
+description: >-
+  Next.js 13.2 為應用路由 (App Router) 帶來重大改進以邁向穩定版，包括 SEO 支援、路由處理器 (Route Handlers)、伺服器元件 (Server Components) 的 MDX 支援、類型安全連結 (Type-Safe Links) 等新功能。
+author:
+  - name: Casey Gowrie
+    image: /static/team/casey.png
+  - name: Jimmy Lai
+    image: /static/team/jimmy.jpg
+  - name: Luba Kravchenko
+    image: /static/team/luba.png
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2023-02-23T18:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-2/twitter-card.png
+---
+
+Next.js 13.2 包含針對應用路由 (`app`) 的重大改進，為穩定版做準備：
+
+*   [**內建 SEO 支援**](#built-in-seo-support-with-new-metadata-api)：全新 Metadata API 可設定靜態與動態 `meta` 標籤
+*   [**路由處理器 (Route Handlers)**](#custom-route-handlers)：基於 Web `Request` 和 `Response` 的自訂請求處理器
+*   [**伺服器元件 (Server Components) 的 MDX 支援**](#mdx-for-server-components)：在 Markdown 中使用 React 元件，僅限伺服器端
+*   [**Rust MDX 解析器**](#rust-mdx-parser)：採用全新 Rust 外掛實現更快的 Markdown 解析
+*   [**改進的錯誤覆蓋層**](#improved-error-overlay)：分離 Next.js 與 React 堆疊追蹤，提升可讀性
+*   [**靜態類型連結 (Beta)**](#statically-typed-links)：透過 `next/link` 和 TypeScript 防止無效連結
+*   [**Turbopack 改進 (Alpha)**](#turbopack-improvements)：相容 Webpack 載入器並提升支援度
+*   [**Next.js 快取 (Beta)**](#nextjs-cache)：漸進式 ISR 與更快的程式碼變更重新部署
+
+立即執行以下指令更新：
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+[透過全新 Metadata API 實現內建 SEO 支援](#built-in-seo-support-with-new-metadata-api)
+-----------------------------------------------------------------------------------------
+
+Next.js 從設計之初就考慮了[搜尋引擎最佳化](https://nextjs.org/learn/seo/introduction-to-seo)。
+
+提供預渲染的 HTML 內容不僅有助於改善搜尋引擎索引，還能提升應用程式效能。雖然 Next.js 長期以來透過 `next/head` 提供簡單的 API 來修改應用程式的中繼資料，但我們希望為應用路由 (`app`) 重新設計並強化搜尋引擎最佳化方式。
+
+新的 Metadata API 允許您在任佈局或頁面（需為伺服器元件）中，透過明確的中繼資料配置來定義 HTML `head` 元素內的 `meta` 和 `link` 標籤。
+
+```tsx filename="app/layout.tsx"
+import type { Metadata } from 'next';
+ 
+export const metadata: Metadata = {
+  title: '首頁',
+  description: '歡迎使用 Next.js',
+};
+```
+
+此 API 簡單、可組合，並設計為與串流伺服器渲染相容。例如，您可以在根佈局中為整個應用程式設定共同的中繼資料屬性，並為其他路由組合與合併中繼資料物件。
+
+這包括對動態與靜態中繼資料的支援：
+
+```js filename="layout.js / page.js"
+// 靜態中繼資料
+export const metadata = {
+  title: '...',
+};
+ 
+// 動態中繼資料
+export async function generateMetadata({ params, searchParams }) {
+  const product = await getProduct(params.id);
+  return { title: product.title };
+}
+```
+
+所有中繼資料選項皆可用，包括透過 [TypeScript 外掛](/docs/app/building-your-application/configuring/typescript#using-the-typescript-plugin) 或添加 `Metadata` 類型來提供自訂中繼資料。
+
+例如，您可以透過中繼資料定義 Open Graph 圖片：
+
+```tsx filename="app/layout.tsx"
+export const metadata = {
+  openGraph: {
+    title: 'Next.js',
+    description: '專為網路打造的 React 框架',
+    url: 'https://nextjs.org',
+    siteName: 'Next.js',
+    images: [
+      {
+        url: 'https://nextjs.org/og.png',
+        width: 800,
+        height: 600,
+      },
+    ],
+    locale: 'en-US',
+    type: 'website',
+  },
+};
+ 
+export default function Layout({ children }) {}
+```
+
+Metadata API 在 13.2 版中適用於應用路由 (`app`)，取代先前的 `head.js` 特殊檔案。此功能不適用於 `pages` 目錄。
+
+[深入瞭解 SEO](/learn/seo/introduction-to-seo) 或查看 [Metadata API 參考文件](/docs/app/api-reference/file-conventions/metadata)。我們要感謝 [next-seo](https://github.com/garmeeh/next-seo) 對社群套件的貢獻及對初期 API 設計的回饋。
+
+[自訂路由處理器 (Route Handlers)](#custom-route-handlers)
+-----------------------------------------------
+
+應用路由 (`app`) 最初 beta 版缺少的功能之一是 API 路由（存在於 `pages/api` 目錄中）。我們希望藉此機會建立一個更現代化的 API 路由版本，深度整合到 `app` 的新路由系統中。
+
+路由處理器允許您使用 Web [Request](https://developer.mozilla.org/docs/Web/API/Request) 和 [Response](https://developer.mozilla.org/docs/Web/API/Response) API 為指定路由建立自訂請求處理器。
+
+```ts filename="app/example/route.ts"
+export async function GET(request: Request) {}
+```
+
+路由處理器具有同構 API，無縫支援 Edge 和 Node.js 運行環境，包括串流回應的支援。由於路由處理器使用與頁面和佈局相同的[路由區段配置](/docs/app/building-your-application/routing)，因此支援期待已久的功能，例如通用[靜態渲染](/docs/app/building-your-application/routing/route-handlers#static-and-dynamic-route-handlers) 和[重新驗證](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data)。
+
+`route.ts` 檔案可以匯出以 HTTP 動詞命名的非同步函式：`GET`、`HEAD`、`OPTIONS`、`POST`、`PUT`、`DELETE` 和 `PATCH`。這些函式可以被封裝和抽象化，為您的自訂路由邏輯建立輔助工具/可重用邏輯。
+
+其他伺服器函式，如 `cookies` 和 `headers`，可以在路由處理器中使用——連同這些抽象化所基於的任何 Web API。這允許在伺服器元件和路由處理器之間共享程式碼。
+
+```ts filename="app/example/route.ts"
+import { cookies } from 'next/headers';
+ 
+export async function GET(request: Request) {
+  const cookieStore = cookies();
+  const token = cookieStore.get('token');
+ 
+  return new Response('Hello, Next.js!', {
+    status: 200,
+    headers: { 'Set-Cookie': `token=${token}` },
+  });
+}
+```
+
+路由處理器在 13.2 版中適用於應用路由 (`app`)，使用 `route.ts` 特殊檔案。它們不適用於 `pages` 目錄，因為它們是 API 路由的替代方案。
+
+[深入瞭解路由處理器](/docs/app/building-your-application/routing/route-handlers) 或 [查看 API 參考文件](/docs/app/api-reference/file-conventions/route)。我們要感謝 SvelteKit 提供的[先前技術與靈感](https://kit.svelte.dev/docs/routing#server)。
+
+[伺服器元件 (Server Components) 的 MDX 支援](#mdx-for-server-components)
+-------------------------------------------------------
+
+MDX 是 Markdown 的超集，允許您直接在 Markdown 檔案中編寫 JSX。這是在內容中添加動態互動性和嵌入 React 元件的強大方式。
+
+在 13.2 版中，您現在可以完全在 React 伺服器元件中使用 MDX——這意味著更少的客戶端 JavaScript，實現更快的頁面載入，同時保留 React 在模板化動態 UI 方面的強大功能。您可以根據需要在 MDX 內容中添加互動性。
+
+`@next/mdx` 外掛已更新，支援在應用程式根目錄定義的新特殊檔案 `mdx-components.js|ts`，以提供自訂元件：
+
+```js filename="your-project/mdx-components.js"
+// 此檔案允許您提供自訂 React 元件
+// 用於 MDX 檔案。您可以匯入和使用任何
+// React 元件，包括來自其他函式庫的元件。
+function H1({ children }) {
+  // ...
+}
+ 
+function H2({ children }) {
+  // ...
+}
+ 
+export function useMDXComponents(components) {
+  return { h1: H1, h2: H2, ...components };
+}
+```
+
+此外，我們與社群套件 [`next-mdx-remote`](https://github.com/hashicorp/next-mdx-remote#react-server-components-rsc--nextjs-app-directory-support) 和 [`contentlayer`](https://www.contentlayer.dev/) 合作，添加了對 React 伺服器元件的支援。
+
+[瞭解如何設定與伺服器元件搭配使用的 MDX](/docs/app/building-your-application/configuring/mdx) 或 [部署我們的範例](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fapp-dir-mdx&project-name=app-dir-mdx&repository-name=app-dir-mdx)。
+
+[Rust MDX 解析器](#rust-mdx-parser)
+-----------------------------------
+
+作為啟用伺服器元件 MDX 支援的一部分，我們還用 Rust 重寫了 MDX 解析器以提高效能。這是一個顯著的改進，相較於之前的 JavaScript 解析器，在處理大量 MDX 檔案時會有明顯的效能下降。
+
+您可以在 `next.config.js` 中選擇使用 Rust 解析器。例如，與 `@next/mdx` 搭配使用：
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    appDir: true,
+    mdxRs: true,
+  },
+};
+ 
+const withMDX = require('@next/mdx')();
+module.exports = withMDX(nextConfig);
+```
+
+我們要感謝 [Titus Wormer](https://wooorm.com)，我們贊助他進行此專案。如果您想在 Next.js 之外使用此功能，請查看新套件 [mdxjs-rs](https://github.com/wooorm/mdxjs-rs)。
+
+[靜態類型連結 (Statically Typed Links)](#statically-typed-links)
+-------------------------------------------------
+
+Next.js 現在可以靜態類型化 `app` 目錄中的連結，以防止在使用 `next/link` 時出現拼寫錯誤和其他錯誤，提升頁面導航時的類型安全性。
+
+```
+import Link from 'next/link'
+ 
+// ✅
+<Link href="/about" />
+// ✅
+<Link href="/blog/nextjs" />
+// ✅
+<Link href={`/blog/${slug}`} />
+ 
+// ❌ 如果 href 不是有效路由，TypeScript 會報錯
+<Link href="/aboot" />
+```
+
+此功能需要使用新的應用路由以及 TypeScript。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    appDir: true,
+    typedRoutes: true,
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+此功能現已進入 beta 版。`rewrites` 和 `redirects` 尚不支援。
+
+[深入瞭解靜態類型路由](/docs/app/building-your-application/configuring/typescript#statically-typed-links)。
+
+[改進的錯誤覆蓋層](#improved-error-overlay)
+-------------------------------------------------
+
+為了提升錯誤的可讀性和可除錯性，我們對 Next.js 錯誤覆蓋層進行了多項改進。
+
+在 13.2 版中，Next.js 和 React 的堆疊追蹤現在分開顯示，更容易識別錯誤來源。此外，錯誤覆蓋層現在會顯示當前 Next.js 版本，幫助您瞭解版本是否為最新。
+
+![13.2 版中改進的錯誤覆蓋層，顯示版本過期狀態。](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-2/error.png)
+
+13.2 版中改進的錯誤覆蓋層，顯示版本過期狀態。
+
+我們還[改進了 React 水合錯誤的輸出](https://github.com/facebook/react/issues/24519#issuecomment-1439915463)，現在更易讀且更容易除錯。
+
+[Turbopack 改進](#turbopack-improvements)
+-------------------------------------------------
+
+[Turbopack](https://nextjs.org/docs/app/api-reference/turbopack) 是與 Next.js 13 一同發布的 alpha 版增量打包工具，旨在加速本地開發以及未來的生產建置。
+
+我們一直專注於在 Turbopack 中支援現有的 Next.js 功能，並在邁向 beta 版的過程中提升整體穩定性。自上次發布以來，我們新增了：
+
+*   支援 `next/dynamic`
+*   支援 `next.config.js` 中的 `rewrites`、`redirects`、`headers` 和 `pageExtensions`
+*   支援 `pages` 中的 404 和錯誤頁面
+*   支援 CSS 模組的 `composes: ... from ...`
+*   提升 Fast Refresh 的可靠性和錯誤恢復能力
+*   改進 CSS 優先級處理
+*   改進編譯時評估
+
+我們還修復了許多錯誤，並在使用一些內部最大的 Next.js 應用程式和早期 Vercel 客戶的過程中提升了穩定性。
+
+### [使用 Webpack 載入器進行自訂檔案轉換](#custom-file-transformation-with-webpack-loaders)
+
+Turbopack 現在支援並相容部分 webpack 載入器。這意味著您可以使用 Webpack 生態系統中的許多載入器來將不同類型的檔案轉換為 JavaScript。支援的載入器包括 `@mdx-js/loader`、`@svgr/webpack` 和 `babel-loader`。[深入瞭解](https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack) 如何自訂 Turbopack。
+
+例如，使用 `experimental.turbo.loaders` 為每個副檔名配置載入器列表：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    turbo: {
+      loaders: {
+        '.md': [
+          {
+            // 選項格式
+            loader: '@mdx-js/loader',
+            options: {
+              format: 'md',
+            },
+          },
+        ],
+        '.svg': ['@svgr/webpack'],
+      },
+    },
+  },
+};
+```
+
+查看[使用載入器的 Turbopack 範例](https://github.com/vercel/next.js/tree/canary/examples/with-turbopack-loaders) 以獲取完整範例。
+
+### [Webpack 風格的解析別名](#webpack-style-resolve-aliases)
+
+Turbopack 現在可以配置為透過別名修改模組解析，類似於 webpack 的 [`resolve.alias`](https://webpack.js.org/configuration/resolve/#resolvealias)。透過 `experimental.turbo.resolveAlias` 進行配置：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        underscore: 'lodash',
+        mocha: { browser: 'mocha/browser-entry.js' },
+      },
+    },
+  },
+};
+```
+
+[Next.js 快取](#nextjs-cache)
+------------------------------
+
+Next.js 13.2 引入了新的 Next.js 快取 (beta)，這是 [ISR](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data) 的演進，實現了：
+
+*   元件層級的漸進式 ISR
+*   無需網路請求的更快刷新
+*   更快的靜態頁面程式碼變更重新部署
+
+對於完全靜態的頁面，ISR 的工作方式與目前相同。對於具有更細粒度資料獲取、混合靜態和動態的頁面，Next.js 快取使用更細粒度、短暫的快取。
+
+基於 React 伺服器元件和 Next.js 應用路由 (`app`) 中的同置資料獲取，您現在可以將靜態或動態資料與其消費元件封裝在一起。
+
+```jsx filename="app/page.jsx"
+export default async function Page() {
+  const [staticData, dynamicData, revalidatedData] = await Promise.all([
+    // 快取直到手動失效
+    fetch(`https://...`),
+    // 每次請求時重新獲取
+    fetch(`https://...`, { cache: 'no-store' }),
+    // 快取 10 秒
+    fetch(`https://...`, { next: { revalidate: 10 } }),
+  ]);
+ 
+  return <div>...</div>;
+}
+```
+
+在使用應用路由進行本地開發時，您現在會在 `next dev` 中看到與生產環境 `next start` 相同的快取行為。這提高了當任何伺服器元件或資料載入程式碼變更時的 Fast Refresh 速度。
+
+使用 Next.js 快取，您的應用程式控制快取——而非第三方 API。這與 `cache-control` 標頭不同，後者由上游控制快取時間。
+
+### [Next.js 快取與 Vercel 快取 API](#nextjs-cache-with-the-vercel-cache-api)
+
+[Vercel 上的 Next.js](https://vercel.com/docs/concepts/next.js/overview) 為您提供了框架定義的基礎架構。您只需撰寫應用程式程式碼（例如使用 `fetch` 進行元件級資料獲取），我們就會為您搭建全球分散式基礎架構，無需額外努力。
+
+新的 Next.js 快取使程式碼變更與資料變更相互獨立。這可以大幅加速靜態頁面的重新部署，因為這些頁面的生成可以使用現有的快取。
+
+這項新的 Vercel 快取 API 設計為可與任何框架協作，但與 Next.js 快取有原生整合。[深入了解 ISR 如何演進為 Next.js 快取](https://vercel.com/blog/vercel-cache-api-nextjs-cache)，以及 Next.js 快取在部署至 Vercel 時的工作原理。
+
+### [自託管時的 Next.js 快取](#nextjs-cache-when-self-hosted)
+
+在自託管環境中，預設使用 50 MB 的 LRU 快取。預設情況下，所有快取條目會自動寫入磁碟。如果節點具有相同的快取鍵，此檔案系統快取可以在節點之間共享，類似於[當前 ISR 的運作方式](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration#self-hosting-isr)。
+
+對於希望進一步自訂和修改 Next.js 快取核心的開發者，可以修改底層快取鍵，並變更快取條目的持久化方式與位置，包括完全禁用持久化。
+
+[其他改進](#other-improvements)
+-----------------------------------------
+
+*   **字型：** 在驚人的社群採用後，`@next/font` 現已內建於 Next.js 中，命名為 `next/font`。這意味著您不再需要單獨安裝 `@next/font`。[了解更多](/docs/pages/building-your-application/optimizing/fonts)。
+*   **字型：** 根據社群反饋，`next/font` 的預設 `font-display` 屬性已從 `optional` 更改為 `font-display: swap`。
+*   **效能：** 優化了建置流程以減少記憶體使用，在我們的測試中節省了約 550MB ([PR](https://github.com/vercel/next.js/pull/45639))。
+*   **效能：** 避免多次載入專案配置，在我們的測試中平均使建置速度加快約 400ms ([PR](https://github.com/vercel/next.js/pull/45637))。
+*   **效能：** 優化了錯誤元件，在不改變樣式的情況下減少了 0.4kb 的 HTML 負載 ([PR](https://github.com/vercel/next.js/pull/45586))。
+*   **效能：** 將 edge 套件大小減少了約 130KB（幾乎是一半），進一步降低部署至 Vercel 等 edge 環境時的冷啟動大小 ([PR](https://github.com/vercel/next.js/pull/45601))。
+*   **安全性：** 新增配置 `images.contentDispositionType: "attachment"`，強制在直接訪問圖片優化 API 時下載圖片 ([PR](https://github.com/vercel/next.js/pull/46254))。
+
+[社群](#community)
+-----------------------
+
+Next.js 是超過 2,500 名獨立開發者、Google 和 Meta 等產業合作夥伴，以及 Vercel 核心團隊共同努力的成果。每週超過 390 萬次 npm 下載和 100,000+ GitHub 星標，使 Next.js 成為構建網路的最受歡迎方式之一。
+
+加入社群參與 [GitHub Discussions](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/) 和 [Discord](https://nextjs.org/discord)。
+
+此版本由以下人員共同呈現：
+
+*   **Next.js** 團隊： [Balazs](https://github.com/balazsorban44)、[Hannes](https://github.com/hanneslund)、[Jan](https://github.com/jankaifer)、[Jiachi](https://github.com/huozhi)、[Jimmy](https://github.com/feedthejim)、[JJ](https://github.com/ijjk)、[Josh](https://github.com/gnoff)、[Sebastian](https://github.com/sebmarkbage)、[Shu](https://github.com/shuding)、[Steven](https://github.com/styfle)、[Tim](https://github.com/timneutkens)、[Wyatt](https://github.com/wyattjoh) 和 [Andrew](https://twitter.com/acdlite)。
+*   **Turbopack** 團隊： [Alex](https://github.com/alexkirsz)、[Donny](https://github.com/kdy1)、[Justin](https://github.com/jridgewell)、[Leah](https://github.com/forsakenharmony)、[LongYinan](https://github.com/brooooooklyn)、[Maia](https://github.com/padmaia)、[OJ](https://github.com/kwonoj)、[Tobias](https://github.com/sokra) 和 [Will](https://github.com/wbinnssmith)。
+
+以及以下貢獻者：@timneutkens、@loettz、@okcoker、@clive-h-townsend、@shuding、@JanKaifer、@sepiropht、@hanneslund、@huozhi、@aralroca、@balazsorban44、@cristobaldominguez95、@vinaykulk621、@Brooooooklyn、@feedthejim、@samsisle、@MarDi66、@styfle、@therealrinku、@sebmarkbage、@cravend、@hu0p、@kdy1、@ijjk、@juzhiyuan、@IvanKiral、@LukeSchlangen、@wojtekolek、@samdenty、@Josehower、@bennettdams、@SCG82、@mike-plummer、@kwonoj、@David0z、@denchance、@joulev、@wbinnssmith、@alexkirsz、@UnknownMonk、@leerob、@sairajchouhan、@imranbarbhuiya、@jomeswang、@ductnn、@thomasballinger、@chibicode、@jridgewell、@sreetamdas、@Juneezee、@SukkaW、@wyattjoh、@michaeloliverx、@cattmote、@joefreeman、@valentincostam、@qrohlf、@ossan-engineer、@rishabhpoddar、@vasucp1207、@Schniz、@andrii-bodnar、@gergelyke、@abstractvector、@wherehows、@BrodaNoel、@taep96、@abe1272001、@0xadada、@nbouvrette、@teobler、@lubakravche、@molebox 和 @hiddenest。

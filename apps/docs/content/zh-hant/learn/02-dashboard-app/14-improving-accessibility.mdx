@@ -1,0 +1,369 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T20:06:48.308Z
+title: 提升無障礙性
+headline: 'App Router：提升無障礙性'
+description: 實作伺服器端表單驗證並改善表單的無障礙性。
+image: 'https://nextjs.org/api/learn-og?title=Improving%20Accessibility&amp;chapter=14'
+---
+
+在上一章中，我們探討了如何捕捉錯誤（包括 404 錯誤）並向使用者顯示備用內容。然而，我們還需要討論另一個關鍵部分：表單驗證。讓我們看看如何使用伺服器動作 (Server Actions) 實作伺服器端驗證，以及如何利用 React 的 [`useActionState`](https://react.dev/reference/react/useActionState) 鉤子顯示表單錯誤——同時兼顧無障礙性！
+
+[什麼是無障礙性？](#what-is-accessibility)
+------------------------------------------------
+
+無障礙性指的是設計和實作所有人都能使用的網頁應用程式，包括身障人士。這是一個涵蓋多個領域的廣泛主題，例如鍵盤導航、語義化 HTML、圖片、顏色、影片等。
+
+雖然本課程不會深入探討無障礙性，但我們將討論 Next.js 提供的無障礙功能以及一些讓應用程式更具無障礙性的常見實踐。
+
+> 如果您想了解更多關於無障礙性的內容，我們推薦 [web.dev](https://web.dev/) 的 [學習無障礙性](https://web.dev/learn/accessibility/) 課程。
+
+[在 Next.js 中使用 ESLint 無障礙外掛](#using-the-eslint-accessibility-plugin-in-nextjs)
+----------------------------------------------------------------------------------------------------
+
+Next.js 在其 ESLint 配置中包含 [`eslint-plugin-jsx-a11y`](https://www.npmjs.com/package/eslint-plugin-jsx-a11y) 外掛，幫助早期發現無障礙問題。例如，該外掛會在以下情況發出警告：圖片缺少 `alt` 文字、錯誤使用 `aria-*` 和 `role` 屬性等。
+
+如果您想嘗試此功能，可以選擇性地在 `package.json` 檔案中新增 `next lint` 腳本：
+
+```json {5} filename="/package.json"
+"scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start",
+    "lint": "next lint"
+},
+```
+
+然後在終端機中執行 `pnpm lint`：
+
+```bash filename="Terminal"
+pnpm lint
+```
+
+這將引導您安裝並配置專案的 ESLint。如果現在執行 `pnpm lint`，您應該會看到以下輸出：
+
+```bash filename="Terminal"
+✔ 沒有 ESLint 警告或錯誤
+```
+
+但是，如果圖片缺少 `alt` 文字會發生什麼？讓我們來看看！
+
+前往 `/app/ui/invoices/table.tsx` 並移除圖片的 `alt` 屬性。您可以使用編輯器的搜尋功能快速找到 `<Image>`：
+
+```tsx {6} filename="/app/ui/invoices/table.tsx"
+<Image
+  src={invoice.image_url}
+  className="rounded-full"
+  width={28}
+  height={28}
+  alt={`${invoice.name}'s profile picture`} // 刪除此行
+/>
+```
+
+現在再次執行 `pnpm lint`，您應該會看到以下警告：
+
+```bash filename="Terminal"
+./app/ui/invoices/table.tsx
+45:25  警告: 圖片元素必須具有 alt 屬性，
+可以是具有意義的文字，或是裝飾性圖片的空字串。 jsx-a11y/alt-text
+```
+
+雖然新增和配置 linter 不是必要步驟，但它有助於在開發過程中發現無障礙問題。
+
+[改善表單無障礙性](#improving-form-accessibility)
+-------------------------------------------------------------
+
+我們已經在表單中做了三件事來提升無障礙性：
+
+*   **語義化 HTML**：使用語義化元素（`<input>`、`<option>` 等）而非 `<div>`。這讓輔助技術 (AT) 能夠聚焦輸入元素並向使用者提供適當的上下文資訊，使表單更易於導航和理解。
+*   **標籤化**：包含 `<label>` 和 `htmlFor` 屬性確保每個表單欄位都有描述性文字標籤。這透過提供上下文來改善 AT 支援，並允許使用者點擊標籤來聚焦對應的輸入欄位，從而提升可用性。
+*   **聚焦外框**：欄位在聚焦時會正確顯示外框樣式。這對無障礙性至關重要，因為它視覺上標示了頁面上的活動元素，幫助鍵盤和螢幕閱讀器使用者理解他們在表單中的位置。您可以透過按 `tab` 鍵來驗證這一點。
+
+這些實踐為讓表單對更多使用者更具無障礙性奠定了良好基礎。然而，它們並未解決**表單驗證**和**錯誤處理**的問題。
+
+[表單驗證](#form-validation)
+-----------------------------------
+
+前往 [http://localhost:3000/dashboard/invoices/create](http://localhost:3000/dashboard/invoices/create)，然後提交一個空白表單。會發生什麼？
+
+您會得到一個錯誤！這是因為您正在向伺服器動作 (Server Action) 發送空白的表單值。您可以透過在客戶端或伺服器端驗證表單來避免這種情況。
+
+### [客戶端驗證](#client-side-validation)
+
+有幾種方法可以在客戶端驗證表單。最簡單的方式是依賴瀏覽器提供的表單驗證，透過在表單的 `<input>` 和 `<select>` 元素中新增 `required` 屬性來實現。例如：
+
+```tsx {7} filename="/app/ui/invoices/create-form.tsx"
+<input
+  id="amount"
+  name="amount"
+  type="number"
+  placeholder="輸入美元金額"
+  className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+  required
+/>
+```
+
+再次提交表單。如果您嘗試提交帶有空值的表單，瀏覽器將顯示警告。
+
+這種方法通常是可以接受的，因為某些 AT 支援瀏覽器驗證。
+
+客戶端驗證的另一種選擇是伺服器端驗證。讓我們在下一節中看看如何實作它。現在，如果您新增了 `required` 屬性，請先刪除它們。
+
+### [伺服器端驗證 (Server-Side validation)](#server-side-validation)
+
+透過在伺服器端驗證表單，您可以：
+
+* 確保資料在傳送到資料庫前符合預期格式
+* 降低惡意使用者繞過客戶端驗證的風險
+* 建立單一可信來源來定義何為「有效」資料
+
+在您的 `create-form.tsx` 元件中，從 `react` 導入 `useActionState` 鉤子 (hook)。由於 `useActionState` 是鉤子，您需要使用 `"use client"` 指令將表單轉換為客戶端元件 (Client Component)：
+
+```tsx {1,4} filename="/app/ui/invoices/create-form.tsx"
+'use client';
+ 
+// ...
+import { useActionState } from 'react';
+```
+
+在您的表單元件中，`useActionState` 鉤子：
+
+* 接收兩個參數：`(action, initialState)`
+* 返回兩個值：`[state, formAction]` - 表單狀態，以及提交表單時要呼叫的函數
+
+將您的 `createInvoice` 動作 (action) 作為參數傳遞給 `useActionState`，並在 `<form action={}>` 屬性中呼叫 `formAction`。
+
+```tsx {5,7} filename="/app/ui/invoices/create-form.tsx"
+// ...
+import { useActionState } from 'react';
+ 
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const [state, formAction] = useActionState(createInvoice, initialState);
+ 
+  return <form action={formAction}>...</form>;
+}
+```
+
+`initialState` 可以是您定義的任何內容，在此範例中，建立一個包含兩個空鍵的物件：`message` 和 `errors`，並從 `actions.ts` 檔案導入 `State` 類型。`State` 目前尚未定義，我們將在下一步建立：
+
+```tsx {2,6} filename="/app/ui/invoices/create-form.tsx"
+// ...
+import { createInvoice, State } from '@/app/lib/actions';
+import { useActionState } from 'react';
+ 
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const initialState: State = { message: null, errors: {} };
+  const [state, formAction] = useActionState(createInvoice, initialState);
+ 
+  return <form action={formAction}>...</form>;
+}
+```
+
+這可能一開始看起來有些困惑，但當您更新伺服器動作後會更清楚。現在讓我們來更新它。
+
+在您的 `action.ts` 檔案中，可以使用 Zod 來驗證表單資料。更新您的 `FormSchema` 如下：
+
+```ts {4,8,10} filename="/app/lib/actions.ts"
+const FormSchema = z.object({
+  id: z.string(),
+  customerId: z.string({
+    invalid_type_error: '請選擇客戶',
+  }),
+  amount: z.coerce
+    .number()
+    .gt(0, { message: '請輸入大於 $0 的金額' }),
+  status: z.enum(['pending', 'paid'], {
+    invalid_type_error: '請選擇發票狀態',
+  }),
+  date: z.string(),
+});
+```
+
+* `customerId` - 如果客戶欄位為空，Zod 已經會拋出錯誤，因為它預期是 `string` 類型。但如果使用者未選擇客戶，我們添加一個友善的提示訊息
+* `amount` - 由於您將金額類型從 `string` 強制轉換為 `number`，如果字串為空，它將默認為零。我們使用 `.gt()` 函數告訴 Zod 我們希望金額始終大於 0
+* `status` - 如果狀態欄位為空，Zod 已經會拋出錯誤，因為它預期是 "pending" 或 "paid"。如果使用者未選擇狀態，我們也添加一個友善的提示訊息
+
+接下來，更新您的 `createInvoice` 動作以接受兩個參數 - `prevState` 和 `formData`：
+
+```ts {1,2,3,4,5,6,7,8,10} filename="/app/lib/actions.ts"
+export type State = {
+  errors?: {
+    customerId?: string[];
+    amount?: string[];
+    status?: string[];
+  };
+  message?: string | null;
+};
+ 
+export async function createInvoice(prevState: State, formData: FormData) {
+  // ...
+}
+```
+
+* `formData` - 與之前相同
+* `prevState` - 包含從 `useActionState` 鉤子傳遞的狀態。在此範例中您不會在動作中使用它，但它是必需的屬性
+
+然後，將 Zod 的 `parse()` 函數更改為 `safeParse()`：
+
+```ts {3} filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // 使用 Zod 驗證表單欄位
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // ...
+}
+```
+
+`safeParse()` 將返回一個包含 `success` 或 `error` 欄位的物件。這有助於更優雅地處理驗證，而無需將此邏輯放在 `try/catch` 區塊中。
+
+在將資訊發送到資料庫之前，使用條件語句檢查表單欄位是否已正確驗證：
+
+```ts {10,11,12,13,14,15} filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // 使用 Zod 驗證表單欄位
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // 如果表單驗證失敗，提前返回錯誤。否則繼續。
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: '缺少欄位。建立發票失敗。',
+    };
+  }
+ 
+  // ...
+}
+```
+
+如果 `validatedFields` 不成功，我們會提前返回函數並帶有 Zod 的錯誤訊息。
+
+> **提示：** 可以 console.log `validatedFields` 並提交空白表單來查看其結構。
+
+最後，由於您是在 try/catch 區塊外單獨處理表單驗證，因此可以為任何資料庫錯誤返回特定訊息，您的最終程式碼應如下所示：
+
+```ts filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // 使用 Zod 驗證表單
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // 如果表單驗證失敗，提前返回錯誤。否則繼續。
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: '缺少欄位。建立發票失敗。',
+    };
+  }
+ 
+  // 準備插入資料庫的資料
+  const { customerId, amount, status } = validatedFields.data;
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+ 
+  // 將資料插入資料庫
+  try {
+    await sql`
+      INSERT INTO invoices (customer_id, amount, status, date)
+      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+    `;
+  } catch (error) {
+    // 如果發生資料庫錯誤，返回更具體的錯誤
+    return {
+      message: '資料庫錯誤：建立發票失敗',
+    };
+  }
+ 
+  // 重新驗證發票頁面的快取並重定向使用者
+  revalidatePath('/dashboard/invoices');
+  redirect('/dashboard/invoices');
+}
+```
+
+很好，現在讓我們在表單元件中顯示錯誤。回到 `create-form.tsx` 元件，您可以使用表單 `state` 來訪問錯誤。
+
+添加一個 **三元運算子 (ternary operator)** 來檢查每個特定錯誤。例如，在客戶欄位後，您可以添加：
+
+```tsx {14,27,28,29,30,31,32,33,34} filename="/app/ui/invoices/create-form.tsx"
+<form action={formAction}>
+  <div className="rounded-md bg-gray-50 p-4 md:p-6">
+    {/* 客戶名稱 */}
+    <div className="mb-4">
+      <label htmlFor="customer" className="mb-2 block text-sm font-medium">
+        選擇客戶
+      </label>
+      <div className="relative">
+        <select
+          id="customer"
+          name="customerId"
+          className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+          defaultValue=""
+          aria-describedby="customer-error"
+        >
+          <option value="" disabled>
+            選擇客戶
+          </option>
+          {customers.map((name) => (
+            <option key={name.id} value={name.id}>
+              {name.name}
+            </option>
+          ))}
+        </select>
+        <UserCircleIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
+      </div>
+      <div id="customer-error" aria-live="polite" aria-atomic="true">
+        {state.errors?.customerId &&
+          state.errors.customerId.map((error: string) => (
+            <p className="mt-2 text-sm text-red-500" key={error}>
+              {error}
+            </p>
+          ))}
+      </div>
+    </div>
+    // ...
+  </div>
+</form>
+```
+
+> **提示：** 您可以在元件中 console.log `state` 來檢查是否一切連接正確。由於您的表單現在是客戶端元件，請在開發工具中查看控制台。
+
+在上面的程式碼中，您還添加了以下 ARIA 標籤：
+
+* `aria-describedby="customer-error"`：這建立了 `select` 元素與錯誤訊息容器之間的關係。它表示帶有 `id="customer-error"` 的容器描述了 `select` 元素。當使用者與 `select` 框互動時，螢幕閱讀器會讀取此描述以通知他們錯誤
+* `id="customer-error"`：此 `id` 屬性唯一標識保存 `select` 輸入錯誤訊息的 HTML 元素。這是 `aria-describedby` 建立關係所必需的
+* `aria-live="polite"`：當 `div` 內的錯誤更新時，螢幕閱讀器應禮貌地通知使用者。當內容更改時（例如當使用者更正錯誤時），螢幕閱讀器會宣布這些更改，但僅在使用者空閒時才進行，以免打擾他們
+
+[練習：添加 ARIA 標籤](#practice-adding-aria-labels)
+============================================================
+
+使用上面的範例，將錯誤添加到其餘的表單欄位中。如果缺少任何欄位，您還應該在表單底部顯示訊息。您的 UI 應如下所示：
+
+<Image
+  alt="建立發票表單顯示每個欄位的錯誤訊息"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/form-validation-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/form-validation-page.png"
+  width="960"
+  height="568"
+/>
+
+準備好後，運行 `pnpm lint` 檢查您是否正確使用了 ARIA 標籤。
+
+如果您想挑戰自己，請運用本章學到的知識，將表單驗證添加到 `edit-form.tsx` 元件中。
+
+您需要：
+
+* 在 `edit-form.tsx` 元件中添加 `useActionState`
+* 編輯 `updateInvoice` 動作以處理來自 Zod 的驗證錯誤
+* 在元件中顯示錯誤，並添加 ARIA 標籤以提高可訪問性
+
+準備好後，展開下面的程式碼片段查看解決方案：

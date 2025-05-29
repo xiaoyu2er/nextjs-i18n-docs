@@ -1,0 +1,202 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T20:02:36.480Z
+title: Next.js 的可組合式快取功能
+description: 深入了解 'use cache' 的 API 設計與優勢
+author:
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+date: 2025-01-03T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/composable-caching/twitter-card.png
+---
+
+我們正在為 Next.js 開發一個簡單而強大的快取模型。在之前的文章中，我們討論了[快取開發歷程](/blog/our-journey-with-caching)以及如何實現 `'use cache'` 指令。
+
+本文將探討 `'use cache'` 的 API 設計與優勢。
+
+[什麼是 `'use cache'`？](#what-is-use-cache)
+--------------------------------------------
+
+`'use cache'` 透過按需快取資料或元件，讓您的應用程式運行得更快。
+
+它是一個 JavaScript「指令」——您在程式碼中添加的字串字面量——用於通知 Next.js 編譯器進入不同的「邊界」。例如，從伺服器端切換到客戶端。
+
+這與 React 的 `'use client'` 和 `'use server'` 等指令概念相似。指令是定義程式碼運行位置的編譯器指示，讓框架能為您優化和協調各個部分。
+
+[運作原理](#how-does-it-work)
+--------------------------------------
+
+讓我們從一個簡單範例開始：
+
+```
+async function getUser(id) {
+  'use cache';
+  let res = await fetch(`https://api.vercel.app/user/${id}`);
+  return res.json();
+}
+```
+
+在底層，Next.js 會因 `'use cache'` 指令將此程式碼轉換為伺服器函式。在編譯期間，會找出此快取項目的「依賴項」並將其作為快取鍵的一部分。
+
+例如，`id` 會成為快取鍵的一部分。如果我們多次呼叫 `getUser(1)`，就會從快取的伺服器函式返回記憶化的輸出。更改此值將在快取中建立新項目。
+
+讓我們看一個在伺服器元件中使用快取函式的範例，其中包含[閉包](https://v0.dev/chat/5kD47RIecQK?b=b_rCP4CvfbFFW)。
+
+```
+function Profile({ id }) {
+  async function getNotifications(index, limit) {
+    'use cache';
+    return await db
+      .select()
+      .from(notifications)
+      .limit(limit)
+      .offset(index)
+      .where(eq(notifications.userId, id));
+  }
+ 
+  return <User notifications={getNotifications} />;
+}
+```
+
+這個範例較為複雜。您能找出所有需要作為快取鍵一部分的依賴項嗎？
+
+參數 `index` 和 `limit` 很明顯——如果這些值改變，我們會選取不同的通知片段。但使用者 `id` 呢？它的值來自父元件。
+
+編譯器能夠理解 `getNotifications` 也依賴於 `id`，其值會自動包含在快取鍵中。這能防止因快取鍵中錯誤或缺失依賴項而導致的快取問題。
+
+[為何不使用快取函式？](#why-not-use-a-cache-function)
+--------------------------------------------------------------
+
+讓我們重新審視上一個範例。我們是否可以使用 `cache()` 函式而非指令？
+
+```
+function Profile({ id }) {
+  async function getNotifications(index, limit) {
+    return await cache(async () => {
+      return await db
+        .select()
+        .from(notifications)
+        .limit(limit)
+        .offset(index)
+        // 糟糕！我們該在哪裡將 id 包含進快取鍵？
+        .where(eq(notifications.userId, id));
+    });
+  }
+ 
+  return <User notifications={getNotifications} />;
+}
+```
+
+`cache()` 函式無法查看閉包並發現 `id` 值應作為快取鍵的一部分。您需要手動指定 `id` 是快取鍵的一部分。如果忘記這樣做或操作不當，可能會導致快取衝突或過時資料。
+
+閉包可以捕獲各種區域變數。簡單的做法可能會意外包含（或遺漏）您未預期的變數。這可能導致快取錯誤資料，或者如果敏感資訊洩漏到快取鍵中，可能引發快取污染風險。
+
+`'use cache'` 為編譯器提供了足夠的上下文來安全處理閉包並正確產生快取鍵。僅在運行時解決的方案（如 `cache()`）需要您手動完成所有操作——這很容易出錯。相比之下，指令可以靜態分析，可靠地在底層處理所有依賴項。
+
+[如何處理不可序列化的輸入值？](#how-are-non-serialized-input-values-handled)
+--------------------------------------------------------------------------------------------
+
+我們有兩種類型的輸入值需要快取：
+
+*   **可序列化**：這裡「可序列化」意味著輸入可以轉換為穩定的、基於字串的格式而不丟失意義。雖然許多人首先想到 `JSON.stringify`，但我們實際上使用 React 的序列化（例如透過伺服器元件）來處理更廣泛的輸入——包括 Promise、循環資料結構和其他複雜物件。這超出了普通 JSON 的能力範圍。
+*   **不可序列化**：這些輸入不是快取鍵的一部分。當我們嘗試快取這些值時，會返回一個伺服器「參考」。然後 Next.js 在運行時使用此參考來恢復原始值。
+
+假設我們記得將 `id` 包含在快取鍵中：
+
+```
+await cache(async () => {
+  return await db
+    .select()
+    .from(notifications)
+    .limit(limit)
+    .offset(index)
+    .where(eq(notifications.userId, id));
+}, [id, index, limit]);
+```
+
+如果輸入值可以序列化，這會有效。但如果 `id` 是一個 React 元素或更複雜的值，我們就需要手動序列化輸入鍵。考慮一個根據 `id` 屬性獲取當前使用者的伺服器元件：
+
+```
+async function Profile({ id, children }) {
+  'use cache';
+  const user = await getUser(id);
+ 
+  return (
+    <>
+      <h1>{user.name}</h1>
+      {/* 變更 children 不會破壞快取... 為什麼？ */}
+      {children}
+    </>
+  );
+}
+```
+
+讓我們逐步了解其運作原理：
+
+1.  在編譯期間，Next.js 看到 `'use cache'` 指令並轉換程式碼以建立支援快取的特殊伺服器函式。快取不會在編譯期間發生，而是 Next.js 設定運行時快取所需的機制。
+2.  當您的程式碼呼叫「快取函式」時，Next.js 會序列化函式的參數。任何不能直接序列化的內容（如 JSX）會被替換為「參考」佔位符。
+3.  Next.js 檢查給定序列化參數是否存在快取結果。如果未找到結果，函式會計算新值進行快取。
+4.  函式完成後，返回值會被序列化。返回值的不可序列化部分會轉換回參考。
+5.  呼叫快取函式的程式碼會反序列化輸出並評估參考。這讓 Next.js 能將參考替換為實際物件或值，意味著像 `children` 這樣的不可序列化輸入可以保留其原始、未快取的值。
+
+這意味著我們可以安全地僅快取 `<Profile>` 元件而不快取子元件。在後續渲染中，不會再次呼叫 `getUser()`。`children` 的值可能是動態的，或是具有不同快取生命週期的單獨快取元素。這就是可組合式快取。
+
+[這似乎很熟悉...](#this-seems-familiar)
+--------------------------------------------
+
+如果您在想「這感覺與伺服器和客戶端組合的模型相同」——您完全正確。這有時稱為「甜甜圈」模式：
+
+*   **外層**是處理資料獲取或繁重邏輯的伺服器元件
+*   **中間的洞**是可能具有某些互動性的子元件
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  return (
+    <ServerComponent>
+      {/* 建立通往客戶端的洞 */}
+      <ClientComponent />
+    <ServerComponent />
+  );
+}
+```
+
+`'use cache'` 也是如此。甜甜圈是外部元件的快取值，而洞是在運行時填充的參考。這就是為什麼變更 `children` 不會使整個快取輸出失效。子元件只是稍後填充的參考。
+
+[標記與失效呢？](#what-about-tagging-and-invalidation)
+----------------------------------------------------------------------------
+
+您可以使用不同的[設定檔](/docs/app/api-reference/functions/cacheLife)定義快取的生命週期。我們包含了一組預設設定檔，但您也可以根據需要定義自訂值。
+
+```
+async function getUser(id) {
+  'use cache';
+  cacheLife('hours');
+  let res = await fetch(`https://api.vercel.app/user/${id}`);
+  return res.json();
+}
+```
+
+要使特定快取項目失效，您可以[標記快取](/docs/app/api-reference/functions/cacheTag)然後呼叫 `revalidateTag()`。一個強大的模式是您可以在獲取資料後（例如從 CMS）標記快取：
+
+```
+async function getPost(postId) {
+  'use cache';
+  let res = await fetch(`https://api.vercel.app/blog/${postId}`);
+  let data = await res.json();
+  cacheTag(postId, data.authorId);
+  return data;
+}
+```
+
+[簡單而強大](#simple-and-powerful)
+-------------------------------------------
+
+我們設計 `'use cache'` 的目標是讓快取邏輯的編寫既簡單又強大。
+
+*   **簡單**：您可以使用局部推理建立快取項目。無需擔心全局副作用，例如遺忘的快取鍵項目或對程式碼庫其他部分的意外變更。
+*   **強大**：您可以快取不僅僅是靜態可分析程式碼。例如，可能在運行時變更的值，但您仍希望在評估後快取輸出結果。
+
+`'use cache'` 在 Next.js 中仍處於**實驗階段**。我們期待您在測試時提供早期反饋。
+
+[在文件中了解更多](/docs/app/api-reference/directives/use-cache)。

@@ -1,0 +1,218 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T19:38:35.464Z
+title: Next.js 14.2 版本发布
+description: >-
+  Next.js 14.2 包含开发环境、生产环境和缓存机制的改进。
+  包括新增配置选项、Turbopack 测试通过率达 99%，以及其他优化。
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2024-04-11T17:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/twitter-card.png
+---
+
+Next.js 14.2 带来了开发环境、生产环境和缓存机制的全面优化。
+
+*   [**Turbopack 开发模式（候选发布版）**](#turbopack-for-development-release-candidate)：`next dev --turbo` 测试通过率达 99.8%
+*   [**构建与生产环境优化**](#build-and-production-improvements)：降低构建内存占用与 CSS 优化
+*   [**缓存机制改进**](#caching-improvements)：可通过 `staleTimes` 配置失效周期
+*   [**错误调试体验提升**](#errors-dx-improvements)：更清晰的水合不匹配错误提示与设计更新
+
+立即升级或通过以下命令创建新项目：
+
+```bash filename="终端"
+npx create-next-app@latest
+```
+
+[Turbopack 开发模式（候选发布版）](#turbopack-for-development-release-candidate)
+---------------------------------------------------------------------------------------------
+
+过去数月，我们持续优化基于 Turbopack 的本地开发性能。在 14.2 版本中，Turbopack **候选发布版** 现已支持本地开发：
+
+*   [集成测试](https://areweturboyet.com/)通过率提升至 **99.8%**
+*   已验证 Next.js 应用中最常用的 300 个 `npm` 包可在 Turbopack 中编译
+*   所有 [Next.js 示例项目](https://github.com/vercel/next.js/tree/canary/examples)均支持 Turbopack
+*   集成了基于 Rust 的高速 CSS 打包工具 [Lightning CSS](https://lightningcss.dev/)
+
+我们在 Vercel 内部应用中深度测试了 Turbopack。以大型 Next.js 应用 `vercel.com` 为例，我们观察到：
+
+*   本地服务启动速度 **最高提升 76.7%**
+*   代码热更新（Fast Refresh）速度 **最高提升 96.3%**
+*   无缓存时的初始路由编译速度 **最高提升 45.8%**（Turbopack 暂未实现磁盘缓存）
+
+Turbopack 仍为可选功能，可通过以下命令体验：
+
+```bash filename="终端"
+next dev --turbo
+```
+
+我们接下来的工作重点将聚焦于内存优化、持久化缓存实现以及 `next build --turbo` 支持：
+
+*   **内存占用** - 我们开发了底层工具用于分析内存使用情况。现在可以[生成追踪文件](/docs/architecture/turbopack#generating-trace-files)，其中包含性能指标和内存使用概况。这些追踪文件使我们无需访问应用源码即可分析性能问题。
+*   **持久化缓存** - 我们正在评估最佳架构方案，预计在未来版本中公布细节。
+*   **`next build`** - 虽然 Turbopack 尚未支持生产构建，但测试通过率已达 **74.7%**。您可通过 [areweturboyet.com/build](https://areweturboyet.com/build) 跟踪进展。
+
+关于 Turbopack 的[已支持功能](/docs/architecture/turbopack#supported-features)和[暂未支持功能](/docs/architecture/turbopack#unsupported-features)，请参阅[文档](/docs/architecture/turbopack)。
+
+[构建与生产环境优化](#build-and-production-improvements)
+-----------------------------------------------------------------------
+
+除 Turbopack 打包优化外，我们还针对所有 Next.js 应用（包括 Pages 和 App Router）改进了构建与生产性能。
+
+### [Tree-shaking 优化](#tree-shaking)
+
+我们优化了服务端组件与客户端组件边界的代码摇树逻辑。例如，从标记了 `"use client"` 的文件中导入单个 `Icon` 组件时，不再包含该包中的所有其他图标组件。这能显著减小生产环境 JavaScript 包体积。
+
+在 `react-aria-components` 等流行库上测试该优化后，最终包体积 **减少 51.3%**。
+
+> **注意：** 当前优化暂不支持 barrel 文件（索引文件）。您可以使用 [`optimizePackageImports`](/docs/app/api-reference/next-config-js/optimizePackageImports) 配置项临时解决：
+> 
+> ```ts filename="next.config.ts"
+> module.exports = {
+>   experimental: {
+>     optimizePackageImports: ['package-name'],
+>   },
+> };
+> ```
+
+### [构建内存占用](#build-memory-usage)
+
+针对超大规模 Next.js 应用，我们修复了生产构建时内存溢出（OOM）的问题。经调查发现根本原因是过度打包和压缩（Next.js 生成了少量但体积巨大且存在重复的 JavaScript 文件）。我们重构了打包逻辑并优化了编译器处理机制。
+
+初步测试显示，在最小化 Next.js 应用上，内存占用和缓存文件大小 **从 2.2GB 平均降至 190MB 以下**。
+
+为便于调试内存性能，我们为 `next build` 新增了 `--experimental-debug-memory-usage` 参数。详见[内存优化文档](/docs/app/building-your-application/optimizing/memory-usage)。
+
+### [CSS 优化](#css)
+
+我们改进了生产构建时的 CSS 优化策略，通过分块处理避免页面间导航时的样式冲突。
+
+现在 CSS 分块的顺序和合并规则由导入顺序决定。例如 `base-button.module.css` 会优先于 `page.module.css` 处理：
+
+```tsx filename="base-button.tsx"
+import styles from './base-button.module.css';
+ 
+export function BaseButton() {
+  return <button className={styles.primary} />;
+}
+```
+
+```tsx filename="page.tsx"
+import { BaseButton } from './base-button';
+import styles from './page.module.css';
+ 
+export function Page() {
+  return <BaseButton className={styles.primary} />;
+}
+```
+
+为保证正确的 CSS 顺序，我们建议：
+
+*   优先使用 [CSS Modules](/docs/app/building-your-application/styling/css-modules) 而非 [全局样式](/docs/app/building-your-application/styling/css-modules#global-styles)
+*   每个 JS/TS 文件只导入对应的 CSS Module
+*   若使用全局类名，请在相同 JS/TS 文件中导入全局样式
+
+该变更对大多数应用不会产生负面影响。如升级后遇到样式问题，请按[文档建议](/docs/app/building-your-application/styling/css#ordering-and-merging)检查 CSS 导入顺序。
+
+[缓存机制改进](#caching-improvements)
+---------------------------------------------
+
+缓存是构建快速可靠 Web 应用的关键。执行数据变更时，用户和开发者都期望缓存能及时更新以反映最新状态。我们持续优化 App Router 中的缓存体验。
+
+### [`staleTimes`（实验性）](#staletimes-experimental)
+
+[客户端路由缓存](/docs/app/building-your-application/caching#data-cache-and-client-side-router-cache)通过缓存已访问和预取的路由，提供快速导航体验。
+
+根据社区反馈，我们新增了实验性 `staleTimes` 选项，允许配置[客户端路由缓存](/docs/app/building-your-application/caching#router-cache)的失效周期。
+
+默认情况下，预取路由（使用不带 `prefetch` 属性的 `<Link>` 组件）会缓存 30 秒，若设置 `prefetch={true}` 则缓存 5 分钟。您可以通过 `next.config.js` 中的[重新验证时间](/docs/app/building-your-application/caching#duration-3)覆盖默认值：
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+`staleTimes` 旨在为需要精细控制缓存策略的用户提供更好体验，但这并非最终解决方案。未来版本我们将重点改进整体缓存语义，提供更灵活的解决方案。
+
+详见 [`staleTimes` 文档](/docs/app/api-reference/next-config-js/staleTimes)。
+
+### [并行路由与拦截路由](#parallel-and-intercepting-routes)
+
+我们正在持续优化[并行路由](/docs/app/building-your-application/routing/parallel-routes)和[拦截路由](/docs/app/building-your-application/routing/intercepting-routes)，目前改进了与客户端路由缓存 (Client-side Router Cache) 的集成。
+
+* 当并行路由与拦截路由调用包含 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) 或 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) 的服务端操作 (Server Actions) 时，将重新验证缓存并刷新可见插槽 (slots)，同时保持用户当前视图不变。
+* 类似地，调用 [`router.refresh`](/docs/app/building-your-application/caching#routerrefresh) 现在能正确刷新可见插槽，同时保持当前视图。
+
+[错误处理开发者体验改进](#errors-dx-improvements)
+-------------------------------------------------
+
+在 14.1 版本中，我们开始着手[改进错误信息和堆栈追踪的可读性](/blog/next-14-1#improved-error-messages-and-fast-refresh)，这些改进在运行 `next dev` 时生效。这项工作延续到 14.2 版本，现在包含更清晰的错误信息、应用路由 (App Router) 和页面路由 (Pages Router) 的错误覆盖层设计改进、支持浅色与深色模式，以及更清晰的 `dev` 和 `build` 日志。
+
+例如，React 水合错误 (Hydration errors) 在我们的社区中常常引起困惑。虽然我们已经改进了帮助用户定位水合不匹配问题的功能（如下所示），但我们仍在与 React 团队合作改进底层错误信息，并显示错误发生的文件名。
+
+**改进前:**
+
+![Next.js 14.2 版本前的错误覆盖层示例](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/error-overlay-before.png)
+
+Next.js 14.2 版本前的错误覆盖层示例。
+
+**改进后:**
+
+![Next.js 14.2 版本后的错误覆盖层示例](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/error-overlay-after.png)
+
+Next.js 14.2 版本后的错误覆盖层示例。
+
+[React 19](#react-19)
+---------------------
+
+今年二月，React 团队宣布即将发布 [React 19](https://react.dev/blog/2024/02/15/react-labs-what-we-have-been-working-on-february-2024#the-next-major-version-of-react)。为迎接 React 19，我们正在将最新功能和改进集成到 Next.js 中，并计划发布一个主要版本来协调这些变更。
+
+诸如 Actions 及其相关钩子等新功能（此前已在 Next.js 中通过 [React canary 渠道](https://react.dev/blog/2023/05/03/react-canaries)提供），现在将适用于所有 React 应用（包括纯客户端应用）。我们期待这些功能在 React 生态中得到更广泛的应用。
+
+[其他改进](#other-improvements)
+-----------------------------------------
+
+* **\[文档\]** 新增视频优化相关文档 ([PR](https://github.com/vercel/next.js/pull/60574))。
+* **\[文档\]** 新增 `instrumentation.ts` 相关文档 ([PR](https://github.com/vercel/next.js/pull/61403))。
+* **\[功能\]** `next/image` 新增 `overrideSrc` 属性 ([PR](https://github.com/vercel/next.js/pull/64221))。
+* **\[功能\]** `getStaticProps` 新增 `revalidateReason` 参数 ([PR](https://github.com/vercel/next.js/pull/64258))。
+* **\[优化\]** 重构流式逻辑，减少生产环境中页面流式传输时间 ([PR](https://github.com/vercel/next.js/pull/63427))。
+* **\[优化\]** 支持嵌套服务端操作 (Server Actions) ([PR](https://github.com/vercel/next.js/pull/61001))。
+* **\[优化\]** 支持生成的站点地图 (Sitemaps) 本地化 ([PR](https://github.com/vercel/next.js/pull/53765))。
+* **\[优化\]** 改进开发与构建日志的视觉效果 ([PR](https://github.com/vercel/next.js/pull/62946))。
+* **\[优化\]** Vercel 上的偏差保护 (Skew protection) 功能已稳定 ([文档](https://vercel.com/docs/skew-protection))。
+* **\[优化\]** 使 `useSelectedLayoutSegment` 兼容页面路由 (Pages Router) ([PR](https://github.com/vercel/next.js/pull/62584))。
+* **\[优化\]** 当绝对 URL 无需解析时跳过 `metadataBase` 警告 ([PR](https://github.com/vercel/next.js/pull/61898))。
+* **\[优化\]** 修复部署到 Vercel 时未启用 JavaScript 的情况下服务端操作无法提交的问题 ([PR](https://github.com/vercel/next.js/pull/63978))。
+* **\[优化\]** 修复当触发服务端操作后离开引用页面或在非活跃并行路由段中使用时，操作未在操作清单中找到的错误 ([PR](https://github.com/vercel/next.js/pull/64227))。
+* **\[优化\]** 修复通过 `next/dynamic` 加载的组件中的 CSS 导入问题 ([PR](https://github.com/vercel/next.js/pull/64294))。
+* **\[优化\]** 当动画图像缺少 `unoptimized` 属性时发出警告 ([PR](https://github.com/vercel/next.js/pull/61045))。
+* **\[优化\]** 如果 `images.loaderFile` 未导出默认函数，则显示错误信息 ([PR](https://github.com/vercel/next.js/pull/64036))。
+
+[社区](#community)
+-----------------------
+
+Next.js 现在拥有超过 100 万月活跃开发者。我们感谢社区的支持与贡献。欢迎加入 [GitHub Discussions](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/) 和 [Discord](/discord) 的讨论。
+
+[贡献者](#contributors)
+-----------------------------
+
+Next.js 是 3000 多位独立开发者、Google 和 Meta 等行业合作伙伴以及 Vercel 核心团队共同努力的成果。本次发布的贡献者包括：
+
+* **Next.js 团队**: [Andrew](https://github.com/acdlite)、[Balazs](https://github.com/balazsorban44)、[Ethan](https://github.com/Ethan-Arrowood)、[Janka](https://github.com/lubieowoce)、[Jiachi](https://github.com/huozhi)、[Jimmy](https://github.com/feedthejim)、[JJ](https://github.com/ijjk)、[Josh](https://github.com/gnoff)、[Sam](https://github.com/samcx)、[Sebastian](https://github.com/sebmarkbage)、[Sebbie](https://github.com/eps1lon)、[Shu](https://github.com/shuding)、[Steven](https://github.com/styfle)、[Tim](https://github.com/timneutkens)、[Wyatt](https://github.com/wyattjoh) 和 [Zack](https://github.com/ztanner)。
+* **Turbopack 团队**: [Donny](https://github.com/kdy1)、[Leah](https://github.com/forsakenharmony)、[Maia](https://github.com/padmaia)、[OJ](https://github.com/kwonoj)、[Tobias](https://github.com/sokra) 和 [Will](https://github.com/wbinnssmith)。
+* **Next.js 文档团队**: [Delba](https://github.com/delbaoliveira)、[Steph](https://github.com/StephDietz)、[Michael](https://github.com/manovotny)、[Anthony](https://github.com/anthonyshew) 和 [Lee](https://github.com/leerob)。
+
+特别感谢 @taishikato、@JesseKoldewijn、@Evavic44、@feugy、@liamlaverty、@dvoytenko、@SukkaW、@wbinnssmith、@rishabhpoddar、@better-salmon、@ziyafenn、@A7med3bdulBaset、@jasonuc、@yossydev、@Prachi-meon、@InfiniteCodeMonkeys、@ForsakenHarmony、@miketimmerman、@kwonoj、@williamli、@gnoff、@jsteele-stripe、@chungweileong94、@WITS、@sogoagain、@junioryono、@eisafaqiri、@yannbolliger、@aramikuto、@rocketman-21、@kenji-webdev、@michaelpeterswa、@Dannymx、@vpaflah、@zeevo、@chrisweb、@stefangeneralao、@tknickman、@Kikobeats、@ubinatus、@code-haseeb、@hmmChase、@byhow、@DanielRivers、@wojtekmaj、@paramoshkinandrew、@OMikkel、@theitaliandev、@oliviertassinari、@Ishaan2053、@Sandeep-Mani、@alyahmedaly、@Lezzio、@devjiwonchoi、@juliusmarminge、@szmazhr、@eddiejaoude、@itz-Me-Pj、@AndersDJohnson、@gentamura、@tills13、@dijonmusters、@SaiGanesh21、@vordgi、@ryota-murakami、@tszhong0411、@officialrajdeepsingh、@alexpuertasr、@AkifumiSato、@Jonas-PFX、@icyJoseph、@florian-lp、@pbzona、@erfanium、@remcohaszing、@bernardobelchior、@willashe、@kevinmitch14、@smakosh、@mnjongerius、@asobirov、@theoholl、@suu3、@ArianHamdi、@adrianha、@Sina-Abf、@kuzeykose、@meenie、@nphmuller、@javivelasco、@belgattitude、@Svetoslav99、@johnslemmer、@colbyfayock、@mehranmf31、@m-nakamura145、@ryo8000、@aryaemami59、@bestlyg、@jinsoul75、@petrovmiroslav、@nattui、@zhuyedev、@dongwonnn、@nhducit、@flotwig、@Schmavery、@abhinaypandey02、@rvetere、@coffeecupjapan、@cjimmy、@Soheiljafarnejad、@jantimon、@zengspr、@wesbos、@neomad1337、@MaxLeiter 和 @devr77 的贡献！

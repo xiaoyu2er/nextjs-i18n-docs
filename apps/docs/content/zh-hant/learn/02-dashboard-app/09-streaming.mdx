@@ -1,0 +1,347 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-05-29T20:06:57.592Z
+title: 串流 (Streaming)
+headline: '應用程式路由器 (App Router)：串流'
+description: 透過串流技術和載入骨架 (loading skeletons) 改善應用程式的載入體驗。
+image: 'https://nextjs.org/api/learn-og?title=Streaming&amp;chapter=9'
+---
+
+在前一章節中，您已了解 Next.js 的不同渲染方法。我們也討論了緩慢的資料獲取如何影響應用程式的效能。現在讓我們看看當遇到緩慢的資料請求時，如何改善使用者體驗。
+
+[什麼是串流？](#what-is-streaming)
+----------------------------------------
+
+串流是一種資料傳輸技術，可讓您將路由拆分成較小的「區塊 (chunks)」，並在它們準備就緒時逐步從伺服器串流傳輸到客戶端。
+
+<Image
+  alt="展示循序資料獲取與平行資料獲取的時間圖表"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/server-rendering-with-streaming.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="618"
+/>
+
+透過串流，您可以防止緩慢的資料請求阻擋整個頁面。這讓使用者能在所有資料載入完成前，先看到並與頁面的部分內容互動。
+
+<Image
+  alt="展示循序資料獲取與平行資料獲取的時間圖表"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/server-rendering-with-streaming-chart.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/server-rendering-with-streaming-chart.png"
+  width="1600"
+  height="450"
+/>
+
+串流與 React 的元件模型配合良好，因為每個元件都可視為一個「區塊」。
+
+在 Next.js 中有兩種實現串流的方式：
+
+1. 在頁面層級，使用 `loading.tsx` 檔案（它會自動為您建立 `<Suspense>`）。
+2. 在元件層級，使用 `<Suspense>` 進行更細粒度的控制。
+
+讓我們看看具體如何運作。
+
+[使用 `loading.tsx` 串流整個頁面](#streaming-a-whole-page-with-loadingtsx)
+------------------------------------------------------------------------------------
+
+在 `/app/dashboard` 資料夾中，建立一個名為 `loading.tsx` 的新檔案：
+
+```tsx filename="/app/dashboard/loading.tsx"
+export default function Loading() {
+  return <div>載入中...</div>;
+}
+```
+
+重新整理 [http://localhost:3000/dashboard](http://localhost:3000/dashboard)，您現在應該會看到：
+
+<Image
+  alt="顯示「載入中...」文字的儀表板頁面"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/loading-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/loading-page.png"
+  width="960"
+  height="501"
+/>
+
+這裡發生了幾件事：
+
+1. `loading.tsx` 是 Next.js 基於 React Suspense 的特殊檔案，它允許您建立替代 UI 在頁面內容載入時顯示。
+2. 由於 `<SideNav>` 是靜態的，它會立即顯示。使用者可以在動態內容載入時與 `<SideNav>` 互動。
+3. 使用者無需等待頁面完全載完即可導航離開（這稱為可中斷導航 interruptable navigation）。
+
+恭喜！您已實現了串流。但我們還能進一步改善使用者體驗。讓我們顯示載入骨架 (loading skeleton) 而非「載入中...」文字。
+
+### [新增載入骨架](#adding-loading-skeletons)
+
+載入骨架是 UI 的簡化版本。許多網站使用它們作為佔位符（或後備內容）來向使用者表示內容正在載入。您在 `loading.tsx` 中新增的任何 UI 都會作為靜態檔案的一部分嵌入，並首先發送。然後，其餘的動態內容會從伺服器串流到客戶端。
+
+在您的 `loading.tsx` 檔案中，匯入一個名為 `<DashboardSkeleton>` 的新元件：
+
+```tsx {1,4} filename="/app/dashboard/loading.tsx"
+import DashboardSkeleton from '@/app/ui/skeletons';
+ 
+export default function Loading() {
+  return <DashboardSkeleton />;
+}
+```
+
+然後，重新整理 [http://localhost:3000/dashboard](http://localhost:3000/dashboard)，您現在應該會看到：
+
+<Image
+  alt="顯示載入骨架的儀表板頁面"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/loading-page-with-skeleton.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/loading-page-with-skeleton.png"
+  width="960"
+  height="501"
+/>
+
+### [使用路由群組 (route groups) 修正載入骨架錯誤](#fixing-the-loading-skeleton-bug-with-route-groups)
+
+目前，您的載入骨架會套用到發票頁面。
+
+由於 `loading.tsx` 在檔案系統中的層級高於 `/invoices/page.tsx` 和 `/customers/page.tsx`，它也會套用到這些頁面。
+
+我們可以使用[路由群組 (Route Groups)](https://nextjs.org/docs/app/building-your-application/routing/route-groups) 來改變這一點。在 dashboard 資料夾中建立一個名為 `/(overview)` 的新資料夾。然後，將您的 `loading.tsx` 和 `page.tsx` 檔案移動到此資料夾中：
+
+<Image
+  alt="展示如何使用括號建立路由群組的資料夾結構"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/route-group.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/route-group.png"
+  width="1600"
+  height="444"
+/>
+
+現在，`loading.tsx` 檔案僅套用到您的儀表板概覽頁面。
+
+路由群組允許您將檔案組織成邏輯群組，而不影響 URL 路徑結構。當您使用括號 `()` 建立新資料夾時，該名稱不會包含在 URL 路徑中。因此 `/dashboard/(overview)/page.tsx` 會變成 `/dashboard`。
+
+在這裡，您使用路由群組確保 `loading.tsx` 僅套用到儀表板概覽頁面。但您也可以使用路由群組將應用程式分成不同部分（例如 `(marketing)` 路由和 `(shop)` 路由），或為大型應用程式按團隊劃分。
+
+### [串流單個元件](#streaming-a-component)
+
+到目前為止，您已串流整個頁面。但您也可以更細粒度地使用 React Suspense 串流特定元件。
+
+Suspense 允許您延遲渲染部分應用程式，直到滿足某些條件（例如資料已載入）。您可以將動態元件包裝在 Suspense 中，然後傳遞一個後備元件 (fallback component) 在動態元件載入時顯示。
+
+如果您還記得那個緩慢的資料請求 `fetchRevenue()`，正是這個請求拖慢了整個頁面。與其阻擋整個頁面，您可以使用 Suspense 僅串流此元件，並立即顯示頁面其餘部分的 UI。
+
+為此，您需要將資料獲取移動到元件中，讓我們更新程式碼看看會是什麼樣子：
+
+從 `/dashboard/(overview)/page.tsx` 中刪除所有 `fetchRevenue()` 的實例及其資料：
+
+```tsx {5,8} filename="/app/dashboard/(overview)/page.tsx"
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchLatestInvoices, fetchCardData } from '@/app/lib/data'; // 移除 fetchRevenue
+ 
+export default async function Page() {
+  const revenue = await fetchRevenue() // 刪除這一行
+  const latestInvoices = await fetchLatestInvoices();
+  const {
+    numberOfInvoices,
+    numberOfCustomers,
+    totalPaidInvoices,
+    totalPendingInvoices,
+  } = await fetchCardData();
+ 
+  return (
+    // ...
+  );
+}
+```
+
+然後，從 React 匯入 `<Suspense>`，並用它包裝 `<RevenueChart />`。您可以傳遞一個名為 `<RevenueChartSkeleton>` 的後備元件。
+
+```tsx {6,7,34,35,36} filename="/app/dashboard/(overview)/page.tsx"
+import { Card } from '@/app/ui/dashboard/cards';
+import RevenueChart from '@/app/ui/dashboard/revenue-chart';
+import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchLatestInvoices, fetchCardData } from '@/app/lib/data';
+import { Suspense } from 'react';
+import { RevenueChartSkeleton } from '@/app/ui/skeletons';
+ 
+export default async function Page() {
+  const latestInvoices = await fetchLatestInvoices();
+  const {
+    numberOfInvoices,
+    numberOfCustomers,
+    totalPaidInvoices,
+    totalPendingInvoices,
+  } = await fetchCardData();
+ 
+  return (
+    <main>
+      <h1 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
+        儀表板
+      </h1>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Card title="已收款" value={totalPaidInvoices} type="collected" />
+        <Card title="待處理" value={totalPendingInvoices} type="pending" />
+        <Card title="總發票數" value={numberOfInvoices} type="invoices" />
+        <Card
+          title="總客戶數"
+          value={numberOfCustomers}
+          type="customers"
+        />
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-4 lg:grid-cols-8">
+        <Suspense fallback={<RevenueChartSkeleton />}>
+          <RevenueChart />
+        </Suspense>
+        <LatestInvoices latestInvoices={latestInvoices} />
+      </div>
+    </main>
+  );
+}
+```
+
+最後，更新 `<RevenueChart>` 元件以自行獲取資料，並移除傳遞給它的 prop：
+
+```tsx {4,8,9} filename="/app/ui/dashboard/revenue-chart.tsx"
+import { generateYAxis } from '@/app/lib/utils';
+import { CalendarIcon } from '@heroicons/react/24/outline';
+import { lusitana } from '@/app/ui/fonts';
+import { fetchRevenue } from '@/app/lib/data';
+ 
+// ...
+ 
+export default async function RevenueChart() { // 將元件設為 async，移除 props
+  const revenue = await fetchRevenue(); // 在元件內部獲取資料
+ 
+  const chartHeight = 350;
+  const { yAxisLabels, topLabel } = generateYAxis(revenue);
+ 
+  if (!revenue || revenue.length === 0) {
+    return <p className="mt-4 text-gray-400">無可用資料。</p>;
+  }
+ 
+  return (
+    // ...
+  );
+}
+ 
+```
+
+現在重新整理頁面，您應該會幾乎立即看到儀表板資訊，同時為 `<RevenueChart>` 顯示後備骨架：
+
+<Image
+  alt="顯示收入圖表骨架及已載入卡片和最新發票元件的儀表板頁面"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/loading-revenue-chart.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/loading-revenue-chart.png"
+  width="960"
+  height="563"
+/>
+
+### [練習：串流 `<LatestInvoices>`](#practice-streaming-latestinvoices)
+
+現在輪到您了！練習您剛剛學到的內容，串流 `<LatestInvoices>` 元件。
+
+將 `fetchLatestInvoices()` 從頁面移動到 `<LatestInvoices>` 元件。用 `<Suspense>` 邊界包裝該元件，並使用名為 `<LatestInvoicesSkeleton>` 的後備元件。
+
+完成後，展開切換以查看解決方案程式碼：
+
+[群組元件](#grouping-components)
+-------------------------------------------
+
+很好！您快完成了，現在您需要用 Suspense 包裝 `<Card>` 元件。您可以為每個單獨的卡片獲取資料，但這可能會導致卡片載入時出現「彈出 (popping)」效果，這對使用者來說視覺上會很突兀。
+
+那麼，如何解決這個問題？
+
+為了創造更「交錯 (staggered)」的效果，您可以使用包裝元件 (wrapper component) 來群組卡片。這意味著靜態的 `<SideNav/>` 會先顯示，接著是卡片等。
+
+在您的 `page.tsx` 檔案中：
+
+1. 刪除您的 `<Card>` 元件。
+2. 刪除 `fetchCardData()` 函數。
+3. 匯入一個新的**包裝**元件 `<CardWrapper />`。
+4. 匯入一個新的**骨架**元件 `<CardsSkeleton />`。
+5. 用 Suspense 包裝 `<CardWrapper />`。
+
+```tsx {1,6,16,17,18} filename="/app/dashboard/(overview)/page.tsx"
+import CardWrapper from '@/app/ui/dashboard/cards';
+// ...
+import {
+  RevenueChartSkeleton,
+  LatestInvoicesSkeleton,
+  CardsSkeleton,
+} from '@/app/ui/skeletons';
+ 
+export default async function Page() {
+  return (
+    <main>
+      <h1 className={`${lusitana.className} mb-4 text-xl md:text-2xl`}>
+        儀表板
+      </h1>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Suspense fallback={<CardsSkeleton />}>
+          <CardWrapper />
+        </Suspense>
+      </div>
+      // ...
+    </main>
+  );
+}
+```
+
+然後，進入檔案 `/app/ui/dashboard/cards.tsx`，匯入 `fetchCardData()` 函數，並在 `<CardWrapper/>` 元件內部呼叫它。確保取消註解此元件中的任何必要程式碼。
+
+```tsx {2,7,8,9,10,11,12} filename="/app/ui/dashboard/cards.tsx"
+// ...
+import { fetchCardData } from '@/app/lib/data';
+ 
+// ...
+ 
+export default async function CardWrapper() {
+  const {
+    numberOfInvoices,
+    numberOfCustomers,
+    totalPaidInvoices,
+    totalPendingInvoices,
+  } = await fetchCardData();
+ 
+  return (
+    <>
+      <Card title="已收款" value={totalPaidInvoices} type="collected" />
+      <Card title="待處理" value={totalPendingInvoices} type="pending" />
+      <Card title="總發票數" value={numberOfInvoices} type="invoices" />
+      <Card
+        title="總客戶數"
+        value={numberOfCustomers}
+        type="customers"
+      />
+    </>
+  );
+}
+```
+
+重新整理頁面，您應該會看到所有卡片同時載入。當您希望多個元件同時載入時，可以使用此模式。
+
+[決定 Suspense 邊界的位置](#deciding-where-to-place-your-suspense-boundaries)
+-----------------------------------------------------------------------------------------------------
+
+您放置 Suspense 邊界的位置將取決於幾個因素：
+
+1. 您希望使用者在頁面串流時的體驗。
+2. 您希望優先顯示的內容。
+3. 元件是否依賴資料獲取。
+
+看看您的儀表板頁面，您會採取不同的做法嗎？
+
+別擔心，這沒有標準答案。
+
+*   您可以像我們使用 `loading.tsx` 那樣串流**整個頁面**...但如果其中一個元件有緩慢的資料獲取，可能會導致更長的載入時間。
+*   您可以**單獨串流每個元件**...但這可能會導致 UI 在準備就緒時「彈出」到螢幕上。
+*   您也可以透過串流**頁面區段**來創造「交錯」效果。但您需要建立包裝元件。
+
+您放置 Suspense 邊界的位置會根據應用程式而有所不同。一般來說，將資料獲取下移到需要它的元件，然後用 Suspense 包裝這些元件是個好做法。但如果您的應用程式需要，串流區段或整個頁面也沒有問題。
+
+不要害怕嘗試 Suspense 並找出最適合的方式，它是一個強大的 API，可以幫助您創造更愉悅的使用者體驗。
+
+[展望未來](#looking-ahead)
+-------------------------------
+
+串流和伺服器元件 (Server Components) 為我們提供了處理資料獲取和載入狀態的新方法，最終目標是改善終端使用者體驗。
+
+在下一章中，您將了解「部分預渲染 (Partial Prerendering)」，這是一個基於串流設計的新 Next.js 渲染模型。
