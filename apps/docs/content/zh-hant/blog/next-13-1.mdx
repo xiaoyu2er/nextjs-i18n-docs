@@ -1,0 +1,216 @@
+---
+source-updated-at: 2025-05-30T16:38:07.000Z
+translation-updated-at: 2025-05-30T16:56:21.971Z
+title: Next.js 13.1 版本更新
+description: >-
+  Next.js 13.1 帶來了多項改進，包括應用目錄功能增強、內建模組轉譯、API 路由的穩定邊緣運行時，以及對 Turbopack 支援的諸多優化。
+author:
+  - name: OJ Kwon
+    image: /static/team/oj.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2022-12-22T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-1/twitter-card.png
+---
+
+Next.js 13.1 針對 `pages/`（穩定版）和 `app/`（測試版）目錄都進行了改進：
+
+*   [**`app` 目錄（測試版）改進：**](#improved-reliability-and-support-for-app-directory) 提升可靠性和效能
+*   [**內建模組轉譯：**](#built-in-module-transpilation-stable) 將 `next-transpile-modules` 功能整合至核心
+*   [**邊緣運行時（穩定版）：**](#a-light-nodejs-runtime-for-the-edge-now-stable-for-api-routes) 輕量級 Node.js 邊緣運行時
+*   [**Turbopack 更新：**](#turbopack-improvements) 支援 Tailwind CSS、`next/image`、`@next/font` 等功能
+*   [**中介軟體改進：**](#nextjs-advanced-middleware) 可返回回應並設定請求標頭
+*   [**SWC 導入解析：**](#import-resolution-for-smaller-bundles) 使用 barrel 檔案時可產生更小的 JavaScript 打包檔案
+*   [記憶體使用優化、新模板等多項改進！](#other-improvements)
+
+立即更新執行：
+
+```bash filename="終端機"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+[`app` 目錄的可靠性與支援改進](#improved-reliability-and-support-for-app-directory)
+-----------------------------------------------------------------------------------------------------------
+
+在 Next.js 13 中，我們推出了新的 `app` 目錄（測試版）。這個新的路由和資料獲取系統可以與現有的 `pages` 目錄逐步整合使用。
+
+`app` 目錄提供了許多優勢，包括增強版佈局、元件/測試/樣式的共置、元件級資料獲取等。感謝您的回饋和早期測試，我們對 `app` 目錄的可靠性進行了多項改進：
+
+*   **不再有佈局 div 元素：** 之前 `app` 目錄會添加額外的 `<div>` 元素來實現導航時的視圖滾動。在 13.1 版本中，這些額外元素不再生成，同時保留了滾動行為。
+*   **TypeScript 插件：** 我們開發了新的 TypeScript 插件，提供頁面和佈局配置選項的建議，將文件直接整合到您的 IDE 中，並提供關於伺服器元件和客戶端元件的使用提示（例如防止在伺服器元件中使用 `useState`）。[了解更多](https://www.youtube.com/watch?v=pqMqn9fKEf8)。
+*   **可靠性改進：** 我們修復了多個錯誤，包括改進 CSS 模組支援、正確去重複化 `cache()` 和 `fetch()` 用於佈局和頁面、記憶體洩漏等問題。
+*   **更少的客戶端 JavaScript：** `app` 目錄現在比 `pages` 目錄減少了 `9.3kB` 的客戶端 JavaScript。這個基準不會因為您添加 1 個或 1000 個伺服器元件而增加。React 運行時暫時稍大，這個增加是由 React 伺服器元件運行時引起的，它處理了 Next.js 之前處理的機制。我們正在努力進一步減少這個大小。
+
+|  | `pages/` | `app/` | 差異 |
+| --- | --- | --- | --- |
+| 首次載入 JS 總量 | `基準` | `-9.3kB` | 減少 `12.1%` |
+| Next.js 運行時 | `基準` | `-12kB` | 減少 `56.8%` |
+| React 運行時 | `基準` | `+2.7kB` | 增加 `5.2%` |
+
+我們對 `app` 目錄穩定性的持續進展感到興奮。[測試版文件](https://beta.nextjs.org/) 已經根據您的回饋進行了數百次更新 [基於您的回饋](https://vercel.com/blog/using-vercel-comments-to-improve-the-next-js-13-documentation)。
+
+[內建模組轉譯（穩定版）](#built-in-module-transpilation-stable)
+-------------------------------------------------------------------------------
+
+您現在可以標記來自本地套件（如 monorepos）或外部依賴項（`node_modules`）的模組進行轉譯和打包。這個內建支援取代了流行的 `next-transpile-modules` 套件。
+
+```
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  transpilePackages: ['@acme/ui', 'lodash-es'],
+};
+ 
+module.exports = nextConfig;
+```
+
+我們感謝 Pierre de la Martinière ([@martpie](https://twitter.com/martpie_)) 在這個套件上的工作，以及他們在確保內建支援滿足社群需求方面的協助。
+
+[導入解析以縮小打包檔案](#import-resolution-for-smaller-bundles)
+-------------------------------------------------------------------------------
+
+許多流行的 npm 套件使用 "barrel 檔案" 來提供一個重新導出其他模組的單一檔案。例如：
+
+```ts filename="@acme/ui/index.ts"
+export { default as Button } from './dist/Button';
+export { default as Slider } from './dist/Slider';
+export { default as Dropdown } from './dist/Dropdown';
+```
+
+這使得套件使用者可以在一行程式碼中使用命名導出：
+
+```
+import { Button, Slider, Dropdown } from '@acme/ui';
+```
+
+雖然打包工具理解這些 barrel 檔案並可以移除未使用的重新導出（稱為"死碼消除"），但這個過程涉及解析/編譯所有重新導出的檔案。對於已發布的函式庫，一些 npm 套件提供的 barrel 檔案可能重新導出了數千個模組，這會減慢編譯時間。這些函式庫建議使用 `babel-plugin-transform-imports` 來避免這個問題，但對於使用 SWC 的使用者來說，之前沒有支援。我們在 Next.js 中新增了一個名為 `modularizeImports` 的內建 SWC 轉換。
+
+這個新設定啟用了 SWC 轉換，它會根據定義的模式改變您的導入語句。例如，上述使用三個元件的程式碼會自動轉換為使用直接導入，開發者無需手動編寫這段程式碼：
+
+```
+// 之前（使用 barrel 檔案）
+import { Button, Slider, Dropdown } from '@acme/ui';
+ 
+// 之後（使用插件的模組化導入）
+import Button from '@acme/ui/dist/Button';
+import Slider from '@acme/ui/dist/Slider';
+import Dropdown from '@acme/ui/dist/Dropdown';
+```
+
+這個轉換可以通過 `next.config.js` 中的 `modularizeImports` 選項實現：
+
+```js filename="next.config.js"
+module.exports = {
+  modularizeImports: {
+    '@acme/ui': {
+      transform: '@acme/ui/dist/{{member}}',
+    },
+  },
+};
+```
+
+將這個轉換與 `@mui/icons-material` 或 `lodash` 結合使用，可以跳過未使用檔案的編譯。[了解更多](/docs/architecture/nextjs-compiler#modularize-imports)。
+
+[查看演示](https://twitter.com/nextjs/status/1610288783311732737) 以實際了解這個功能。
+
+[輕量級 Node.js 邊緣運行時，現已穩定支援 API 路由](#a-light-nodejs-runtime-for-the-edge-now-stable-for-api-routes)
+---------------------------------------------------------------------------------------------------------------------------------
+
+Next.js 中的 Edge 運行時使用 Node.js API 的嚴格子集（如 `Request`、`Response` 等），這些 API 與 Vercel 等邊緣計算平台或自託管環境相容。這些 API 可以在任何地方運行，包括瀏覽器，讓開發者學習一次就能到處使用。
+
+```ts filename="pages/api/hello.ts"
+// 不再需要 "experimental-" 前綴
+export const config = {
+  runtime: 'edge',
+};
+ 
+export default function handler(req: Request) {
+  return new Response('Hello World');
+}
+```
+
+Next.js 中介軟體預設已經使用這個輕量級邊緣運行時以獲得更好的效能。由於中介軟體可以在應用程式的每個請求之前運行，擁有輕量級運行時對於確保低延遲至關重要。在 Next.js 12.2 中，我們增加了可選使用這個運行時來處理 [API 路由](https://nextjs.org/blog/next-12-2#edge-api-routes-experimental) 的功能。
+
+隨著 13.1 版本的發布，Next.js 中的 Edge 運行時 **現已穩定** 支援 API 路由。在自託管環境中，使用 Edge 運行時的中介軟體和 API 路由預設會作為單一區域工作負載運行，作為 `next start` 的一部分。在 Vercel 上，Next.js 中介軟體和 API 路由會 [使用 Vercel Edge Functions 進行全局部署](https://vercel.com/docs/concepts/next.js/overview) 以實現最低延遲。Vercel Edge Functions 也 [現已正式可用](https://vercel.com/blog/edge-functions-generally-available)。
+
+[Turbopack 改進](#turbopack-improvements)
+-------------------------------------------------
+
+在 Next.js 13 中發布 [Turbopack](https://nextjs.org/docs/app/api-reference/turbopack) alpha 版本後，我們一直致力於提高可靠性、增加對最常請求功能的支援，並制定在其他框架中使用插件和功能的計劃。
+
+自 Next.js 13.0.0 以來，Turbopack：
+
+*   支援 PostCSS，包括 Tailwind CSS
+*   支援 `next/image`
+*   支援 `@next/font`（Google 字體）
+*   支援從動態 `import()` 語句載入 CSS
+*   支援 CSS 源映射（感謝 `@ahabhgk` 的 [貢獻](https://github.com/vercel/turbo/pull/2839)）
+*   改進了 `next dev` 錯誤覆蓋層的錯誤處理
+*   改進了記憶體使用
+*   改進了 CSS 模組支援
+*   改進了 HMR 更新的分塊算法
+*   提高了 HMR 源映射的可靠性
+
+我們感謝 Evan You 和 Vite 社群的回饋和貢獻，確保 Turbopack 基準測試盡可能準確。我們與 Vite 團隊合作驗證了最新的 Turbopack 基準測試，並對我們的測試方法進行了多項改進。
+
+作為這次合作的結果，我們現在使用了一個更準確的指標，包括 React 更新機制所花費的時間。我們能夠將 Turbopack 以及 Next.js 13.1 在 webpack 上的 React 快速刷新時間縮短了 30ms。我們還新增了一個使用 SWC 的 Vite 基準測試，顯示與使用預設 Babel 的 Vite 相比性能有所提升。查看 [更新後的基準測試](https://nextjs.org/docs/app/api-reference/turbopack) 或閱讀 [測試方法](https://nextjs.org/docs/app/api-reference/turbopack)。
+
+立即在 Next.js 13 中試用 Turbopack alpha 版本，使用 `next dev --turbo`。如果您有任何回饋，請在 [GitHub 討論區](https://github.com/vercel/turbo/discussions/2312) 告訴我們。
+
+[Next.js 進階中介軟體](#nextjs-advanced-middleware)
+----------------------------------------------------------
+
+感謝您的回饋，我們正在使 Next.js 中介軟體比以往更強大。在 13.1 版本中，您現在可以從中介軟體返回回應，以及在請求上設定標頭。
+
+這些 API 改進為您提供了強大的新靈活性，可以自訂 Next.js 路由生命週期的每個部分。`next.config.js` 中的 `experimental.allowMiddlewareResponseBody` 配置選項不再需要。
+
+您現在可以更輕鬆地在請求上設定標頭，以及直接回應而無需 `rewrite` 或 `redirect`：
+
+```ts filename="middleware.ts"
+import { NextResponse } from 'next/server';
+ 
+export function middleware(request: Request) {
+  // 檢查使用者是否有權限...
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ message: 'Unauthorized' });
+  }
+ 
+  // 添加新標頭，這將改變您可以
+  // 在 getServerSideProps 和 API 路由中讀取的傳入請求標頭
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-version', '13.1');
+ 
+  return NextResponse.next({
+    request: {
+      // 應用新的請求標頭
+      headers: requestHeaders,
+    },
+  });
+}
+```
+
+了解更多關於 [Next.js 進階中介軟體](/docs/pages/building-your-application/routing/middleware)。
+
+[其他改進](#other-improvements)
+-----------------------------------------
+
+*   `@next/font` 現在支援在同一字體宣告中添加多種字體粗細和樣式。[了解更多](/docs/pages/building-your-application/optimizing/fonts#google-fonts)。
+*   `next/dynamic` 現在使用 React 原始方法 `lazy()` 和 `<Suspense>`。之前的 `suspense` 選項不再需要。有了這些改變，`next/dynamic` 現在與 `app` 目錄相容。
+*   `create-next-app` 已更新為新設計，現在預設包含 [`@next/font`](/docs/pages/building-your-application/optimizing/fonts) 以實現字體的自動自託管，且零版面偏移。試試看 `npx create-next-app@latest` 或 [部署模板](https://vercel.com/templates/next.js/nextjs-boilerplate)。
+*   我們對 [App 目錄遊樂場](https://app-dir.vercel.app/) 進行了多項改進，展示了 Next.js 13 中 `app` 目錄（測試版）的一些最新功能和慣例。[部署您自己的](https://vercel.com/templates/next.js/app-directory)。
+*   我們創建了一個 [高效能圖片庫模板](https://vercel.com/templates/next.js/image-gallery-starter)，包括圖片佔位符、懶載入、自動優化、鍵盤支援等功能。[部署您自己的](https://vercel.com/templates/next.js/image-gallery-starter)。
+*   我們創建了一個資源，幫助理解如何 [遷移大型開源 React 和 Express.js 應用程式](https://vercel.com/blog/migrating-a-large-open-source-react-application-to-next-js-and-vercel) 到 Next.js，包括詳細的逐步說明和指向特定提交的連結。
+
+[社群](#community)
+-----------------------
+
+Next.js 是超過 2,400 名獨立開發者、Google 和 Meta 等行業合作夥伴以及我們在 Vercel 的核心團隊共同努力的成果。每週超過 360 萬次 npm 下載和 97,900+ GitHub 星標，Next.js 是構建 Web 的最流行方式之一。
+
+加入 [GitHub 討論區](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/) 和 [Discord](https://nextjs.org/discord) 上的社群。
+
+這個版本由以下人員帶給您：
+
+*   **Next.js** 團隊： [Balazs](https://github.com/balazsorban44)、[Hannes](https://github.com/hanneslund)、[Jan](https://github.com/jankaifer)、[Jiachi](https://github.com/huozhi)、[Jimmy](https://github.com/feedthejim)、[JJ](https://github.com/ijjk)、[Josh](https://github.com/gnoff)、[Sebastian](https://github.com/sebmarkbage)、[Shu](https://github.com/shuding)、[Steven](https://github.com/styfle)、[Tim](https://github.com/timneutkens) 和 [Wyatt](https://github.com/wyattjoh)。
+*   **Turbopack** 團隊： [Alex](https://github.com/alexkirsz)、[Donny](https://github.com/kdy1)、[Justin](https://github.com/jridgewell)、[Leah](https://github.com/forsakenharmony)、[LongYinan](https://github.com/brooooooklyn)、[Maia](https://github.com/padmaia)、[OJ](https://github.com/kwonoj)、[Tobias](https://github.com/sokra) 和 [Will](https://github.com/wbinnssmith)。
+
+以及以下貢獻者：@aarnadlr、@aaronbrown-vercel、@aaronjy、@abayomi185、@ademilter、@adictonator、@adilansari、@adtc、@alantoa、@aleksa-codes、@alfred-mountfield、@alpha-xek、@andarist、@andykenward、@anujssstw、@artdevgame、@artechventure、@arturbien、@aziyatali、@bennettdams、@bertho-zero、@blue-devil1134、@bot08、@brkalow、@brvnonascimento、@chanceaclark、@chibicode、@chrisipanaque、@chunsch、@colinking、@craigwheeler、@ctjlewis、@cvolant、@danmindru、@davidnx、@delbaoliveira、@devvspaces、@dtinth、@ducanhgh、@duncanogle、@ethomson、@fantaasm、@feugy、@fomichroman、@gruz0、@haschikeks、@hughlilly、@idoob、@iiegor、@imranbarbhuiya、@ingovals、@inokawa、@ishaqibrahimbot、@ismaelrumzan、@jakemstar、@janicklas-ralph、@jaredpalmer、@jaykch、@jimcresswell、@joliss、@josephcsoti、@joshuaslate、@joulev、@jueungrace、@juliusmarminge、@karlhorky、@kikobeats、@kleintorres、@koenpunt、@koltong、@kosai106、@labyrinthitis、@lachlanjc、@laityned、@leerob、@leoortizz、@lorenzobloedow、@lucasassisrosa、@m7yue、@manovotny、@marcus-rise、@matthew-heath、@mattpr、@maxleiter、@maxproske、@meenie、@mmaaaaz、@mnajdova、@moetazaneta、@mrkldshv、@nathanhammond、@nekochantaiwan、@nfinished、@niedziolkamichal、@nocell、@notrab、@nuta、@nutlope、@obusk、@orionmiz、@peraltafederico、@reshmi-sriram、@reyrodrigez、@rightones、@rishabhpoddar、@saseungmin、@serkanbektas、@sferadev、@silvioprog、@sivtu、@soonoo、@sqve、@steven-tey、@sukkaw、@superbahbi、@teobler、@theevilhead、@thomasballinger、@timeyoutakeit、@valentinh、@ws-jm、@wxh06、@yasath、@yutsuten 和 @zekicaneksi。
