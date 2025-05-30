@@ -13,21 +13,14 @@ import { addMdxContent } from '@/lib/remark-plugins/remark-add-content';
 import { convertCodeMeta } from '@/lib/remark-plugins/remark-convert-code-meta';
 import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
 
-const asyncMode = process.env.MDX_ASYNC === 'true';
-if (!asyncMode && process.env.NODE_ENV === 'development') {
-  console.log('AsyncMode', asyncMode);
-  console.warn(
-    'This may result in longer dev server start time for large docs sites, you can enable Async Mode on doc collections to improve this.',
-  );
-}
-
 // You can customise Zod schemas for frontmatter and `meta.json` here
 // see https://fumadocs.dev//docs/mdx/collections#define-docs
 export const docs = defineDocs({
   dir: `content/${process.env.LOCALE}/docs`,
   docs: {
-    async: asyncMode,
+    async: true,
     schema: frontmatterSchema.extend({
+      'translation-updated-at': z.date().optional(),
       nav_title: z.string().optional(),
       source: z.string().optional(),
       related: z
@@ -49,6 +42,7 @@ export const blog = defineCollections({
   dir: `content/${process.env.LOCALE}/blog`,
   async: true,
   schema: frontmatterSchema.extend({
+    'translation-updated-at': z.date().optional(),
     author: z
       .object({
         name: z.string().optional(),
@@ -64,8 +58,9 @@ export const blog = defineCollections({
 export const learn = defineDocs({
   dir: `content/${process.env.LOCALE}/learn`,
   docs: {
-    async: asyncMode,
+    async: true,
     schema: frontmatterSchema.extend({
+      'translation-updated-at': z.date().optional(),
       image: z.string().url().optional(),
       headline: z.string().optional(),
     }),
