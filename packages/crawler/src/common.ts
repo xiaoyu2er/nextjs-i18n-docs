@@ -1,12 +1,18 @@
 import { LANGUAGE_MAP } from '@next-i18n/const';
 import { getFileExtension } from '@next-i18n/utils';
 import TurndownService from 'turndown';
+// @ts-ignore
+import turndownPluginGfm from 'turndown-plugin-gfm';
+
 export const CODE_LANGUAGE_SEP = '===CODE_LANGUAGE_SEP===';
 export const CODE_LANGUAGE_SPACE = '===CODE_LANGUAGE_SPACE===';
 
 const turndownService = new TurndownService({
   codeBlockStyle: 'fenced',
 });
+
+const gfm = turndownPluginGfm.gfm;
+turndownService.use(gfm);
 
 turndownService.addRule(`data-state="closed"`, {
   filter: (node) => {

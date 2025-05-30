@@ -38,35 +38,21 @@ export function checkApiKey() {
 
 export const model = 'deepseek-chat';
 
-export const systemPrompt =
-  'You are a professional technical translator specializing in software documentation. You are particularly skilled at translating React, web development, and programming terminology, keeping the translations consistent and readable.';
-
 // Helper function to translate a single chunk
 async function translateChunk(
   chunk: string,
   langConfig: LangConfig,
   context: string,
+  needsFrontmatterRules = true,
 ): Promise<string> {
   if (!openai) {
     throw new Error('OPENAI_API_KEY is not set.');
   }
 
   const textLength = chunk.length;
-  const prompt = `
-Translate the following documentation from English to ${langConfig.name}.
+  const systemPrompt = `You are a professional technical translator from English to ${langConfig.name} specializing in software documentation. You are particularly skilled at translating React, web development, and programming terminology, keeping the translations consistent and readable.`;
 
-General rules:
-• The document is MDX format - ensure all component tags are properly closed (e.g., \`<AppOnly> </AppOnly>\` \`<PagesOnly> </PagesOnly>\` )
-• Keep unchanged:
-  - All code blocks
-  - Markdown formatting
-  - HTML tags
-  - Variables
-  - Text within \`\`\` code blocks or inline \`code\`
-  - URLs and file paths
-• Maintain the original paragraph structure and heading levels
-
-⚠️ CRITICAL MDX FRONTMATTER RULES ⚠️
+  const frontmatterRules = `⚠️ CRITICAL MDX FRONTMATTER RULES ⚠️
 • NEVER start a frontmatter value with inline code (text between \`backticks\`)
 • This applies to ALL inline code including \`<Component>\` tags, \`functions\`, variables, etc.
 • In frontmatter (sections between --- marks), ALWAYS rearrange sentences so inline code appears AFTER some text
@@ -144,7 +130,23 @@ Examples of MDX Frontmatter Translation:
     title: \`public\` 目錄中的靜態資源
 
 These rules apply ONLY to frontmatter (between --- marks) and are CRITICAL for proper document rendering.
-REMEMBER: You must NEVER start with inline code in frontmatter values and ALWAYS include both opening and closing --- delimiters.
+REMEMBER: You must NEVER start with inline code in frontmatter values and ALWAYS include both opening and closing --- delimiters.`;
+
+  const prompt = `
+Please read the following rules carefully:
+
+General rules:
+• The document is MDX format - ensure all component tags are properly closed (e.g., \`<AppOnly> </AppOnly>\` \`<PagesOnly> </PagesOnly>\` )
+• Keep unchanged:
+  - All code blocks
+  - Markdown formatting
+  - HTML tags
+  - Variables
+  - Text within \`\`\` code blocks or inline \`code\`
+  - URLs and file paths
+• Maintain the original paragraph structure and heading levels
+
+${needsFrontmatterRules ? frontmatterRules : ''}
 
 Output format:
 • Provide only the translated content
@@ -153,7 +155,7 @@ Output format:
 
 ${context}
 
-HERE IS THE TEXT TO TRANSLATE:
+NEXT MESSAGE IS THE TEXT TO TRANSLATE, PLEASE TRANSLATE IT TO ${langConfig.name}:
 `;
 
   logger.debug(
@@ -165,17 +167,16 @@ HERE IS THE TEXT TO TRANSLATE:
   const messages: Array<ChatCompletionMessageParam> = [
     {
       role: 'system',
-      content: systemPrompt,
-    },
-    {
-      role: 'user',
-      content: prompt,
+      content: systemPrompt + prompt,
     },
     {
       role: 'user',
       content: chunk,
     },
   ];
+
+  // console.log(systemPrompt + prompt);
+  // console.log(chunk);
 
   const response = await openai.chat.completions.create({
     model: model,
@@ -212,7 +213,7 @@ export async function $translateDocument({
 
   // For small documents, use the direct approach
   if (!needsChunking(content)) {
-    return await translateChunk(content, langConfig, context);
+    return await translateChunk(content, langConfig, context, true);
   }
 
   logger.debug(
@@ -227,7 +228,12 @@ export async function $translateDocument({
     logger.debug(`Translating chunk ${i + 1} of ${chunks.length}`);
 
     // Translate the chunk
-    const translatedChunk = await translateChunk(chunk, langConfig, context);
+    const translatedChunk = await translateChunk(
+      chunk,
+      langConfig,
+      context,
+      i === 0,
+    );
 
     // Add to the complete translated content
     if (chunk[0] === '\n' && translatedChunk[0] !== '\n') {

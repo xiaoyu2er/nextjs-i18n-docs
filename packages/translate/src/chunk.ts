@@ -81,7 +81,5 @@ export function splitIntoChunks(content: string): string[] {
     chunks.push(currentChunk);
   }
 
-  // console.log('chunks-tokens', chunks.map((chunk) => estimateTokens(chunk)));
-
-  return chunks;
+  return chunks.filter((chunk) => chunk.trim() !== '');
 }
