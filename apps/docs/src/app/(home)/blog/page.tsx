@@ -1,4 +1,6 @@
+import { createMetadata } from '@/lib/metadata';
 import { blog } from '@/lib/source';
+import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
 export default function Page(): React.ReactElement {
@@ -40,4 +42,12 @@ export default function Page(): React.ReactElement {
       </div>
     </main>
   );
+}
+
+export async function generateMetadata() {
+  const t = await getTranslations('baseOptions');
+  return createMetadata({
+    title: t('blog'),
+    pathname: '/blog',
+  });
 }

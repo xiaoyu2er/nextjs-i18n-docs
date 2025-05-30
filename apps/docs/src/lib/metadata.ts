@@ -1,6 +1,9 @@
+import { SITES } from '@next-i18n/const';
 import type { Metadata } from 'next/types';
 
-export function createMetadata(override: Metadata): Metadata {
+export function createMetadata(
+  override: Metadata & { pathname?: string; image?: string },
+): Metadata {
   return {
     ...override,
     openGraph: {
@@ -8,6 +11,11 @@ export function createMetadata(override: Metadata): Metadata {
       description: override.description ?? undefined,
       images: '/twitter-card.png',
       siteName: 'nextjs.im',
+      ...(override.image
+        ? {
+            images: override.image,
+          }
+        : {}),
       ...override.openGraph,
     },
     twitter: {
@@ -16,8 +24,25 @@ export function createMetadata(override: Metadata): Metadata {
       title: override.title ?? undefined,
       description: override.description ?? undefined,
       images: '/twitter-card.png',
+      ...(override.image
+        ? {
+            images: override.image,
+          }
+        : {}),
       ...override.twitter,
     },
+    ...(override.pathname
+      ? {
+          alternates: {
+            canonical: baseUrl.origin + override.pathname,
+            languages: {
+              'en-US': SITES.en + override.pathname,
+              'zh-Hans': SITES['zh-hans'] + override.pathname,
+              'zh-Hant': SITES['zh-hant'] + override.pathname,
+            },
+          },
+        }
+      : {}),
   };
 }
 

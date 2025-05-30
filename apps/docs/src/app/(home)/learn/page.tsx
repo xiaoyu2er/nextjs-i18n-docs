@@ -1,5 +1,7 @@
 import { getLearnTabs } from '@/lib/learn';
+import { createMetadata } from '@/lib/metadata';
 import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
 export default function LearnIndexPage() {
@@ -37,4 +39,13 @@ export default function LearnIndexPage() {
       </div>
     </main>
   );
+}
+
+export async function generateMetadata() {
+  const t = await getTranslations('baseOptions');
+  return createMetadata({
+    title: t('learn'),
+    pathname: '/learn',
+    image: 'https://nextjs.org/learn/opengraph-image-r39hrb.jpg',
+  });
 }

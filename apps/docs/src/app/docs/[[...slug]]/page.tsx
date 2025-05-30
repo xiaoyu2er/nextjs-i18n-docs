@@ -124,7 +124,9 @@ export async function generateMetadata(props: {
   if (!page) notFound();
 
   return createMetadata({
-    title: page.data.nav_title || page.data.title,
+    title: page.data.title,
     description: page.data.description,
+    pathname: page.url,
+    image: `https://nextjs.org/api/docs-og?title=${page.data.title}`,
   });
 }

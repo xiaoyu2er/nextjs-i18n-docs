@@ -47,10 +47,13 @@ export async function generateMetadata(props: {
   const page = blog.getPage([params.slug]);
 
   if (!page) notFound();
+  const url = page.url;
 
   return createMetadata({
     title: page.data.title,
     description: page.data.description,
+    pathname: url,
+    image: page.data.image,
   });
 }
 

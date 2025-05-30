@@ -1,4 +1,6 @@
+import { createMetadata } from '@/lib/metadata';
 import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
 export default function HomePage() {

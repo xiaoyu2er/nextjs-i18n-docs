@@ -55,5 +55,7 @@ export async function generateMetadata(props: {
   return createMetadata({
     title: page.data.headline || page.data.title,
     description: page.data.description,
+    pathname: page.url,
+    image: page.data.image,
   });
 }
