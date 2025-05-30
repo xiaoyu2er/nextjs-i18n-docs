@@ -26,7 +26,7 @@ export async function updateSearchIndexes(): Promise<void> {
     api_key: process.env.ORAMA_PRIVATE_API_KEY || '',
   });
   // Get all .body files in the static directory
-  const staticDir = path.join('.next/server/app/static');
+  const staticDir = path.join('.next/server/app/search-index');
   let allRecords: OramaDocument[] = [];
 
   // Check if the directory exists
