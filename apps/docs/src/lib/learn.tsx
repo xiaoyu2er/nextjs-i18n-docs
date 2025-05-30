@@ -6,7 +6,7 @@ import {
 } from '@/mdx/Icon';
 import type { Option } from 'fumadocs-ui/components/layout/root-toggle';
 import type { ReactNode } from 'react';
-import { type Learn, learn } from './source';
+import { type LearnPage, learn } from './source';
 
 export const LEARN_URLS = [
   '/learn/react-foundations',
@@ -37,13 +37,13 @@ export function getLearnTabs() {
   return LEARN_TABS;
 }
 
-export function getPage(url: string): Learn | undefined {
+export function getPage(url: string): LearnPage | undefined {
   const pages = learn.getPages();
   const page = pages.find((page) => page.url === url);
   return page;
 }
 
-export function getChildren(url: string): Learn[] {
+export function getChildren(url: string): LearnPage[] {
   const pages = learn.getPages();
   return pages.filter((page) => page.url.startsWith(url) && page.url !== url);
 }

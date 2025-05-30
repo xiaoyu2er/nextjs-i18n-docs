@@ -1,7 +1,7 @@
-import { type Page, source } from './source';
+import { type DocsPage, docs } from './source';
 
-export function getPage(url: string): Page | undefined {
-  const pages = source.getPages();
+export function getPage(url: string): DocsPage | undefined {
+  const pages = docs.getPages();
   const page = pages.find((page) => page.url === url);
   return page;
 }

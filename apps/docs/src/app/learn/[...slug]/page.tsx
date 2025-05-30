@@ -5,7 +5,7 @@ import { getLearnUrl } from '@/lib/utils';
 import { getLearnMDXComponents } from '@/mdx-components';
 
 import { createRelativeLink } from 'fumadocs-ui/mdx';
-import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/page';
+import { DocsBody, DocsTitle, DocsPage as UiDocsPage } from 'fumadocs-ui/page';
 import { notFound } from 'next/navigation';
 import { DocsLayout } from './learn.layout';
 
@@ -20,15 +20,11 @@ export default async function Docs(props: {
 
   if (!page) notFound();
 
-  // @ts-ignore
-  const { body: MdxContent, toc } = page.data.load
-    ? // @ts-ignore
-      await page.data.load()
-    : page.data;
+  const { body: MdxContent, toc } = await page.data.load();
 
   return (
     <DocsLayout tree={learn.pageTree} tabs={getLearnTabs()}>
-      <DocsPage toc={toc} full={page.data.full}>
+      <UiDocsPage toc={toc} full={page.data.full}>
         <DocsTitle>{page.data.title}</DocsTitle>
         <DocsBody>
           <MdxContent
@@ -38,7 +34,7 @@ export default async function Docs(props: {
             })}
           />
         </DocsBody>
-      </DocsPage>
+      </UiDocsPage>
     </DocsLayout>
   );
 }

@@ -1,5 +1,5 @@
 import { getOramaDocuments } from '@/lib/orama/orama-document';
-import { source } from '@/lib/source';
+import { docs } from '@/lib/source';
 
 import { getLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -19,14 +19,14 @@ export async function GET(
   const locale = await getLocale();
 
   return NextResponse.json(
-    await getOramaDocuments(source, locale, Number.parseInt(page)),
+    await getOramaDocuments(docs, locale, Number.parseInt(page)),
   );
 }
 
 export function generateStaticParams() {
   if (process.env.GEN_ORAMA_STATIC !== 'true') return [];
 
-  const pages = source.getPages();
+  const pages = docs.getPages();
   const pageSize = 20;
   const pageIndex = Math.ceil(pages.length / pageSize);
 

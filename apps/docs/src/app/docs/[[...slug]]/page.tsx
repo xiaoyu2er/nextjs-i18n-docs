@@ -2,14 +2,14 @@ import { DocsLayout } from '@/app/docs/[[...slug]]/docs.layout';
 import { getPage } from '@/lib/docs';
 import { createMetadata } from '@/lib/metadata';
 import { getPageTreePeers } from '@/lib/pageTree';
-import { type Page, type Source, source } from '@/lib/source';
+import { type DocsPage, type DocsSource, docs } from '@/lib/source';
 import { getDocId, getDocUrl, parseDocId } from '@/lib/utils';
 import { getMDXComponents } from '@/mdx-components';
 import { Identity } from '@/mdx/Identity';
 import { Void } from '@/mdx/Void';
 import { Card, Cards } from 'fumadocs-ui/components/card';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
-import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/page';
+import { DocsBody, DocsTitle, DocsPage as UiDocsPage } from 'fumadocs-ui/page';
 import { type Locale, useLocale } from 'next-intl';
 import { getLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -25,11 +25,8 @@ export default async function Docs(props: {
   const page = getPage(docUrl);
   if (!page) notFound();
   const { isApp, isPages } = parseDocId(docId);
-  // @ts-ignore
-  let { body: MdxContent, toc } = page.data.load
-    ? // @ts-ignore
-      await page.data.load()
-    : page.data;
+
+  let { body: MdxContent, toc } = await page.data.load();
 
   // source: app/getting-started/installation
   const ref = page.data.source;
@@ -37,11 +34,8 @@ export default async function Docs(props: {
     const refUrl = getDocUrl(ref);
     const refPage = getPage(refUrl);
     if (!refPage) notFound();
-    // @ts-ignore
-    const { body: MdxContent2, toc: toc2 } = refPage.data.load
-      ? // @ts-ignore
-        await refPage.data.load()
-      : refPage.data;
+
+    const { body: MdxContent2, toc: toc2 } = await refPage.data.load();
 
     MdxContent = MdxContent2;
     toc = toc2;
@@ -51,8 +45,8 @@ export default async function Docs(props: {
   const isIndex = page.file.name === 'index';
 
   return (
-    <DocsLayout docId={docId} pageTree={source.pageTree}>
-      <DocsPage
+    <DocsLayout docId={docId} pageTree={docs.pageTree}>
+      <UiDocsPage
         toc={toc}
         full={page.data.full}
         breadcrumb={{ includePage: true, includeRoot: true }}
@@ -62,22 +56,22 @@ export default async function Docs(props: {
           <MdxContent
             components={getMDXComponents({
               // this allows you to link to other pages with relative file paths
-              a: createRelativeLink(source, page),
+              a: createRelativeLink(docs, page),
               AppOnly: isApp ? Identity : Void,
               PagesOnly: isPages ? Identity : Void,
             })}
           />
           {hasRelated ? <DocsRelated page={page} /> : null}
           {!hasRelated && isIndex ? (
-            <DocsCategory url={page.url} source={source} />
+            <DocsCategory url={page.url} source={docs} />
           ) : null}
         </DocsBody>
-      </DocsPage>
+      </UiDocsPage>
     </DocsLayout>
   );
 }
 
-function DocsCategory({ url, source }: { url: string; source: Source }) {
+function DocsCategory({ url, source }: { url: string; source: DocsSource }) {
   const peers = getPageTreePeers(source.pageTree, url);
 
   return (
@@ -91,14 +85,14 @@ function DocsCategory({ url, source }: { url: string; source: Source }) {
   );
 }
 
-function DocsRelated({ page }: { page: Page }) {
+function DocsRelated({ page }: { page: DocsPage }) {
   const locale = useLocale();
   const relatedLinks = page.data.related?.links || [];
   const pages = relatedLinks
     .map((link) => {
       return getPage(getDocUrl(link));
     })
-    .filter(Boolean) as Page[];
+    .filter(Boolean) as DocsPage[];
   return (
     <Cards>
       {pages.map((page) => {
@@ -118,7 +112,7 @@ function DocsRelated({ page }: { page: Page }) {
 
 export async function generateStaticParams() {
   if (process.env.GEN_DOC_STATIC !== 'true') return [];
-  return source.generateParams();
+  return docs.generateParams();
 }
 
 export async function generateMetadata(props: {

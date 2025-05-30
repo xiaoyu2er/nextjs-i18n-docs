@@ -1,13 +1,16 @@
-import { docs } from '@/.source';
-import { blog as blogPosts, learn as learnPosts } from '@/.source';
+import {
+  blog as blogPosts,
+  docs as docsPosts,
+  learn as learnPosts,
+} from '@/.source';
 import * as icons from '@/mdx/Icon';
 import { loader } from 'fumadocs-core/source';
 import { createMDXSource } from 'fumadocs-mdx';
 import { createElement } from 'react';
 
 // See https://fumadocs.dev//docs/headless/source-api for more info
-export const source = loader({
-  source: docs.toFumadocsSource(),
+export const docs = loader({
+  source: docsPosts.toFumadocsSource(),
   // it assigns a URL to your pages
   baseUrl: '/docs',
   icon(icon) {
@@ -58,7 +61,9 @@ export const learn = loader({
   },
 });
 
-export type Source = typeof source;
-export type Page = NonNullable<ReturnType<typeof source.getPage>>;
-export type Blog = NonNullable<ReturnType<typeof blog.getPage>>;
-export type Learn = NonNullable<ReturnType<typeof learn.getPage>>;
+export type DocsSource = typeof docs;
+export type BlogSource = typeof blog;
+export type LearnSource = typeof learn;
+export type DocsPage = NonNullable<ReturnType<typeof docs.getPage>>;
+export type BlogPage = NonNullable<ReturnType<typeof blog.getPage>>;
+export type LearnPage = NonNullable<ReturnType<typeof learn.getPage>>;

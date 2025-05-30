@@ -1,11 +1,11 @@
 import type { OramaDocument } from 'fumadocs-core/search/orama-cloud';
 import type { Locale } from 'next-intl';
 import { structure } from '../remark-plugins/remark-structure';
-import type { Source } from '../source';
+import type { DocsSource } from '../source';
 import { getDocId, getDocUrl, parseDocId } from '../utils';
 
 export async function getOramaDocuments(
-  source: Source,
+  source: DocsSource,
   lang: Locale,
   i: number,
 ) {

@@ -1,9 +1,8 @@
 'use client';
 
 import { useBaseOptions } from '@/hooks/useLayoutOptions';
-import { getPage } from '@/lib/learn';
+
 import { getLearnSidebarTree } from '@/lib/pageTree';
-import { Learn } from '@/lib/source';
 
 import type { PageTree } from 'fumadocs-core/server';
 import type { Option } from 'fumadocs-ui/components/layout/root-toggle';
