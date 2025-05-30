@@ -14,6 +14,7 @@ export default function CustomSearchDialog(props: SharedProps) {
   const pathname = usePathname();
   const locale = useLocale();
   const config = ORAMA_CONFIGS_MAP[locale];
+  if (!config) return null;
   const client = useMemo(
     () =>
       new OramaClient({

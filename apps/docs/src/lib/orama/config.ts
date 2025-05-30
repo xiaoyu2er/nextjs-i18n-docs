@@ -23,8 +23,6 @@ const OORAMA_ZH_HANT_CONFIG = {
   endpoint: 'https://cloud.orama.run/v1/indexes/zh-hant-nvys3a',
 };
 
-export const ORAMA_CONFIGS = [ORAMA_EN_CONFIG, OORAMA_ZH_HANS_CONFIG] as const;
-
 export const ORAMA_CONFIGS_MAP: Record<Locale, ORAMA_EN_CONFIG> = {
   en: ORAMA_EN_CONFIG,
   'zh-hans': OORAMA_ZH_HANS_CONFIG,

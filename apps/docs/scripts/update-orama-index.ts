@@ -1,10 +1,10 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { ORAMA_CONFIGS_MAP } from '@/lib/orama/config';
+import { sync } from '@/lib/orama/orama-cloud';
 import { CloudManager } from '@oramacloud/client';
 import type { OramaDocument } from 'fumadocs-core/search/orama-cloud';
 import type { Locale } from 'next-intl';
-import { sync } from '../src/lib/orama/orama-cloud';
 
 export async function updateSearchIndexes(): Promise<void> {
   if (!process.env.ORAMA_PRIVATE_API_KEY) {
@@ -13,7 +13,14 @@ export async function updateSearchIndexes(): Promise<void> {
     );
     return;
   }
-  const { locale, index } = ORAMA_CONFIGS_MAP[process.env.LOCALE as Locale];
+  const config = ORAMA_CONFIGS_MAP[process.env.LOCALE as Locale];
+  if (!config) {
+    console.warn(
+      `No Orama config found for locale: ${process.env.LOCALE}. Skipping index update.`,
+    );
+    return;
+  }
+  const { locale, index } = config;
 
   const manager = new CloudManager({
     api_key: process.env.ORAMA_PRIVATE_API_KEY || '',
