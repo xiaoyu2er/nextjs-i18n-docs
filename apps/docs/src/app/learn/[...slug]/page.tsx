@@ -40,7 +40,6 @@ export default async function Docs(props: {
 }
 
 export async function generateStaticParams() {
-  if (process.env.GEN_DOC_STATIC !== 'true') return [];
   return learn.generateParams();
 }
 

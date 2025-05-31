@@ -12,9 +12,6 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ page: string }> },
 ) {
-  if (process.env.GEN_ORAMA_STATIC !== 'true') {
-    throw notFound();
-  }
   const { page = '0' } = await params;
   const locale = await getLocale();
 
@@ -24,8 +21,6 @@ export async function GET(
 }
 
 export function generateStaticParams() {
-  if (process.env.GEN_ORAMA_STATIC !== 'true') return [];
-
   const pages = docs.getPages();
   const pageSize = 20;
   const pageIndex = Math.ceil(pages.length / pageSize);

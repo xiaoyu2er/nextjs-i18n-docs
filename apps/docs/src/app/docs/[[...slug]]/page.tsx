@@ -111,7 +111,6 @@ function DocsRelated({ page }: { page: DocsPage }) {
 }
 
 export async function generateStaticParams() {
-  if (process.env.GEN_DOC_STATIC !== 'true') return [];
   return docs.generateParams();
 }
 

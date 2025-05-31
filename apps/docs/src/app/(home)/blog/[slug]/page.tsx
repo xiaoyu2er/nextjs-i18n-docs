@@ -58,7 +58,6 @@ export async function generateMetadata(props: {
 }
 
 export function generateStaticParams(): { slug: string }[] {
-  if (process.env.GEN_DOC_STATIC !== 'true') return [];
   return blog.getPages().map((page) => ({
     slug: page.slugs[0],
   }));
