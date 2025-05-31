@@ -15,20 +15,44 @@ permissions:
   issues: write
 
 jobs:
-  deploy:
+  generate-matrix:
     if: |
       github.event_name == 'pull_request' && 
-      contains(github.event.pull_request.labels.*.name, 'prerelease')
+      (contains(github.event.pull_request.labels.*.name, 'prerelease') ||
+       contains(toJSON(github.event.pull_request.labels.*.name), 'prerelease:'))
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Generate matrix from locales config
+        id: set-matrix
+        run: |
+          # Read the locales config and generate matrix for enabled locales
+          MATRIX=$(jq -c '
+            to_entries |
+            map(select(.value.enabled == true)) |
+            map({
+              locale: .key,
+              secret_project_id: .value.secret_project_id
+            })
+          ' .github/locales-config.json)
+          echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
+          echo "Generated matrix: {\"include\":$MATRIX}"
+          
+          # Check if there are any enabled locales
+          ENABLED_COUNT=$(echo "$MATRIX" | jq length)
+          if [ "$ENABLED_COUNT" -eq 0 ]; then
+            echo "No enabled locales found in locales-config.json"
+            exit 1
+          fi
+
+  deploy:
+    needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        include:
-          - locale: en
-            secret_project_id: VERCEL_PROJECT_EN_ID
-          - locale: zh-hans
-            secret_project_id: VERCEL_PROJECT_ZH_HANS_ID
-          - locale: zh-hant
-            secret_project_id: VERCEL_PROJECT_ZH_HANT_ID
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     name: Deploy ${{ matrix.locale }}
     steps:
       # Calculate if this matrix job should run based on PR labels
@@ -96,7 +120,7 @@ jobs:
           path: deploy-result.json
 
   comment-vercel-previews:
-    needs: deploy
+    needs: [generate-matrix, deploy]
     name: Comment Vercel Previews
     runs-on: ubuntu-latest
     steps:
