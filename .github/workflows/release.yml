@@ -7,17 +7,116 @@ on:
       - main
 
 jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix-include: ${{ steps.generate-matrix.outputs.include }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Generate dynamic files config
+        id: generate-files-config
+        shell: bash
+        run: |
+          # Read locale config
+          locale_config=$(cat .github/locales-config.json)
+          
+          # Start with core files config
+          files_yaml="core:
+            - 'apps/docs/**'
+            - 'packages/**'
+            - '!apps/docs/content/**'
+            - '!apps/docs/messages/**'"
+          
+          # Add each locale from config dynamically
+          for locale in $(echo "$locale_config" | jq -r 'keys[]'); do
+            files_yaml="$files_yaml
+          $locale:
+            - 'apps/docs/content/$locale/**'
+            - 'apps/docs/messages/$locale.json'"
+          done
+          
+          echo "Generated files_yaml:"
+          echo "$files_yaml"
+          
+          # Debug: Also log the exact content that will be passed to changed-files
+          echo "=== Debug: files_yaml content ==="
+          echo "$files_yaml"
+          echo "================================="
+          
+          # Save to output for next step
+          {
+            echo "files_yaml<<EOF"
+            echo "$files_yaml"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+      
+      - name: Get changed files with dynamic config
+        id: changes
+        uses: tj-actions/changed-files@v41
+        with:
+          files_yaml: ${{ steps.generate-files-config.outputs.files_yaml }}
+      
+      - name: Generate deployment matrix
+        id: generate-matrix
+        shell: bash
+        run: |
+          # Read locale config
+          locale_config=$(cat .github/locales-config.json)
+          
+          # Initialize matrix
+          matrix_include="[]"
+          
+          echo "=== Debug: All changes outputs ==="
+          changes_json='${{ toJSON(steps.changes.outputs) }}'
+          echo "Changes JSON: $changes_json"
+          
+          # Check what keys were actually changed
+          echo "Changed keys: $(echo "$changes_json" | jq -r '.changed_keys // "none"')"
+          echo "Modified keys: $(echo "$changes_json" | jq -r '.modified_keys // "none"')"
+          echo "=================================="
+          
+          # Check core changes - use the correct output format for files_yaml
+          core_changed="${{ steps.changes.outputs.core_any_changed }}"
+          
+          echo "Core changed: '$core_changed'"
+          
+          # Check each locale dynamically from config
+          for locale in $(echo "$locale_config" | jq -r 'keys[]'); do
+            # Get locale configuration
+            enabled=$(echo "$locale_config" | jq -r ".[\"$locale\"].enabled")
+            secret_project_id=$(echo "$locale_config" | jq -r ".[\"$locale\"].secret_project_id")
+            
+            # Get locale change status dynamically from the changes JSON
+            # Use the correct output format: {locale}_any_changed
+            locale_changed=$(echo "$changes_json" | jq -r ".[\"${locale}_any_changed\"] // \"false\"")
+            
+            echo "Checking $locale: enabled=$enabled, changed=$locale_changed, core_changed=$core_changed"
+            
+            # Add to matrix if enabled and (core changed or locale changed)
+            if [ "$enabled" == "true" ] && ([ "$core_changed" == "true" ] || [ "$locale_changed" == "true" ]); then
+              echo "Adding $locale to deployment matrix"
+              matrix_include=$(echo "$matrix_include" | jq --arg locale "$locale" --arg secret_id "$secret_project_id" '. + [{"locale": $locale, "secret_project_id": $secret_id}]')
+            fi
+          done
+          
+          echo "Final matrix: $matrix_include"
+          
+          # Ensure the matrix is properly formatted as a single line
+          matrix_output=$(echo "$matrix_include" | jq -c '.')
+          echo "Matrix output (compact): $matrix_output"
+          echo "include=$matrix_output" >> $GITHUB_OUTPUT
+
   deploy-and-update-index:
+    needs: check-changes
+    if: needs.check-changes.outputs.matrix-include != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - locale: en
-            secret_project_id: VERCEL_PROJECT_EN_ID
-          - locale: zh-hans
-            secret_project_id: VERCEL_PROJECT_ZH_HANS_ID
-          - locale: zh-hant
-            secret_project_id: VERCEL_PROJECT_ZH_HANT_ID
+        include: ${{ fromJson(needs.check-changes.outputs.matrix-include) }}
     name: Deploy ${{ matrix.locale }}
     steps:
       - name: Checkout code
