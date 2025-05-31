@@ -7,6 +7,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { baseUrl, createMetadata } from '@/lib/metadata';
 import type { Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { getLangDir } from 'rtl-detect';
 
 export async function generateMetadata() {
   const t = await getTranslations('meta');
@@ -44,16 +45,18 @@ export default async function Layout({
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
+  const direction = getLangDir(locale);
 
   return (
     <html
       lang={locale}
+      dir={direction}
       className={`${geist.variable} ${mono.variable}`}
       suppressHydrationWarning
     >
-      <body className="flex flex-col min-h-screen">
+      <body className="flex flex-col min-h-screen" dir={direction}>
         <NextIntlClientProvider>
-          <Provider>{children}</Provider>
+          <Provider dir={direction}>{children}</Provider>
         </NextIntlClientProvider>
       </body>
     </html>
