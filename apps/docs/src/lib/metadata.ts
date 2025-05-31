@@ -47,9 +47,9 @@ export function createMetadata(
 }
 
 export const baseUrl =
-  process.env.NODE_ENV === 'development' ||
-  !process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL
+  process.env.NODE_ENV === 'development'
     ? new URL('http://localhost:3000')
     : new URL(
-        `https://${process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL}`,
+        // biome-ignore lint/style/noNonNullAssertion: <explanation>
+        SITES[process.env.LOCALE!],
       );
