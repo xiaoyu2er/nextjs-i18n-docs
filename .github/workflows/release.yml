@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      locales:
+        description: 'Comma-separated list of locales to deploy (e.g., en,zh-hans). Leave empty to deploy all enabled locales.'
+        required: false
+        type: string
   push:
     branches:
       - main
@@ -10,14 +15,62 @@ jobs:
   check-changes:
     runs-on: ubuntu-latest
     outputs:
-      matrix-include: ${{ steps.generate-matrix.outputs.include }}
+      matrix-include: ${{ github.event_name == 'workflow_dispatch' && steps.generate-matrix-manual.outputs.include || steps.generate-matrix-auto.outputs.include }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: ${{ github.event_name == 'push' && 0 || 1 }}
       
-      - name: Generate dynamic files config
+      - name: Generate deployment matrix (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        id: generate-matrix-manual
+        shell: bash
+        run: |
+          # Read locale config
+          locale_config=$(cat .github/locales-config.json)
+          
+          # Initialize matrix
+          matrix_include="[]"
+          
+          # Get manual input
+          manual_locales="${{ github.event.inputs.locales }}"
+          
+          if [ -z "$manual_locales" ]; then
+            echo "No specific locales provided, deploying all enabled locales"
+            # Deploy all enabled locales
+            for locale in $(echo "$locale_config" | jq -r 'keys[]'); do
+              enabled=$(echo "$locale_config" | jq -r ".[\"$locale\"].enabled")
+              secret_project_id=$(echo "$locale_config" | jq -r ".[\"$locale\"].secret_project_id")
+              
+              if [ "$enabled" == "true" ]; then
+                echo "Adding $locale to deployment matrix"
+                matrix_include=$(echo "$matrix_include" | jq --arg locale "$locale" --arg secret_id "$secret_project_id" '. + [{"locale": $locale, "secret_project_id": $secret_id}]')
+              fi
+            done
+          else
+            echo "Manual locales specified: $manual_locales"
+            # Parse comma-separated locales
+            IFS=',' read -ra LOCALE_ARRAY <<< "$manual_locales"
+            for locale in "${LOCALE_ARRAY[@]}"; do
+              # Trim whitespace
+              locale=$(echo "$locale" | xargs)
+              
+              # Check if locale exists and is enabled
+              enabled=$(echo "$locale_config" | jq -r ".[\"$locale\"].enabled // \"false\"")
+              secret_project_id=$(echo "$locale_config" | jq -r ".[\"$locale\"].secret_project_id // \"\"")
+              
+              if [ "$enabled" == "true" ] && [ -n "$secret_project_id" ]; then
+                echo "Adding $locale to deployment matrix"
+                matrix_include=$(echo "$matrix_include" | jq --arg locale "$locale" --arg secret_id "$secret_project_id" '. + [{"locale": $locale, "secret_project_id": $secret_id}]')
+              else
+                echo "Skipping $locale (not enabled or not found in config)"
+              fi
+            done
+          fi
+      
+      - name: Generate dynamic files config (automatic trigger)
+        if: github.event_name == 'push'
         id: generate-files-config
         shell: bash
         run: |
@@ -54,14 +107,16 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
       
-      - name: Get changed files with dynamic config
+      - name: Get changed files with dynamic config (automatic trigger)
+        if: github.event_name == 'push'
         id: changes
         uses: tj-actions/changed-files@v41
         with:
           files_yaml: ${{ steps.generate-files-config.outputs.files_yaml }}
       
-      - name: Generate deployment matrix
-        id: generate-matrix
+      - name: Generate deployment matrix (automatic trigger)
+        if: github.event_name == 'push'
+        id: generate-matrix-auto
         shell: bash
         run: |
           # Read locale config
@@ -108,7 +163,17 @@ jobs:
           # Ensure the matrix is properly formatted as a single line
           matrix_output=$(echo "$matrix_include" | jq -c '.')
           echo "Matrix output (compact): $matrix_output"
-          echo "include=$matrix_output" >> $GITHUB_OUTPUT
+          
+          # Debug: Check if it's valid JSON
+          echo "Validating JSON..."
+          if echo "$matrix_output" | jq . >/dev/null 2>&1; then
+            echo "JSON is valid"
+            echo "include=$matrix_output" >> $GITHUB_OUTPUT
+          else
+            echo "Invalid JSON generated: $matrix_output"
+            echo "Outputting empty array instead"
+            echo "include=[]" >> $GITHUB_OUTPUT
+          fi
 
   deploy-and-update-index:
     needs: check-changes
