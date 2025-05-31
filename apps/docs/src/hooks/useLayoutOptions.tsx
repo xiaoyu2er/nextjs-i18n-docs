@@ -1,3 +1,4 @@
+import { GITHUB_URL } from '@next-i18n/const';
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 import { AlbumIcon, Book, NotebookIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -14,7 +15,7 @@ export const useBaseOptions = () => {
         </>
       ),
     },
-    githubUrl: 'https://github.com/xiaoyu2er/nextjs-i18n-docs',
+    githubUrl: GITHUB_URL,
     links: [
       {
         icon: <Book />,

@@ -1,4 +1,4 @@
-import { PENDING_SITES, SITES } from '@next-i18n/const';
+import { GITHUB_URL, PENDING_SITES, SITES } from '@next-i18n/const';
 import Image from 'next/image';
 
 // Language metadata with display names and descriptions
@@ -288,18 +288,11 @@ export default function Home() {
               Want to help with translations?
             </p>
             <a
-              href="https://github.com/vercel/next.js"
+              href={GITHUB_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
             >
-              <Image
-                src="/globe.svg"
-                alt="Contribute icon"
-                width={16}
-                height={16}
-                className="invert"
-              />
               <span>Contribute on GitHub</span>
             </a>
           </div>
@@ -350,13 +343,6 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Image
-                    src="/file.svg"
-                    alt="Docs icon"
-                    width={14}
-                    height={14}
-                    className="dark:invert"
-                  />
                   <span>Official Docs</span>
                 </a>
                 <a
@@ -365,13 +351,6 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Image
-                    src="/file.svg"
-                    alt="Learn icon"
-                    width={14}
-                    height={14}
-                    className="dark:invert"
-                  />
                   <span>Learn Next.js</span>
                 </a>
                 <a
@@ -380,13 +359,6 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Image
-                    src="/window.svg"
-                    alt="Templates icon"
-                    width={14}
-                    height={14}
-                    className="dark:invert"
-                  />
                   <span>Templates</span>
                 </a>
               </div>
@@ -398,18 +370,11 @@ export default function Home() {
               </h4>
               <div className="space-y-2">
                 <a
-                  href="https://github.com/vercel/next.js"
+                  href={GITHUB_URL}
                   className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Image
-                    src="/globe.svg"
-                    alt="GitHub icon"
-                    width={14}
-                    height={14}
-                    className="dark:invert"
-                  />
                   <span>GitHub</span>
                 </a>
                 <a
@@ -418,13 +383,6 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Image
-                    src="/vercel.svg"
-                    alt="Vercel icon"
-                    width={14}
-                    height={14}
-                    className="dark:invert"
-                  />
                   <span>Vercel</span>
                 </a>
                 <a
@@ -433,13 +391,6 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Image
-                    src="/globe.svg"
-                    alt="Website icon"
-                    width={14}
-                    height={14}
-                    className="dark:invert"
-                  />
                   <span>Next.js</span>
                 </a>
               </div>
