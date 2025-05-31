@@ -44,4 +44,22 @@ export const ORAMA_CONFIGS_MAP: Record<Locale, ORAMA_EN_CONFIG> = {
     index: 'qh93dcne0w9qe3x9niih7o8x',
     endpoint: 'https://cloud.orama.run/v1/indexes/de-zxbgkd',
   },
+  fr: {
+    locale: 'fr',
+    apiKey: 'GJSlM7jwvECgofjKdRLg16g1yAwctuMr',
+    index: 'wumgx337fh9tifv0s48j18tw',
+    endpoint: 'https://cloud.orama.run/v1/indexes/fr-umqvhp',
+  },
+  ru: {
+    locale: 'ru',
+    apiKey: 'pTc3jK5ezTdvIKrUc80XvxWaUESuUmbb',
+    index: 'vo05hc538hzov91x5hzk1r9o',
+    endpoint: 'https://cloud.orama.run/v1/indexes/ru-pesecj',
+  },
+  ar: {
+    locale: 'ar',
+    apiKey: 'RRgZYNFsJ63ISQjtiFQiwufEbc3v6T21',
+    index: 'o5rklrsy0xn32v3md1qwa4xn',
+    endpoint: 'https://cloud.orama.run/v1/indexes/ar-eziv7h',
+  },
 } as const;
