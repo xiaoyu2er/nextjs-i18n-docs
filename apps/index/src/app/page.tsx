@@ -1,4 +1,4 @@
-import { SITES } from '@next-i18n/const';
+import { PENDING_SITES, SITES } from '@next-i18n/const';
 import Image from 'next/image';
 
 // Language metadata with display names and descriptions
@@ -24,10 +24,54 @@ const LANGUAGE_INFO = {
     description: 'Next.js 繁體中文文檔',
     color: 'from-purple-500 to-purple-600',
   },
+  // Pending languages
+  ja: {
+    name: 'Japanese',
+    nativeName: '日本語',
+    flag: '🇯🇵',
+    description: 'Next.js 日本語ドキュメント',
+    color: 'from-pink-500 to-pink-600',
+  },
+  es: {
+    name: 'Spanish',
+    nativeName: 'Español',
+    flag: '🇪🇸',
+    description: 'Documentación de Next.js en español',
+    color: 'from-amber-500 to-amber-600',
+  },
+  de: {
+    name: 'German',
+    nativeName: 'Deutsch',
+    flag: '🇩🇪',
+    description: 'Next.js Dokumentation auf Deutsch',
+    color: 'from-gray-500 to-gray-600',
+  },
+  fr: {
+    name: 'French',
+    nativeName: 'Français',
+    flag: '🇫🇷',
+    description: 'Documentation Next.js en français',
+    color: 'from-indigo-500 to-indigo-600',
+  },
+  ru: {
+    name: 'Russian',
+    nativeName: 'Русский',
+    flag: '🇷🇺',
+    description: 'Документация Next.js на русском языке',
+    color: 'from-emerald-500 to-emerald-600',
+  },
+  ar: {
+    name: 'Arabic',
+    nativeName: 'العربية',
+    flag: '🇸🇦',
+    description: 'وثائق Next.js باللغة العربية',
+    color: 'from-green-500 to-green-600',
+  },
 } as const;
 
 export default function Home() {
   const siteEntries = Object.entries(SITES);
+  const pendingSiteEntries = Object.entries(PENDING_SITES);
   const totalTranslations = siteEntries.length;
 
   return (
@@ -65,6 +109,12 @@ export default function Home() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 <span>{totalTranslations} Languages Available</span>
               </div>
+              {pendingSiteEntries.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                  <span>{pendingSiteEntries.length} More Coming Soon</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Image
                   src="/globe.svg"
@@ -159,6 +209,103 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Pending Sites Section */}
+      {pendingSiteEntries.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              Coming Soon
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+              More languages are in development. Help us expand the Next.js
+              documentation to reach developers worldwide.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {pendingSiteEntries.map(([locale, url]) => {
+              const info = LANGUAGE_INFO[locale as keyof typeof LANGUAGE_INFO];
+              if (!info) return null;
+
+              return (
+                <div
+                  key={locale}
+                  className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-700 opacity-75"
+                >
+                  {/* Gradient Background */}
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br ${info.color} opacity-3`}
+                  />
+
+                  {/* Card Content */}
+                  <div className="relative p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="text-3xl mb-3 opacity-60">
+                        {info.flag}
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded-full">
+                        <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
+                        <span>In Progress</span>
+                      </div>
+                    </div>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      {info.nativeName}
+                    </h3>
+
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                      {info.name}
+                    </p>
+
+                    <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2 text-sm">
+                      {info.description}
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <Image
+                          src="/globe.svg"
+                          alt="Coming soon icon"
+                          width={12}
+                          height={12}
+                          className="dark:invert opacity-60"
+                        />
+                        <span>Translation in Progress</span>
+                      </div>
+
+                      <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                        Coming Soon
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="text-center mt-8">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Want to help with translations?
+            </p>
+            <a
+              href="https://github.com/vercel/next.js"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
+            >
+              <Image
+                src="/globe.svg"
+                alt="Contribute icon"
+                width={16}
+                height={16}
+                className="invert"
+              />
+              <span>Contribute on GitHub</span>
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Footer Section */}
       <footer className="border-t border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -183,6 +330,8 @@ export default function Home() {
               </p>
               <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                 <span>{totalTranslations} Languages</span>
+                <span>•</span>
+                <span>{pendingSiteEntries.length} In Progress</span>
                 <span>•</span>
                 <span>Open Source</span>
                 <span>•</span>
