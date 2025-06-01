@@ -28,6 +28,7 @@ export interface MainConfig {
   listOnly?: boolean;
   targetLanguage?: string;
   concurrency?: number;
+  verbose?: boolean;
 }
 
 export interface TranslationResult {

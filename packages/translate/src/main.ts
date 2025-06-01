@@ -23,6 +23,7 @@ export async function main({
   max = Number.POSITIVE_INFINITY,
   targetLanguage,
   concurrency = 10,
+  verbose,
 }: MainConfig): Promise<void> {
   // Filter languages based on targetLanguage if specified
   const filteredLangs = targetLanguage
@@ -159,7 +160,7 @@ export async function main({
 
       tableData.push({
         Source: sourcePath,
-        Target: targetPath,
+        ...(verbose ? { Target: targetPath } : {}),
         'Should update?': shouldUpdate ? '✅ Yes' : '❌ No',
         Chunks: chunks,
         Reason: reason,

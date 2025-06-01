@@ -66,6 +66,7 @@ program
           ...(options.docsPath ? { docsPath: options.docsPath } : {}),
           ...(options.max ? { max: options.max } : {}),
           ...(options.concurrency ? { concurrency: options.concurrency } : {}),
+          verbose: options.verbose,
           listOnly: options.listOnly,
           targetLanguage: options.targetLanguage,
         });
