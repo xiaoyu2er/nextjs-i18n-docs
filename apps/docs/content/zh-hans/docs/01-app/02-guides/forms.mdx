@@ -1,0 +1,493 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-01T22:09:41.632Z
+title: 如何使用 Server Actions 创建表单
+nav_title: 表单
+description: 学习如何在 Next.js 中使用 React Server Actions 创建表单。
+---
+
+React Server Actions 是运行在服务端的[服务端函数 (Server Functions)](https://react.dev/reference/rsc/server-functions)，可以在服务端和客户端组件中调用以处理表单提交。本指南将介绍如何在 Next.js 中使用 Server Actions 创建表单。
+
+## 工作原理
+
+React 扩展了 HTML [`<form>`](https://developer.mozilla.org/docs/Web/HTML/Element/form) 元素，允许通过 [`action`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/form#action) 属性调用 Server Actions。
+
+在表单中使用时，函数会自动接收 [`FormData`](https://developer.mozilla.org/docs/Web/API/FormData/FormData) 对象。您可以使用原生 [`FormData 方法`](https://developer.mozilla.org/en-US/docs/Web/API/FormData#instance_methods)提取数据：
+
+```tsx filename="app/invoices/page.tsx" switcher
+export default function Page() {
+  async function createInvoice(formData: FormData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // mutate data
+    // revalidate the cache
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+```jsx filename="app/invoices/page.js" switcher
+export default function Page() {
+  async function createInvoice(formData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // mutate data
+    // revalidate the cache
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+> **须知：** 处理多字段表单时，可以使用 [`entries()`](https://developer.mozilla.org/en-US/docs/Web/API/FormData/entries) 方法配合 JavaScript 的 [`Object.fromEntries()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/fromEntries)。例如：`const rawFormData = Object.fromEntries(formData)`。
+
+## 传递额外参数
+
+除了表单字段外，您可以使用 JavaScript 的 [`bind`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind) 方法向服务端函数传递额外参数。例如，向 `updateUser` 服务端函数传递 `userId` 参数：
+
+```tsx filename="app/client-component.tsx" highlight={6} switcher
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }: { userId: string }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">更新用户名</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" highlight={6} switcher
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">更新用户名</button>
+    </form>
+  )
+}
+```
+
+服务端函数将接收 `userId` 作为额外参数：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function updateUser(userId: string, formData: FormData) {}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function updateUser(userId, formData) {}
+```
+
+> **须知：**
+>
+> - 另一种方法是将参数作为隐藏输入字段传递（例如 `<input type="hidden" name="userId" value={userId} />`）。但这种方式会使值成为渲染 HTML 的一部分且不会被编码。
+> - `bind` 方法在服务端和客户端组件中都适用，并支持渐进增强。
+
+## 表单验证
+
+表单可以在客户端或服务端进行验证。
+
+- **客户端验证**：可以使用 HTML 属性如 `required` 和 `type="email"` 进行基本验证。
+- **服务端验证**：可以使用 [zod](https://zod.dev/) 等库验证表单字段。例如：
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({
+    invalid_type_error: '无效的邮箱格式',
+  }),
+})
+
+export default async function createUser(formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  // 如果表单数据无效则提前返回
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // 变更数据
+}
+```
+
+```jsx filename="app/actions.js" switcher
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({
+    invalid_type_error: '无效的邮箱格式',
+  }),
+})
+
+export default async function createsUser(formData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  // 如果表单数据无效则提前返回
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // 变更数据
+}
+```
+
+## 验证错误
+
+要显示验证错误或消息，可以将定义 `<form>` 的组件转换为客户端组件，并使用 React 的 [`useActionState`](https://react.dev/reference/react/useActionState)。
+
+使用 `useActionState` 时，服务端函数签名会发生变化，第一个参数将接收新的 `prevState` 或 `initialState` 参数。
+
+```tsx filename="app/actions.ts" highlight={4} switcher
+'use server'
+
+import { z } from 'zod'
+
+export async function createUser(initialState: any, formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+  // ...
+}
+```
+
+```jsx filename="app/actions.ts" highlight={4} switcher
+'use server'
+
+import { z } from 'zod'
+
+// ...
+
+export async function createUser(initialState, formData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+  // ...
+}
+```
+
+然后可以根据 `state` 对象条件渲染错误消息。
+
+```tsx filename="app/ui/signup.tsx" highlight={11,18-20} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">邮箱</label>
+      <input type="text" id="email" name="email" required />
+      {/* ... */}
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>注册</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" highlight={11,18-20} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">邮箱</label>
+      <input type="text" id="email" name="email" required />
+      {/* ... */}
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>注册</button>
+    </form>
+  )
+}
+```
+
+## 等待状态
+
+[`useActionState`](https://react.dev/reference/react/useActionState) 钩子暴露了一个 `pending` 布尔值，可用于在执行操作时显示加载指示器或禁用提交按钮。
+
+```tsx filename="app/ui/signup.tsx" highlight={7,12} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      {/* 其他表单元素 */}
+      <button disabled={pending}>注册</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" highlight={7,12} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      {/* 其他表单元素 */}
+      <button disabled={pending}>注册</button>
+    </form>
+  )
+}
+```
+
+或者，您可以使用 [`useFormStatus`](https://react.dev/reference/react-dom/hooks/useFormStatus) 钩子在操作执行时显示加载指示器。使用此钩子时，需要创建一个单独的组件来渲染加载指示器。例如，在操作等待时禁用按钮：
+
+```tsx filename="app/ui/button.tsx" highlight={6} switcher
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      注册
+    </button>
+  )
+}
+```
+
+```jsx filename="app/ui/button.js" highlight={6} switcher
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      注册
+    </button>
+  )
+}
+```
+
+然后可以在表单中嵌套 `SubmitButton` 组件：
+
+```tsx filename="app/ui/signup.tsx" switcher
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* 其他表单元素 */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" switcher
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* 其他表单元素 */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+> **须知：** 在 React 19 中，`useFormStatus` 包含返回对象上的额外键，如 data、method 和 action。如果您未使用 React 19，则只有 `pending` 键可用。
+
+## 乐观更新
+
+您可以使用 React 的 [`useOptimistic`](https://react.dev/reference/react/useOptimistic) 钩子在服务端函数执行完成前乐观地更新 UI，而不是等待响应：
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+type Message = {
+  message: string
+}
+
+export function Thread({ messages }: { messages: Message[] }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<
+    Message[],
+    string
+  >(messages, (state, newMessage) => [...state, { message: newMessage }])
+
+  const formAction = async (formData: FormData) => {
+    const message = formData.get('message') as string
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m, i) => (
+        <div key={i}>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">发送</button>
+      </form>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+export function Thread({ messages }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state, newMessage) => [...state, { message: newMessage }]
+  )
+
+  const formAction = async (formData) => {
+    const message = formData.get('message')
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m) => (
+        <div>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">发送</button>
+      </form>
+    </div>
+  )
+}
+```
+
+## 嵌套表单元素
+
+可以在 `<form>` 内的嵌套元素（如 `<button>`、`<input type="submit">` 和 `<input type="image">`）中调用 Server Actions。这些元素接受 `formAction` 属性或事件处理程序。
+
+这在需要在表单中调用多个 Server Actions 时非常有用。例如，除了发布按钮外，还可以为保存草稿创建特定的 `<button>` 元素。更多信息请参阅 [React `<form>` 文档](https://react.dev/reference/react-dom/components/form#handling-multiple-submission-types)。
+
+## 编程式表单提交
+
+可以使用 [`requestSubmit()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/requestSubmit) 方法以编程方式触发表单提交。例如，当用户使用 `⌘` + `Enter` 键盘快捷键提交表单时，可以监听 `onKeyDown` 事件：
+
+```tsx filename="app/entry.tsx" switcher
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'Enter' || e.key === 'NumpadEnter')
+    ) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/entry.js" switcher
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'Enter' || e.key === 'NumpadEnter')
+    ) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```
+
+这将触发最近的 `<form>` 祖先的提交，从而调用服务端函数。
