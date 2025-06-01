@@ -1,0 +1,65 @@
+name: 'Check Locale Changes'
+description: 'Check which enabled locales have changes and generate deployment matrix'
+inputs:
+  trigger-type:
+    description: 'Type of trigger: "manual", "auto", or "docs-pr"'
+    required: true
+  manual-locales:
+    description: 'Comma-separated list of locales for manual trigger (optional)'
+    required: false
+    default: ''
+outputs:
+  matrix-include:
+    description: 'JSON array of locales to deploy with their config'
+    value: ${{ steps.generate-matrix.outputs.include }}
+  has-changes:
+    description: 'Whether any enabled locales have changes'
+    value: ${{ steps.generate-matrix.outputs.has-changes }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Generate dynamic files config (for auto/docs-pr triggers)
+      if: inputs.trigger-type == 'auto' || inputs.trigger-type == 'docs-pr'
+      id: generate-files-config
+      shell: bash
+      run: |
+        # Use the dedicated script to generate files config
+        files_yaml=$(.github/scripts/generate-files-config.sh)
+        
+        echo "Generated files_yaml:"
+        echo "$files_yaml"
+        
+        # Save to output for next step
+        {
+          echo "files_yaml<<EOF"
+          echo "$files_yaml"
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+
+    - name: Get changed files (for auto/docs-pr triggers)
+      if: inputs.trigger-type == 'auto' || inputs.trigger-type == 'docs-pr'
+      id: changes
+      uses: tj-actions/changed-files@v41
+      with:
+        files_yaml: ${{ steps.generate-files-config.outputs.files_yaml }}
+
+    - name: Generate deployment matrix
+      id: generate-matrix
+      shell: bash
+      run: |
+        # Prepare arguments for the matrix generation script
+        trigger_type="${{ inputs.trigger-type }}"
+        manual_locales="${{ inputs.manual-locales }}"
+        
+        if [ "$trigger_type" == "manual" ]; then
+          # For manual trigger, we don't need changes JSON
+          output=$(.github/scripts/generate-locale-matrix.sh "$trigger_type" "$manual_locales")
+        else
+          # For auto/docs-pr triggers, pass the changes JSON
+          changes_json='${{ toJSON(steps.changes.outputs) }}'
+          output=$(.github/scripts/generate-locale-matrix.sh "$trigger_type" "" "$changes_json")
+        fi
+        
+        # Parse the output (the script outputs two lines: include= and has-changes=)
+        echo "$output" >> $GITHUB_OUTPUT
