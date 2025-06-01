@@ -22,6 +22,7 @@ export async function main({
   listOnly,
   max = Number.POSITIVE_INFINITY,
   targetLanguage,
+  concurrency = 10,
 }: MainConfig): Promise<void> {
   // Filter languages based on targetLanguage if specified
   const filteredLangs = targetLanguage
@@ -190,7 +191,6 @@ export async function main({
     // Process tasks if not in list-only mode
     if (!listOnly) {
       let completedRefDocs = 0;
-      const concurrency = 10;
 
       await executeInBatches(
         tasks,

@@ -27,6 +27,7 @@ export interface MainConfig {
   max?: number;
   listOnly?: boolean;
   targetLanguage?: string;
+  concurrency?: number;
 }
 
 export interface TranslationResult {
