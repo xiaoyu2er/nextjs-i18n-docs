@@ -1,4 +1,4 @@
-name: Update Next.js English Documentation
+name: Sync Next.js Official Documentation
 
 on:
   workflow_dispatch: # Manual trigger
@@ -13,28 +13,35 @@ permissions:
   pull-requests: write
 
 jobs:
-  update-docs:
-    name: Update Next.js Docs
+  check-branch:
+    name: Check if PR branch exists
     runs-on: ubuntu-latest
+    outputs:
+      should_sync: ${{ steps.check_branch.outputs.should_sync }}
+    steps:
+      - name: Check if PR branch exists
+        id: check_branch
+        run: |
+          if git ls-remote --heads https://github.com/${{ github.repository }}.git | grep -q "docs/sync-nextjs-documentation"; then
+            echo "Branch already exists, skipping update"
+            echo "should_sync=false" >> $GITHUB_OUTPUT
+          else
+            echo "Branch does not exist, proceeding with update"
+            echo "should_sync=true" >> $GITHUB_OUTPUT
+          fi
+
+  sync-docs:
+    name: Sync Next.js Docs
+    runs-on: ubuntu-latest
+    needs: check-branch
+    if: needs.check-branch.outputs.should_sync == 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check if PR branch exists
-        id: check_branch
-        run: |
-          if git ls-remote --heads origin "docs/sync-nextjs-documentation" | grep -q "docs/sync-nextjs-documentation"; then
-            echo "Branch already exists, skipping update"
-            echo "branch_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Branch does not exist, proceeding with update"
-            echo "branch_exists=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Clone Next.js repository (canary)
-        if: steps.check_branch.outputs.branch_exists == 'false'
         run: |
           git clone --depth 1 --branch canary --single-branch https://github.com/vercel/next.js.git nextjs-canary
           mkdir -p apps/docs/content/en/docs
@@ -42,7 +49,6 @@ jobs:
           rm -rf nextjs-canary
 
       - name: Clone Next.js repository (v14.2.28)
-        if: steps.check_branch.outputs.branch_exists == 'false'
         run: |
           git clone --depth 1 --branch v14.2.28 --single-branch https://github.com/vercel/next.js.git nextjs-v14
           mkdir -p apps/docs/content/en/docs/14
@@ -50,24 +56,28 @@ jobs:
           rm -rf nextjs-v14
 
       - name: Clone Next.js repository (v13.5.11)
-        if: steps.check_branch.outputs.branch_exists == 'false'
         run: |
           git clone --depth 1 --branch v13.5.11 --single-branch https://github.com/vercel/next.js.git nextjs-v13
           mkdir -p apps/docs/content/en/docs/13
           rsync -av --delete nextjs-v13/docs/ apps/docs/content/en/docs/13/
           rm -rf nextjs-v13
 
+      - name: Setup Tools
+        uses: ./.github/actions/setup
+ 
+      - name: Sync blog & learn
+        run: |
+          node packages/crawler/dist/index.js
+
       - name: Find available translation locales
-        if: steps.check_branch.outputs.branch_exists == 'false'
         id: find_locales
         run: |
           cd apps/docs/content
-          LOCALES=$(find . -maxdepth 1 -type d | grep -v "^.$" | grep -v "/en$" | sed 's|^\./||')
+          LOCALES=$(find . -maxdepth 1 -type d | grep -v "^.$" | grep -v "/en$" | sed 's|^\./||' | tr '\n' ' ' | sed 's/ $//')
           echo "Available translation locales: $LOCALES"
           echo "locales=$LOCALES" >> $GITHUB_OUTPUT
       
       - name: Stage changes to detect renames
-        if: steps.check_branch.outputs.branch_exists == 'false'
         run: |
           # Stage all changes so Git can detect renames
           git add .
@@ -76,13 +86,12 @@ jobs:
           git status --porcelain
 
       - name: Process file renames and deletions
-        if: steps.check_branch.outputs.branch_exists == 'false'
         run: |
           # Get list of renamed files from git status
-          RENAMES=$(git status --porcelain | grep -E "^R[[:space:]]+apps/docs/content/en/docs" | sed 's/^R[[:space:]]*//')
+          RENAMES=$(git status --porcelain | grep -E "^R[[:space:]]+apps/docs/content/en" | sed 's/^R[[:space:]]*//')
           
           # Get list of deleted files from git status
-          DELETES=$(git status --porcelain | grep -E "^D[[:space:]]+apps/docs/content/en/docs" | sed 's/^D[[:space:]]*//')
+          DELETES=$(git status --porcelain | grep -E "^D[[:space:]]+apps/docs/content/en" | sed 's/^D[[:space:]]*//')
           
           # Generate current timestamp in ISO format
           CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
@@ -184,7 +193,6 @@ jobs:
           fi
 
       - name: Check for modifications
-        if: steps.check_branch.outputs.branch_exists == 'false'
         id: check_changes
         run: |
           if [[ $(git status --porcelain | grep -E "apps/docs/content/" | wc -l) -gt 0 ]]; then
@@ -196,7 +204,7 @@ jobs:
           fi
 
       - name: Create Pull Request
-        if: steps.check_branch.outputs.branch_exists == 'false' && steps.check_changes.outputs.has_changes == 'true'
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

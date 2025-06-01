@@ -22,7 +22,7 @@ export async function writeFiles(learns: Writeable[]) {
     try {
       await fs$.mkdir(dirname, { recursive: true });
       await fs$.writeFile(fileName, learn.content);
-      console.log(`Written file to ${fileName}`);
+      console.log(`Write file to ${fileName}`);
     } catch (error) {
       console.error(`Failed to write file ${learn.filename}:`, error);
     }
