@@ -100,8 +100,9 @@ export default function Home() {
             </h1>
 
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-              Access comprehensive Next.js documentation in multiple languages.
-              Built with AI-powered translation and maintained by the community.
+              Access comprehensive Next.js documentation in multiple languages,
+              synchronized with the official site. Includes complete docs
+              (latest, v14, v13), blog posts, and learn tutorials.
             </p>
 
             <div className="flex items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
@@ -123,7 +124,7 @@ export default function Home() {
                   height={16}
                   className="dark:invert"
                 />
-                <span>Powered by AI Translation</span>
+                <span>Synced with Official Site</span>
               </div>
             </div>
           </div>
@@ -181,11 +182,11 @@ export default function Home() {
                         height={14}
                         className="dark:invert"
                       />
-                      <span>Full Documentation</span>
+                      <span>Docs • Blog • Learn</span>
                     </div>
 
                     <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-300">
-                      <span className="text-sm font-medium">Visit Docs</span>
+                      <span className="text-sm font-medium">Visit Site</span>
                       <svg
                         className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300"
                         fill="none"
@@ -244,9 +245,9 @@ export default function Home() {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                    <span className="text-lg">💬</span>
+                    <span className="text-lg">🔄</span>
                   </div>
-                  <span className="text-sm">Share your use case</span>
+                  <span className="text-sm">Synced with official site</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
@@ -385,7 +386,7 @@ export default function Home() {
                           height={12}
                           className="dark:invert opacity-60"
                         />
-                        <span>Translation in Progress</span>
+                        <span>Docs • Blog • Learn</span>
                       </div>
 
                       <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
@@ -432,9 +433,9 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-gray-600 dark:text-gray-300 mb-4 max-w-md">
-                Community-driven multilingual documentation for Next.js.
-                Translations powered by AI and refined by contributors
-                worldwide.
+                Community-driven multilingual documentation for Next.js,
+                synchronized with the official site. Includes docs (latest, v14,
+                v13), blog posts, and learn tutorials in multiple languages.
               </p>
               <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                 <span>{totalTranslations} Languages</span>
