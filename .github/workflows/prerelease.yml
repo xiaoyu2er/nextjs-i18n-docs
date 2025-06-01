@@ -29,15 +29,35 @@ jobs:
       - name: Generate matrix from locales config
         id: set-matrix
         run: |
-          # Read the locales config and generate matrix for enabled locales
-          MATRIX=$(jq -c '
+          LABELS_JSON='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          echo "LABELS_JSON: $LABELS_JSON"
+          
+          # Check if we should deploy all locales (general prerelease)
+          SHOULD_DEPLOY_GENERAL=false
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            SHOULD_DEPLOY_GENERAL=true
+          elif echo "$LABELS_JSON" | grep -E '"prerelease"' > /dev/null; then
+            SHOULD_DEPLOY_GENERAL=true
+          fi
+          
+          echo "Should deploy all locales: $SHOULD_DEPLOY_GENERAL"
+          
+          # Read the locales config and generate matrix for enabled locales that should deploy
+          MATRIX=$(jq -c --argjson should_deploy_general "$SHOULD_DEPLOY_GENERAL" --argjson labels "$LABELS_JSON" '
             to_entries |
             map(select(.value.enabled == true)) |
-            map({
-              locale: .key,
-              secret_project_id: .value.secret_project_id
-            })
+            map(. as $item | {
+              locale: $item.key,
+              secret_project_id: $item.value.secret_project_id,
+              should_deploy: (
+                $should_deploy_general or 
+                ($labels | any(. == ("prerelease:" + $item.key)))
+              )
+            }) |
+            map(select(.should_deploy == true)) |
+            map({locale: .locale, secret_project_id: .secret_project_id})
           ' .github/locales-config.json)
+          
           echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
           echo "Generated matrix: {\"include\":$MATRIX}"
           
@@ -55,41 +75,16 @@ jobs:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     name: Deploy ${{ matrix.locale }}
     steps:
-      # Calculate if this matrix job should run based on PR labels
-      #
-      # This job will deploy if:
-      # - The event is NOT a pull_request (e.g., workflow_dispatch)
-      # - OR the PR has the label 'prerelease'
-      # - OR the PR has the label 'prerelease:<locale>' matching the current matrix locale
-      - name: Calculate should_deploy
-        id: should_deploy
-        shell: bash
-        run: |
-          LABELS_JSON='${{ toJson(github.event.pull_request.labels.*.name) }}'
-          echo "LABELS_JSON: $LABELS_JSON"
-          SHOULD_DEPLOY=false
-          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
-            SHOULD_DEPLOY=true
-          elif echo "$LABELS_JSON" | grep -E '"prerelease"' > /dev/null; then
-            SHOULD_DEPLOY=true
-          elif echo "$LABELS_JSON" | grep -E '"prerelease:'"${{ matrix.locale }}"'"' > /dev/null; then
-            SHOULD_DEPLOY=true
-          fi
-          echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
       - name: Checkout code
-        if: steps.should_deploy.outputs.should_deploy == 'true'
         uses: actions/checkout@v3
         with:
           fetch-depth: 1
           ref: ${{ github.head_ref }}
       - name: Log checked out commit
-        if: steps.should_deploy.outputs.should_deploy == 'true'
         run: git log -1
       - name: Setup Tools
-        if: steps.should_deploy.outputs.should_deploy == 'true'
         uses: ./.github/actions/setup
       - name: Deploy to Vercel (${{ matrix.locale }})
-        if: steps.should_deploy.outputs.should_deploy == 'true'
         id: deploy
         uses: ./.github/actions/vercel-deploy
         with:
@@ -98,14 +93,12 @@ jobs:
           vercel_org_id: ${{ secrets.VERCEL_ORG_ID }}
           vercel_token: ${{ secrets.VERCEL_TOKEN }}
       - name: Set deploy outputs
-        if: steps.should_deploy.outputs.should_deploy == 'true'
         id: set_outputs
         run: |
           echo "preview_url=${{ steps.deploy.outputs.prod_url }}" >> $GITHUB_OUTPUT
           echo "inspect_url=${{ steps.deploy.outputs.inspect_url }}" >> $GITHUB_OUTPUT
           echo "label=${{ matrix.locale }}" >> $GITHUB_OUTPUT
       - name: Write deploy result to file
-        if: steps.should_deploy.outputs.should_deploy == 'true'
         run: |
           jq -n \
             --arg label "${{ steps.set_outputs.outputs.label }}" \
@@ -113,7 +106,6 @@ jobs:
             --arg inspect_url "${{ steps.set_outputs.outputs.inspect_url }}" \
             '{label: $label, preview_url: $preview_url, inspect_url: $inspect_url}' > deploy-result.json
       - name: Upload deploy result artifact
-        if: steps.should_deploy.outputs.should_deploy == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deploy-result-${{ matrix.locale }}
