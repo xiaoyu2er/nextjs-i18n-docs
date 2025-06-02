@@ -1,0 +1,465 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:40:13.275Z
+title: Next.js 13.4
+description: >-
+  Next.js 13.4 macht den App Router stabil, bringt Turbopack in die Beta-Phase und führt experimentelle Unterstützung für Server Actions ein.
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2023-05-04T18:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-4/twitter-card.png
+---
+
+Next.js 13.4 ist ein grundlegender Release, der den App Router als stabil markiert:
+
+*   [**App Router (Stabil)**](#nextjs-app-router):
+    *   React Server Components
+    *   Verschachtelte Routen & Layouts
+    *   Vereinfachtes Data Fetching
+    *   Streaming & Suspense
+    *   Integrierte SEO-Unterstützung
+*   [**Turbopack (Beta)**](#turbopack-beta): Ihr lokaler Entwicklungsserver, schneller und mit verbesserter Stabilität
+*   [**Server Actions (Alpha)**](#server-actions-alpha): Daten auf dem Server mutieren ohne Client-JavaScript
+
+Seit der Veröffentlichung von [Next.js 13](/blog/next-13) vor sechs Monaten haben wir uns darauf konzentriert, die Grundlagen für die Zukunft von Next.js - den App Router - so zu bauen, dass er schrittweise übernommen werden kann, ohne unnötige Breaking Changes zu verursachen.
+
+Mit der Veröffentlichung von 13.4 können Sie den App Router nun für die Produktion übernehmen.
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+[Next.js App Router](#nextjs-app-router)
+----------------------------------------
+
+Wir haben Next.js 2016 veröffentlicht, um eine einfache Möglichkeit zu bieten, React-Anwendungen serverseitig zu rendern, mit dem Ziel, ein dynamischeres, personalisierteres und globaleres Web zu schaffen.
+
+[Im ursprünglichen Ankündigungspost](https://vercel.com/blog/next) teilten wir einige Designprinzipien von Next.js mit:
+
+*   **Zero setup. Nutzen Sie das Dateisystem als API**
+*   **Nur JavaScript. Alles ist eine Funktion**
+*   **Automatisches Server-Rendering und Code-Splitting**
+*   **Data Fetching liegt in der Verantwortung des Entwicklers**
+
+Next.js ist jetzt sechs Jahre alt. Unsere ursprünglichen Designprinzipien sind geblieben - und da Next.js von mehr Entwicklern und Unternehmen übernommen wurde, haben wir an einem grundlegenden Upgrade des Frameworks gearbeitet, um diese Prinzipien besser zu erreichen.
+
+Wir haben an der nächsten Generation von Next.js gearbeitet, und heute ist mit `13.4` diese nächste Generation stabil und bereit für die Übernahme. Dieser Beitrag wird mehr über unsere Designentscheidungen und -auswahl für den App Router teilen.
+
+### [Zero setup. Nutzen Sie das Dateisystem als API](#zero-setup-use-the-filesystem-as-an-api)
+
+[Dateisystembasierte Routen](/docs/app/building-your-application/routing) waren von Anfang an ein Kernfeature von Next.js. In unserem ursprünglichen Post zeigten wir dieses Beispiel für das Erstellen einer Route aus einer einzelnen React-Komponente:
+
+```js filename="pages/about.js"
+// Pages Router
+ 
+import React from 'react';
+export default () => <h1>About us</h1>;
+```
+
+Es gab nichts zusätzlich zu konfigurieren. Legen Sie eine Datei in `pages/` ab und der Next.js Router übernahm den Rest. Wir lieben diese Einfachheit beim Routing immer noch. Aber mit dem Wachstum der Framework-Nutzung sind auch die Arten von Schnittstellen gewachsen, die Entwickler damit bauen wollen.
+
+Entwickler haben nach verbesserter Unterstützung für die Definition von Layouts, das Verschachteln von UI-Teilen als Layouts und mehr Flexibilität bei der Definition von Lade- und Fehlerzuständen gefragt. Dies war nicht einfach in den bestehenden Next.js Router zu integrieren.
+
+Jeder Teil des Frameworks muss um den Router herum designed werden. Seitenübergänge, Data Fetching, Caching, Mutieren und Revalidieren von Daten, Streaming, Styling von Inhalten und mehr.
+
+Um unseren Router mit Streaming kompatibel zu machen und diese Anfragen nach erweiterter Layout-Unterstützung zu lösen, haben wir uns entschieden, eine neue Version unseres Routers zu bauen.
+
+Hier sind wir nach unserer ersten Veröffentlichung des [Layouts RFC](/blog/layouts-rfc) gelandet.
+
+```js filename="app/layout.js"
+// Neu: App Router ✨
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+```js filename="app/page.js"
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>;
+}
+```
+
+Wichtiger als das, was Sie hier sehen, ist das, was Sie _nicht_ sehen. Dieser neue Router (der schrittweise über das `app/`-Verzeichnis übernommen werden kann) hat eine völlig andere Architektur, die auf der Grundlage von [React Server Components](/docs/getting-started/react-essentials) und [Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming) aufbaut.
+
+Diese Grundlage hat es uns ermöglicht, Next.js-spezifische APIs zu entfernen, die ursprünglich entwickelt wurden, um die React-Primitive zu erweitern. Zum Beispiel müssen Sie keine benutzerdefinierte `_app`-Datei mehr verwenden, um das globale Shared Layout anzupassen:
+
+```js filename="pages/_app.js"
+// Pages Router
+ 
+// Dieses "globale Layout" umschließt alle Routen. Es gibt keine Möglichkeit,
+// andere Layout-Komponenten zu komponieren, und Sie können keine globalen
+// Daten aus dieser Datei abrufen.
+export default function MyApp({ Component, pageProps }) {
+  return <Component {...pageProps} />;
+}
+```
+
+Mit dem Pages Router konnten Layouts nicht komponiert werden, und Data Fetching konnte nicht mit der Komponente zusammengelegt werden. Mit dem neuen App Router ist dies nun möglich.
+
+```js filename="app/layout.js"
+// Neu: App Router ✨
+// Das Root-Layout wird für die gesamte Anwendung geteilt
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+```js filename="app/dashboard/layout.js"
+// Layouts können verschachtelt und komponiert werden
+export default function DashboardLayout({ children }) {
+  return (
+    <section>
+      <h1>Dashboard</h1>
+      {children}
+    </section>
+  );
+}
+```
+
+Mit dem Pages Router wurde `_document` verwendet, um die initiale Payload vom Server anzupassen.
+
+```js filename="pages/_document.js"
+// Pages Router
+ 
+// Diese Datei ermöglicht es Ihnen, die <html>- und <body>-Tags
+// für die Server-Anfrage anzupassen, fügt aber Framework-spezifische Features
+// hinzu, anstatt HTML-Elemente zu schreiben.
+import { Html, Head, Main, NextScript } from 'next/document';
+ 
+export default function Document() {
+  return (
+    <Html>
+      <Head />
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  );
+}
+```
+
+Mit dem App Router müssen Sie `<Html>`, `<Head>` und `<Body>` nicht mehr aus Next.js importieren. Stattdessen verwenden Sie einfach React.
+
+```js filename="app/layout.js"
+// Neu: App Router ✨
+// Das Root-Layout wird für die gesamte Anwendung geteilt
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+Die Möglichkeit, einen neuen Dateisystem-Router zu bauen, war auch der richtige Zeitpunkt, um viele andere verwandte Feature-Anfragen für unser Routing-System anzugehen. Zum Beispiel:
+
+*   Bisher konnten Sie globale Stylesheets nur aus externen npm-Paketen (wie Komponentenbibliotheken) in `_app.js` importieren. Dies war eine weniger als ideale Developer Experience. Mit dem App Router können Sie jede CSS-Datei in jeder Komponente importieren (und zusammenlegen).
+*   Bisher bedeutete das Opt-in für serverseitiges Rendering mit Next.js (über `getServerSideProps`), dass die Interaktion mit Ihrer Anwendung blockiert war, bis die gesamte Seite hydratisiert war. Mit dem App Router haben wir die Architektur so umgestaltet, dass sie tief mit React Suspense integriert ist, was bedeutet, dass wir Teile der Seite selektiv hydratisieren können, ohne andere Komponenten in der UI von der Interaktivität zu blockieren. Inhalte können sofort vom Server gestreamt werden, was die wahrgenommene Ladeleistung einer Seite verbessert.
+
+Der [Router](/docs/app/building-your-application/routing) ist das Herzstück von Next.js. Aber es geht nicht um den Router selbst, sondern darum, wie er die restlichen Teile des Frameworks integriert - wie [Data Fetching](/docs/app/building-your-application/data-fetching).
+
+### [Nur JavaScript. Alles ist eine Funktion](#only-javascript-everything-is-a-function)
+
+Next.js- und React-Entwickler möchten JavaScript- und TypeScript-Code schreiben und Anwendungskomponenten zusammenstellen. Aus unserem ursprünglichen Post:
+
+```js filename="pages/index.js"
+import React from 'react';
+import Head from 'next/head';
+ 
+export default () => (
+  <div>
+    <Head>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+    </Head>
+    <h1>Hi. I'm mobile-ready!</h1>
+  </div>
+);
+```
+
+> In zukünftigen Versionen von Next.js haben wir eine DX-Verbesserung hinzugefügt, um React automatisch für Sie zu importieren.
+
+Diese Komponente kapselt Logik, die überall in Ihrer Anwendung wiederverwendet und zusammengesetzt werden kann. In Kombination mit dateisystembasiertem Routing bedeutete dies eine einfache Möglichkeit, mit dem Bau von React-Anwendungen zu beginnen, die sich anfühlte wie das Schreiben von JavaScript und HTML.
+
+Wenn Sie beispielsweise einige Daten abrufen wollten, sah die ursprüngliche Version von Next.js so aus:
+
+```js filename="pages/index.js"
+import React from 'react';
+import 'isomorphic-fetch';
+ 
+export default class extends React.Component {
+  static async getInitialProps() {
+    const res = await fetch('https://api.company.com/user/123');
+    const data = await res.json();
+    return { username: data.profile.username };
+  }
+}
+```
+
+> In zukünftigen Versionen von Next.js haben wir eine DX-Verbesserung hinzugefügt, die fetch polyfilled, sodass Sie `isomorphic-fetch` oder `node-fetch` nicht mehr importieren mussten und die Web-`fetch API` sowohl auf dem Client als auch auf dem Server verwenden konnten.
+
+Mit zunehmender Akzeptanz und Reifung des Frameworks haben wir neue Patterns für Data Fetching erkundet.
+
+`getInitialProps` lief sowohl auf dem Server _als auch_ auf dem Client. Diese API erweiterte die React-Komponente, indem sie es ermöglichte, ein `Promise` zu erstellen und die Ergebnisse an die `props` der Komponente weiterzuleiten.
+
+Während `getInitialProps` heute noch funktioniert, haben wir basierend auf Kundenfeedback die nächste Generation von Data-Fetching-APIs entwickelt: `getServerSideProps` und `getStaticProps`.
+
+```js filename="pages/index.js"
+// Erzeugen Sie eine statische Version der Route
+export async function getStaticProps(context) {
+  return { props: {} };
+}
+// Oder rendern Sie die Route dynamisch serverseitig
+export async function getServerSideProps(context) {
+  return { props: {} };
+}
+```
+
+Diese APIs machten klarer, wo Ihr Code lief, entweder auf dem Client oder Server, und ermöglichten es Next.js-Anwendungen, [automatisch statisch optimiert](/docs/pages/building-your-application/rendering/automatic-static-optimization) zu werden. Darüber hinaus ermöglichten sie [statische Exports](/docs/app/building-your-application/deploying/static-exports), sodass Next.js an Orten bereitgestellt werden konnte, die keinen Server unterstützen (z.B. AWS S3 Bucket).
+
+Dies war jedoch nicht "nur JavaScript", und wir wollten uns näher an unser ursprüngliches Designprinzip halten.
+
+Seit der Erstellung von Next.js haben wir eng mit dem React-Core-Team bei Meta zusammengearbeitet, um Framework-Features auf React-Primitiven aufzubauen. Unsere Partnerschaft, in Kombination mit den Jahren der Forschung und Entwicklung des React-Core-Teams, hat zu einer Möglichkeit für Next.js geführt, unsere Ziele durch die neueste Version der React-Architektur zu erreichen, einschließlich [Server Components](/docs/getting-started/react-essentials).
+
+Mit dem App Router [holen Sie Daten](/docs/app/building-your-application/data-fetching) mit der vertrauten `async`- und `await`-Syntax ab. Es gibt keine neuen APIs zu lernen. Standardmäßig sind alle Komponenten React Server Components, sodass Data Fetching sicher auf dem Server stattfindet. Zum Beispiel:
+
+```js filename="app/page.js"
+export default async function Page() {
+  const res = await fetch('https://api.example.com/...');
+  // Der Rückgabewert ist *nicht* serialisiert
+  // Sie können Date, Map, Set usw. verwenden
+  const data = res.json();
+ 
+  return '...';
+}
+```
+
+Kritisch ist, dass das Prinzip "Data Fetching liegt in der Verantwortung des Entwicklers" realisiert wird. Sie können Daten abrufen und _jede_ Komponente zusammenstellen. Und nicht nur First-Party-Komponenten, sondern _jede_ Komponente im Server-Components-Ökosystem, wie einen [Twitter-Embed](https://github.com/vercel-labs/react-tweet) `react-tweet`, der so designed wurde, dass er mit Server Components integriert und vollständig auf dem Server läuft.
+
+```js filename="app/page.js"
+import { Tweet } from 'react-tweet';
+ 
+export default async function Page() {
+  return <Tweet id="790942692909916160" />;
+}
+```
+
+Da der Router mit [React Suspense](https://react.dev/reference/react/Suspense) integriert ist, können Sie Fallback-Inhalte flüssiger anzeigen, während Teile Ihrer Inhalte geladen werden, und Inhalte nach Bedarf progressiv enthüllen.
+
+```js filename="app/page.js"
+import { Suspense } from 'react';
+import { PostFeed, Weather } from './components';
+ 
+export default function Page() {
+  return (
+    <section>
+      <Suspense fallback={<p>Loading feed...</p>}>
+        <PostFeed />
+      </Suspense>
+      <Suspense fallback={<p>Loading weather...</p>}>
+        <Weather />
+      </Suspense>
+    </section>
+  );
+}
+```
+
+Darüber hinaus markiert der Router Seitenübergänge als [Transitions](https://react.dev/reference/react/useTransition), wodurch Routenübergänge unterbrechbar werden.
+
+### [Automatisches Server-Rendering und Code-Splitting](#automatic-server-rendering-and-code-splitting)
+
+Als wir Next.js entwickelten, war es noch üblich, dass Entwickler Webpack, Babel und andere Tools manuell konfigurieren mussten, um eine React-Anwendung zum Laufen zu bringen. Zusätzliche Optimierungen wie Server-seitiges Rendering (Server Rendering) oder Code-Splitting wurden in individuellen Lösungen oft nicht implementiert. Next.js sowie andere React-Frameworks schufen eine Abstraktionsebene, um diese Best Practices umzusetzen und zu erzwingen.
+
+Route-basiertes Code-Splitting bedeutete, dass jede Datei im `pages/`-Verzeichnis in ihr eigenes JavaScript-Bundle aufgeteilt wurde, was dazu beitrug, die Dateigröße zu reduzieren und die anfängliche Ladeleistung der Seite zu verbessern.
+
+Dies war sowohl für Server-seitig gerenderte Anwendungen als auch für Single-Page-Anwendungen mit Next.js von Vorteil, da letztere oft ein einzelnes großes JavaScript-Bundle beim Start der Anwendung luden. Um jedoch Code-Splitting auf Komponentenebene zu implementieren, mussten Entwickler `next/dynamic` verwenden, um Komponenten dynamisch zu importieren.
+
+```tsx filename="app/page.tsx"
+import dynamic from 'next/dynamic';
+ 
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  loading: () => <p>Loading...</p>,
+});
+ 
+export default function Home() {
+  return <DynamicHeader />;
+}
+```
+
+Mit dem App Router sind Server-Komponenten (Server Components) nicht im JavaScript-Bundle für den Browser enthalten. [Client-Komponenten](/docs/getting-started/react-essentials#client-components) werden standardmäßig automatisch per Code-Splitting aufgeteilt (entweder mit Webpack oder Turbopack in Next.js). Da zudem die gesamte Router-Architektur Streaming- und Suspense-fähig ist, können Teile Ihrer Benutzeroberfläche progressiv vom Server an den Client gesendet werden.
+
+Beispielsweise können Sie ganze Codepfade mit bedingter Logik per Code-Splitting aufteilen. In diesem Beispiel müsste das client-seitige JavaScript des Dashboards nicht für abgemeldete Benutzer geladen werden.
+
+```tsx filename="app/layout.tsx"
+import { getUser } from './auth';
+import { Dashboard, Landing } from './components';
+ 
+export default async function Layout() {
+  const isLoggedIn = await getUser();
+  return isLoggedIn ? <Dashboard /> : <Landing />;
+}
+```
+
+[Turbopack (Beta)](#turbopack-beta)
+-----------------------------------
+
+[Turbopack](https://nextjs.org/docs/app/api-reference/turbopack), unser neuer Bundler, den wir über Next.js testen und stabilisieren, beschleunigt lokale Iterationen während der Arbeit an Ihrer Next.js-Anwendung (über `next dev --turbo`) und bald auch Ihre Produktions-Builds (`next build --turbo`).
+
+Seit der Alpha-Version in Next.js 13 haben wir eine stetig wachsende Akzeptanz beobachtet, während wir Fehler behoben und fehlende Funktionen nachgerüstet haben. Wir haben Turbopack intern auf [Vercel.com](https://vercel.com) und bei vielen Vercel-Kunden mit großen Next.js-Websites eingesetzt, um Feedback zu sammeln und die Stabilität zu verbessern. Wir sind der Community dankbar für ihre Unterstützung beim Testen und Melden von Fehlern an unser Team.
+
+Sechs Monate später sind wir nun bereit, in die Beta-Phase überzugehen.
+
+Turbopack hat noch keine vollständige Funktionsparität mit Webpack und Next.js erreicht. Wir verfolgen den Support für diese Funktionen in [diesem Issue](https://github.com/vercel/next.js/issues/49174). Die meisten Anwendungsfälle sollten jedoch bereits unterstützt werden. Unser Ziel mit dieser Beta ist es, verbleibende Fehler durch die gestiegene Nutzung zu beheben und die Stabilität für eine zukünftige Version vorzubereiten.
+
+Unsere Investition in die Verbesserung der inkrementellen Engine und der Caching-Schicht von Turbopack wird nicht nur die lokale Entwicklung beschleunigen, sondern bald auch Produktions-Builds. Bleiben Sie gespannt auf eine zukünftige Next.js-Version, in der Sie `next build --turbo` für sofortige Builds ausführen können.
+
+Testen Sie die [Turbopack](/docs/architecture/turbopack)-Beta heute in Next.js 13.4 mit `next dev --turbo`.
+
+[Server Actions (Alpha)](#server-actions-alpha)
+-----------------------------------------------
+
+Die React-Community hat viel Innovation und Erkundung von Ideen rund um Formulare, Formularzustandsverwaltung sowie Caching und Revalidierung von Daten erlebt. Im Laufe der Zeit hat React einige dieser Muster stärker standardisiert. Zum Beispiel empfiehlt es nun ["uncontrolled components"](https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components) für Formularzustände.
+
+Die aktuelle Lösungslandschaft bestand entweder aus wiederverwendbaren client-seitigen Lösungen oder in Frameworks eingebauten Primitiven. Bisher gab es keine Möglichkeit, Server-Mutationen und Daten-Primitive zu kombinieren. Das React-Team [arbeitet an](https://react.dev/blog/2023/03/22/react-labs-what-we-have-been-working-on-march-2023) einer First-Party-Lösung für Mutationen.
+
+Wir freuen uns, die Unterstützung für experimentelle **Server Actions in Next.js** anzukündigen, mit der Sie Daten auf dem Server mutieren können, indem Sie Funktionen direkt aufrufen – _ohne_ eine zusätzliche API-Schicht erstellen zu müssen.
+
+```tsx
+import kv from './kv';
+ 
+export default function Page({ params }) {
+  async function increment() {
+    'use server';
+    await kv.incr(`post:id:${params.id}`);
+  }
+ 
+  return (
+    <form action={increment}>
+      <button type="submit">Like</button>
+    </form>
+  );
+}
+```
+
+Mit Server Actions erhalten Sie leistungsstarke server-first Datenmutationen, weniger client-seitiges JavaScript und progressiv verbesserte Formulare.
+
+```tsx
+import db from './db';
+import { redirect } from 'next/navigation';
+ 
+async function create(formData: FormData) {
+  'use server';
+  const post = await db.post.insert({
+    title: formData.get('title'),
+    content: formData.get('content'),
+  });
+  redirect(`/blog/${post.slug}`);
+}
+ 
+export default function Page() {
+  return (
+    <form action={create}>
+      <input type="text" name="title" />
+      <textarea name="content" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+Server Actions in Next.js wurden für eine tiefe Integration in den Rest des Datenlebenszyklus entwickelt, einschließlich des Next.js-Caches, Incremental Static Regeneration (ISR) und des Client-Routers.
+
+Die Revalidierung von Daten über die neuen APIs `revalidatePath` und `revalidateTag` bedeutet, dass Mutationen, Neu-Rendering der Seite oder Weiterleitungen in **einem Netzwerk-Roundtrip** erfolgen können, wodurch sichergestellt wird, dass die korrekten Daten auf dem Client angezeigt werden, selbst wenn der Upstream-Provider langsam ist.
+
+```tsx
+import db from './db';
+import { revalidateTag } from 'next/cache';
+ 
+async function update(formData: FormData) {
+  'use server';
+  await db.post.update({
+    title: formData.get('title'),
+  });
+  revalidateTag('posts');
+}
+ 
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['posts'] } });
+  const data = await res.json();
+  // ...
+}
+```
+
+Server Actions sind darauf ausgelegt, komponierbar zu sein. Jeder in der React-Community kann Server Actions erstellen und veröffentlichen und sie im Ökosystem verteilen. Genau wie bei Server Components freuen wir uns auf eine neue Ära komponierbarer Primitiven für Client und Server.
+
+[Server Actions](/docs/app/building-your-application/data-fetching/server-actions) sind heute in der Alpha-Phase mit Next.js 13.4 verfügbar. Durch die Verwendung von Server Actions nutzt Next.js den experimentellen Release-Kanal von React.
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    serverActions: true,
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+[Weitere Verbesserungen](#other-improvements)
+-----------------------------------------
+
+*   [Draft Mode](/docs/app/building-your-application/configuring/draft-mode): Abrufen und Rendern von Entwurfsinhalten aus Ihrem Headless-CMS. Der Draft Mode funktioniert sowohl in `pages` als auch in `app`. Wir haben die bestehende Preview Mode API erweitert und vereinfacht, die weiterhin für `pages` funktioniert. Preview Mode funktioniert _nicht_ in `app` – Sie sollten Draft Mode verwenden.
+
+[Häufig gestellte Fragen](#frequently-asked-questions)
+-----------------------------------------------------
+
+### [Was bedeutet die Stabilität des App Routers?](#what-does-app-router-stability-mean)
+
+Die Markierung des App Routers als stabil bedeutet nicht, dass unsere Arbeit abgeschlossen ist. Stabilität bedeutet, dass der Kern des App Routers produktionsreif ist und sowohl durch unsere internen Tests als auch durch viele Next.js-Frühnutzer validiert wurde.
+
+Es gibt noch zusätzliche Optimierungen, die wir in Zukunft vornehmen möchten, einschließlich der vollen Stabilität von Server Actions. Es war uns wichtig, die Kernstabilität voranzutreiben, um der Community Klarheit darüber zu geben, wo sie heute mit dem Lernen und dem Erstellen von Anwendungen beginnen sollten.
+
+Der App Router basiert auf dem React-`canary`-Kanal, der jetzt bereit für die Framework-Integration von Funktionen wie Server Components ist. [Mehr erfahren](https://react.dev/blog/2023/05/03/react-canaries).
+
+### [Was bedeutet das für die Next.js-Beta-Dokumentation?](#what-does-this-mean-for-the-nextjs-beta-docs)
+
+Ab heute empfehlen wir, neue Anwendungen mit dem App Router zu erstellen. Die Next.js-Beta-Dokumentation, die zur Erklärung des App Routers verwendet und von Grund auf neu geschrieben wurde, ist nun in die [stabile Next.js-Dokumentation](/docs) integriert. Sie können jetzt einfach zwischen dem App- oder Pages-Router wechseln.
+
+Wir empfehlen die Lektüre des [App Router Incremental Adoption Guide](/docs/app/building-your-application/upgrading/app-router-migration), um zu erfahren, wie Sie den App Router einführen können.
+
+### [Wird der Pages Router verschwinden?](#is-the-pages-router-going-away)
+
+Nein. Wir verpflichten uns, die Entwicklung mit `pages/` zu unterstützen, einschließlich Fehlerbehebungen, Verbesserungen und Sicherheitspatches, für mehrere zukünftige Major-Versionen. Wir möchten sicherstellen, dass Entwickler genügend Zeit haben, den App Router schrittweise einzuführen, wenn sie bereit sind.
+
+Die gleichzeitige Verwendung von `pages/` und `app/` in der Produktion wird unterstützt und empfohlen. Der App Router kann [pro Route](/docs/app/building-your-application/upgrading/app-router-migration) eingeführt werden.
+
+### [Bedeutet das, dass Server Components "fertig" sind?](#does-this-mean-server-components-are-complete)
+
+Next.js ist eines der Frameworks, das sich für den Aufbau auf der React-Architektur entschieden hat, die Server Components einschließt. Wir hoffen, dass die mit dem App Router gebotene Erfahrung andere Frameworks (oder neue Frameworks) dazu ermutigen wird, diese Architektur ebenfalls in Betracht zu ziehen.
+
+Es gibt noch Muster, die in diesem Ökosystem noch nicht definiert sind, wie das Handling von Infinite Scroll. Derzeit empfehlen wir für diese Muster client-seitige Lösungen, während das Ökosystem wächst und Bibliotheken erstellt oder aktualisiert werden.
+
+[Community](#community)
+-----------------------
+
+Next.js ist das Ergebnis der gemeinsamen Arbeit von über 2.600 einzelnen Entwicklern, Industriepartnern wie Google und Meta sowie unserem Kernteam bei Vercel. Treten Sie der Community auf [GitHub Discussions](https://github.com/vercel/next.js/discussions), [Reddit](https://www.reddit.com/r/nextjs/) und [Discord](/discord) bei.
+
+Diese Version wurde ermöglicht durch:
+
+*   Das **Next.js**-Team: [Andrew](https://github.com/acdlite), [Balazs](https://github.com/balazsorban44), [Jan](https://github.com/jankaifer), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sebastian](https://github.com/sebmarkbage), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens) und [Wyatt](https://github.com/wyattjoh).
+*   Das **Turbopack**-Team: [Alex](https://github.com/alexkirsz), [Donny](https://github.com/kdy1), [Justin](https://github.com/jridgewell), [Leah](https://github.com/forsakenharmony), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra) und [Will](https://github.com/wbinnssmith).
+
+Sowie die Beiträge von: @shuding, @huozhi, @wyattfry, @styfle, @sreetamdas, @afonsojramos, @timneutkens, @alexkirsz, @chriswdmr, @jankaifer, @pn-code, @kdy1, @sokra, @kwonoj, @martin-wahlberg, @Kikobeats, @JTaylor0196, @sebmarkbage, @ijjk, @gnoff, @jridgewell, @sagarpreet-xflowpay, @balazsorban44, @cprussin, @ForsakenHarmony, @li-jia-nan, @dciug, @albertothedev, @DuCanhGH, @feedthejim, @patrick91, @padmaia, @sophiebits, @eps1lon, @reconbot, @acdlite, @cjmling, @nabsul, @motopods, @hanneslund, @tunamagur0, @devknoll, @apeltop, @maranomynet, @y-tsubuku, @EndangeredMassa, @ykzts, @AviAvinav, @adilansari, @wyattjoh, @charkour, @delbaoliveira, @agadzik, @Just-Moh-it, @rodrigofeijao, @leerob, @juliusmarminge, @koba04, @Phiction, @jessewarren-aa, @ryo-manba, @Yovach und @dylanjha.

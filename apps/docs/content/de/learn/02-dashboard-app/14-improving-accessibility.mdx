@@ -1,0 +1,369 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:46:25.769Z
+title: Barrierefreiheit verbessern
+headline: 'App Router: Barrierefreiheit verbessern'
+description: Implementierung serverseitiger Formularvalidierung und Verbesserung der Barrierefreiheit in Formularen.
+image: 'https://nextjs.org/api/learn-og?title=Improving%20Accessibility&amp;chapter=14'
+---
+
+Im vorherigen Kapitel haben wir uns angesehen, wie Fehler (einschließlich 404-Fehler) abgefangen und eine Fallback-Lösung für Benutzer angezeigt werden kann. Allerdings fehlt noch ein wichtiger Teil des Puzzles: die Formularvalidierung. Lassen Sie uns untersuchen, wie serverseitige Validierung mit Server Actions implementiert werden kann und wie Formularfehler mit Reacts [`useActionState`](https://react.dev/reference/react/useActionState)-Hook angezeigt werden können – unter Berücksichtigung der Barrierefreiheit!
+
+[Was ist Barrierefreiheit?](#what-is-accessibility)
+------------------------------------------------
+
+Barrierefreiheit (Accessibility) bezieht sich auf die Gestaltung und Implementierung von Webanwendungen, die von allen genutzt werden können, einschließlich Menschen mit Behinderungen. Es ist ein umfangreiches Thema, das viele Bereiche abdeckt, wie Tastaturnavigation, semantisches HTML, Bilder, Farben, Videos usw.
+
+Obwohl wir in diesem Kurs nicht tief in die Barrierefreiheit eintauchen werden, besprechen wir die in Next.js verfügbaren Barrierefreiheitsfunktionen und einige gängige Praktiken, um Ihre Anwendungen zugänglicher zu gestalten.
+
+> Wenn Sie mehr über Barrierefreiheit lernen möchten, empfehlen wir den Kurs [Learn Accessibility](https://web.dev/learn/accessibility/) von [web.dev](https://web.dev/).
+
+[Verwendung des ESLint-Barrierefreiheits-Plugins in Next.js](#using-the-eslint-accessibility-plugin-in-nextjs)
+----------------------------------------------------------------------------------------------------
+
+Next.js enthält das Plugin [`eslint-plugin-jsx-a11y`](https://www.npmjs.com/package/eslint-plugin-jsx-a11y) in seiner ESLint-Konfiguration, um Barrierefreiheitsprobleme frühzeitig zu erkennen. Dieses Plugin warnt beispielsweise, wenn Bilder ohne `alt`-Text verwendet werden, die `aria-*`- und `role`-Attribute falsch eingesetzt werden und mehr.
+
+Optional können Sie dies ausprobieren, indem Sie `next lint` als Skript in Ihrer `package.json`-Datei hinzufügen:
+
+```json {5} filename="/package.json"
+"scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start",
+    "lint": "next lint"
+},
+```
+
+Führen Sie dann `pnpm lint` in Ihrem Terminal aus:
+
+```bash filename="Terminal"
+pnpm lint
+```
+
+Dies führt Sie durch die Installation und Konfiguration von ESLint für Ihr Projekt. Wenn Sie jetzt `pnpm lint` ausführen, sollte folgende Ausgabe erscheinen:
+
+```bash filename="Terminal"
+✔ Keine ESLint-Warnungen oder -Fehler
+```
+
+Aber was passiert, wenn Sie ein Bild ohne `alt`-Text haben? Lassen Sie uns das herausfinden!
+
+Gehen Sie zu `/app/ui/invoices/table.tsx` und entfernen Sie das `alt`-Attribut vom Bild. Sie können die Suchfunktion Ihres Editors nutzen, um schnell das `<Image>`-Element zu finden:
+
+```tsx {6} filename="/app/ui/invoices/table.tsx"
+<Image
+  src={invoice.image_url}
+  className="rounded-full"
+  width={28}
+  height={28}
+  alt={`${invoice.name}'s profile picture`} // Diese Zeile löschen
+/>
+```
+
+Führen Sie nun erneut `pnpm lint` aus, und Sie sollten folgende Warnung sehen:
+
+```bash filename="Terminal"
+./app/ui/invoices/table.tsx
+45:25  Warnung: Bildelemente müssen ein alt-Attribut haben,
+entweder mit aussagekräftigem Text oder einem leeren String für dekorative Bilder. jsx-a11y/alt-text
+```
+
+Obwohl das Hinzufügen und Konfigurieren eines Linters kein verpflichtender Schritt ist, kann es hilfreich sein, um Barrierefreiheitsprobleme im Entwicklungsprozess zu erkennen.
+
+[Verbesserung der Formularbarrierefreiheit](#improving-form-accessibility)
+-------------------------------------------------------------
+
+Es gibt drei Dinge, die wir bereits tun, um die Barrierefreiheit in unseren Formularen zu verbessern:
+
+*   **Semantisches HTML**: Verwendung semantischer Elemente (`<input>`, `<option>` usw.) anstelle von `<div>`. Dies ermöglicht es Hilfstechnologien (AT), sich auf die Eingabeelemente zu konzentrieren und dem Benutzer entsprechende Kontextinformationen bereitzustellen, was das Formular leichter navigierbar und verständlich macht.
+*   **Beschriftung**: Einbindung von `<label>` und dem `htmlFor`-Attribut stellt sicher, dass jedes Formularfeld einen beschreibenden Textlabel hat. Dies verbessert die AT-Unterstützung durch Bereitstellung von Kontext und erhöht die Benutzerfreundlichkeit, da Benutzer auf das Label klicken können, um das entsprechende Eingabefeld zu fokussieren.
+*   **Fokusumriss**: Die Felder sind so gestaltet, dass sie bei Fokus einen Umriss anzeigen. Dies ist entscheidend für die Barrierefreiheit, da es visuell das aktive Element auf der Seite anzeigt und sowohl Tastatur- als auch Screenreader-Nutzern hilft zu verstehen, wo sie sich im Formular befinden. Sie können dies überprüfen, indem Sie `Tab` drücken.
+
+Diese Praktiken legen eine gute Grundlage, um Ihre Formulare für viele Benutzer zugänglicher zu gestalten. Allerdings behandeln sie nicht die **Formularvalidierung** und **Fehler**.
+
+[Formularvalidierung](#form-validation)
+-----------------------------------
+
+Gehen Sie zu [http://localhost:3000/dashboard/invoices/create](http://localhost:3000/dashboard/invoices/create) und senden Sie ein leeres Formular ab. Was passiert?
+
+Sie erhalten einen Fehler! Dies liegt daran, dass leere Formularwerte an Ihre Server Action gesendet werden. Sie können dies verhindern, indem Sie Ihr Formular client- oder serverseitig validieren.
+
+### [Clientseitige Validierung](#client-side-validation)
+
+Es gibt mehrere Möglichkeiten, Formulare clientseitig zu validieren. Die einfachste wäre, sich auf die vom Browser bereitgestellte Formularvalidierung zu verlassen, indem Sie das `required`-Attribut zu den `<input>`- und `<select>`-Elementen in Ihren Formularen hinzufügen. Zum Beispiel:
+
+```tsx {7} filename="/app/ui/invoices/create-form.tsx"
+<input
+  id="amount"
+  name="amount"
+  type="number"
+  placeholder="Enter USD amount"
+  className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+  required
+/>
+```
+
+Senden Sie das Formular erneut ab. Der Browser zeigt eine Warnung an, wenn Sie versuchen, ein Formular mit leeren Werten abzusenden.
+
+Dieser Ansatz ist generell in Ordnung, da einige ATs die Browser-Validierung unterstützen.
+
+Eine Alternative zur clientseitigen Validierung ist die serverseitige Validierung. Sehen wir uns im nächsten Abschnitt an, wie Sie diese implementieren können. Löschen Sie vorerst die `required`-Attribute, falls Sie sie hinzugefügt haben.
+
+### [Server-seitige Validierung](#server-side-validation)
+
+Durch die Validierung von Formularen auf dem Server können Sie:
+
+* Sicherstellen, dass Ihre Daten im erwarteten Format vorliegen, bevor sie an Ihre Datenbank gesendet werden.
+* Das Risiko verringern, dass böswillige Nutzer die clientseitige Validierung umgehen.
+* Eine einzige Quelle der Wahrheit für das haben, was als _gültige_ Daten betrachtet wird.
+
+Importieren Sie in Ihrer `create-form.tsx`-Komponente den `useActionState`-Hook aus `react`. Da `useActionState` ein Hook ist, müssen Sie Ihr Formular mit der `"use client"`-Direktive in eine Client-Komponente umwandeln:
+
+```tsx {1,4} filename="/app/ui/invoices/create-form.tsx"
+'use client';
+ 
+// ...
+import { useActionState } from 'react';
+```
+
+Innerhalb Ihrer Form-Komponente nimmt der `useActionState`-Hook:
+
+* Zwei Argumente entgegen: `(action, initialState)`.
+* Gibt zwei Werte zurück: `[state, formAction]` - den Formularzustand und eine Funktion, die beim Absenden des Formulars aufgerufen wird.
+
+Übergeben Sie Ihre `createInvoice`-Aktion als Argument an `useActionState` und rufen Sie innerhalb des `<form action={}>`-Attributs `formAction` auf.
+
+```tsx {5,7} filename="/app/ui/invoices/create-form.tsx"
+// ...
+import { useActionState } from 'react';
+ 
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const [state, formAction] = useActionState(createInvoice, initialState);
+ 
+  return <form action={formAction}>...</form>;
+}
+```
+
+Der `initialState` kann alles sein, was Sie definieren. In diesem Fall erstellen Sie ein Objekt mit zwei leeren Schlüsseln: `message` und `errors`, und importieren Sie den `State`-Typ aus Ihrer `actions.ts`-Datei. `State` existiert noch nicht, aber wir werden ihn als Nächstes erstellen:
+
+```tsx {2,6} filename="/app/ui/invoices/create-form.tsx"
+// ...
+import { createInvoice, State } from '@/app/lib/actions';
+import { useActionState } from 'react';
+ 
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const initialState: State = { message: null, errors: {} };
+  const [state, formAction] = useActionState(createInvoice, initialState);
+ 
+  return <form action={formAction}>...</form>;
+}
+```
+
+Das mag zunächst verwirrend erscheinen, wird aber klarer, sobald Sie die Server-Aktion aktualisieren. Lassen Sie uns das jetzt tun.
+
+In Ihrer `action.ts`-Datei können Sie Zod zur Validierung der Formulardaten verwenden. Aktualisieren Sie Ihre `FormSchema` wie folgt:
+
+```ts {4,8,10} filename="/app/lib/actions.ts"
+const FormSchema = z.object({
+  id: z.string(),
+  customerId: z.string({
+    invalid_type_error: 'Bitte wählen Sie einen Kunden aus.',
+  }),
+  amount: z.coerce
+    .number()
+    .gt(0, { message: 'Bitte geben Sie einen Betrag größer als 0 $ ein.' }),
+  status: z.enum(['pending', 'paid'], {
+    invalid_type_error: 'Bitte wählen Sie einen Rechnungsstatus aus.',
+  }),
+  date: z.string(),
+});
+```
+
+* `customerId` - Zod wirft bereits einen Fehler, wenn das Kundenfeld leer ist, da es einen Typ `string` erwartet. Aber fügen wir eine freundliche Nachricht hinzu, falls der Benutzer keinen Kunden auswählt.
+* `amount` - Da Sie den Betragstyp von `string` zu `number` erzwingen, wird standardmäßig Null zurückgegeben, wenn der String leer ist. Lassen Sie uns Zod mitteilen, dass wir immer einen Betrag größer als 0 mit der `.gt()`-Funktion wollen.
+* `status` - Zod wirft bereits einen Fehler, wenn das Statusfeld leer ist, da es "pending" oder "paid" erwartet. Fügen wir auch hier eine freundliche Nachricht hinzu, falls der Benutzer keinen Status auswählt.
+
+Aktualisieren Sie als Nächstes Ihre `createInvoice`-Aktion, um zwei Parameter zu akzeptieren - `prevState` und `formData`:
+
+```ts {1,2,3,4,5,6,7,8,10} filename="/app/lib/actions.ts"
+export type State = {
+  errors?: {
+    customerId?: string[];
+    amount?: string[];
+    status?: string[];
+  };
+  message?: string | null;
+};
+ 
+export async function createInvoice(prevState: State, formData: FormData) {
+  // ...
+}
+```
+
+* `formData` - wie zuvor.
+* `prevState` - enthält den Zustand, der vom `useActionState`-Hook übergeben wird. Sie werden ihn in diesem Beispiel nicht in der Aktion verwenden, aber er ist eine erforderliche Eigenschaft.
+
+Ändern Sie dann die Zod-`parse()`-Funktion in `safeParse()`:
+
+```ts {3} filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Formularfelder mit Zod validieren
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // ...
+}
+```
+
+`safeParse()` gibt ein Objekt zurück, das entweder ein `success`- oder ein `error`-Feld enthält. Dies hilft, die Validierung eleganter zu handhaben, ohne diese Logik in den `try/catch`-Block einfügen zu müssen.
+
+Überprüfen Sie vor dem Senden der Informationen an Ihre Datenbank mit einer Bedingung, ob die Formularfelder korrekt validiert wurden:
+
+```ts {10,11,12,13,14,15} filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Formularfelder mit Zod validieren
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // Wenn die Formularvalidierung fehlschlägt, geben Sie die Fehler frühzeitig zurück. Andernfalls fahren Sie fort.
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Fehlende Felder. Rechnung konnte nicht erstellt werden.',
+    };
+  }
+ 
+  // ...
+}
+```
+
+Wenn `validatedFields` nicht erfolgreich ist, geben wir die Funktion frühzeitig mit den Fehlermeldungen von Zod zurück.
+
+> **Tipp:** Geben Sie `validatedFields` mit console.log aus und senden Sie ein leeres Formular ab, um dessen Struktur zu sehen.
+
+Schließlich, da Sie die Formularvalidierung separat außerhalb Ihres try/catch-Blocks handhaben, können Sie eine spezifische Nachricht für Datenbankfehler zurückgeben. Ihr endgültiger Code sollte so aussehen:
+
+```ts filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Formular mit Zod validieren
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // Wenn die Formularvalidierung fehlschlägt, geben Sie die Fehler frühzeitig zurück. Andernfalls fahren Sie fort.
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Fehlende Felder. Rechnung konnte nicht erstellt werden.',
+    };
+  }
+ 
+  // Daten für die Einfügung in die Datenbank vorbereiten
+  const { customerId, amount, status } = validatedFields.data;
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+ 
+  // Daten in die Datenbank einfügen
+  try {
+    await sql`
+      INSERT INTO invoices (customer_id, amount, status, date)
+      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+    `;
+  } catch (error) {
+    // Wenn ein Datenbankfehler auftritt, geben Sie einen spezifischeren Fehler zurück.
+    return {
+      message: 'Datenbankfehler: Rechnung konnte nicht erstellt werden.',
+    };
+  }
+ 
+  // Cache für die Rechnungsseite neu validieren und den Benutzer weiterleiten.
+  revalidatePath('/dashboard/invoices');
+  redirect('/dashboard/invoices');
+}
+```
+
+Großartig, jetzt lassen Sie uns die Fehler in Ihrer Form-Komponente anzeigen. In der `create-form.tsx`-Komponente können Sie über den Formular-`state` auf die Fehler zugreifen.
+
+Fügen Sie einen **ternären Operator** hinzu, der nach jedem spezifischen Fehler sucht. Zum Beispiel können Sie nach dem Kundenfeld hinzufügen:
+
+```tsx {14,27,28,29,30,31,32,33,34} filename="/app/ui/invoices/create-form.tsx"
+<form action={formAction}>
+  <div className="rounded-md bg-gray-50 p-4 md:p-6">
+    {/* Kundenname */}
+    <div className="mb-4">
+      <label htmlFor="customer" className="mb-2 block text-sm font-medium">
+        Kunde auswählen
+      </label>
+      <div className="relative">
+        <select
+          id="customer"
+          name="customerId"
+          className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+          defaultValue=""
+          aria-describedby="customer-error"
+        >
+          <option value="" disabled>
+            Kunde auswählen
+          </option>
+          {customers.map((name) => (
+            <option key={name.id} value={name.id}>
+              {name.name}
+            </option>
+          ))}
+        </select>
+        <UserCircleIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
+      </div>
+      <div id="customer-error" aria-live="polite" aria-atomic="true">
+        {state.errors?.customerId &&
+          state.errors.customerId.map((error: string) => (
+            <p className="mt-2 text-sm text-red-500" key={error}>
+              {error}
+            </p>
+          ))}
+      </div>
+    </div>
+    // ...
+  </div>
+</form>
+```
+
+> **Tipp:** Sie können `state` in Ihrer Komponente mit console.log ausgeben und überprüfen, ob alles korrekt verbunden ist. Überprüfen Sie die Konsole in den Dev Tools, da Ihr Formular jetzt eine Client-Komponente ist.
+
+Im obigen Code fügen Sie auch die folgenden ARIA-Labels hinzu:
+
+* `aria-describedby="customer-error"`: Stellt eine Beziehung zwischen dem `select`-Element und dem Fehlermeldungscontainer her. Es zeigt an, dass der Container mit `id="customer-error"` das `select`-Element beschreibt. Screenreader lesen diese Beschreibung, wenn der Benutzer mit dem `select`-Feld interagiert, um ihn über Fehler zu informieren.
+* `id="customer-error"`: Dieses `id`-Attribut identifiziert eindeutig das HTML-Element, das die Fehlermeldung für das `select`-Eingabefeld enthält. Dies ist notwendig, damit `aria-describedby` die Beziehung herstellen kann.
+* `aria-live="polite"`: Der Screenreader soll den Benutzer höflich informieren, wenn der Fehler innerhalb des `div` aktualisiert wird. Wenn sich der Inhalt ändert (z.B. wenn ein Benutzer einen Fehler korrigiert), wird der Screenreader diese Änderungen ankündigen, aber nur, wenn der Benutzer untätig ist, um ihn nicht zu unterbrechen.
+
+[Übung: ARIA-Labels hinzufügen](#practice-adding-aria-labels)
+============================================================
+
+Verwenden Sie das obige Beispiel, um Fehler zu Ihren verbleibenden Formularfeldern hinzuzufügen. Sie sollten auch eine Nachricht am Ende des Formulars anzeigen, falls Felder fehlen. Ihre Benutzeroberfläche sollte so aussehen:
+
+<Image
+  alt="Rechnungserstellungsformular mit Fehlermeldungen für jedes Feld."
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/form-validation-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/form-validation-page.png"
+  width="960"
+  height="568"
+/>
+
+Führen Sie `pnpm lint` aus, um zu überprüfen, ob Sie die ARIA-Labels korrekt verwenden, sobald Sie bereit sind.
+
+Wenn Sie sich herausfordern möchten, nehmen Sie das in diesem Kapitel erworbene Wissen und fügen Sie die Formularvalidierung zur `edit-form.tsx`-Komponente hinzu.
+
+Sie müssen:
+
+* `useActionState` zu Ihrer `edit-form.tsx`-Komponente hinzufügen.
+* Die `updateInvoice`-Aktion bearbeiten, um Validierungsfehler von Zod zu handhaben.
+* Die Fehler in Ihrer Komponente anzeigen und ARIA-Labels für bessere Barrierefreiheit hinzufügen.
+
+Erweitern Sie den folgenden Codeausschnitt, um die Lösung zu sehen, sobald Sie bereit sind:
