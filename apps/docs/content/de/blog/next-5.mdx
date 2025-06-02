@@ -1,0 +1,362 @@
+---
+source-updated-at: 2025-05-30T16:38:07.000Z
+translation-updated-at: 2025-06-02T19:35:33.094Z
+title: 'Next.js 5: Universelles Webpack, CSS-Imports, Plugins und Zones'
+description: >-
+  Next.js 5 konzentriert sich auf bessere Erweiterbarkeit, Komponierbarkeit für große
+  Anwendungen und Leistung
+author:
+  - name: Arunoda Susiripala
+    image: /static/team/arunoda.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2018-02-05T19:10:43.056Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/twitter-card.png
+---
+
+Wir freuen uns sehr, Next.js 5.0 der Welt vorzustellen. Es ist ab sofort auf npm verfügbar. Führen Sie zum Upgrade folgenden Befehl aus:
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest
+```
+
+> Neben dem Update von Next.js aktualisieren wir auch die Peer-Abhängigkeiten `react` und `react-dom`
+
+Next.js ist ein Toolkit für universelle, serverseitig gerenderte (oder statisch vorgerenderte) React.js-Anwendungen. Mit dem Befehl `next` können Sie sofort mit der Entwicklung einer Anwendung jeder Größe beginnen. ([Mehr erfahren](https://vercel.com/blog/next).)
+
+Mit jeder neuen Version legen wir Wert auf Abwärtskompatibilität, einfache Upgrade-Pfade und API-Änderungen nur bei absolutem Bedarf. Next.js 5.0 bildet hier keine Ausnahme.
+
+Unter der Haube hat Next.js jedoch eine radikale Transformation durchlaufen, um neue leistungsstarke Anwendungsfälle und Erweiterbarkeit zu ermöglichen. Wir begannen damit, Next.js eine universelle Webpack-Pipeline für Server- und Client-Code teilen zu lassen.
+
+[Universelles Webpack und Next-Plugins](#universal-webpack-and-next-plugins)
+-------------------------------------------------------------------------
+
+Next.js nutzt leistungsstarke Tools wie Webpack, Babel und Uglify und präsentiert sie dem Endbenutzer als bemerkenswert einfache Schnittstelle: `next` (für die Entwicklung), `next build` (für die Produktionsvorbereitung) und `next start` (zum Bereitstellen) oder `next export` zum Vorrendern in statische Dateien.
+
+Eine unserer frühen Entscheidungen war, sehr leistungsfähige Erweiterungspunkte für die Konfiguration dieser Tools bereitzustellen. Wir wollten nicht nur Benutzerfreundlichkeit, sondern auch die Flexibilität, das Toolkit nach Belieben zu erweitern.
+
+Sie können beispielsweise [die Next.js-Webpack-Konfiguration erweitern](https://github.com/vercel/next.js#customizing-webpack-config), indem Sie eine `webpack`-Eigenschaft in Ihrer `next.config.js` einrichten.
+
+Da Webpack für Produktion und Entwicklung unterschiedlich ausgeführt wird, entschieden wir uns damals, daraus **eine Funktion** zu machen, die unsere Standard-Webpack-Konfiguration dekoriert:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    // Anpassungen vornehmen
+    return config;
+  },
+};
+```
+
+> Ein Beispiel für die optionale Datei `next.config.js`
+
+Allerdings würde Webpack nur für Client-Bundles (Browser) ausgeführt, und Sie verpassen die Möglichkeit, diese großartige Toolchain für serverseitiges Rendering zu nutzen.
+
+Wir freuen uns, bekannt zu geben, dass wir unsere Codebasis umfassend refaktoriert haben, um **Webpack universell nutzbar zu machen**.
+
+Aus Ihrer Perspektive ändert sich nur, dass eine zusätzliche Eigenschaft `isServer` an die obige Dekoratorfunktion übergeben wird. Die neue Semantik bedeutet jedoch, dass das breite Ökosystem der Webpack-Loader nun für Sie verfügbar ist.
+
+### [CSS, LESS, SASS, SCSS und CSS-Module](#css-less-sass-scss-and-css-modules)
+
+Eine unserer am häufigsten nachgefragten Funktionen ist die Möglichkeit, CSS-Dateien zu importieren und Webpack-Loader zu nutzen:
+
+```
+import './index.css';
+ 
+export default function Index() {
+  return (
+    <div>
+      <p>Ich liebe CSS!</p>
+    </div>
+  );
+}
+```
+
+> Eine Beispielseite (`pages/index.js`), die CSS-Imports dank universellem Webpack nutzt
+
+Um dies zu ermöglichen, können Sie die benötigten Loader als Peer-Abhängigkeiten einbinden:
+
+```bash filename="Terminal"
+npm i --save css-loader style-loader postcss-loader
+```
+
+> Next.js gibt Ihnen die Freiheit, die benötigten Loader auszuwählen und bei Bedarf auf verschiedene Versionen zu aktualisieren.
+
+Erweitern Sie dann die Konfiguration, um Ihre Loader einzurichten. In `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, options) {
+    const { dev, isServer } = options;
+    const extractCSSPlugin = new ExtractTextPlugin({
+      filename: 'static/style.css',
+      disable: dev,
+    });
+    config.module.rules.push({
+      test: /\\.css$/,
+      use: cssLoaderConfig(extractCSSPlugin, {
+        cssModules,
+        dev,
+        isServer,
+      }),
+    });
+    return config;
+  },
+};
+```
+
+> Die Erweiterung der rohen Webpack-Konfiguration gibt Ihnen große Flexibilität und Kontrolle
+
+Während wir generell Lösungen für komponentenlokales Styling wie das [integrierte `styled-jsx`-Babel-Plugin](https://github.com/vercel/next.js#built-in-css-support) empfehlen, glauben wir, dass CSS-Loader viele wichtige Stärken haben, wie die einfache Wiederverwendung bestehender CSS-Codebasen und die stark vereinfachte Migration alter Codebasen zu Next.js.
+
+Statt jedes denkbare Feature und jeden Loader standardmäßig zu aktivieren, führen wir [**Next.js-Plugins**](https://github.com/vercel/next-plugins) ein, die _einfache Funktionen zur Dekoration Ihrer Konfiguration_ sind. Anstatt die Konfiguration manuell wie oben zu erweitern, können Sie einfach folgendes tun:
+
+```
+const withCss = require('next-css');
+module.exports = withCss({
+  /* zusätzliche optionale Konfiguration */
+});
+```
+
+> Alles, was benötigt wird, um das Importieren von `.css`-Dateien zu ermöglichen, ist das Einbinden von `next-css`
+
+Lesen Sie mehr über die [Verwendung von CSS-Loadern](https://github.com/vercel/next-plugins/tree/master/packages/next-css) mit Next.js oder sehen Sie sich einige der bereits für Sie erstellten Pakete an:
+
+| Loader | Paket |
+| --- | --- |
+| CSS | [next-css](https://github.com/vercel/next-plugins/tree/master/packages/next-css) |
+| LESS | [next-less](https://github.com/vercel/next-plugins/tree/master/packages/next-less) |
+| SASS | [next-sass](https://github.com/vercel/next-plugins/tree/master/packages/next-sass) |
+
+Unser Ziel ist es, die Community zu befähigen, ein Ökosystem praktischer, einfacher Erweiterungen zu entwickeln und zu pflegen. Zu diesem Zweck öffnen wir das [next-plugins](https://github.com/vercel/next-plugins)-Monorepo für die Next.js-Community. PRs sind willkommen!
+
+### [TypeScript-Unterstützung](#typescript-support)
+
+Eine der [am schnellsten wachsenden Technologien](https://stateofjs.com/2017/flavors/results) im JavaScript-Ökosystem ist TypeScript. So sehr, dass es [offizielle Unterstützung durch Babel 7](https://github.com/babel/babel/tree/master/packages/babel-preset-typescript) erhält, was bedeutet, dass es natürlich von Next.js unterstützt wird, indem Sie einfach [Ihre .babelrc anpassen](https://github.com/vercel/next.js#customizing-babel-config).
+
+In der Zwischenzeit können Sie dank unserer neuen universellen Webpack-Unterstützung bereits heute vollständige TypeScript-Unterstützung nutzen!
+
+Sie können Ihre Webpack-Konfiguration wie folgt erweitern:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, options) {
+    const { dir, defaultLoaders } = options;
+    config.resolve.extensions.push('.ts', '.tsx');
+    config.module.rules.push({
+      test: /\\.+(ts|tsx)$/,
+      include: [dir],
+      exclude: /node_modules/,
+      use: [
+        defaultLoaders.babel,
+        { loader: 'ts-loader', options: { transpileOnly: true } },
+      ],
+    });
+    return config;
+  },
+};
+```
+
+> Alles, was wir tun müssen, ist den `ts-loader` zu aktivieren
+
+Wie CSS-Loader und Präprozessoren war TypeScript eine der am häufigsten nachgefragten Funktionen. Um die Integration in Projekte so einfach wie bei jedem anderen Loader zu gestalten, haben wir jetzt ein [`next-typescript`-Plugin](/), das Sie in Ihre `next.config.js`-Datei einbinden können:
+
+```js filename="next.config.js"
+const withTs = require('next-typescript');
+module.exports = withTs({
+  /* zusätzliche Konfiguration */
+});
+```
+
+> Plugins können trivial zusammengesetzt werden: Es sind nur Funktionen
+
+### [Bessere Unterstützung für React-Alternativen & Modulüberladung](#better-support-for-react-altlibs--module-overloading)
+
+Im Laufe der Zeit sind viele Drop-in-Ersatzimplementierungen von React entstanden. Darunter einige bemerkenswerte wie [`preact`](https://preactjs.com/), [`nervjs`](https://github.com/NervJS/nerv) und [`inferno`](https://github.com/infernojs/inferno).
+
+Andere Bibliotheken konzentrieren sich auf den Ersatz des DOM-Renderers, wie [`react-dom-lite`](https://github.com/jquense/react-dom-lite), das eine kleinere React-Build-Version durch geringfügige Kompromisse bei der Browserkompatibilität anstrebt.
+
+Die universelle Webpack-Unterstützung macht den Prozess der **Integration dieser Bibliotheken als Drop-in-Ersatz noch einfacher**. Ähnlich wie bei anderen Plugins ist dies alles, was Sie tun müssen, um Next.js mit Preact zu verwenden:
+
+```bash filename="Terminal"
+npm i @zeit/next-preact preact preact-compat
+```
+
+> Wir installieren das Preact-Plugin und die notwendigen Peer-Abhängigkeiten
+
+```
+const withPreact = require('@zeit/next-preact');
+module.exports = withPreact();
+```
+
+> Unsere neue `next.config.js` bereit für Preact
+
+Sehen Sie sich das sehr einfache [@zeit/next-preact](https://github.com/vercel/next-plugins/tree/master/packages/next-preact)-Modul an oder erstellen Sie Ihr eigenes!
+
+### [Optionale externe Sourcemaps in der Produktion](#optional-external-sourcemaps-in-production)
+
+Da Next.js jetzt webpack sowohl für Client- als auch Server-Code verwendet, ist die Aktivierung von Source-Maps in Produktions-Builds nur eine kleine Anpassung an dessen Konfiguration.
+
+In der Entwicklung sind Source-Maps automatisch aktiviert, daher konfigurieren wir sie für die Produktion anders:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    if (!dev) {
+      config.devtool = 'source-map';
+    }
+    return config;
+  },
+};
+```
+
+> Wir konfigurieren einfach die `devtool`-Option anders, wenn wir nicht in der Entwicklung sind
+
+[Zones](#zones)
+---------------
+
+Eines der [formulierten Ziele von Next.js](https://deck.vercel.app) von Anfang an war es, die Einfachheit des Webs zurückzubringen und zu bewahren.
+
+Server-seitiges Rendering (SSR), ein einfacher und agnostischer Ansatz zum Datenabruf und deklarative Seiten basierend auf der Dateisystemstruktur sind einige der Funktionen, die wir in diesem Sinne eingeführt haben.
+
+Ein häufig übersehener Aspekt von Webdiensten und Websites ist, wie _natürlich komponierbar und skalierbar_ sie sind.
+
+Beispielsweise könnten `mydomain.com/settings` und `mydomain.com/` zwei völlig unterschiedliche Apps sein, unabhängig voneinander bereitgestellt, unabhängig skaliert und sogar mit unterschiedlichen Versionen derselben Software betrieben werden.
+
+Alles, was benötigt wird, um sie zu einer einheitlichen Erfahrung für den Endbenutzer zu _"verkleben"_, ist [eine einfache Konfiguration](/docs/pages/building-your-application/configuring/absolute-imports-and-module-aliases) der Backend-Routing-Schicht oder Load-Balancer, die sie der Welt zugänglich machen. Wir freuen uns sehr, jetzt die Möglichkeit zu bieten, **mehrere mit Next.js erstellte Anwendungen** zu kombinieren, die über normale `<Link>`-Komponenten miteinander verbunden sind. Wir nennen diese Funktion **Zones**.
+
+Als Beispiel betrachten Sie diese beiden unabhängigen Next.js-Anwendungen, die auf [Vercel](https://vercel.com) bereitgestellt wurden:
+
+*   [https://front.vercel.app](https://front.vercel.app)
+*   [https://zeit-docs-zbqbsrucga.vercel.app/docs](https://zeit-docs-zbqbsrucga.vercel.app/docs) [https://zeit-docs-zbqbsrucga.vercel.app/api](https://zeit-docs-zbqbsrucga.vercel.app/api)
+
+![Beide unserer Seiten bieten eine nahtlose Erfahrung, gehören aber zu separaten Apps](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/zones.png)
+
+Beide unserer Seiten bieten eine nahtlose Erfahrung, gehören aber zu separaten Apps
+
+Als wir unsere Dokumentation überarbeiteten, wollten wir das Akzeptieren von Community-Beiträgen so einfach wie möglich machen.
+
+Wir beschlossen, die Dokumentations-"Mini-Website" in ihr [eigenes Repository](https://github.com/vercel/docs) auszulagern. Zusätzlich wird, wenn ein Pull-Request eingereicht und eine Änderung vorgeschlagen wird, diese automatisch isoliert bereitgestellt:
+
+![Jedes Mal, wenn eine Änderung in einem PR erfolgt, wird sie automatisch von unserem Bot bereitgestellt](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/github.png)
+
+Jedes Mal, wenn eine Änderung in einem PR erfolgt, wird sie automatisch von unserem Bot bereitgestellt
+
+Was wir letztendlich erhalten haben, sind _zwei Zones_, die über unsere [Pfad-Alias-Funktion](/docs/pages/building-your-application/configuring/absolute-imports-and-module-aliases) in die übergeordnete Domain `https://vercel.com` integriert werden. Es sieht etwa so aus:
+
+```
+{
+  "rules": [
+    { "pathname": "/docs", "dest": "our-docs.vercel.app" },
+    { "pathname": "/api", "dest": "our-docs.vercel.app" },
+    { "dest": "my-main-website.vercel.app" }
+  ]
+}
+```
+
+> Diese einfachen Regeln ermöglichen es Ihnen, Microservices und Zones zusammenzusetzen
+
+Alles, was noch bleibt, ist der Aufruf eines `now alias`-Befehls:
+
+```bash filename="Terminal"
+now alias -r rules.json my-domain.com
+```
+
+Unsere Mission ist es, die Bereitstellung so universell und offen wie möglich zu gestalten. Um die lokale Entwicklung zu unterstützen, haben wir kürzlich `micro-proxy` als Open-Source veröffentlicht, ein Tool, das mit dem oben gezeigten Konfigurationsformat arbeitet.
+
+Ebenso können Sie Zones mit anderen Lösungen wie Nginx, HAProxy oder API Gateway verbinden.
+
+[Schnellere Produktions-Build-Zeiten](#faster-production-build-times)
+---------------------------------------------------------------
+
+Wir denken, dass Entwicklererfahrung und Benutzererfahrung Hand in Hand gehen. Je effizienter Änderungen geschrieben, getestet und bereitgestellt werden können, desto schneller werden neue Funktionen hinzugefügt, Fehler behoben und die allgemeine Benutzererfahrung verbessert.
+
+Folglich bleiben wir darauf konzentriert, kontinuierlich an der Leistung der grundlegendsten Bausteine des Systems zu arbeiten.
+
+Mit Next.js 5.0 hatten wir die Gelegenheit, uns `next build` erneut anzusehen, den Befehl, den Sie vor der Bereitstellung in der Produktion oder dem Exportieren Ihrer Next.js-Anwendung [als statische Site](/docs/pages/building-your-application/deploying/static-exports) ausführen.
+
+Wir freuen uns, berichten zu können, dass wir für vercel.com, eine React-App mit Tausenden von Komponenten, mit Next.js 5.0 ziemlich dramatische Verbesserungen gesehen haben, in der Größenordnung von **23,6 % schnellere Produktions-Build-Zeiten**:
+
+![Die Produktions-Build-Zeit unserer Hauptanwendung ist jetzt um 38 Sekunden kürzer](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/build.png)
+
+Die Produktions-Build-Zeit unserer Hauptanwendung ist jetzt um 38 Sekunden kürzer
+
+[Verbessertes Caching für dynamische Imports](#improved-caching-for-dynamic-imports)
+-----------------------------------------------------------------------------
+
+Immer wenn Sie `import()` dynamisch verwenden, signalisiert dies WebPack, dass ein neuer Code-Splitting-Einstiegspunkt existiert.
+
+Zur Build-Zeit bedeutet dies, ein spezifisches Bundle für den entsprechenden Teilbaum der Module zu generieren.
+
+Vor Next.js 5.0 erhielten die dynamischen Bundles eine URL, die wie folgt aussah:
+
+```
+/_next/1517592683901/webpack/chunks/components_hello1_1345d10fc951cd6717c5676c467579a6.js
+```
+
+Jetzt haben wir dynamische Imports in inhaltsadressierte Hashes der Inhalte des Teilbaums umgewandelt:
+
+```
+/_next/webpack/chunks/components_hello1_1345d10fc951cd6717c5676c467579a6-b7874680a9e21fb6eb89.js
+```
+
+Das bedeutet, dass Ihre Benutzer und Kunden über Bereitstellungen hinweg nicht unnötig Code neu herunterladen müssen, den sie bereits verwendet haben.
+
+[Fragmente](#fragments)
+-----------------------
+
+Next.js baut eine übergeordnete `<Document>`-Komponente auf, die mit jeder Seite serverseitig gerendert wird. [Das Überladen dieser Komponente](/) gibt Ihnen die vollständige Kontrolle über Ihr Markup und ermöglicht viele [fortgeschrittene Anwendungsfälle](https://github.com/vercel/next.js/tree/canary/examples).
+
+Ein Teil dieses anfänglichen Markups ist die Liste der Skripte, die Next.js auf der Client-Seite auswerten muss. Ein benutzerdefiniertes `_document` sieht so aus:
+
+```js filename="pages/_document.js"
+import Document, { Head, Main, NextScript } from 'next/document';
+export default class extends Document {
+  render() {
+    return (
+      <html>
+        <Head />
+        <body>
+          <Main />
+          <NextScript />
+        </body>
+      </html>
+    );
+  }
+}
+```
+
+> `Document` ermöglicht es Ihnen, die gesamte serverseitig gerenderte Ausgabe einer Seite anzupassen
+
+Bis vor kurzem waren wir gezwungen, unsere Skripte in einem `<div>` zu verpacken.
+
+Mit Next.js 5.0 nutzen wir jetzt die neue `Fragment`-Unterstützung, was zu **leichteren Seiten** und vollständiger Kontrolle über das Styling der Seite führt, ohne überflüssiges Markup.
+
+[Präzisere Fehler](#more-accurate-errors)
+---------------------------------------------
+
+Node.js unterstützt keine Source-Maps, Fehler, die auf der Serverseite auftreten, werden mit einem Stack-Trace begleitet, der auf den kompilierten Code verweist.
+
+Mit Next 5 haben wir die Source-Map-Unterstützung auf der Serverseite verbessert. Fehler, die beim serverseitigen Rendern auftreten, zeigen jetzt auf die korrekte Funktion und Zeilennummer.
+
+![Fehler zeigen jetzt die korrekte Zeile, Datei und Funktionsnamen an](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/errors.png)
+
+Fehler zeigen jetzt die korrekte Zeile, Datei und Funktionsnamen an
+
+[Fazit](#conclusion)
+-------------------------
+
+Universal Webpack festigt die Grundlagen von Next.js und macht es noch zukunftssicherer. Im Großen und Ganzen gibt es keine künstliche Trennung mehr, welche Plugins oder Loader für Next.js anwendbar sind und welche nicht.
+
+Im Geiste der _Zero Configuration_ freuen wir uns, [Next Plugins](https://github.com/vercel/next-plugins) einzuführen, das Community-Repository für Rezepte, die die Funktionalität von Next.js automatisch erweitern, ohne spezifische Einstellungen anpassen zu müssen.
+
+Damit unterstützen wir jetzt das gesamte Spektrum der CSS-Lösungen, kompilierbare zu JS-Sprachen wie TypeScript und React-Alternativen wie [Nerve](https://github.com/NervJS/nerv), indem wir einfach ein zusätzliches Modul einbinden und dessen Einbindung in `next.config.js` explizit machen. Einfachheit ohne Unklarheit.
+
+Zones ermöglichen die Verbindung von Next.js-Apps, die nicht im selben Repository oder sogar auf denselben Servern verwurzelt sind. Wir betrachten dies als einen sehr wichtigen Meilenstein in der Kategorie "Team-Skalierbarkeit" der Verbesserungen.
+
+Next.js wird damit ein großartiger Kandidat für große Anwendungen, die von mehreren Teams gewartet werden. Sie können jetzt Verbesserungen parallel bereitstellen, Fehleroberflächen reduzieren, die Iterationsgeschwindigkeit erhöhen und sogar verschiedene Technologien zusätzlich zu unserem Kern ausprobieren, wie die [vielen verschiedenen Ansätze](https://github.com/vercel/next.js/tree/canary/examples) zum Zustandsmanagement oder Datenabruf.
+
+Wir möchten diese Gelegenheit nutzen, um Deep Varma und dem [Trulia](https://trulia.com)-Engineering-Team für ihre wesentlichen Erkenntnisse, ihren Code und ihre Tests zu danken, die zum Design dieser Funktion geführt haben.
+
+Wie immer wäre diese Veröffentlichung ohne die vielen Open-Source-Mitwirkenden und unsere wunderbare Community nicht möglich gewesen.

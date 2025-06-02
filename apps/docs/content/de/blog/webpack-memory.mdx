@@ -1,0 +1,95 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:32:57.181Z
+title: Verbesserungen der Webpack-Speichernutzung in Next.js 8
+description: >-
+  Kürzlich wurde Next.js 8 veröffentlicht. Diese Version beinhaltet eine massive Reduzierung der Speichernutzung während des Builds. In diesem Blogbeitrag untersuchen wir, wie wir zur Optimierung von Webpack für die Community beigetragen haben.
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-02-19T14:00:00.000Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/twitter-card.png
+---
+
+Kürzlich wurde [Next.js 8](/blog/next-8) veröffentlicht. Diese Version beinhaltet eine massive Reduzierung der Speichernutzung während des Builds. In diesem Blogbeitrag untersuchen wir, wie wir zur Optimierung von Webpack für die Community beigetragen haben.
+
+Next.js ist konfigurationsfrei und basiert auf Tools wie [Webpack](https://webpack.js.org/) und [Babel](https://babeljs.io). Sein Ziel ist es, Ihnen zu helfen, sich auf das Wesentliche zu konzentrieren: Ihren Anwendungscode.
+
+Moderne Webanwendungen bestehen aus einer oder mehreren Seiten. Zum Beispiel eine Startseite, ein Blog, ein Dashboard oder eine Produktliste.
+
+Mit Next.js werden diese Seiten zu Dateien in einem speziellen `pages`-Verzeichnis im Stammverzeichnis Ihres Projekts.
+
+Beispiel: Die Datei `pages/about.js` wird der URL `/about` zugeordnet.
+
+Eine der wichtigsten Designbeschränkungen des Frameworks ist, dass es sowohl für eine einzelne Seite als auch für Tausende von Seiten gut funktionieren muss.
+
+Bei der Implementierung von [Serverless Next.js](/blog/next-8#serverless-nextjs) wurde schnell deutlich, dass die Ausführung von `next build` in einem Projekt mit Hunderten von Seiten zu hoher Speichernutzung führte. Manchmal wurde sogar die Heap-Grenze von Node.js von etwa 1,4 GB überschritten.
+
+Wir begannen, die Speichernutzung des Build-Prozesses mit den Chrome-Entwicklertools zu profilieren.
+
+In den resultierenden Profilen entdeckten wir einen Punkt, an dem Webpack auf einmal **548 MB** Speicher allokierte.
+
+Die Menge des allokierten Speichers korrelierte direkt mit der Anzahl der Seiten, was bedeutet, dass mehr Seiten zu höherem Speicherverbrauch führten.
+
+![Die Speicherprofiler-Funktion der Chrome Developer Tools zeigte eine einmalige Allokation von 548 MB](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/allocation-before.png)
+
+Die Speicherprofiler-Funktion der Chrome Developer Tools zeigte eine einmalige Allokation von 548 MB
+
+Durch die Analyse des Stacktraces im Speicherprofil konnten wir die Funktion identifizieren, die den Speicherallokationsspike verursachte.
+
+Die Allokation selbst stammte vom Aufruf der [`source.source()`-Methode](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L334), die die resultierende Datei generiert und im Speicher ablegt.
+
+Indem wir weiter die Funktion untersuchten, die die `source()`-Methode aufruft, konnten wir sehen, dass [`compilation.assets`](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L316) mit `asyncLib.forEach` durchlaufen wurde. Das bedeutet, dass die [bereitgestellte Funktion](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L317) für jede Datei im `compilation.assets`-Array gleichzeitig aufgerufen wurde.
+
+Das bedeutete, dass wenn es beispielsweise 100 Seiten gibt und jede Seite auf die Festplatte geschrieben werden muss, der obige Code versuchen würde, alle 100 gleichzeitig zu schreiben, einschließlich der Generierung aller 100 Dateien gleichzeitig.
+
+Die Lösung für dieses Problem ist die Verwendung eines [Semaphors](https://de.wikipedia.org/wiki/Semaphor_\(Informatik\)), um die Anzahl der gleichzeitigen Schreibvorgänge zu begrenzen. Normalerweise verwenden wir dafür [async-sema](https://github.com/vercel/async-sema), aber in diesem Fall hatte Webpack bereits eine geeignete Methode in [neo-async](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L8):
+
+```
+asyncLib.forEach(compilation.assets, (source, file, callback) => {
+  // etc
+});
+```
+
+> Vorheriger Code, der die Funktion für alle Assets gleichzeitig ausführte
+
+```
+asyncLib.forEachLimit(compilation.assets, 15, (source, file, callback) => {
+  // etc
+});
+```
+
+> Neuer Code, der die Funktion gleichzeitig für maximal 15 Assets ausführt
+
+Nach der Implementierung dieser Parallelitätsbegrenzung und erneuter Profilierung der Build-Speichernutzung konnten wir sehen, dass die Speicherallokation in kleinere Teile von **34 MB** aufgeteilt wurde.
+
+![Der Profiler zeigte nun Allokationen von 34 MB über die Zeit verteilt](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/after-limiting.png)
+
+Der Profiler zeigte nun Allokationen von 34 MB über die Zeit verteilt
+
+Diese Änderung zeigte vielversprechende Ergebnisse, aber in der Praxis lief der Build immer noch aus dem Speicher, also setzten wir die Profilierung und Untersuchung des Problems fort.
+
+Bei weiterer Untersuchung des Speicherprofils bemerkten wir, dass der Speicher nach dem Aufruf der [`source.source()`-Methode](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L334) nicht bereinigt wurde (Garbage Collection).
+
+In Webpack sind Assets im Allgemeinen Instanzen von [Source-Klassen](https://github.com/webpack/webpack-sources). Diese Klassen implementieren alle eine `source()`-Methode, die den Dateiquelltext generiert.
+
+Das Profil zeigte, dass viele Assets Instanzen von [`CachedSource`](https://github.com/webpack/webpack-sources#cachedsource) waren. Die Funktionsweise von `CachedSource` besteht darin, dass das Ergebnis von `source()` im Speicher zwischengespeichert wird, bis das Asset verworfen wird.
+
+Die Untersuchung der von Next.js verwendeten Webpack-Plugins zeigte, dass wir keine Plugins hatten, die `source()` nach dem Schreiben der Datei durch Webpack aufriefen, was bedeutet, dass das Zwischenspeichern des geschriebenen Werts keinen Nutzen hatte.
+
+Nach der [Zusammenarbeit](https://github.com/webpack/webpack/pull/8609) mit [Tobias Koppers](https://twitter.com/wSokra) hat er [eine neue Option namens `output.futureEmitAssets` implementiert](https://github.com/webpack/webpack/pull/8642), die das neue Asset-Schreibverhalten ermöglicht.
+
+Mit diesem neuen Verhalten wurden die allokierten Chunks über die Zeit auf **_182 KB_** reduziert.
+
+![Nach allen Optimierungen zeigt der Profiler Allokationen von 184 KB über die Zeit verteilt](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/allocation-after.png)
+
+Nach allen Optimierungen zeigt der Profiler Allokationen von 184 KB über die Zeit verteilt
+
+[Next.js 8](/blog/next-8) hat bereits alle diese Optimierungen integriert. Es ist keine Änderung erforderlich, wenn Sie Next.js verwenden.
+
+Diese Optimierung wurde in Webpack eingeführt, was bedeutet, dass nicht nur Next.js-Nutzer, sondern alle Webpack-Nutzer von diesen Optimierungen profitieren werden.
+
+Wir werden aktiv weiter daran arbeiten, die Speichernutzung und Leistung von Next.js und Webpack zu verbessern.

@@ -1,0 +1,349 @@
+---
+source-updated-at: 2025-05-30T16:38:07.000Z
+translation-updated-at: 2025-06-02T19:35:19.710Z
+title: Next.js 8
+description: >-
+  Next.js 8 führt den Serverless-Modus ein, bietet kleinere Bundles, Leistungsverbesserungen und mehr.
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-02-11T08:00:35.009Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/twitter-card.png
+---
+
+Wir freuen uns heute, die produktionsreife Version von Next.js 8 vorzustellen, die folgende Features bietet:
+
+*   [Serverless Next.js](#serverless-nextjs)
+*   [Massive Reduzierung der Speichernutzung während des Builds](#massive-build-time-memory-usage-reduction)
+*   [Build-Zeit-Umgebungskonfiguration](#build-time-environment-configuration)
+*   [Leistungsverbesserungen beim Prefetching](#prefetch-performance-improvements)
+*   [Kleinere initiale HTML-Größe](#smaller-initial-html-size)
+*   [Verbesserte On-Demand-Entries](#improved-on-demand-entries)
+*   [Schnelleres Port-Listening in der Entwicklung](#faster-port-listening-in-development)
+*   [Schnellerer Static Export](#faster-static-export)
+*   [Deduplizierung von Head-Elementen](#head-element-deduplication)
+*   [Neue crossOrigin-Konfigurationsoption](#new-crossorigin-config-option)
+*   [Entfernung von Inline-Javascript](#removed-inline-javascript)
+*   [Beispiel für API-Authentifizierung](#example-of-api-authentication)
+
+Wie immer haben wir uns bemüht, sicherzustellen, dass alle diese Vorteile **vollständig abwärtskompatibel** sind. Für die meisten Next.js-Anwendungen müssen Sie nur folgendes ausführen:
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest
+```
+
+Wir danken unserer Community und allen, die auf unseren Erfolg gesetzt haben. Seit unserem letzten Blogpost haben wir Unternehmen wie [AT&T](https://att.com), [Starbucks](https://www.starbucksreserve.com/en-us) und [Twitch](https://m.twitch.tv/) gesehen, die ihre öffentlichen Websites und Apps mit Next.js neu gestartet haben.
+
+[Serverless Next.js](#serverless-nextjs)
+----------------------------------------
+
+Das Serverless-Target von Next.js erzeugt Serverless-Funktionen aus Seiten
+
+Die Serverless-Bereitstellung verbessert die Zuverlässigkeit und Skalierbarkeit erheblich, indem Ihre Anwendung in kleinere Teile (auch **Lambdas** genannt) aufgeteilt wird. Im Fall von Next.js wird jede Seite im `pages`-Verzeichnis zu einer Serverless-Lambda.
+
+Es gibt [eine Reihe von Vorteilen](https://vercel.com/docs/serverless-functions/conceptual-model) bei Serverless. Der verlinkte Artikel spricht über einige davon im Kontext von Express, aber die Prinzipien gelten universell: Serverless ermöglicht verteilte Fehlerpunkte, unendliche Skalierbarkeit und ist aufgrund des "Pay-for-what-you-use"-Modells äußerst kostengünstig.
+
+Um den **Serverless-Modus** in Next.js zu aktivieren, fügen Sie das `serverless`-Build-`target` in `next.config.js` hinzu:
+
+```js filename="next.config.js"
+module.exports = {
+  target: 'serverless',
+};
+```
+
+Das `serverless`-Target erzeugt eine einzelne Lambda pro Seite. Diese Datei ist vollständig eigenständig und benötigt keine Abhängigkeiten, um ausgeführt zu werden:
+
+*   `pages/index.js` => `.next/serverless/pages/index.js`
+*   `pages/about.js` => `.next/serverless/pages/about.js`
+
+Die Signatur der Next.js-Serverless-Funktion ähnelt dem Node.js-HTTP-Server-Callback:
+
+```
+type Function = (req: http.IncomingMessage, res: http.ServerResponse) => void;
+```
+
+*   [http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage)
+*   [http.ServerResponse](https://nodejs.org/api/http.html#http_class_http_serverresponse)
+*   `void` bezieht sich darauf, dass die Funktion keinen Rückgabewert hat und entspricht dem `undefined` von JavaScript. Der Aufruf der Funktion beendet die Anfrage.
+
+Next.js bietet Low-Level-APIs für Serverless-Bereitstellungen, da Hosting-Plattformen unterschiedliche Funktionssignaturen haben. Im Allgemeinen sollten Sie die Ausgabe eines Next.js-Serverless-Builds mit einer Kompatibilitätsschicht umschließen.
+
+Wenn die Plattform beispielsweise die Node.js-Klasse [http.Server](https://nodejs.org/api/http.html#http_class_http_server) unterstützt:
+
+```js filename="server.js"
+const http = require('http');
+const page = require('./.next/serverless/about.js');
+const server = new http.Server((req, res) => page.render(req, res));
+server.listen(3000, () => console.log('Listening on http://localhost:3000'));
+```
+
+### [**Zusammenfassung**](#summary)
+
+*   Low-Level-API für die Implementierung von Serverless-Bereitstellungen
+*   Jede Seite im `pages`-Verzeichnis wird zu einer Serverless-Funktion (Lambda)
+*   Erzeugt die kleinstmögliche Serverless-Funktion (**50 KB** Basis-Zip-Größe)
+*   Optimiert für schnellen [Cold Start](https://vercel.com/docs/serverless-functions/conceptual-model) der Funktion
+*   Die Serverless-Funktion hat 0 Abhängigkeiten (sie sind im Funktions-Bundle enthalten)
+*   Verwendet [http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage) und [http.ServerResponse](https://nodejs.org/api/http.html#http_class_http_serverresponse) von Node.js
+*   Opt-in über `target: 'serverless'` in `next.config.js`
+*   Das `server`-Target wird weiterhin vollständig unterstützt und gewartet
+*   `publicRuntimeConfig` und `serverRuntimeConfig` werden im `serverless`-Modus nicht unterstützt. Verwenden Sie stattdessen die Build-Zeit-Konfiguration.
+
+[Massive Reduzierung der Speichernutzung während des Builds](#massive-build-time-memory-usage-reduction)
+---------------------------------------------------------------------------------------
+
+Wir haben zu Webpack beigetragen, um die Build-Leistung und Ressourcennutzung von Next.js (und des restlichen Webpack-Ökosystems!) zu verbessern.
+
+Diese Bemühungen haben zu einer bis zu **16-mal besseren Speichernutzung ohne Leistungseinbußen** geführt.
+
+Der Speicher wird viel schneller freigegeben und Prozesse stürzen nicht mehr unter hoher Last (viele Seiten) ab.
+
+Wir werden bald detailliert darauf eingehen, wie wir diese Optimierung erreicht haben. Halten Sie Ausschau auf dem [Next.js-Blog](/blog).
+
+[Build-Zeit-Umgebungskonfiguration](#build-time-environment-configuration)
+-----------------------------------------------------------------------------
+
+Bei der Überprüfung von Next.js-Anwendungen haben wir häufig beobachtet, dass `babel-plugin-transform-define` oder `webpack.DefinePlugin` hinzugefügt werden, um Konfigurationswerte für die Anwendung bereitzustellen.
+
+Mit Next.js 8 führen wir einen neuen Schlüssel in `next.config.js` namens `env` ein, um dieselbe Funktionalität auf abwärtskompatible Weise bereitzustellen:
+
+```js filename="next.config.js"
+module.exports = {
+  env: {
+    customKey: 'MyValue',
+  },
+};
+```
+
+Dies ermöglicht Ihnen die Verwendung von `process.env.customKey` in Ihrem Code. Zum Beispiel:
+
+```js filename="pages/index.js"
+export default function IndexPage() {
+  return <h1>Der Wert von customKey ist: {process.env.customKey}</h1>;
+}
+```
+
+`process.env.customKey` wird zur Build-Zeit durch `'MyValue'` ersetzt.
+
+[Leistungsverbesserungen beim Prefetching](#prefetch-performance-improvements)
+-----------------------------------------------------------------------
+
+Der Next.js-Router ermöglicht es Ihnen, Seiten für eine schnellere Navigation vorab zu laden:
+
+```js filename="pages/index.js"
+import Link from 'next/link';
+ 
+export default function IndexPage() {
+  return (
+    <>
+      <Link href="/about" prefetch>
+        <a>Zur About-Seite</a>
+      </Link>
+    </>
+  );
+}
+```
+
+Dies funktioniert, indem das JavaScript-Bundle jedes Links mit einem `prefetch`-Attribut vorab geladen wird.
+
+In Versionen vor Next.js 8 bedeutete dies, dass ein `<script>`-Tag in das Dokument `<body>` eingefügt wurde.
+
+Dies führte jedoch zu einigen Overheads beim Öffnen von Seiten, insbesondere zeigte der Browser "Lade"-Indikator länger als erwartet, obwohl die Seite bereits interagierbar war.
+
+In Next.js 8 verwendet `prefetch` `<link rel="preload">` anstelle eines `<script>`-Tags. Außerdem beginnt das Prefetching erst nach `onload`, damit der Browser die Ressourcen verwalten kann.
+
+Zusätzlich erkennt Next.js nun 2G-Internet und den `navigator.connection.saveData`-Modus, um das Prefetching bei langsameren Netzwerkverbindungen zu deaktivieren.
+
+[Kleinere initiale HTML-Größe](#smaller-initial-html-size)
+-------------------------------------------------------
+
+Da Next.js HTML vorrendert, werden Seiten in eine Standardstruktur mit `<html>`, `<head>`, `<body>` und den JavaScript-Dateien eingewickelt, die zum Rendern der Seite benötigt werden.
+
+Mit [Next.js 7 haben wir die initiale Nutzlast auf 1,50 KB optimiert](https://nextjs.org/blog/next-7/#smaller-initial-html-payload), was einer Reduzierung von 7,4 % gegenüber der vorherigen Version entsprach.
+
+Wir konnten die initiale Nutzlastgröße weiter auf 1,16 KB reduzieren, was einer weiteren Reduzierung von 23 % entspricht:
+
+|  | 7.0 | 8.0 | Delta |
+| --- | --- | --- | --- |
+| Dokumentgröße (servergerendert) | 1,50 KB | 1,16 KB | **23 %** _kleiner_ |
+
+Die Hauptwege, wie wir die Größe reduziert haben, sind:
+
+*   Das Inline-Skript zur Seiteninitialisierung wurde entfernt
+*   Die `/_error`-Seite wird nicht mehr bei jedem Seitenladen eingebunden
+
+### [On-Demand-Loading von /\_error](#on-demand-loading-of-_error)
+
+Wenn in der Produktion ein Fehler auftritt, wird die `/_error`-Seite gerendert, um anzuzeigen, dass ein Fehler aufgetreten ist.
+
+Seit der ersten Version von Next.js war das `/_error`-Seiten-Skript-Tag Teil des initialen HTML, was bedeutet, dass es geladen wurde, auch wenn es bei keinen Laufzeitfehlern verwendet würde.
+
+Ab Next.js 8 wird die `/_error`-Seite bei Bedarf geladen, wenn ein Fehler auftritt.
+
+Das bedeutet, dass standardmäßig weniger Code geladen, geparst und ausgeführt werden muss.
+
+[Verbesserungen der Developer Experience (DX)](#dx-improvements)
+-----------------------------------
+
+Eines der Hauptziele von Next.js ist es, die beste Produktionsleistung mit **der bestmöglichen Developer Experience** zu bieten. Diese Version enthält viele subtile Verbesserungen basierend auf Benutzerfeedback.
+
+### [Verbesserte On-Demand-Entries](#improved-on-demand-entries)
+
+Standardmäßig kompiliert Next.js automatisch nur Seiten, die _aktiv_ entwickelt werden. Next.js kompiliert nicht alle Seiten im pages-Verzeichnis jedes Mal, wenn `next dev` ausgeführt wird. Stattdessen werden Seiten kompiliert, wenn Sie auf sie zugreifen.
+
+Wenn Sie beispielsweise `http://localhost:3000/my-page` besuchen, wird die Datei `pages/my-page.js` on-demand kompiliert, bevor die Seite gerendert wird.
+
+Dies stellt sicher, dass der Entwickler nicht warten muss, bis alle Seiten kompiliert sind, wenn der Entwicklungsserver gestartet wird, was bei größeren Apps ziemlich lange dauern kann. Es hält die Speichernutzung niedrig und den Compiler schnell, da der Compiler nicht alle Seiten beim Bundling berücksichtigen muss.
+
+![Der On-Demand-Entries-Flow](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/flow.jpg)
+
+Der On-Demand-Entries-Flow
+
+Wenn eine Seite 25 Sekunden lang nicht aufgerufen wurde, wird sie aus dem Build-Cache des Compilers entfernt, um den Compiler schnell zu halten und die Speichernutzung zu reduzieren.
+
+Die Art und Weise, wie Next.js verfolgt, welche Seiten aufgerufen werden, erfolgt über einen Polling-Mechanismus. Alle 5 Sekunden wird ein "on-demand-entries-ping" gesendet, um den Next.js-Entwicklungsserver darüber zu informieren, dass eine bestimmte Seite aufgerufen wird.
+
+Seit der ersten Veröffentlichung dieses Features wurde das Ping über einen `window.fetch`-Aufruf durchgeführt, was bedeutet, dass jedes Mal, wenn das Ping ausgelöst wurde, es in den Browser-Entwicklungstools im `console`- und `network`-Tab angezeigt wurde.
+
+Eines der am häufigsten nachgefragten Features ist die Möglichkeit, diese Anfragen in den Browser-Entwicklungstools auszublenden, da sie unnötigen Lärm verursachen können.
+
+Wir freuen uns, bekannt zu geben, dass in Next.js 8 das `fetch`-basierte Ping durch einen WebSockets-basierten Ansatz ersetzt wurde, was bedeutet, dass Pings weiterhin stattfinden, aber nur sichtbar sind, wenn die WebSocket-Verbindung inspiziert wird.
+
+Besonderer Dank geht an [JJ Kasper](https://github.com/ijjk) für die Zusammenarbeit bei der Umstellung auf WebSockets.
+
+### [Schnelleres Port-Listening in der Entwicklung](#faster-port-listening-in-development)
+
+Wenn der Next.js-Entwicklungsserver gestartet wird, muss er eine initiale Kompilierung durchführen, um Anfragen bedienen zu können. Standardmäßig würde Next.js warten, bis dieser Kompilierungsschritt abgeschlossen ist, bevor der HTTP-Server gestartet wird. Das bedeutete, dass wenn Sie `next dev` ausführten und dann in Ihren Browser gingen, es manchmal passieren konnte, dass Sie die Meldung "Diese Seite ist nicht erreichbar" erhielten, weil der HTTP-Server noch nicht auf Verbindungen wartete.
+
+Mit Next.js 8 wartet der HTTP-Server auf Verbindungen, bevor die Kompilierung beginnt, was bedeutet, dass wenn Sie `http://localhost:3000/` aufrufen, bevor die Kompilierung abgeschlossen ist, die Anfrage wartet, bis die initiale Kompilierung abgeschlossen ist, bevor die Anfrage bedient wird, anstatt die Seite aktualisieren zu müssen, bis sie verfügbar ist.
+
+Besonderer Dank geht an [Brian Beck](https://github.com/exogen) für die Implementierung dieses Features.
+
+[Schnellerer Static Export](#faster-static-export)
+---------------------------------------------
+
+Next.js konzentriert sich auf die Idee des **Pre-Renderings** als Mittel zur Erreichung hoher Leistung. Pre-Rendering gibt es in zwei Formen:
+
+*   **Server-Rendering**, bei dem jede Anfrage ein Rendering auslöst. Dadurch muss der Endbenutzer nicht warten, bis JS heruntergeladen wurde, um mit der Nutzung der Daten zu beginnen
+*   **Statisches Rendering**, bei dem wir statische Dateien ausgeben, die direkt ohne Code-Ausführung auf dem Server bereitgestellt werden können
+
+Ab Next.js 8 wird das statische Rendering über `next export` Geschwindigkeitsverbesserungen aufweisen, wenn Ihr Computer über mehrere CPUs verfügt.
+
+Basierend auf Tests mit einem MacBook mit 4 CPU-Kernen stieg die Exportgeschwindigkeit von etwa 25 Seiten pro Sekunde auf 75 Seiten pro Sekunde, indem alle Kerne für das Pre-Rendering von Seiten genutzt werden.
+
+Next.js erkennt automatisch die Anzahl der CPU-Kerne und verteilt die Seiten entsprechend, ohne dass Codeänderungen erforderlich sind.
+
+Besonderer Dank geht an [Benjamin Kniffler](https://github.com/bkniffler) für die Implementierung dieses Features.
+
+[Deduplizierung von Head-Elementen](#head-element-deduplication)
+---------------------------------------------------------
+
+Ein häufiges Bedürfnis beim Erstellen von Anwendungen ist die Aktualisierung des `<head>`-Elements einer Seite. Zum Beispiel, um den `<title>` oder `<meta name="viewport">` für responsives Design festzulegen.
+
+Next.js stellt eine eingebaute Komponente zur Verfügung, um Änderungen am `<head>` vorzunehmen:
+
+```js filename="pages/index.js"
+import Head from 'next/head';
+ 
+export default function IndexPage() {
+  return (
+    <>
+      <Head>
+        <title>Mein Seitentitel</title>
+      </Head>
+    </>
+  );
+}
+```
+
+Die `<Head>`-Komponente kann sogar mehrmals in verschiedenen Komponenten verwendet werden, zum Beispiel könnte Ihre Layout-Komponente einige Standard-Head-Tags setzen.
+
+Möglicherweise möchten Sie jedoch die Standard-Head-Tags mit einem anderen Wert überschreiben. In älteren Versionen von Next.js führte dies dazu, dass das Tag in der Ausgabe dupliziert wurde, da es keine Möglichkeit gab, Tags zu deduplizieren.
+
+Aus diesem Grund ist es nun möglich, jeder Element innerhalb der `<Head>`-Komponente eine `key`-Eigenschaft zuzuweisen, die automatisch Tags mit demselben `key`-Wert dedupliziert.
+
+Wenn `key="viewport"` auf zwei Tags gesetzt wird, wird nur das letzte gerendert.
+
+```js filename="pages/index.js"
+import Head from 'next/head';
+export default function IndexPage() {
+  return (
+    <>
+      <Head>
+        <title>Mein Seitentitel</title>
+        <meta
+          name="viewport"
+          content="initial-scale=1.0, width=device-width"
+          key="viewport"
+        />
+      </Head>
+      <Head>
+        <meta
+          name="viewport"
+          content="initial-scale=1.2, width=device-width"
+          key="viewport"
+        />
+      </Head>
+    </>
+  );
+}
+```
+
+[Sicherheitsverbesserungen](#security-improvements)
+-----------------------------------------------
+
+### [Neue `crossOrigin`-Konfigurationsoption](#new-crossorigin-config-option)
+
+In Next.js 6 haben wir die Option eingeführt, ein `crossOrigin`-Attribut zu `<Head>` und `<NextScript>` in `pages/_document.js` hinzuzufügen, dies deckte jedoch nicht alle Anwendungsfälle für die Einstellung von `cross-origin` ab.
+
+Next.js hat einen Client-seitigen Router, der dynamisch `<script>`-Tags injiziert. Diese Tags fehlten das `cross-origin`-Attribut bei der Injektion.
+
+Um sicherzustellen, dass alle `<script>`-Tags das `cross-origin`-Attribut gesetzt haben, haben wir eine neue Konfigurationsoption in `next.config.js` eingeführt:
+
+```js filename="next.config.js"
+module.exports = {
+  crossOrigin: 'anonymous',
+};
+```
+
+Ein weiterer Vorteil dieser Option ist, dass keine benutzerdefinierte `pages/_document.js` mehr benötigt wird, um `cross-origin` in Ihrer Anwendung einzurichten.
+
+Das bisherige Verhalten wird weiterhin unterstützt, gibt jedoch eine Warnung in der Entwicklung aus, um Entwickler bei der Umstellung auf die neu eingeführte Option zu unterstützen.
+
+### [Entfernte Inline-Javascript](#entfernte-inline-javascript)
+
+Bei der Verwendung von Next.js 7 und älteren Versionen mussten Nutzer für die Aktivierung der [Content Security Policy (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP) `script-src 'unsafe-inline'` in ihre Richtlinie aufnehmen, da Next.js ein Inline-`<script>`-Tag erstellte, um Daten zu übertragen, beispielsweise um das Ergebnis von `getInitialProps` an die Client-Seite zu übergeben.
+
+Mit Next.js 8 haben wir dieses Inline-Script-Tag durch ein JSON-Tag für die sichere Übertragung an den Client ersetzt. Das bedeutet, dass Next.js keine Inline-Scripts mehr einbindet.
+
+Mit entsprechender Sorgfalt kann nun `script-src 'self'` verwendet werden.
+
+### [Beispiel für API-Authentifizierung](#beispiel-für-api-authentifizierung)
+
+Eines der [am häufigsten nachgefragten Beispiele aller Zeiten](https://github.com/vercel/next.js/issues/153) war, wie Authentifizierung in Next.js gegenüber einer externen API, beliebiger APIs in jeder Programmiersprache, durchgeführt werden kann.
+
+Mit der Einführung von Next.js 8 präsentieren wir auch ein neu erstelltes Beispiel: [with-cookie-auth](https://github.com/vercel/next.js/tree/canary/examples/with-cookie-auth)
+
+Dieses Beispiel zeigt, wie die Authentifizierung gegenüber einer externen Node.js-API funktioniert, aber die angewandten Konzepte lassen sich auf jede zustandslose API übertragen.
+
+Das Beispiel verwendet ein Cookie, um das Token zwischen dem Server-seitigen und Client-seitigen Rendering auszutauschen.
+
+Auf diese Weise kann die App, wenn sie auf dem Server gerendert wird, weiterhin authentifizierte Daten im Namen des Nutzers abrufen.
+
+Besonderer Dank geht an [Juan Olvera](https://github.com/j0lv3r4), der das Beispiel beigesteuert hat.
+
+[Community](#community)
+-----------------------
+
+Seit seiner ersten Veröffentlichung wurde Next.js in allem eingesetzt, von Fortune-500-Unternehmen bis hin zu persönlichen Blogs. Wir freuen uns sehr über das kontinuierliche Wachstum der Next.js-Nutzung.
+
+*   Über **600 Mitwirkende** haben mindestens einen Commit beigesteuert.
+*   Auf GitHub wurde das Projekt über **34.400 Mal** mit einem Stern markiert.
+*   Seit der ersten Veröffentlichung wurden über **2600 Pull Requests** eingereicht.
+
+Die Next.js-Community umfasst über **4.570 Mitglieder**. [Mach mit!](https://github.com/vercel/next.js/discussions)
