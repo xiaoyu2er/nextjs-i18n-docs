@@ -1,4 +1,4 @@
-import { SITES } from '@next-i18n/const';
+import { PENDING_SITES, SITES } from '@next-i18n/const';
 import type { Metadata } from 'next/types';
 
 export function createMetadata(
@@ -51,5 +51,5 @@ export const baseUrl =
     ? new URL('http://localhost:3000')
     : new URL(
         // biome-ignore lint/style/noNonNullAssertion: <explanation>
-        SITES[process.env.LOCALE!],
+        SITES[process.env.LOCALE!] || PENDING_SITES[process.env.LOCALE!],
       );
