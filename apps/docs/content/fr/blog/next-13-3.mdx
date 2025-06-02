@@ -1,0 +1,273 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-06-02T19:38:49.726Z
+title: Next.js 13.3
+description: >-
+  Next.js 13.3 introduit les images Open Graph dynamiques, les exports statiques avancés,
+  les routes parallèles et l'interception, le support OTEL, et plus encore.
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2023-04-06T18:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-3/twitter-card.png
+---
+
+Next.js 13.3 ajoute des fonctionnalités populaires demandées par la communauté, notamment :
+
+*   [**API Metadata basée sur les fichiers**](#file-based-metadata-api) : Génération dynamique de sitemaps, robots, favicons et plus.
+*   [**Images Open Graph dynamiques**](#dynamic-open-graph-image-generation) : Génération d'images OG avec JSX, HTML et CSS.
+*   [**Export statique pour App Router**](#static-export-for-app-router) : Support des applications statiques / Single-Page (SPA) pour les Server Components.
+*   [**Routes parallèles et interception**](#parallel-routes-and-interception) : Fonctionnalités avancées de routage pour App Router.
+
+Mettez à jour dès aujourd'hui en exécutant :
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+Nous approchons du marquage d'App Router comme stable dans la prochaine version mineure et concentrons nos efforts sur l'optimisation des performances, l'amélioration des comportements et la correction des bugs.
+
+Bien que nous travaillions encore sur quelques fonctionnalités comme les Mutations, nous ne prévoyons pas qu'elles impactent la surface API des autres fonctionnalités d'App Router. Nous sommes impatients de voir ce que vous construirez avec App Router et [attendons vos retours](https://github.com/vercel/next.js/discussions/41745).
+
+[API Metadata basée sur les fichiers](#file-based-metadata-api)
+-------------------------------------------------------------
+
+Dans [Next.js 13.2](https://nextjs.org/blog/next-13-2#built-in-seo-support-with-new-metadata-api), nous avons annoncé une nouvelle API Metadata permettant de définir des métadonnées (comme les balises `title`, `meta` et `link` dans l'élément HTML `head`) en exportant un objet Metadata depuis un layout ou une page.
+
+```js filename="layout.js or page.js"
+// Soit des métadonnées statiques
+export const metadata = {
+  title: 'Accueil',
+};
+// Sortie :
+// <head>
+//	 <title>Accueil</title>
+// </head>
+ 
+// Ou des métadonnées dynamiques
+export async function generateMetadata({ params, searchParams }) {
+  const product = await getProduct(params.id);
+  return { title: product.title };
+}
+// Sortie :
+// <head>
+//	 <title>Mon Produit Unique</title>
+// </head>
+ 
+export default function Page() {}
+```
+
+En plus des métadonnées basées sur la configuration, l'API Metadata supporte désormais de nouvelles conventions de fichiers pour personnaliser vos pages et améliorer le SEO et le partage web :
+
+*   `opengraph-image.(jpg|png|svg)`
+*   `twitter-image.(jpg|png|svg)`
+*   `favicon.ico`
+*   `icon.(ico|jpg|png|svg)`
+*   `sitemap.(xml|js|jsx|ts|tsx)`
+*   `robots.(txt|js|jsx|ts|tsx)`
+*   `manifest.(json|js|jsx|ts|tsx)`
+
+Par exemple, vous pouvez utiliser les métadonnées basées sur les fichiers pour ajouter un favicon à votre application et une image Open Graph pour votre page `/about` :
+
+```
+app
+├── favicon.ico
+├── layout.js
+├── page.js
+└── about
+    ├── opengraph-image.jpg
+    └── page.js
+```
+
+Next.js servira automatiquement ces fichiers avec des hachages (pour le nom de fichier) en production pour la mise en cache, et mettra à jour les éléments `head` pertinents avec les bonnes informations de métadonnées comme l'URL de l'asset, le type de fichier et la taille de l'image.
+
+```
+// Visite de "/"
+<link rel="icon" href="<computedUrl>"/>
+ 
+// Visite de "/about"
+<link rel="icon" href="<computedUrl>"/>
+<meta property="og:image" content="<computedUrl>" type="<computedType>" ... />
+```
+
+Ajouter des fichiers statiques à votre application est souvent l'approche la plus simple, mais il y a des cas où vous devrez créer des fichiers dynamiquement. Pour chaque convention de fichier statique, il existe une variante dynamique `(.js|.jsx|.ts|.tsx)` qui vous permet d'écrire du code pour générer le fichier.
+
+Par exemple, bien que vous puissiez ajouter un fichier `sitemap.xml` statique, la plupart des sites ont des pages générées dynamiquement à partir d'une source de données externe. Pour générer un sitemap dynamique, vous pouvez ajouter un fichier `sitemap.js` qui retourne un tableau de vos routes dynamiques.
+
+```js filename="app/sitemap.js"
+export default async function sitemap() {
+  const res = await fetch('https://.../posts');
+  const allPosts = await res.json();
+ 
+  const posts = allPosts.map((post) => ({
+    url: `https://acme.com/blog/${post.slug}`,
+    lastModified: post.publishedAt,
+  }));
+ 
+  const routes = ['', '/about', '/blog'].map((route) => ({
+    url: `https://acme.com${route}`,
+    lastModified: new Date().toISOString(),
+  }));
+ 
+  return [...routes, ...posts];
+}
+```
+
+Avec les options [basées sur la configuration](/docs/app/api-reference/file-conventions/metadata#metadata-object) et les nouvelles options basées sur les fichiers, vous disposez désormais d'une API Metadata complète couvrant les métadonnées statiques et dynamiques.
+
+L'API Metadata est disponible dans la version 13.3 pour App Router (`app`). Elle n'est pas disponible dans le répertoire `pages`. En savoir plus sur [les métadonnées basées sur les fichiers et consulter la référence API](/docs/app/api-reference/file-conventions/metadata#file-based-metadata).
+
+[Génération d'images Open Graph dynamiques](#dynamic-open-graph-image-generation)
+--------------------------------------------------------------------------------
+
+Il y a six mois, nous avons publié [@vercel/og](https://vercel.com/blog/introducing-vercel-og-image-generation-fast-dynamic-social-card-images) et [Satori](https://github.com/vercel/satori), des bibliothèques permettant de générer des images dynamiquement avec JSX, HTML et CSS.
+
+`@vercel/og` a été mis à l'épreuve lors de [Next.js Conf](https://nextjs.org/conf), générant plus de 100 000 images de tickets dynamiques pour chaque participant. Avec une adoption massive chez les clients Vercel et plus de 900 000 téléchargements depuis sa sortie, nous sommes ravis d'intégrer la génération d'images dynamiques à toutes les applications Next.js sans besoin d'un package externe.
+
+Vous pouvez maintenant importer `ImageResponse` depuis `next/server` pour générer des images :
+
+```tsx filename="/app/about/opengraph-image.tsx"
+import { ImageResponse } from 'next/server';
+ 
+export const size = { width: 1200, height: 600 };
+export const alt = 'À propos de Acme';
+export const contentType = 'image/png';
+export const runtime = 'edge';
+ 
+export default function og() {
+  return new ImageResponse();
+  // ...
+}
+```
+
+`ImageResponse` s'intègre naturellement bien avec les autres APIs Next.js, y compris les Route Handlers et les métadonnées basées sur les fichiers. Par exemple, vous pouvez utiliser `ImageResponse` dans un fichier `opengraph-image.tsx` pour générer des images Open Graph et Twitter au moment du build ou dynamiquement au moment de la requête.
+
+En savoir plus sur [l'API Image Response](/docs/app/building-your-application/optimizing/metadata#dynamic-image-generation).
+
+[Export statique pour App Router](#static-export-for-app-router)
+---------------------------------------------------------------
+
+App Router de Next.js supporte désormais les exports entièrement statiques.
+
+Vous pouvez commencer avec un site statique ou une Single-Page Application (SPA), puis éventuellement passer à des fonctionnalités Next.js nécessitant un serveur.
+
+Lors de l'exécution de `next build`, Next.js génère un fichier HTML par route. En découpant une SPA stricte en fichiers HTML individuels, Next.js évite de charger du code JavaScript inutile côté client, réduisant la taille du bundle et permettant des chargements de page plus rapides.
+
+```js filename="next.config.js"
+/**
+ * @type {import('next').NextConfig}
+ */
+const nextConfig = {
+  output: 'export',
+};
+ 
+module.exports = nextConfig;
+```
+
+L'export statique fonctionne avec les nouvelles fonctionnalités d'App Router, y compris les Route Handlers statiques, les images Open Graph et les React Server Components.
+
+Par exemple, les Server Components s'exécuteront pendant le build, similairement à la génération de site statique traditionnelle, rendant les composants en HTML statique pour le chargement initial de la page et une payload statique pour la navigation client entre les routes.
+
+Précédemment, pour utiliser l'export statique dans le répertoire `pages`, vous deviez exécuter `next export`. Cependant, avec l'option `next.config.js`, `next build` générera un répertoire `out` quand `output: 'export'` est défini. Vous pouvez utiliser la même configuration pour App Router et le répertoire `pages`. Cela signifie que `next export` n'est plus nécessaire.
+
+Avec le support avancé de l'export statique, vous obtiendrez des erreurs plus tôt dans le processus de développement (`next dev`), comme lorsque vous tentez d'utiliser une fonction dynamique nécessitant un serveur comme `cookies()` ou `headers()`.
+
+En savoir plus sur [l'Export Statique](/docs/app/building-your-application/deploying/static-exports).
+
+[Routes parallèles et interception](#parallel-routes-and-interception)
+---------------------------------------------------------------------
+
+Next.js 13.3 introduit de nouvelles conventions dynamiques permettant d'implémenter des cas de routage avancés : **Routes parallèles et Routes d'interception**. Ces fonctionnalités vous permettent d'afficher plus d'une page dans la même vue, comme avec des tableaux de bord complexes ou des modales.
+
+Avec les Routes parallèles, vous pouvez rendre simultanément une ou plusieurs pages dans la _même vue_ qui peuvent être naviguées indépendamment. Elles peuvent aussi être utilisées pour conditionnellement afficher des pages.
+
+Les Routes parallèles sont créées avec des **"slots"** nommés. Les slots sont définis avec la convention `@folder` :
+
+```
+dashboard
+├── @user
+│   └── page.js
+├── @team
+│   └── page.js
+├── layout.js
+└── page.js
+```
+
+Le layout dans le même segment de route accepte les slots comme props :
+
+```js filename="app/dashboard/layout.js"
+export default async function Layout({ children, user, team }) {
+  const userType = getCurrentUserType();
+ 
+  return (
+    <>
+      {userType === 'user' ? user : team}
+      {children}
+    </>
+  );
+}
+```
+
+Dans l'exemple ci-dessus, les slots de route parallèle `@user` et `@team` (explicites) sont rendus conditionnellement selon votre logique. `children` est un slot de route implicite qui n'a _pas_ besoin d'être mappé à un `@folder`. Par exemple, `dashboard/page.js` est équivalent à `dashboard/@children/page.js`.
+
+Les Routes d'interception vous permettent de charger une nouvelle route dans le layout actuel tout en "masquant" l'URL du navigateur. C'est utile quand garder le contexte de la page actuelle est important, comme développer une photo dans un fil via une modale où le fil est gardé en arrière-plan de la modale.
+
+Les Routes d'interception peuvent être définies avec la convention `(..)`, similaire aux chemins relatifs `../`. Vous pouvez aussi utiliser la convention `(...)` pour créer un chemin relatif au répertoire `app`.
+
+```
+feed
+├── @modal
+│   └── (..)photo
+│       └── [id]
+│           └── page.tsx
+├── page.tsx
+└── layout.tsx
+photo
+└── [id]
+    └── page.tsx
+```
+
+Dans l'exemple ci-dessus, cliquer sur la photo depuis le profil utilisateur ouvrira la photo dans une modale pendant la navigation côté client. Cependant, rafraîchir ou partager la page chargera la photo avec son layout par défaut.
+
+![Les routes parallèles et l'interception permettent un routage de modale similaire à Instagram.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-3/modal-routing.png)
+
+Les routes parallèles et l'interception permettent un routage de modale similaire à Instagram.
+
+Cela résout les défis que vous pourriez rencontrer en créant des modales, comme rendre le contenu de la modale partageable via une URL, empêcher la perte de contexte au rafraîchissement de la page, et fermer/rouvrir la modale avec la navigation avant/arrière.
+
+Pour plus d'exemples et de comportements, voir la documentation des [Routes parallèles](/docs/app/building-your-application/routing/parallel-routes) et [Routes d'interception](/docs/app/building-your-application/routing/intercepting-routes).
+
+[Autres améliorations](#other-improvements)
+-----------------------------------------
+
+*   **Mises à jour du design** : La [page d'accueil](https://nextjs.org/) et la [vitrine](https://nextjs.org/showcase) de Next.js ont été rafraîchies avec un nouveau design.
+*   **Turbopack** : Ajout du support pour Middleware, toutes les options `next/font`, et le streaming avec Server Components alors qu'il approche de la bêta ([voir démo](https://twitter.com/padmaia/status/1641130761775464448)). Nous avons aussi corrigé des bugs supplémentaires découverts en testant sur des applications Next.js matures comme [vercel.com](https://vercel.com) et [nextjs.org](https://nextjs.org/). [En savoir plus](/docs/architecture/turbopack).
+*   **Fast Refresh pour `next.config.js`** : Les modifications de `next.config.js` redémarreront maintenant automatiquement votre serveur de développement local. Cela étend le rechargement automatique des fichiers de configuration `.env`, `.env.*`, `jsconfig.json`, `tsconfig.json`.
+*   **Accessibilité** : App Router inclut désormais l'annonce de route depuis `pages`. Cette fonctionnalité annonce les transitions de route côté client aux lecteurs d'écran et autres technologies d'assistance. [En savoir plus](/docs/accessibility).
+*   **Liens typés statiquement** : Les `redirects` et `rewrites` définis dans `next.config.js` sont maintenant considérés pendant la vérification de type. [En savoir plus](/docs/app/building-your-application/configuring/typescript#statically-typed-links).
+*   **Tailwind CSS pour `create-next-app`** : En démarrant un nouveau projet avec `npx create-next-app@latest`, vous pouvez maintenant optionnellement sélectionner Tailwind CSS, ou utiliser le flag `--tailwind`, pour préconfigurer votre application avec cette solution de style.
+*   **Route Handlers** : Utiliser `export default` au lieu d'un [verbe HTTP supporté](/docs/app/api-reference/file-conventions/route) lance maintenant une erreur utile avec `route.ts`. [En savoir plus sur les Route Handlers](/docs/app/building-your-application/routing/route-handlers).
+*   **Images** : `next/image` supporte maintenant l'attribut [`fetchPriority="high"`](https://developer.mozilla.org/docs/Web/HTML/Element/img#:~:text=elementtiming%20attribute%20page.-,fetchpriority,-Experimental).
+*   **Metadata** : L'ancienne API pour les métadonnées (`head.js`), dépréciée en 13.2, a été supprimée. Utilisez plutôt le support natif pour le SEO via l'API [Metadata](/docs/app/api-reference/file-conventions/metadata).
+*   **Exclure des dossiers du routage** : Préfixez un dossier avec \_ pour l'exclure lui et ses segments enfants du routage. Par exemple, `app/_dashboard/page.tsx` ne serait pas routable.
+*   **App Router** : Nous avons ajouté un nouveau hook `useParams` pour les composants clients afin de lire les paramètres dynamiques d'un segment de route. [En savoir plus](/docs/app/api-reference/functions/use-params).
+*   **Amélioration du chargement des feuilles de style** : Next.js implémente désormais le CSS Suspensey de React, corrigeant de nombreux problèmes autour du chargement CSS et des flashes de contenu non stylisé, particulièrement pendant la navigation.
+*   **Gestion améliorée des Not Found** : En plus d'attraper les erreurs `notFound()` attendues, le fichier racine `app/not-found.js` gérera aussi toutes les URLs non correspondantes pour votre application entière. Cela signifie que les utilisateurs visitant une URL non gérée par votre app verront l'UI exportée par `app/not-found.js`. [En savoir plus](/docs/app/api-reference/file-conventions/not-found).
+*   **Amélioration du cache client-side du routeur** : `router.refresh()` invalidera désormais tout le cache et les paramètres de recherche font maintenant partie de la clé de cache, permettant à la navigation entre deux paramètres de recherche (ex. `/?search=leerob` et `/?search=tim`) de correctement restaurer le contenu dépendant du paramètre.
+
+[Communauté](#community)
+-----------------------
+
+Next.js est le résultat du travail combiné de plus de 2 600 développeurs individuels, de partenaires industriels comme Google et Meta, et de notre équipe core chez Vercel. Avec plus de 4,2 millions de téléchargements npm par semaine et 104 000+ étoiles GitHub, Next.js est l'une des façons les plus populaires de construire le Web.
+
+Rejoignez la communauté sur [GitHub Discussions](https://github.com/vercel/next.js/discussions), [Reddit](https://www.reddit.com/r/nextjs/), et [Discord](https://nextjs.org/discord).
+
+Cette version vous est apportée par :
+
+*   L'équipe **Next.js** : [Andrew](https://github.com/acdlite), [Balazs](https://github.com/balazsorban44), [Hannes](https://github.com/hanneslund), [Jan](https://github.com/jankaifer), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sebastian](https://github.com/sebmarkbage), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens), et [Wyatt](https://github.com/wyattjoh).
+*   L'équipe **Turbopack** : [Alex](https://github.com/alexkirsz), [Donny](https://github.com/kdy1), [Justin](https://github.com/jridgewell), [Leah](https://github.com/forsakenharmony), [LongYinan](https://github.com/brooooooklyn), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra), et [Will](https://github.com/wbinnssmith).
+
+Et les contributions de : @shuding, @huozhi, @sokra, @hanneslund, @JesseKoldewijn, @kaguya3222, @yangshun, @ijjk, @konomae, @Brooooooklyn, @jridgewell, @zlrlyy, @JohnDaly, @abhiyandhakal, @benjie, @johnnyomair, @nk980113, @dirheimerb, @DerTimonius, @DuCanhGH, @padmaia, @stafyniaksacha, @Gladowar, @zek, @jankaifer, @styfle, @balazsorban44, @wbinnssmith, @chibicode, @ForsakenHarmony, @franktronics, @FSaldanha, @Schniz, @raisedadead, @AdamKatzDev, @wyattjoh, @leerob, @meesvandongen, @vladikoff, @feedthejim, @tka5, @pyjun01, @gdborton, @M3kH, @aretrace, @shivanshubisht, @alexkirsz, @agrattan0820, @vinaykulk621, @heyitsuzair, @mrkldshv, @timneutkens, @furkanmavili, @swaminator, @EndangeredMassa, @DevEsteves, @rishabhpoddar, @schehata, @molebox, @dlehmhus, @akshaynox, @sp00ls, @janicklas-ralph, @tomryanx, @kwonoj, @karlhorky, @kdy1, @dante-robinson, @lachlanjc, @ianmacartney, @hotters, @isaackatayev, @insik-han, @jayair, @ivanhofer, @javivelasco, @SukkaW, @visshaljagtap, @imranbarbhuiya, @nivak-monarch, @HarshaVardhanReddyDuvvuru, @ianldgs, @ricardofiorani, @swarnava, et @gustavostz.

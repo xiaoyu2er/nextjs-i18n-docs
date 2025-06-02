@@ -1,0 +1,393 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:35:59.907Z
+title: Comment aborder la sécurité dans Next.js
+description: >-
+  Découvrez les protections de sécurité intégrées à Next.js et consultez un guide
+  pour auditer vos applications.
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2023-10-23T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/security-nextjs-server-components-actions/twitter-card.png
+---
+
+Les composants serveur React (RSC) dans App Router représentent un nouveau paradigme qui élimine une grande partie de la redondance et des risques potentiels associés aux méthodes conventionnelles. Étant donné leur nouveauté, les développeurs et les équipes de sécurité peuvent avoir du mal à aligner leurs protocoles de sécurité existants avec ce modèle.
+
+Ce document vise à mettre en lumière quelques points de vigilance, les protections intégrées, et inclut un guide pour auditer les applications. Nous nous concentrons particulièrement sur les risques d'exposition accidentelle de données.
+
+[Choisir son modèle de gestion des données](#choosing-your-data-handling-model)
+-----------------------------------------------------------------------
+
+Les [composants serveur React](/docs/app/building-your-application/rendering/server-components) brouillent la frontière entre serveur et client. La gestion des données est primordiale pour comprendre où l'information est traitée et ensuite rendue disponible.
+
+La première chose à faire est de choisir l'approche de gestion des données adaptée à notre projet.
+
+*   [API HTTP](#http-apis) (recommandé pour les grands projets/existants)
+*   [Couche d'accès aux données](#data-access-layer) (recommandé pour les nouveaux projets)
+*   [Accès aux données au niveau composant](#component-level-data-access) (recommandé pour le prototypage et l'apprentissage)
+
+Nous recommandons de s'en tenir à une seule approche et d'éviter de trop mélanger. Cela clarifie les attentes pour les développeurs travaillant sur votre codebase et les auditeurs de sécurité. Les exceptions ressortent comme suspectes.
+
+### [API HTTP](#http-apis)
+
+Si vous adoptez les composants serveur dans un projet existant, l'approche recommandée est de considérer par défaut les composants serveur à l'exécution comme non fiables, comme pour le SSR ou dans le client. Ainsi, il n'y a pas d'hypothèse de réseau interne ou de zones de confiance, et les ingénieurs peuvent appliquer le concept de Zero Trust. À la place, vous appelez uniquement des points d'API personnalisés comme REST ou GraphQL en utilisant `fetch()` depuis les composants serveur, comme s'ils s'exécutaient côté client. En transmettant les cookies éventuels.
+
+Si vous aviez des `getStaticProps`/`getServerSideProps` existants se connectant à une base de données, vous pourriez vouloir consolider le modèle et les déplacer vers des points d'API pour avoir une seule façon de faire.
+
+Soyez vigilant sur tout contrôle d'accès qui suppose que les requêtes depuis le réseau interne sont sûres.
+
+Cette approche vous permet de conserver les structures organisationnelles existantes où les équipes backend spécialisées en sécurité peuvent appliquer leurs pratiques existantes. Si ces équipes utilisent d'autres langages que JavaScript, cela fonctionne bien avec cette approche.
+
+Elle tire toujours parti des avantages des composants serveur en envoyant moins de code au client et les cascades de données inhérentes peuvent s'exécuter avec une faible latence.
+
+### [Couche d'accès aux données](#data-access-layer)
+
+Notre approche recommandée pour les nouveaux projets est de créer une couche d'accès aux données séparée dans votre codebase JavaScript et d'y consolider tous les accès aux données. Cette approche assure un accès cohérent aux données et réduit les risques de bogues d'autorisation. Elle est aussi plus facile à maintenir puisque vous consolidez dans une seule bibliothèque. Cela peut aussi améliorer la cohésion d'équipe avec un seul langage de programmation. Vous bénéficiez aussi de meilleures performances avec une surcharge d'exécution réduite et la possibilité de partager un cache en mémoire entre différentes parties d'une requête.
+
+Vous construisez une bibliothèque JavaScript interne qui effectue des vérifications d'accès aux données avant de les fournir à l'appelant. Similaire aux points d'API HTTP mais dans le même modèle mémoire. Chaque API doit accepter l'utilisateur courant et vérifier s'il peut voir ces données avant de les retourner. Le principe est qu'un composant serveur ne doit voir que les données auxquelles l'utilisateur actuel est autorisé à accéder.
+
+À partir de là, les pratiques de sécurité normales pour implémenter des API prennent le relais.
+
+```tsx filename="data/auth.tsx"
+import { cache } from 'react';
+import { cookies } from 'next/headers';
+ 
+// Les méthodes helpers en cache facilitent l'obtention de la même valeur à plusieurs endroits
+// sans avoir à la passer manuellement. Cela décourage de la passer d'un composant serveur
+// à un autre, minimisant le risque de la transmettre à un composant client.
+export const getCurrentUser = cache(async () => {
+  const token = cookies().get('AUTH_TOKEN');
+  const decodedToken = await decryptAndValidate(token);
+  // N'incluez pas de jetons secrets ou d'informations privées comme champs publics.
+  // Utilisez des classes pour éviter de passer accidentellement l'objet entier au client.
+  return new User(decodedToken.id);
+});
+```
+
+```tsx filename="data/user-dto.tsx"
+import 'server-only';
+import { getCurrentUser } from './auth';
+ 
+function canSeeUsername(viewer: User) {
+  // Info publique pour l'instant, mais peut changer
+  return true;
+}
+ 
+function canSeePhoneNumber(viewer: User, team: string) {
+  // Règles de confidentialité
+  return viewer.isAdmin || team === viewer.team;
+}
+ 
+export async function getProfileDTO(slug: string) {
+  // Ne passez pas de valeurs, relisez les valeurs en cache, résout aussi le contexte et facilite la mise en cache
+ 
+  // utilisez une API de base de données qui supporte le templating sécurisé des requêtes
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`;
+  const userData = rows[0];
+ 
+  const currentUser = await getCurrentUser();
+ 
+  // ne retournez que les données pertinentes pour cette requête et pas tout
+  // <https://www.w3.org/2001/tag/doc/APIMinimization>
+  return {
+    username: canSeeUsername(currentUser) ? userData.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, userData.team)
+      ? userData.phonenumber
+      : null,
+  };
+}
+```
+
+Ces méthodes doivent exposer des objets sûrs à transférer vers le client tels quels. Nous aimons les appeler Objets de Transfert de Données (DTO) pour clarifier qu'ils sont prêts à être consommés par le client.
+
+Ils pourraient n'être consommés que par des composants serveur en pratique. Cela crée une stratification où les audits de sécurité peuvent se concentrer principalement sur la couche d'accès aux données tandis que l'UI peut itérer rapidement. Une surface réduite et moins de code à couvrir facilite la détection des problèmes de sécurité.
+
+```
+import {getProfile} from '../../data/user'
+export async function Page({ params: { slug } }) {
+  // Cette page peut maintenant passer ce profil en toute sécurité en sachant
+  // qu'il ne devrait rien contenir de sensible.
+  const profile = await getProfile(slug);
+  ...
+}
+```
+
+Les clés secrètes peuvent être stockées dans des variables d'environnement mais seule la couche d'accès aux données devrait accéder à `process.env` avec cette approche.
+
+### [Accès aux données au niveau composant](#component-level-data-access)
+
+Une autre approche est de mettre vos requêtes de base de données directement dans vos composants serveur. Cette approche n'est appropriée que pour l'itération rapide et le prototypage. Par exemple pour un petit produit avec une petite équipe où tout le monde est conscient des risques et comment les surveiller.
+
+Avec cette approche, vous devrez auditer soigneusement vos fichiers `"use client"`. Lors des audits et revues de PR, examinez toutes les fonctions exportées et si la signature de type accepte des objets trop larges comme `User`, ou contient des props comme `token` ou `creditCard`. Même les champs sensibles comme `phoneNumber` nécessitent un examen approfondi. Un composant client ne devrait pas accepter plus de données que le strict nécessaire pour accomplir sa tâche.
+
+```
+import Profile from './components/profile.tsx';
+ 
+export async function Page({ params: { slug } }) {
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`;
+  const userData = rows[0];
+  // EXPOSÉ : Cela expose tous les champs de userData au client car
+  // nous passons les données du composant serveur au client.
+  // C'est similaire à retourner `userData` dans `getServerSideProps`
+  return <Profile user={userData} />;
+}
+```
+
+```
+'use client';
+// MAUVAIS : C'est une mauvaise interface de props car elle accepte bien plus de données que
+// ce dont le composant client a besoin et encourage les composants serveur à tout passer.
+// Une meilleure solution serait d'accepter un objet limité avec juste
+// les champs nécessaires pour afficher le profil.
+export default async function Profile({ user }: { user: User }) {
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      ...
+    </div>
+  );
+}
+```
+
+Utilisez toujours des requêtes paramétrées, ou une bibliothèque de base de données qui le fait pour vous, pour éviter les attaques par injection SQL.
+
+[Serveur uniquement](#server-only)
+---------------------------
+
+Le code qui ne doit s'exécuter que sur le serveur peut être marqué avec :
+
+```
+import 'server-only';
+```
+
+Cela provoquera une erreur de build si un composant client tente d'importer ce module. Cela permet de s'assurer que du code propriétaire/sensible ou de la logique métier interne ne fuie pas accidentellement vers le client.
+
+Le principal moyen de transférer des données est d'utiliser le protocole des composants serveur React qui se produit automatiquement lors du passage de props aux composants clients. Cette sérialisation supporte un sur-ensemble de JSON. Le transfert de classes personnalisées n'est pas supporté et générera une erreur.
+
+Ainsi, une astuce pour éviter que des objets trop larges ne soient accidentellement exposés au client est d'utiliser `class` pour vos enregistrements d'accès aux données.
+
+Dans la prochaine version Next.js 14, vous pouvez aussi essayer les APIs expérimentales [React Taint](https://react.dev/reference/react/experimental_taintObjectReference) en activant le flag `taint` dans `next.config.js`.
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    taint: true,
+  },
+};
+```
+
+Cela vous permet de marquer un objet qui ne devrait pas être passé tel quel au client.
+
+```ts filename="app/data.ts"
+import { experimental_taintObjectReference } from 'react';
+ 
+export async function getUserData(id) {
+  const data = ...;
+  experimental_taintObjectReference(
+    'Ne pas passer les données utilisateur au client',
+    data
+  );
+  return data;
+}
+```
+
+```tsx filename="app/page.tsx"
+import { getUserData } from './data';
+ 
+export async function Page({ searchParams }) {
+  const userData = getUserData(searchParams.id);
+  return <ClientComponent user={userData} />; // erreur
+}
+```
+
+Cela ne protège pas contre l'extraction de champs de données depuis cet objet et leur passage :
+
+```tsx filename="app/page.tsx"
+export async function Page({ searchParams }) {
+  const { name, phone } = getUserData(searchParams.id);
+  // Exposition intentionnelle de données personnelles
+  return <ClientComponent name={name} phoneNumber={phone} />;
+}
+```
+
+Pour les chaînes uniques comme les jetons, la valeur brute peut aussi être bloquée avec [`taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue).
+
+```ts filename="app/data.ts"
+import { experimental_taintObjectReference, experimental_taintUniqueValue } from 'react';
+ 
+export async function getUserData(id) {
+  const data = ...;
+  experimental_taintObjectReference(
+    'Ne pas passer les données utilisateur au client',
+    data
+  );
+  experimental_taintUniqueValue(
+    'Ne pas passer les jetons au client',
+    data,
+    data.token
+  );
+  return data;
+}
+```
+
+Cependant, même cela ne bloque pas les valeurs dérivées.
+
+Il est préférable d'éviter que les données n'arrivent dans les composants serveur en premier lieu - en utilisant une couche d'accès aux données. La vérification de taint fournit une couche supplémentaire de protection contre les erreurs en spécifiant la valeur, mais gardez à l'esprit que les fonctions et classes sont déjà bloquées pour être passées aux composants clients. Plus il y a de couches, plus le risque qu'une chose passe à travers est minimisé.
+
+Par défaut, les variables d'environnement ne sont disponibles que sur le serveur. Par convention, Next.js expose aussi toute variable préfixée par `NEXT_PUBLIC_` au client. Cela vous permet d'exposer certaines configurations explicites qui devraient être disponibles côté client.
+
+[SSR vs RSC](#ssr-vs-rsc)
+-------------------------
+
+Pour le chargement initial, Next.js exécute à la fois les composants serveur et client sur le serveur pour produire du HTML.
+
+Les composants serveur (RSC) s'exécutent dans un système de modules séparé des composants clients pour éviter d'exposer accidentellement des informations entre les deux.
+
+Les composants clients rendus via le rendu côté serveur (SSR) doivent être considérés comme ayant la même politique de sécurité que le client navigateur. Ils ne devraient pas avoir accès à des données privilégiées ou des APIs privées. Il est fortement déconseillé d'utiliser des astuces pour contourner cette protection (comme stocker des données sur l'objet global). Le principe est que ce code devrait pouvoir s'exécuter de la même façon sur le serveur que sur le client. Conformément aux pratiques sécurisées par défaut, Next.js fera échouer le build si des modules `server-only` sont importés depuis un composant client.
+
+[Lecture](#read)
+-------------
+
+Dans Next.js App Router, la lecture de données depuis une base de données ou une API est implémentée en rendant des pages de composants serveur.
+
+Les entrées des pages sont les searchParams dans l'URL, les paramètres dynamiques mappés depuis l'URL et les en-têtes. Ceux-ci peuvent être manipulés pour avoir des valeurs différentes par le client. Ils ne doivent pas être considérés comme fiables et doivent être revérifiés à chaque lecture. Par exemple, un searchParam ne devrait pas être utilisé pour suivre des choses comme `?isAdmin=true`. Juste parce que l'utilisateur est sur `/[team]/` ne signifie pas qu'il a accès à cette équipe, cela doit être vérifié lors de la lecture des données. Le principe est de toujours relire les contrôles d'accès et `cookies()` lors de la lecture des données. Ne les passez pas comme props ou params.
+
+Le rendu d'un composant serveur ne devrait jamais effectuer d'effets de bord comme des mutations. Cela n'est pas unique aux composants serveur. React décourage naturellement les effets de bord même lors du rendu de composants clients (en dehors de useEffect), en faisant des choses comme du double rendu.
+
+De plus, dans Next.js il n'y a pas moyen de définir des cookies ou de déclencher la revalidation des caches pendant le rendu. Cela décourage aussi l'utilisation des rendus pour des mutations.
+
+Par exemple, `searchParams` ne devrait pas être utilisé pour effectuer des effets de bord comme sauvegarder des changements ou se déconnecter. Les actions serveur devraient être utilisées pour cela à la place.
+
+Cela signifie que le modèle Next.js n'utilise jamais les requêtes GET pour des effets de bord lorsqu'il est utilisé comme prévu. Cela aide à éviter une grande source de problèmes CSRF.
+
+Next.js a bien un support pour les gestionnaires de route personnalisés (`route.tsx`), qui peuvent définir des cookies sur GET. C'est considéré comme une échappatoire et ne fait pas partie du modèle général. Ceux-ci doivent explicitement opter pour accepter les requêtes GET. Il n'y a pas de gestionnaire attrape-tout qui pourrait recevoir accidentellement des requêtes GET. Si vous décidez de créer un gestionnaire GET personnalisé, ceux-ci pourraient nécessiter un audit supplémentaire.
+
+[Écriture](#write)
+---------------
+
+La façon idiomatique d'effectuer des écritures ou mutations dans Next.js App Router est d'utiliser les [actions serveur](/docs/app/building-your-application/data-fetching/forms-and-mutations).
+
+```ts filename="actions.ts"
+'use server';
+ 
+export function logout() {
+  cookies().delete('AUTH_TOKEN');
+}
+```
+
+L'annotation `"use server"` expose un point d'extrémité qui rend toutes les fonctions exportées invocables par le client. Les identifiants sont actuellement un hash de l'emplacement du code source. Tant qu'un utilisateur obtient le handle de l'id d'une action, il peut l'invoquer avec n'importe quels arguments.
+
+En conséquence, ces fonctions devraient toujours commencer par vérifier que l'utilisateur courant est autorisé à invoquer cette action. Les fonctions devraient aussi valider l'intégrité de chaque argument. Cela peut être fait manuellement ou avec un outil comme `zod`.
+
+```ts filename="actions.ts"
+"use server";
+ 
+export async function deletePost(id: number) {
+  if (typeof id !== 'number') {
+    // Les annotations TypeScript ne sont pas imposées donc
+    // nous pourrions avoir besoin de vérifier que l'id est bien
+    // ce que nous pensons.
+    throw new Error();
+  }
+  const user = await getCurrentUser();
+  if (!canDeletePost(user, id)) {
+    throw new Error();
+  }
+  ...
+}
+```
+
+### [Fermetures (Closures)](#closures)
+
+Les Actions Serveur peuvent également être encodées dans des [fermetures (closures)](https://developer.mozilla.org/fr/docs/Web/JavaScript/Closures). Cela permet à l'action d'être associée à un instantané des données utilisées au moment du rendu, que vous pouvez utiliser lorsque l'action est invoquée :
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  const publishVersion = await getLatestVersion();
+  async function publish() {
+    "use server";
+    if (publishVersion !== await getLatestVersion()) {
+      throw new Error('The version has changed since pressing publish');
+    }
+    ...
+  }
+  return <button action={publish}>Publish</button>;
+}
+ 
+```
+
+L'instantané de la fermeture doit être envoyé au client et renvoyé lorsque le serveur est invoqué.
+
+Dans Next.js 14, les variables capturées sont chiffrées avec l'ID de l'action avant d'être envoyées au client. Par défaut, une clé privée est générée automatiquement lors de la construction d'un projet Next.js. Chaque reconstruction génère une nouvelle clé privée, ce qui signifie que chaque Action Serveur ne peut être invoquée que pour une construction spécifique. Vous pourriez vouloir utiliser la [Protection contre les décalages (Skew Protection)](https://vercel.com/blog/version-skew-protection) pour vous assurer que vous invoquez toujours la version correcte lors des redéploiements.
+
+Si vous avez besoin d'une clé qui tourne plus fréquemment ou qui persiste sur plusieurs constructions, vous pouvez la configurer manuellement en utilisant la variable d'environnement `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`.
+
+En chiffrant toutes les variables capturées, vous évitez d'exposer accidentellement des secrets. En les signant, cela rend plus difficile pour un attaquant de manipuler l'entrée de l'action.
+
+Une autre alternative à l'utilisation des fermetures est d'utiliser la fonction `.bind(...)` en JavaScript. **Ces variables ne sont PAS chiffrées.** Cela offre une option de sortie pour la performance et est également cohérent avec `.bind()` côté client.
+
+```tsx filename="app/page.tsx"
+async function deletePost(id: number) {
+  "use server";
+  // vérifier l'id et que vous pouvez toujours le supprimer
+  ...
+}
+ 
+export async function Page({ slug }) {
+  const post = await getPost(slug);
+  return <button action={deletePost.bind(null, post.id)}>
+    Delete
+  </button>;
+}
+```
+
+Le principe est que la liste des arguments des Actions Serveur (`"use server"`) doit toujours être traitée comme hostile et l'entrée doit être vérifiée.
+
+### [CSRF](#csrf)
+
+Toutes les Actions Serveur peuvent être invoquées par un simple `<form>`, ce qui pourrait les exposer à des attaques CSRF. En coulisses, les Actions Serveur sont toujours implémentées en utilisant POST et seule cette méthode HTTP est autorisée pour les invoquer. Cela seul empêche la plupart des vulnérabilités CSRF dans les navigateurs modernes, notamment grâce aux cookies Same-Site étant la valeur par défaut.
+
+Comme protection supplémentaire, les Actions Serveur dans Next.js 14 comparent également l'en-tête `Origin` à l'en-tête `Host` (ou `X-Forwarded-Host`). S'ils ne correspondent pas, l'Action sera rejetée. En d'autres termes, les Actions Serveur ne peuvent être invoquées que sur le même hôte que la page qui les héberge. Les navigateurs très anciens, non pris en charge et obsolètes qui ne supportent pas l'en-tête `Origin` pourraient être à risque.
+
+Les Actions Serveur n'utilisent pas de jetons CSRF, donc la désinfection HTML est cruciale.
+
+Lorsque des gestionnaires de route personnalisés (`route.tsx`) sont utilisés à la place, un audit supplémentaire peut être nécessaire car la protection CSRF doit y être faite manuellement. Les règles traditionnelles s'appliquent alors.
+
+[Gestion des erreurs](#error-handling)
+---------------------------------
+
+Les bugs arrivent. Lorsque des erreurs sont levées sur le serveur, elles sont finalement relancées dans le code client pour être gérées dans l'interface utilisateur. Les messages d'erreur et les traces de pile pourraient contenir des informations sensibles. Par exemple, `[numéro de carte de crédit] n'est pas un numéro de téléphone valide`.
+
+En mode production, React n'émet pas d'erreurs ou de promesses rejetées vers le client. À la place, un hachage est envoyé représentant l'erreur. Ce hachage peut être utilisé pour associer plusieurs erreurs identiques et associer l'erreur aux journaux du serveur. React remplace le message d'erreur par un message générique.
+
+En mode développement, les erreurs du serveur sont toujours envoyées en texte brut au client pour aider au débogage.
+
+Il est important de toujours exécuter Next.js en mode production pour les charges de travail en production. Le mode développement n'est pas optimisé pour la sécurité et les performances.
+
+[Routes personnalisées et Middleware](#custom-routes-and-middleware)
+-------------------------------------------------------------
+
+Les [Gestionnaires de route personnalisés](/docs/app/building-your-application/routing/route-handlers) et le [Middleware](/docs/app/building-your-application/routing/middleware) sont considérés comme des échappatoires de bas niveau pour les fonctionnalités qui ne peuvent pas être implémentées en utilisant d'autres fonctionnalités intégrées. Cela ouvre également des pièges potentiels contre lesquels le framework protège normalement. Avec un grand pouvoir vient une grande responsabilité.
+
+Comme mentionné ci-dessus, les routes `route.tsx` peuvent implémenter des gestionnaires GET et POST personnalisés qui pourraient souffrir de problèmes CSRF s'ils ne sont pas correctement configurés.
+
+Le Middleware peut être utilisé pour limiter l'accès à certaines pages. Généralement, il est préférable de le faire avec une liste d'autorisation plutôt qu'une liste de refus. C'est parce qu'il peut être difficile de connaître toutes les différentes façons d'accéder aux données, comme s'il y a une réécriture ou une requête client.
+
+Par exemple, il est courant de ne penser qu'à la page HTML. Next.js prend également en charge la navigation client qui peut charger des charges utiles RSC/JSON. Dans le routeur Pages, cela se faisait auparavant dans une URL personnalisée.
+
+Pour faciliter l'écriture des correspondances, le routeur d'application Next.js utilise toujours l'URL simple de la page pour le HTML initial, les navigations client et les Actions Serveur. Les navigations client utilisent le paramètre de recherche `?_rsc=...` comme briseur de cache.
+
+Les Actions Serveur vivent sur la page où elles sont utilisées et héritent donc des mêmes contrôles d'accès. Si le Middleware permet de lire une page, vous pouvez également invoquer des actions sur cette page. Pour limiter l'accès aux Actions Serveur sur une page, vous pouvez interdire la méthode HTTP POST sur cette page.
+
+[Audit](#audit)
+---------------
+
+Si vous effectuez un audit d'un projet utilisant le routeur d'application Next.js, voici quelques éléments que nous recommandons de vérifier particulièrement :
+
+*   **Couche d'accès aux données.** Existe-t-il une pratique établie pour une couche d'accès aux données isolée ? Vérifiez que les packages de base de données et les variables d'environnement ne sont pas importés en dehors de la couche d'accès aux données.
+*   **Fichiers `"use client"`.** Les props des composants attendent-ils des données privées ? Les signatures de type sont-elles trop larges ?
+*   **Fichiers `"use server"`.** Les arguments des actions sont-ils validés dans l'action ou à l'intérieur de la couche d'accès aux données ? L'utilisateur est-il ré-autorisé à l'intérieur de l'action ?
+*   **`/[param]/`.** Les dossiers avec des crochets sont des entrées utilisateur. Les paramètres sont-ils validés ?
+*   **`middleware.tsx`** et **`route.tsx`** ont beaucoup de pouvoir. Passez plus de temps à auditer ceux-ci en utilisant des techniques traditionnelles. Effectuez des tests de pénétration ou des analyses de vulnérabilité régulièrement ou en accord avec le cycle de vie de développement logiciel de votre équipe.

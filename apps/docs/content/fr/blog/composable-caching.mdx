@@ -1,0 +1,202 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:40:59.661Z
+title: Cache modulaire avec Next.js
+description: Découvrez la conception de l'API et les avantages de la directive 'use cache'
+author:
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+date: 2025-01-03T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/composable-caching/twitter-card.png
+---
+
+Nous travaillons sur un modèle de mise en cache simple et puissant pour Next.js. Dans un précédent article, nous avons parlé de [notre parcours avec le cache](/blog/our-journey-with-caching) et comment nous en sommes arrivés à la directive `'use cache'`.
+
+Cet article abordera la conception de l'API et les avantages de `'use cache'`.
+
+[Qu'est-ce que `'use cache'` ?](#what-is-use-cache)
+--------------------------------------------------
+
+`'use cache'` rend votre application plus rapide en mettant en cache les données ou composants selon les besoins.
+
+C'est une "directive" JavaScript - un littéral de chaîne que vous ajoutez dans votre code - qui signale au compilateur Next.js d'entrer dans une "limite" différente. Par exemple, passer du serveur au client.
+
+C'est une idée similaire aux directives React comme `'use client'` et `'use server'`. Les directives sont des instructions du compilateur qui définissent où le code doit s'exécuter, permettant au framework d'optimiser et d'orchestrer les éléments individuels pour vous.
+
+[Comment ça marche ?](#how-does-it-work)
+----------------------------------------
+
+Commençons par un exemple simple :
+
+```
+async function getUser(id) {
+  'use cache';
+  let res = await fetch(`https://api.vercel.app/user/${id}`);
+  return res.json();
+}
+```
+
+En arrière-plan, Next.js transforme ce code en une fonction serveur grâce à la directive `'use cache'`. Pendant la compilation, les "dépendances" de cette entrée de cache sont identifiées et utilisées comme partie de la clé de cache.
+
+Par exemple, `id` devient partie de la clé de cache. Si nous appelons `getUser(1)` plusieurs fois, nous retournons la sortie mémoïsée de la fonction serveur mise en cache. Changer cette valeur créera une nouvelle entrée dans le cache.
+
+Regardons un exemple utilisant la fonction mise en cache dans un composant serveur avec une [fermeture (closure)](https://v0.dev/chat/5kD47RIecQK?b=b_rCP4CvfbFFW).
+
+```
+function Profile({ id }) {
+  async function getNotifications(index, limit) {
+    'use cache';
+    return await db
+      .select()
+      .from(notifications)
+      .limit(limit)
+      .offset(index)
+      .where(eq(notifications.userId, id));
+  }
+ 
+  return <User notifications={getNotifications} />;
+}
+```
+
+Cet exemple est plus complexe. Pouvez-vous repérer toutes les dépendances qui doivent faire partie de la clé de cache ?
+
+Les arguments `index` et `limit` sont logiques - si ces valeurs changent, nous sélectionnons une tranche différente des notifications. Mais qu'en est-il de l'`id` utilisateur ? Sa valeur provient du composant parent.
+
+Le compilateur peut comprendre que `getNotifications` dépend aussi de `id`, et sa valeur est automatiquement incluse dans la clé de cache. Cela évite toute une catégorie de problèmes de cache dus à des dépendances incorrectes ou manquantes dans la clé de cache.
+
+[Pourquoi ne pas utiliser une fonction cache ?](#why-not-use-a-cache-function)
+----------------------------------------------------------------------------
+
+Revisitons le dernier exemple. Pourrions-nous plutôt utiliser une fonction `cache()` au lieu d'une directive ?
+
+```
+function Profile({ id }) {
+  async function getNotifications(index, limit) {
+    return await cache(async () => {
+      return await db
+        .select()
+        .from(notifications)
+        .limit(limit)
+        .offset(index)
+        // Oups ! Où incluons-nous id dans la clé de cache ?
+        .where(eq(notifications.userId, id));
+    });
+  }
+ 
+  return <User notifications={getNotifications} />;
+}
+```
+
+Une fonction `cache()` ne pourrait pas examiner la fermeture et voir que la valeur `id` devrait faire partie de la clé de cache. Vous devriez spécifier manuellement que `id` fait partie de votre clé. Si vous oubliez de le faire, ou le faites incorrectement, vous risquez des collisions de cache ou des données obsolètes.
+
+Les fermetures peuvent capturer toutes sortes de variables locales. Une approche naïve pourrait accidentellement inclure (ou omettre) des variables que vous ne souhaitiez pas. Cela pourrait conduire à mettre en cache les mauvaises données, ou risquer un empoisonnement du cache si des informations sensibles fuient dans la clé de cache.
+
+`'use cache'` donne au compilateur suffisamment de contexte pour gérer les fermetures en toute sécurité et produire des clés de cache correctement. Une solution uniquement runtime, comme `cache()`, vous obligerait à tout faire manuellement - et il est facile de faire des erreurs. En revanche, une directive peut être analysée statiquement pour gérer de manière fiable toutes vos dépendances sous le capot.
+
+[Comment les valeurs d'entrée non sérialisables sont-elles gérées ?](#how-are-non-serialized-input-values-handled)
+------------------------------------------------------------------------------------------------------------------
+
+Nous avons deux types différents de valeurs d'entrée à mettre en cache :
+
+*   **Sérialisables** : Ici, "sérialisable" signifie qu'une entrée peut être convertie en un format stable basé sur des chaînes _sans_ perdre de sens. Bien que beaucoup pensent d'abord à `JSON.stringify`, nous utilisons en fait la sérialisation de React (par exemple via les composants serveur) pour gérer une gamme plus large d'entrées - incluant les promesses, les structures de données circulaires et d'autres objets complexes. Cela va au-delà de ce que le JSON brut peut faire.
+*   **Non sérialisables** : Ces entrées ne font pas partie de la clé de cache. Lorsque nous tentons de mettre ces valeurs en cache, nous retournons une "référence" serveur. Cette référence est ensuite utilisée par Next.js pour restaurer la valeur originale au runtime.
+
+Supposons que nous ayons pensé à inclure `id` dans la clé de cache :
+
+```
+await cache(async () => {
+  return await db
+    .select()
+    .from(notifications)
+    .limit(limit)
+    .offset(index)
+    .where(eq(notifications.userId, id));
+}, [id, index, limit]);
+```
+
+Cela fonctionne si les valeurs d'entrée peuvent être sérialisées. Mais si `id` était un élément React ou une valeur plus complexe, nous devrions sérialiser manuellement les clés d'entrée. Considérons un composant serveur qui récupère l'utilisateur courant basé sur une prop `id` :
+
+```
+async function Profile({ id, children }) {
+  'use cache';
+  const user = await getUser(id);
+ 
+  return (
+    <>
+      <h1>{user.name}</h1>
+      {/* Changer children ne casse pas le cache... pourquoi ? */}
+      {children}
+    </>
+  );
+}
+```
+
+Détaillons comment cela fonctionne :
+
+1.  Pendant la compilation, Next.js voit la directive `'use cache'` et transforme le code pour créer une fonction serveur spéciale qui prend en charge le cache. Aucune mise en cache ne se produit pendant la compilation, mais plutôt Next.js met en place le mécanisme nécessaire pour la mise en cache au runtime.
+2.  Lorsque votre code appelle la "fonction cache", Next.js sérialise les arguments de la fonction. Tout ce qui n'est pas directement sérialisable, comme le JSX, est remplacé par un placeholder de "référence".
+3.  Next.js vérifie si un résultat mis en cache existe pour les arguments sérialisés donnés. Si aucun résultat n'est trouvé, la fonction calcule la nouvelle valeur à mettre en cache.
+4.  Après que la fonction a terminé, la valeur de retour est sérialisée. Les parties non sérialisables de la valeur de retour sont reconverties en références.
+5.  Le code qui a appelé la fonction cache désérialise la sortie et évalue les références. Cela permet à Next.js d'échanger les références avec leurs objets ou valeurs réels, ce qui signifie que des entrées non sérialisables comme `children` peuvent conserver leurs valeurs originales, non mises en cache.
+
+Cela signifie que nous pouvons mettre en cache en toute sécurité _seulement_ le composant `<Profile>` et pas les enfants. Lors des rendus suivants, `getUser()` n'est pas rappelé. La valeur de `children` pourrait être dynamique ou un élément mis en cache séparément avec une durée de cache différente. C'est le cache modulaire.
+
+[Cela semble familier...](#this-seems-familiar)
+-----------------------------------------------
+
+Si vous pensez "ça ressemble au même modèle de composition serveur et client" - vous avez tout à fait raison. C'est parfois appelé le motif "donut" :
+
+*   La partie **extérieure** du donut est un composant serveur qui gère la récupération de données ou une logique lourde.
+*   Le **trou** au milieu est un composant enfant qui pourrait avoir de l'interactivité
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  return (
+    <ServerComponent>
+      {/* Crée un trou vers le client */}
+      <ClientComponent />
+    <ServerComponent />
+  );
+}
+```
+
+`'use cache'` est la même chose. Le donut est la valeur mise en cache du composant extérieur et le trou est les références qui sont remplies au runtime. C'est pourquoi changer `children` n'invalide pas toute la sortie mise en cache. Les enfants sont juste des références qui sont remplies plus tard.
+
+[Qu'en est-il du tagging et de l'invalidation ?](#what-about-tagging-and-invalidation)
+-------------------------------------------------------------------------------------
+
+Vous pouvez définir la durée de vie du cache avec différents [profils](/docs/app/api-reference/functions/cacheLife). Nous incluons un ensemble de profils par défaut, mais vous pouvez définir vos propres valeurs personnalisées si vous le souhaitez.
+
+```
+async function getUser(id) {
+  'use cache';
+  cacheLife('hours');
+  let res = await fetch(`https://api.vercel.app/user/${id}`);
+  return res.json();
+}
+```
+
+Pour invalider une entrée de cache spécifique, vous pouvez [tagger le cache](/docs/app/api-reference/functions/cacheTag) puis appeler `revalidateTag()`. Un modèle puissant est que vous pouvez tagger le cache _après_ avoir récupéré vos données (par exemple depuis un CMS) :
+
+```
+async function getPost(postId) {
+  'use cache';
+  let res = await fetch(`https://api.vercel.app/blog/${postId}`);
+  let data = await res.json();
+  cacheTag(postId, data.authorId);
+  return data;
+}
+```
+
+[Simple et puissant](#simple-and-powerful)
+-----------------------------------------
+
+Notre objectif avec `'use cache'` est de rendre la création de logique de cache simple _et_ puissante.
+
+*   **Simple** : Vous pouvez créer des entrées de cache avec un raisonnement local. Vous n'avez pas besoin de vous soucier des effets de bord globaux, comme des entrées de clé de cache oubliées ou des modifications involontaires d'autres parties de votre codebase.
+*   **Puissant** : Vous pouvez mettre en cache plus que du code statiquement analysable. Par exemple, des valeurs qui pourraient changer au runtime, mais dont vous voulez quand même mettre en cache le résultat après évaluation.
+
+`'use cache` est encore **expérimental** dans Next.js. Nous adorerions avoir vos retours précoces pendant que vous le testez.
+
+[En savoir plus dans la documentation](/docs/app/api-reference/directives/use-cache).
