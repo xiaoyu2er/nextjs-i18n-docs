@@ -1,0 +1,476 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-06-02T19:47:28.088Z
+title: إضافة المصادقة
+headline: 'موجه التطبيق: إضافة المصادقة'
+description: >-
+  أضف المصادقة لحماية مسارات لوحة التحكم باستخدام NextAuth.js، وإجراءات الخادم، والوسيط (Middleware).
+image: 'https://nextjs.org/api/learn-og?title=Adding%20Authentication&amp;chapter=15'
+---
+
+في الفصل السابق، أكملت بناء مسارات الفواتير بإضافة التحقق من النماذج وتحسين إمكانية الوصول. في هذا الفصل، ستقوم بإضافة المصادقة إلى لوحة التحكم الخاصة بك.
+
+[ما هي المصادقة؟](#what-is-authentication)
+-------------------------------------------
+
+المصادقة هي جزء أساسي في العديد من تطبيقات الويب اليوم. إنها الطريقة التي يتأكد بها النظام من أن المستخدم هو من يدعي أنه هو.
+
+غالبًا ما يستخدم الموقع الآمن طرقًا متعددة للتحقق من هوية المستخدم. على سبيل المثال، بعد إدخال اسم المستخدم وكلمة المرور، قد يرسل الموقع رمز تحقق إلى جهازك أو يستخدم تطبيقًا خارجيًا مثل Google Authenticator. هذه المصادقة ذات العاملين (2FA) تساعد في زيادة الأمان. حتى إذا عرف شخص ما كلمة المرور الخاصة بك، فلن يتمكن من الوصول إلى حسابك بدون الرمز الفريد الخاص بك.
+
+### [المصادقة مقابل التفويض](#authentication-vs-authorization)
+
+في تطوير الويب، تخدم المصادقة والتفويض أدوارًا مختلفة:
+
+*   **المصادقة** تتعلق بالتأكد من أن المستخدم هو من يدعي أنه هو. أنت تثبت هويتك بشيء تملكه مثل اسم المستخدم وكلمة المرور.
+*   **التفويض** هو الخطوة التالية. بمجرد تأكيد هوية المستخدم، يحدد التفويض الأجزاء المسموح له باستخدامها في التطبيق.
+
+إذن، المصادقة تتحقق من هويتك، والتفويض يحدد ما يمكنك فعله أو الوصول إليه في التطبيق.
+
+[إنشاء مسار تسجيل الدخول](#creating-the-login-route)
+----------------------------------------------------
+
+ابدأ بإنشاء مسار جديد في تطبيقك يسمى `/login` والصق الكود التالي:
+
+```tsx filename="/app/login/page.tsx"
+import AcmeLogo from '@/app/ui/acme-logo';
+import LoginForm from '@/app/ui/login-form';
+import { Suspense } from 'react';
+ 
+export default function LoginPage() {
+  return (
+    <main className="flex items-center justify-center md:h-screen">
+      <div className="relative mx-auto flex w-full max-w-[400px] flex-col space-y-2.5 p-4 md:-mt-32">
+        <div className="flex h-20 w-full items-end rounded-lg bg-blue-500 p-3 md:h-36">
+          <div className="w-32 text-white md:w-36">
+            <AcmeLogo />
+          </div>
+        </div>
+        <Suspense>
+          <LoginForm />
+        </Suspense>
+      </div>
+    </main>
+  );
+}
+```
+
+ستلاحظ أن الصفحة تستورد `<LoginForm />`، والذي ستقوم بتحديثه لاحقًا في هذا الفصل. هذا المكون مغلف بـ React `<Suspense>` لأنه سيتحصل على معلومات من الطلب الوارد (معلمات البحث في URL).
+
+[NextAuth.js](#nextauthjs)
+--------------------------
+
+سنستخدم [NextAuth.js](https://nextjs.authjs.dev/) لإضافة المصادقة إلى تطبيقك. يقوم NextAuth.js بتجريد الكثير من التعقيدات المتعلقة بإدارة الجلسات، وتسجيل الدخول والخروج، وجوانب أخرى من المصادقة. بينما يمكنك تنفيذ هذه الميزات يدويًا، قد تكون العملية طويلة وعرضة للأخطاء. يبسط NextAuth.js العملية، ويوفر حلًا موحدًا للمصادقة في تطبيقات Next.js.
+
+[إعداد NextAuth.js](#setting-up-nextauthjs)
+-------------------------------------------
+
+قم بتثبيت NextAuth.js عن طريق تشغيل الأمر التالي في طرفيتك:
+
+```bash filename="Terminal"
+pnpm i next-auth@beta
+```
+
+هنا، تقوم بتثبيت الإصدار `beta` من NextAuth.js، وهو متوافق مع Next.js 14+.
+
+بعد ذلك، قم بإنشاء مفتاح سري لتطبيقك. يستخدم هذا المفتاح لتشفير ملفات تعريف الارتباط، مما يضمن أمان جلسات المستخدمين. يمكنك القيام بذلك عن طريق تشغيل الأمر التالي في طرفيتك:
+
+```bash filename="Terminal"
+# macOS
+openssl rand -base64 32
+# يمكن لنظام Windows استخدام https://generate-secret.vercel.app/32
+```
+
+ثم، في ملف `.env` الخاص بك، أضف المفتاح الذي تم إنشاؤه إلى المتغير `AUTH_SECRET`:
+
+```bash {1} filename=".env"
+AUTH_SECRET=your-secret-key
+```
+
+لكي تعمل المصادقة في بيئة الإنتاج، ستحتاج إلى تحديث متغيرات البيئة في مشروع Vercel الخاص بك أيضًا. تحقق من هذا [الدليل](https://vercel.com/docs/environment-variables) حول كيفية إضافة متغيرات البيئة على Vercel.
+
+### [إضافة خيار الصفحات](#adding-the-pages-option)
+
+قم بإنشاء ملف `auth.config.ts` في جذر مشروعنا يصدر كائن `authConfig`. سيحتوي هذا الكائن على خيارات التكوين لـ NextAuth.js. في الوقت الحالي، سيحتوي فقط على خيار `pages`:
+
+```ts filename="/auth.config.ts"
+import type { NextAuthConfig } from 'next-auth';
+ 
+export const authConfig = {
+  pages: {
+    signIn: '/login',
+  },
+} satisfies NextAuthConfig;
+```
+
+يمكنك استخدام خيار `pages` لتحديد المسار لصفحات تسجيل الدخول والخروج والأخطاء المخصصة. هذا ليس مطلوبًا، ولكن بإضافة `signIn: '/login'` إلى خيار `pages` الخاص بنا، سيتم توجيه المستخدم إلى صفحة تسجيل الدخول المخصصة لدينا، بدلاً من الصفحة الافتراضية لـ NextAuth.js.
+
+[حماية مساراتك باستخدام Next.js Middleware](#protecting-your-routes-with-nextjs-middleware)
+-------------------------------------------------------------------------------------------
+
+بعد ذلك، أضف المنطق لحماية مساراتك. هذا سيمنع المستخدمين من الوصول إلى صفحات لوحة التحكم ما لم يكونوا مسجلين الدخول.
+
+```ts {7,8,9,10,11,12,13,14,15,16,17,18,19,20,21} filename="/auth.config.ts"
+import type { NextAuthConfig } from 'next-auth';
+ 
+export const authConfig = {
+  pages: {
+    signIn: '/login',
+  },
+  callbacks: {
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user;
+      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
+      if (isOnDashboard) {
+        if (isLoggedIn) return true;
+        return false; // توجيه المستخدمين غير المصادق عليهم إلى صفحة تسجيل الدخول
+      } else if (isLoggedIn) {
+        return Response.redirect(new URL('/dashboard', nextUrl));
+      }
+      return true;
+    },
+  },
+  providers: [], // أضف مزودين بمصفوفة فارغة في الوقت الحالي
+} satisfies NextAuthConfig;
+```
+
+يتم استخدام رد النداء `authorized` للتحقق مما إذا كان الطلب مصرحًا له بالوصول إلى صفحة باستخدام [Next.js Middleware](/docs/app/building-your-application/routing/middleware). يتم استدعاؤه قبل اكتمال الطلب، ويتلقى كائنًا يحتوي على خصائص `auth` و `request`. تحتوي خاصية `auth` على جلسة المستخدم، وتحتوي خاصية `request` على الطلب الوارد.
+
+خيار `providers` هو مصفوفة تسرد فيها خيارات تسجيل الدخول المختلفة. في الوقت الحالي، إنها مصفوفة فارغة لتلبية تكوين NextAuth. ستتعلم المزيد عنها في قسم [إضافة مزود بيانات الاعتماد](#adding-the-credentials-provider).
+
+بعد ذلك، ستحتاج إلى استيراد كائن `authConfig` إلى ملف Middleware. في جذر مشروعك، قم بإنشاء ملف يسمى `middleware.ts` والصق الكود التالي:
+
+```ts filename="/middleware.ts"
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+ 
+export default NextAuth(authConfig).auth;
+ 
+export const config = {
+  // https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+};
+```
+
+هنا تقوم بتهيئة NextAuth.js باستخدام كائن `authConfig` وتصدير خاصية `auth`. أنت أيضًا تستخدم خيار `matcher` من Middleware لتحديد أنه يجب تشغيله على مسارات محددة.
+
+ميزة استخدام Middleware لهذه المهمة هي أن المسارات المحمية لن تبدأ حتى في التقديم حتى يتحقق Middleware من المصادقة، مما يعزز أمان وأداء تطبيقك.
+
+### [تجزئة كلمة المرور](#password-hashing)
+
+من الممارسات الجيدة **تجزئة** كلمات المرور قبل تخزينها في قاعدة البيانات. تحول التجزئة كلمة المرور إلى سلسلة ذات طول ثابت من الأحرف، والتي تبدو عشوائية، مما يوفر طبقة من الأمان حتى إذا تم الكشف عن بيانات المستخدم.
+
+عند بذر قاعدة البيانات الخاصة بك، استخدمت حزمة تسمى `bcrypt` لتجزئة كلمة مرور المستخدم قبل تخزينها في قاعدة البيانات. ستستخدمها _مرة أخرى_ لاحقًا في هذا الفصل لمقارنة أن كلمة المرور التي أدخلها المستخدم تطابق تلك الموجودة في قاعدة البيانات. ومع ذلك، ستحتاج إلى إنشاء ملف منفصل لحزمة `bcrypt`. هذا لأن `bcrypt` تعتمد على واجهات برمجة تطبيقات Node.js غير متوفرة في Next.js Middleware.
+
+قم بإنشاء ملف جديد يسمى `auth.ts` يقوم بنشر كائن `authConfig` الخاص بك:
+
+```ts filename="/auth.ts"
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+});
+```
+
+### [إضافة مزود بيانات الاعتماد](#adding-the-credentials-provider)
+
+بعد ذلك، ستحتاج إلى إضافة خيار `providers` لـ NextAuth.js. `providers` هي مصفوفة تسرد فيها خيارات تسجيل الدخول المختلفة مثل Google أو GitHub. في هذه الدورة، سنركز على استخدام [مزود بيانات الاعتماد](https://authjs.dev/getting-started/providers/credentials-tutorial) فقط.
+
+يسمح مزود بيانات الاعتماد للمستخدمين بتسجيل الدخول باستخدام اسم مستخدم وكلمة مرور.
+
+```ts {3,7} filename="/auth.ts"
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+import Credentials from 'next-auth/providers/credentials';
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [Credentials({})],
+});
+```
+
+> **معلومة جيدة:**
+> 
+> هناك مزودون آخرون مثل [OAuth](https://authjs.dev/getting-started/providers/oauth-tutorial) أو [البريد الإلكتروني](https://authjs.dev/getting-started/providers/email-tutorial). راجع [وثائق NextAuth.js](https://authjs.dev/getting-started/providers) للحصول على قائمة كاملة بالخيارات.
+
+### [إضافة وظيفة تسجيل الدخول](#adding-the-sign-in-functionality)
+
+يمكنك استخدام الدالة `authorize` للتعامل مع منطق المصادقة. بشكل مشابه لإجراءات الخادم، يمكنك استخدام `zod` للتحقق من صحة البريد الإلكتروني وكلمة المرور قبل التحقق مما إذا كان المستخدم موجودًا في قاعدة البيانات:
+
+```ts {4,9,10,11,12,13,14,15} filename="/auth.ts"
+import NextAuth from 'next-auth';
+import { authConfig } from './auth.config';
+import Credentials from 'next-auth/providers/credentials';
+import { z } from 'zod';
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        const parsedCredentials = z
+          .object({ email: z.string().email(), password: z.string().min(6) })
+          .safeParse(credentials);
+      },
+    }),
+  ],
+});
+```
+
+بعد التحقق من صحة بيانات الاعتماد، قم بإنشاء دالة `getUser` جديدة تستعلم عن المستخدم من قاعدة البيانات.
+
+```ts {5,6,7,9,10,11,12,13,14,15,16,17,28,29,30,31} filename="/auth.ts"
+import NextAuth from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
+import { authConfig } from './auth.config';
+import { z } from 'zod';
+import type { User } from '@/app/lib/definitions';
+import bcrypt from 'bcrypt';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+async function getUser(email: string): Promise<User | undefined> {
+  try {
+    const user = await sql<User[]>`SELECT * FROM users WHERE email=${email}`;
+    return user[0];
+  } catch (error) {
+    console.error('Failed to fetch user:', error);
+    throw new Error('Failed to fetch user.');
+  }
+}
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        const parsedCredentials = z
+          .object({ email: z.string().email(), password: z.string().min(6) })
+          .safeParse(credentials);
+ 
+        if (parsedCredentials.success) {
+          const { email, password } = parsedCredentials.data;
+          const user = await getUser(email);
+          if (!user) return null;
+        }
+ 
+        return null;
+      },
+    }),
+  ],
+});
+```
+
+ثم، استدعِ `bcrypt.compare` للتحقق مما إذا كانت كلمات المرور متطابقة:
+
+```ts {7,22,24,27,28} filename="/auth.ts"
+import NextAuth from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
+import { authConfig } from './auth.config';
+import { z } from 'zod';
+import type { User } from '@/app/lib/definitions';
+import bcrypt from 'bcrypt';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+// ...
+ 
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        // ...
+ 
+        if (parsedCredentials.success) {
+          const { email, password } = parsedCredentials.data;
+          const user = await getUser(email);
+          if (!user) return null;
+          const passwordsMatch = await bcrypt.compare(password, user.password);
+ 
+          if (passwordsMatch) return user;
+        }
+ 
+        console.log('Invalid credentials');
+        return null;
+      },
+    }),
+  ],
+});
+```
+
+أخيرًا، إذا تطابقت كلمات المرور، تريد إرجاع المستخدم، وإلا، قم بإرجاع `null` لمنع المستخدم من تسجيل الدخول.
+
+### [تحديث نموذج تسجيل الدخول](#updating-the-login-form)
+
+الآن تحتاج إلى ربط منطق المصادقة (authentication) بنموذج تسجيل الدخول لديك. في ملف `actions.ts`، أنشئ إجراءً جديدًا يُسمى `authenticate`. يجب أن يستورد هذا الإجراء دالة `signIn` من ملف `auth.ts`:
+
+```ts filename="/app/lib/actions.ts"
+'use server';
+ 
+import { signIn } from '@/auth';
+import { AuthError } from 'next-auth';
+ 
+// ...
+ 
+export async function authenticate(
+  prevState: string | undefined,
+  formData: FormData,
+) {
+  try {
+    await signIn('credentials', formData);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      switch (error.type) {
+        case 'CredentialsSignin':
+          return 'بيانات الاعتماد غير صالحة.';
+        default:
+          return 'حدث خطأ ما.';
+      }
+    }
+    throw error;
+  }
+}
+```
+
+إذا كان هناك خطأ من نوع `'CredentialsSignin'`، فستحتاج إلى عرض رسالة خطأ مناسبة. يمكنك معرفة المزيد عن أخطاء NextAuth.js في [الوثائق](https://errors.authjs.dev).
+
+أخيرًا، في مكون `login-form.tsx`، يمكنك استخدام `useActionState` من React لاستدعاء إجراء الخادم، والتعامل مع أخطاء النموذج، وعرض حالة الانتظار للنموذج:
+
+```tsx {1,11,12,13,16,17,18,19,20,21,24,70,71,72,73,79,80,81,82,83,84} filename="app/ui/login-form.tsx"
+'use client';
+ 
+import { lusitana } from '@/app/ui/fonts';
+import {
+  AtSymbolIcon,
+  KeyIcon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/24/outline';
+import { ArrowRightIcon } from '@heroicons/react/20/solid';
+import { Button } from '@/app/ui/button';
+import { useActionState } from 'react';
+import { authenticate } from '@/app/lib/actions';
+import { useSearchParams } from 'next/navigation';
+ 
+export default function LoginForm() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const [errorMessage, formAction, isPending] = useActionState(
+    authenticate,
+    undefined,
+  );
+ 
+  return (
+    <form action={formAction} className="space-y-3">
+      <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8">
+        <h1 className={`${lusitana.className} mb-3 text-2xl`}>
+          يرجى تسجيل الدخول للمتابعة.
+        </h1>
+        <div className="w-full">
+          <div>
+            <label
+              className="mb-3 mt-5 block text-xs font-medium text-gray-900"
+              htmlFor="email"
+            >
+              البريد الإلكتروني
+            </label>
+            <div className="relative">
+              <input
+                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+                id="email"
+                type="email"
+                name="email"
+                placeholder="أدخل عنوان بريدك الإلكتروني"
+                required
+              />
+              <AtSymbolIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <label
+              className="mb-3 mt-5 block text-xs font-medium text-gray-900"
+              htmlFor="password"
+            >
+              كلمة المرور
+            </label>
+            <div className="relative">
+              <input
+                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+                id="password"
+                type="password"
+                name="password"
+                placeholder="أدخل كلمة المرور"
+                required
+                minLength={6}
+              />
+              <KeyIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+            </div>
+          </div>
+        </div>
+        <input type="hidden" name="redirectTo" value={callbackUrl} />
+        <Button className="mt-4 w-full" aria-disabled={isPending}>
+          تسجيل الدخول <ArrowRightIcon className="ml-auto h-5 w-5 text-gray-50" />
+        </Button>
+        <div
+          className="flex h-8 items-end space-x-1"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {errorMessage && (
+            <>
+              <ExclamationCircleIcon className="h-5 w-5 text-red-500" />
+              <p className="text-sm text-red-500">{errorMessage}</p>
+            </>
+          )}
+        </div>
+      </div>
+    </form>
+  );
+}
+```
+
+[إضافة وظيفة تسجيل الخروج](#adding-the-logout-functionality)
+-----------------------------------------------------------
+
+لإضافة وظيفة تسجيل الخروج إلى `<SideNav />`، استدعِ دالة `signOut` من `auth.ts` في عنصر `<form>` الخاص بك:
+
+```tsx {5,15,16,17,18} filename="/ui/dashboard/sidenav.tsx"
+import Link from 'next/link';
+import NavLinks from '@/app/ui/dashboard/nav-links';
+import AcmeLogo from '@/app/ui/acme-logo';
+import { PowerIcon } from '@heroicons/react/24/outline';
+import { signOut } from '@/auth';
+ 
+export default function SideNav() {
+  return (
+    <div className="flex h-full flex-col px-3 py-4 md:px-2">
+      // ...
+      <div className="flex grow flex-row justify-between space-x-2 md:flex-col md:space-x-0 md:space-y-2">
+        <NavLinks />
+        <div className="hidden h-auto w-full grow rounded-md bg-gray-50 md:block"></div>
+        <form
+          action={async () => {
+            'use server';
+            await signOut({ redirectTo: '/' });
+          }}
+        >
+          <button className="flex h-[48px] grow items-center justify-center gap-2 rounded-md bg-gray-50 p-3 text-sm font-medium hover:bg-sky-100 hover:text-blue-600 md:flex-none md:justify-start md:p-2 md:px-3">
+            <PowerIcon className="w-6" />
+            <div className="hidden md:block">تسجيل الخروج</div>
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+```
+
+[جربها بنفسك](#try-it-out)
+---------------------------
+
+الآن، جربها بنفسك. يجب أن تكون قادرًا على تسجيل الدخول والخروج من تطبيقك باستخدام بيانات الاعتماد التالية:
+
+*   البريد الإلكتروني: `user@nextmail.com`
+*   كلمة المرور: `123456`

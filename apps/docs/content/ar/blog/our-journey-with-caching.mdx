@@ -1,0 +1,219 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:34:05.562Z
+title: رحلتنا مع التخزين المؤقت
+description: تعرف على رحلتنا مع التخزين المؤقت في موجه تطبيقات Next.js.
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2024-10-24T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/our-journey-with-caching/twitter-card.png
+---
+
+قد يكون تحقيق أداء جيد في الواجهة الأمامية أمرًا صعبًا. حتى في التطبيقات المُحسنة للغاية، فإن السبب الأكثر شيوعًا للأداء البطيء هو ما يُعرف بـ "شلالات الخادم-العميل" (client-server waterfalls). عند تقديم موجه تطبيقات Next.js، كنا نعلم أننا نريد حل هذه المشكلة. ولتحقيق ذلك، احتجنا إلى نقل طلبات REST بين الخادم والعميل إلى الخادم باستخدام مكونات خادم React (React Server Components) في رحلة ذهاب وإياب واحدة. وهذا يعني أن الخادم كان يجب أن يكون ديناميكيًا أحيانًا، مما يتطلب التضحية بأداء التحميل الأولي الممتاز الذي توفره Jamstack. قمنا ببناء التصيير الجزئي المسبق (partial prerendering) لحل هذه المفاضلة والحصول على أفضل ما في العالمين.
+
+ومع ذلك، عانى تجربة المطورين على طول الطريق بسبب إعدادات التخزين المؤقت الافتراضية والضوابط التي وفرناها. تغير الإعداد الافتراضي لـ `fetch()` لصالح الأداء عن طريق التخزين المؤقت افتراضيًا، لكن النماذج الأولية السريعة والتطبيقات الديناميكية للغاية عانت. لم نقدم سيطرة كافية على الوصول إلى قواعد البيانات المحلية التي لم تستخدم `fetch()`. كان لدينا `unstable_cache()`، لكنه لم يكن مريحًا في الاستخدام. أدى ذلك إلى الحاجة إلى تكوينات على مستوى القطاعات (segment-level configs)، مثل `export const dynamic, runtime, fetchCache, dynamicParams, revalidate = ...`، كحل بديل.
+
+بالطبع، سنستمر في دعم ذلك للتوافق مع الإصدارات السابقة. ولكن للحظة، أود منك أن تنسى كل ذلك. نعتقد أن لدينا فكرة لشيء أبسط.
+
+كنا نعمل على وضع تجريبي جديد يعتمد على مفهومين فقط: `<Suspense>` و `use cache`.
+
+[اختر مغامرتك](#choose-your-adventure)
+---------------------------------------
+
+أول شيء ستلاحظه هو أنه عند إضافة بيانات إلى مكوناتك، ستواجه الآن خطأ.
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // error
+}
+ 
+export default async function Page() {
+  return <Component />
+}
+```
+
+لاستخدام البيانات، ملفات تعريف الارتباط (cookies)، العناوين (headers)، الوقت الحالي أو القيم العشوائية، لديك الآن خيار: هل تريد تخزين البيانات مؤقتًا (على الخادم أو جانب العميل) أو تنفيذها في كل طلب؟ أستخدم `fetch()` كمثال، لكن هذا ينطبق على أي واجهة برمجة تطبيقات غير متزامنة في Node، مثل قواعد البيانات أو المؤقتات (timers).
+
+[ديناميكي](#dynamic)
+--------------------
+
+إذا كنت لا تزال في مرحلة التكرار أو تبني لوحة تحكم ديناميكية للغاية، يمكنك تغليف المكون في حدود `<Suspense>`. `<Suspense>` يختار جلب البيانات الديناميكية والبث (streaming).
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // no error
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+يمكنك أيضًا القيام بذلك في التخطيط الجذري (root layout) أو استخدام `loading.tsx`.
+
+هذا يضمن أن هيكل تطبيقك يظل فوريًا. يمكنك الاستمرار في إضافة المزيد من البيانات داخل صفحتك، مع العلم أنها ستكون جميعها ديناميكية افتراضيًا. لا يوجد شيء مخزن مؤقتًا افتراضيًا. لا مزيد من الذاكرة المخبأة الخفية.
+
+[ثابت](#static)
+----------------
+
+إذا كنت تبني شيئًا ثابتًا ولا تريد استخدام الوظائف الديناميكية، يمكنك استخدام التوجيه الجديد `use cache`.
+
+```tsx filename="app/page.tsx"
+"use cache"
+ 
+export default async function Page() {
+  return fetch(...) // no error
+}
+```
+
+عن طريق وضع علامة `use cache` على الصفحة، فإنك تشير إلى أنه يجب تخزين القطاع بأكمله مؤقتًا. هذا يعني أن أي بيانات تقوم بجلبها يمكن الآن تخزينها مؤقتًا، مما يسمح بتصيير الصفحة بشكل ثابت. لا يتم استخدام حدود `<Suspense>` للمحتوى الثابت. يمكنك إضافة المزيد من البيانات إلى الصفحة، وسيتم تخزينها جميعًا مؤقتًا.
+
+[جزئي](#partial)
+-----------------
+
+يمكنك أيضًا المزج بين الطريقتين. على سبيل المثال، يمكنك وضع `use cache` في التخطيط الجذري لضمان تخزينه مؤقتًا. يمكن تخزين كل تخطيط أو صفحة مؤقتًا بشكل مستقل.
+
+```tsx filename="app/layout.tsx"
+"use cache"
+ 
+export default async function Layout({ children }) {
+  const response = await fetch(...)
+  const data = await response.json()
+  return <html>
+    <body>
+      <div>{data.notice}</div>
+      {children}
+    </body>
+  </html>
+}
+```
+
+بينما تستخدم بيانات ديناميكية داخل صفحة معينة:
+
+```tsx filename="app/page.tsx"
+import { Suspense } from 'react'
+async function Component() {
+  return fetch(...) // no error
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+[وظائف مخزنة مؤقتًا](#cached-functions)
+----------------------------------------
+
+عند استخدام نهج هجين مثل هذا، قد يكون أكثر ملاءمة إضافة التخزين المؤقت بالقرب من استدعاءات واجهة برمجة التطبيقات.
+
+يمكنك إضافة `use cache` إلى أي وظيفة غير متزامنة، تمامًا مثل `use server`. فكر فيها كإجراء خادم (Server Action) ولكن بدلاً من استدعاء خادم، فإنك تستدعي ذاكرة تخزين مؤقت. وهي تدعم نفس الأنواع الغنية من الوسائط وقيم الإرجاع التي تتجاوز JSON فقط. يتضمن مفتاح التخزين المؤقت تلقائيًا أي وسائط وإغلاقات (closures)، لذلك لا تحتاج إلى تحديد مفتاح تخزين مؤقت يدويًا.
+
+```tsx filename="app/layout.tsx"
+async function getNotice() {
+  "use cache"
+  const response = await fetch(...)
+  const data = await response.json()
+  return data.notice;
+}
+ 
+export default async function Layout({ children }) {
+  return <html>
+    <body>
+      <h1>{await getNotice()}</h1>
+      {children}
+    </body>
+  </html>
+}
+```
+
+نظرًا لعدم استخدام أي بيانات أخرى في هذا التخطيط، يمكن أن يظل ثابتًا. فائدة هذا النهج هي أنه إذا أضفت بيانات ديناميكية جديدة عن طريق الخطأ إلى التخطيط، فسيؤدي ذلك إلى حدوث خطأ أثناء البناء، مما يجبرك على اتخاذ خيار جديد. إذا أضفت `use cache` إلى التخطيط بأكمله، فسيتم تخزينه مؤقتًا دون أي خطأ. يعتمد النهج الذي تختاره على حالة الاستخدام الخاصة بك.
+
+[وضع علامة على ذاكرة التخزين المؤقت](#tagging-a-cache)
+------------------------------------------------------
+
+إذا كنت تريد مسح إدخال ذاكرة التخزين المؤقت بواسطة علامة (tag) بشكل صريح، يمكنك استخدام واجهة برمجة التطبيقات الجديدة `cacheTag()` داخل وظيفة `use cache`.
+
+```ts filename="app/utils.ts"
+import { cacheTag } from 'next/cache';
+ 
+async function getNotice() {
+  'use cache';
+  cacheTag('my-tag');
+}
+```
+
+ثم، ما عليك سوى استدعاء `revalidateTag('my-tag')` من إجراء خادم (Server Action) كما كان من قبل.
+
+نظرًا لأنه يمكن استدعاء واجهة برمجة التطبيقات هذه بعد تحميل البيانات، يمكنك الآن استخدام البيانات لوضع علامات على إدخالات ذاكرة التخزين المؤقت الخاصة بك.
+
+```ts filename="app/actions.ts"
+import { unstable_cacheTag as cacheTag } from 'next/cache';
+ 
+async function getBlogPosts(page) {
+  'use cache';
+  const posts = await fetchPosts(page);
+  for (let post of posts) {
+    cacheTag('blog-post-' + post.id);
+  }
+  return posts;
+}
+```
+
+[تحديد عمر ذاكرة التخزين المؤقت](#defining-the-lifetime-of-a-cache)
+--------------------------------------------------------------------
+
+إذا كنت تريد التحكم في المدة التي يجب أن يعيش فيها إدخال أو صفحة معينة في ذاكرة التخزين المؤقت، يمكنك استخدام واجهة برمجة التطبيقات `cacheLife()`:
+
+```tsx filename="app/page.tsx"
+"use cache"
+import { unstable_cacheLife as cacheLife } from 'next/cache'
+ 
+export default async function Page() {
+  cacheLife("minutes")
+  return ...
+}
+```
+
+افتراضيًا، تقبل القيم التالية:
+
+*   `"seconds"` (ثواني)
+*   `"minutes"` (دقائق)
+*   `"hours"` (ساعات)
+*   `"days"` (أيام)
+*   `"weeks"` (أسابيع)
+*   `"max"` (أقصى حد)
+
+اختر النطاق التقريبي الذي يناسب حالة الاستخدام الخاصة بك. لا حاجة لتحديد رقم محدد وحساب عدد الثواني (أو هل كانت ميلي ثانية؟) في أسبوع. ومع ذلك، يمكنك أيضًا تحديد قيم محددة أو تكوين ملفات تعريف التخزين المؤقت المسماة الخاصة بك.
+
+بالإضافة إلى `revalidate`، يمكن لواجهة برمجة التطبيقات هذه التحكم في وقت `stale` لذاكرة التخزين المؤقت للعميل وكذلك `expire`، الذي يحدد متى يجب أن تنتهي صلاحية الصفحة إذا لم تحظ بالكثير من الزيارات لفترة من الوقت.
+
+[تجريبي](#experimental)
+-----------------------
+
+لا يزال هذا مشروعًا تجريبيًا للغاية. إنه ليس جاهزًا للإنتاج بعد وما زال به ميزات ناقصة وأخطاء. على وجه الخصوص، نعلم أننا بحاجة إلى تحسين أكوام الأخطاء (error stacks) لهذا النوع الجديد من الأخطاء. ومع ذلك، إذا كنت تشعر بالمغامرة، فنحن نرحب بملاحظاتك المبكرة.
+
+سننشر مسار ترقية أكثر تفصيلاً. بخلاف الأخطاء المبكرة، فإن التغيير الرئيسي غير المتوافق هنا هو التراجع عن التخزين المؤقت الافتراضي لـ `fetch()`. مع ذلك، نوصي بالتجربة فقط على المشاريع الجديدة في هذه المرحلة التجريبية المبكرة. إذا سارت الأمور على ما يرام، نأمل في إصدار إصدار اختياري في إصدار ثانوي وجعله الافتراضي في إصدار رئيسي مستقبلي.
+
+للعب به، يجب أن تكون على الإصدار `canary` من Next.js:
+
+```
+npx create-next-app@canary
+```
+
+يجب أيضًا تمكين العلم التجريبي dynamicIO في `next.config.ts`:
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  experimental: {
+    dynamicIO: true,
+  }
+};
+ 
+export default nextConfig;
+```
+
+اقرأ المزيد حول [`use cache`](/docs/canary/app/api-reference/directives/use-cache)، و [`cacheLife`](/docs/canary/app/api-reference/next-config-js/cacheLife)، و [`cacheTag`](/docs/canary/app/api-reference/functions/cacheTag) في وثائقنا.

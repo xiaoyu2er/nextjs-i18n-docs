@@ -1,0 +1,558 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-06-02T19:48:22.495Z
+title: إضافة البحث والترقيم
+headline: 'موجه التطبيق (App Router): إضافة البحث والترقيم'
+description: أضف ميزتي البحث والترقيم إلى تطبيق لوحة التحكم باستخدام واجهات برمجة تطبيقات Next.js.
+image: >-
+  https://nextjs.org/api/learn-og?title=Adding%20Search%20and%20Pagination&amp;chapter=11
+---
+
+في الفصل السابق، قمت بتحسين أداء التحميل الأولي للوحة التحكم باستخدام البث (streaming). الآن دعنا ننتقل إلى صفحة `/invoices`، ونعلم كيفية إضافة البحث والترقيم.
+
+[كود البداية](#starting-code)
+-------------------------------
+
+بداخل ملف `/dashboard/invoices/page.tsx`، الصق الكود التالي:
+
+```tsx filename="/app/dashboard/invoices/page.tsx"
+import Pagination from '@/app/ui/invoices/pagination';
+import Search from '@/app/ui/search';
+import Table from '@/app/ui/invoices/table';
+import { CreateInvoice } from '@/app/ui/invoices/buttons';
+import { lusitana } from '@/app/ui/fonts';
+import { InvoicesTableSkeleton } from '@/app/ui/skeletons';
+import { Suspense } from 'react';
+ 
+export default async function Page() {
+  return (
+    <div className="w-full">
+      <div className="flex w-full items-center justify-between">
+        <h1 className={`${lusitana.className} text-2xl`}>Invoices</h1>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 md:mt-8">
+        <Search placeholder="Search invoices..." />
+        <CreateInvoice />
+      </div>
+      {/*  <Suspense key={query + currentPage} fallback={<InvoicesTableSkeleton />}>
+        <Table query={query} currentPage={currentPage} />
+      </Suspense> */}
+      <div className="mt-5 flex w-full justify-center">
+        {/* <Pagination totalPages={totalPages} /> */}
+      </div>
+    </div>
+  );
+}
+```
+
+خذ بعض الوقت للتعرف على الصفحة والمكونات التي ستعمل معها:
+
+1. `<Search/>` يسمح للمستخدمين بالبحث عن فواتير محددة.
+2. `<Pagination/>` يسمح للمستخدمين بالتنقل بين صفحات الفواتير.
+3. `<Table/>` يعرض الفواتير.
+
+ستغطي وظيفة البحث كلًا من العميل والخادم. عندما يبحث المستخدم عن فاتورة على العميل، سيتم تحديث معلمات URL، وسيتم جلب البيانات على الخادم، وسيتم إعادة عرض الجدول على الخادم بالبيانات الجديدة.
+
+[لماذا نستخدم معلمات بحث URL؟](#why-use-url-search-params)
+--------------------------------------------------------
+
+كما ذكرنا أعلاه، ستستخدم معلمات بحث URL لإدارة حالة البحث. قد يكون هذا النمط جديدًا إذا كنت معتادًا على القيام بذلك باستخدام حالة جانب العميل.
+
+هناك بعض الفوائد لتنفيذ البحث باستخدام معلمات URL:
+
+* **عنوانات URL قابلة للإشارة المرجعية والمشاركة**: نظرًا لأن معلمات البحث موجودة في URL، يمكن للمستخدمين حفظ الحالة الحالية للتطبيق، بما في ذلك استعلامات البحث والمرشحات، للرجوع إليها لاحقًا أو مشاركتها.
+* **التقديم من جانب الخادم (SSR)**: يمكن استخدام معلمات URL مباشرة على الخادم لتقديم الحالة الأولية، مما يجعل التعامل مع التقديم من جانب الخادم أسهل.
+* **التحليلات والتتبع**: وجود استعلامات البحث والمرشحات مباشرة في URL يجعل تتبع سلوك المستخدم أسهل دون الحاجة إلى منطق إضافي على جانب العميل.
+
+[إضافة وظيفة البحث](#adding-the-search-functionality)
+-------------------------------------------------------------------
+
+هذه هي خطافات (hooks) Next.js للعميل التي ستستخدمها لتنفيذ وظيفة البحث:
+
+* **`useSearchParams`** - يسمح لك بالوصول إلى معلمات URL الحالية. على سبيل المثال، معلمات البحث لعنوان URL هذا `/dashboard/invoices?page=1&query=pending` ستبدو هكذا: `{page: '1', query: 'pending'}`.
+* **`usePathname`** - يسمح لك بقراءة مسار URL الحالي. على سبيل المثال، للمسار `/dashboard/invoices`، سيعيد `usePathname` `'/dashboard/invoices'`.
+* **`useRouter`** - يتيح التنقل بين المسارات داخل مكونات العميل برمجيًا. هناك [عدة طرق](/docs/app/api-reference/functions/use-router#userouter) يمكنك استخدامها.
+
+إليك نظرة سريعة على خطوات التنفيذ:
+
+1. التقاط إدخال المستخدم.
+2. تحديث URL بمعلمات البحث.
+3. الحفاظ على تزامن URL مع حقل الإدخال.
+4. تحديث الجدول ليعكس استعلام البحث.
+
+### [1. التقاط إدخال المستخدم](#1-capture-the-users-input)
+
+انتقل إلى مكون `<Search>` (`/app/ui/search.tsx`)، وستلاحظ:
+
+* `"use client"` - هذا مكون عميل، مما يعني أنه يمكنك استخدام مستمعي الأحداث والخطافات.
+* `<input>` - هذا هو حقل البحث.
+
+أنشئ دالة جديدة `handleSearch`، وأضف مستمع `onChange` إلى عنصر `<input>`. سيستدعي `onChange` الدالة `handleSearch` كلما تغيرت قيمة الإدخال.
+
+```tsx {6,7,8,18,19,20} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+ 
+export default function Search({ placeholder }: { placeholder: string }) {
+  function handleSearch(term: string) {
+    console.log(term);
+  }
+ 
+  return (
+    <div className="relative flex flex-1 flex-shrink-0">
+      <label htmlFor="search" className="sr-only">
+        Search
+      </label>
+      <input
+        className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+        placeholder={placeholder}
+        onChange={(e) => {
+          handleSearch(e.target.value);
+        }}
+      />
+      <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+    </div>
+  );
+}
+```
+
+تحقق من أنها تعمل بشكل صحيح عن طريق فتح وحدة التحكم في أدوات مطور المتصفح، ثم اكتب في حقل البحث. يجب أن ترى مصطلح البحث مسجلًا في وحدة تحكم المتصفح.
+
+رائع! أنت الآن تلتقط إدخال بحث المستخدم. الآن، تحتاج إلى تحديث URL بمصطلح البحث.
+
+### [2. تحديث URL بمعلمات البحث](#2-update-the-url-with-the-search-params)
+
+استورد خطاف `useSearchParams` من `next/navigation` وقم بتعيينه لمتغير:
+
+```tsx {4,7} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams } from 'next/navigation';
+ 
+export default function Search() {
+  const searchParams = useSearchParams();
+ 
+  function handleSearch(term: string) {
+    console.log(term);
+  }
+  // ...
+}
+```
+
+بداخل `handleSearch`، أنشئ مثيلًا جديدًا من [`URLSearchParams`](https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams) باستخدام متغير `searchParams` الجديد.
+
+```tsx {10} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams } from 'next/navigation';
+ 
+export default function Search() {
+  const searchParams = useSearchParams();
+ 
+  function handleSearch(term: string) {
+    const params = new URLSearchParams(searchParams);
+  }
+  // ...
+}
+```
+
+`URLSearchParams` هي واجهة برمجة تطبيقات ويب توفر طرقًا مساعدة لمعالجة معلمات استعلام URL. بدلاً من إنشاء سلسلة حرفية معقدة، يمكنك استخدامها للحصول على سلسلة المعلمات مثل `?page=1&query=a`.
+
+بعد ذلك، `اضبط` سلسلة المعلمات بناءً على إدخال المستخدم. إذا كان الإدخال فارغًا، فأنت تريد `حذفه`:
+
+```tsx {11,12,13,14,15} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams } from 'next/navigation';
+ 
+export default function Search() {
+  const searchParams = useSearchParams();
+ 
+  function handleSearch(term: string) {
+    const params = new URLSearchParams(searchParams);
+    if (term) {
+      params.set('query', term);
+    } else {
+      params.delete('query');
+    }
+  }
+  // ...
+}
+```
+
+الآن بعد أن أصبح لديك سلسلة الاستعلام. يمكنك استخدام خطافي `useRouter` و `usePathname` من Next.js لتحديث URL.
+
+استورد `useRouter` و `usePathname` من `'next/navigation'`، واستخدم طريقة `replace` من `useRouter()` داخل `handleSearch`:
+
+```tsx {4,8,9,18} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useSearchParams, usePathname, useRouter } from 'next/navigation';
+ 
+export default function Search() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { replace } = useRouter();
+ 
+  function handleSearch(term: string) {
+    const params = new URLSearchParams(searchParams);
+    if (term) {
+      params.set('query', term);
+    } else {
+      params.delete('query');
+    }
+    replace(`${pathname}?${params.toString()}`);
+  }
+}
+```
+
+إليك تفصيل لما يحدث:
+
+* `${pathname}` هو المسار الحالي، في حالتك، `"/dashboard/invoices"`.
+* أثناء كتابة المستخدم في شريط البحث، `params.toString()` يترجم هذا الإدخال إلى تنسيق مناسب لـ URL.
+* `replace(${pathname}?${params.toString()})` يقوم بتحديث URL ببيانات بحث المستخدم. على سبيل المثال، `/dashboard/invoices?query=lee` إذا بحث المستخدم عن "Lee".
+* يتم تحديث URL دون إعادة تحميل الصفحة، بفضل التنقل من جانب العميل في Next.js (الذي تعلمته في فصل [التنقل بين الصفحات](/learn/dashboard-app/navigating-between-pages).
+
+### [3. الحفاظ على تزامن URL والإدخال](#3-keeping-the-url-and-input-in-sync)
+
+لضمان تزامن حقل الإدخال مع URL وملؤه عند المشاركة، يمكنك تمرير `defaultValue` إلى الإدخال عن طريق القراءة من `searchParams`:
+
+```tsx {7} filename="/app/ui/search.tsx"
+<input
+  className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+  placeholder={placeholder}
+  onChange={(e) => {
+    handleSearch(e.target.value);
+  }}
+  defaultValue={searchParams.get('query')?.toString()}
+/>
+```
+
+> **`defaultValue` مقابل `value` / مكونات خاضعة للتحكم مقابل غير خاضعة للتحكم**
+> 
+> إذا كنت تستخدم الحالة (state) لإدارة قيمة حقل إدخال، فستستخدم سمة `value` لجعله مكونًا خاضعًا للتحكم. هذا يعني أن React ستدير حالة الإدخال.
+> 
+> ومع ذلك، بما أنك لا تستخدم الحالة، يمكنك استخدام `defaultValue`. هذا يعني أن الإدخال الأصلي سيدير حالته بنفسه. هذا مقبول لأنك تحفظ استعلام البحث في URL بدلاً من الحالة.
+
+### [4. تحديث الجدول](#4-updating-the-table)
+
+أخيرًا، تحتاج إلى تحديث مكون الجدول ليعكس استعلام البحث.
+
+انتقل مرة أخرى إلى صفحة الفواتير.
+
+تقبل مكونات الصفحة [خاصية تسمى `searchParams`](/docs/app/api-reference/file-conventions/page)، لذا يمكنك تمرير معلمات URL الحالية إلى مكون `<Table>`.
+
+```tsx {9,10,11,12,13,14,15,16,17,28,29,30} filename="/app/dashboard/invoices/page.tsx"
+import Pagination from '@/app/ui/invoices/pagination';
+import Search from '@/app/ui/search';
+import Table from '@/app/ui/invoices/table';
+import { CreateInvoice } from '@/app/ui/invoices/buttons';
+import { lusitana } from '@/app/ui/fonts';
+import { Suspense } from 'react';
+import { InvoicesTableSkeleton } from '@/app/ui/skeletons';
+ 
+export default async function Page(props: {
+  searchParams?: Promise<{
+    query?: string;
+    page?: string;
+  }>;
+}) {
+  const searchParams = await props.searchParams;
+  const query = searchParams?.query || '';
+  const currentPage = Number(searchParams?.page) || 1;
+ 
+  return (
+    <div className="w-full">
+      <div className="flex w-full items-center justify-between">
+        <h1 className={`${lusitana.className} text-2xl`}>Invoices</h1>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 md:mt-8">
+        <Search placeholder="Search invoices..." />
+        <CreateInvoice />
+      </div>
+      <Suspense key={query + currentPage} fallback={<InvoicesTableSkeleton />}>
+        <Table query={query} currentPage={currentPage} />
+      </Suspense>
+      <div className="mt-5 flex w-full justify-center">
+        {/* <Pagination totalPages={totalPages} /> */}
+      </div>
+    </div>
+  );
+}
+```
+
+إذا انتقلت إلى مكون `<Table>`، فسترى أن الخاصيتين `query` و `currentPage` يتم تمريرهما إلى الدالة `fetchFilteredInvoices()` التي تعيد الفواتير التي تطابق الاستعلام.
+
+```tsx filename="/app/ui/invoices/table.tsx"
+// ...
+export default async function InvoicesTable({
+  query,
+  currentPage,
+}: {
+  query: string;
+  currentPage: number;
+}) {
+  const invoices = await fetchFilteredInvoices(query, currentPage);
+  // ...
+}
+```
+
+مع هذه التغييرات في مكانها، جربها الآن. إذا بحثت عن مصطلح، فستقوم بتحديث URL، مما سيرسل طلبًا جديدًا إلى الخادم، سيتم جلب البيانات على الخادم، وسيتم إرجاع الفواتير التي تطابق استعلامك فقط.
+
+> **متى تستخدم خطاف `useSearchParams()` مقابل خاصية `searchParams`؟**
+> 
+> ربما لاحظت أنك استخدمت طريقتين مختلفتين لاستخراج معلمات البحث. سواء استخدمت واحدة أو الأخرى يعتمد على ما إذا كنت تعمل على العميل أو الخادم.
+> 
+> * `<Search>` هو مكون عميل، لذا استخدمت خطاف `useSearchParams()` للوصول إلى المعلمات من العميل.
+> * `<Table>` هو مكون خادم يجلب بياناته الخاصة، لذا يمكنك تمرير خاصية `searchParams` من الصفحة إلى المكون.
+> 
+> كقاعدة عامة، إذا كنت تريد قراءة المعلمات من العميل، فاستخدم خطاف `useSearchParams()` لأن هذا يتجنب الحاجة إلى العودة إلى الخادم.
+
+### [أفضل ممارسة: إزالة الارتداد (Debouncing)](#best-practice-debouncing)
+
+تهانينا! لقد قمت بتنفيذ ميزة البحث باستخدام Next.js! ولكن هناك شيء يمكنك فعله لتحسينها.
+
+داخل دالة `handleSearch` الخاصة بك، أضف سطر `console.log` التالي:
+
+```tsx {2} filename="/app/ui/search.tsx"
+function handleSearch(term: string) {
+  console.log(`جار البحث... ${term}`);
+ 
+  const params = new URLSearchParams(searchParams);
+  if (term) {
+    params.set('query', term);
+  } else {
+    params.delete('query');
+  }
+  replace(`${pathname}?${params.toString()}`);
+}
+```
+
+ثم اكتب "Delba" في شريط البحث وتحقق من وحدة التحكم في أدوات المطور. ماذا يحدث؟
+
+```plaintext filename="Dev Tools Console"
+جار البحث... D
+جار البحث... De
+جار البحث... Del
+جار البحث... Delb
+جار البحث... Delba
+```
+
+أنت تقوم بتحديث عنوان URL مع كل ضغطة مفتاح، وبالتالي يتم استعلام قاعدة البيانات مع كل ضغطة! هذه ليست مشكلة لأن تطبيقنا صغير، ولكن تخيل لو كان لديك آلاف المستخدمين، كل منهم يرسل طلبًا جديدًا إلى قاعدة البيانات مع كل ضغطة مفتاح.
+
+**إزالة الارتداد (Debouncing)** هي ممارسة برمجية تحد من المعدل الذي يمكن لدالة أن تنفذ به. في حالتنا، تريد فقط استعلام قاعدة البيانات عندما يتوقف المستخدم عن الكتابة.
+
+> **كيف تعمل إزالة الارتداد:**
+> 
+> 1.  **حدث التشغيل**: عندما يحدث حدث يجب إزالة ارتداده (مثل ضغطة مفتاح في مربع البحث)، يبدأ مؤقت.
+> 2.  **الانتظار**: إذا حدث حدث جديد قبل انتهاء المؤقت، يتم إعادة تعيين المؤقت.
+> 3.  **التنفيذ**: إذا وصل المؤقت إلى نهاية العد التنازلي، يتم تنفيذ الدالة بعد إزالة الارتداد.
+
+يمكنك تنفيذ إزالة الارتداد بعدة طرق، بما في ذلك إنشاء دالة إزالة الارتداد يدويًا. لتبسيط الأمور، سنستخدم مكتبة تسمى [`use-debounce`](https://www.npmjs.com/package/use-debounce).
+
+قم بتثبيت `use-debounce`:
+
+```bash filename="Terminal"
+pnpm i use-debounce
+```
+
+في مكون `<Search>` الخاص بك، استورد دالة تسمى `useDebouncedCallback`:
+
+```tsx {2,5,15} filename="/app/ui/search.tsx"
+// ...
+import { useDebouncedCallback } from 'use-debounce';
+ 
+// داخل مكون البحث...
+const handleSearch = useDebouncedCallback((term) => {
+  console.log(`جار البحث... ${term}`);
+ 
+  const params = new URLSearchParams(searchParams);
+  if (term) {
+    params.set('query', term);
+  } else {
+    params.delete('query');
+  }
+  replace(`${pathname}?${params.toString()}`);
+}, 300);
+```
+
+هذه الدالة ستلف محتويات `handleSearch`، وتنفذ الكود فقط بعد وقت محدد بمجرد توقف المستخدم عن الكتابة (300 مللي ثانية).
+
+الآن اكتب في شريط البحث مرة أخرى، وافتح وحدة التحكم في أدوات المطور. يجب أن ترى ما يلي:
+
+```plaintext filename="Dev Tools Console"
+جار البحث... Delba
+```
+
+باستخدام إزالة الارتداد، يمكنك تقليل عدد الطلبات المرسلة إلى قاعدة البيانات، وبالتالي توفير الموارد.
+
+[إضافة ترقيم الصفحات](#adding-pagination)
+---------------------------------------
+
+بعد إضافة ميزة البحث، ستلاحظ أن الجدول يعرض فقط 6 فواتير في كل مرة. هذا لأن دالة `fetchFilteredInvoices()` في `data.ts` ترجع حدًا أقصى من 6 فواتير لكل صفحة.
+
+إضافة ترقيم الصفحات يسمح للمستخدمين بالتنقل بين الصفحات المختلفة لعرض جميع الفواتير. دعونا نرى كيف يمكنك تنفيذ ترقيم الصفحات باستخدام معلمات URL، تمامًا كما فعلت مع البحث.
+
+انتقل إلى مكون `<Pagination/>` وستلاحظ أنه مكون عميل (Client Component). لا تريد جلب البيانات على العميل لأن هذا سيعرض أسرار قاعدة البيانات (تذكر أنك لا تستخدم طبقة API). بدلاً من ذلك، يمكنك جلب البيانات على الخادم، وتمريرها إلى المكون كخاصية (prop).
+
+في `/dashboard/invoices/page.tsx`، استورد دالة جديدة تسمى `fetchInvoicesPages` ومرر `query` من `searchParams` كوسيطة:
+
+```tsx {2,15} filename="/app/dashboard/invoices/page.tsx"
+// ...
+import { fetchInvoicesPages } from '@/app/lib/data';
+ 
+export default async function Page(
+  props: {
+    searchParams?: Promise<{
+      query?: string;
+      page?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const query = searchParams?.query || '';
+  const currentPage = Number(searchParams?.page) || 1;
+  const totalPages = await fetchInvoicesPages(query);
+ 
+  return (
+    // ...
+  );
+}
+```
+
+ترجع `fetchInvoicesPages` العدد الإجمالي للصفحات بناءً على استعلام البحث. على سبيل المثال، إذا كان هناك 12 فاتورة تطابق استعلام البحث، ويعرض كل صفحة 6 فواتير، فإن العدد الإجمالي للصفحات سيكون 2.
+
+بعد ذلك، مرر خاصية `totalPages` إلى مكون `<Pagination/>`:
+
+```tsx {27} filename="/app/dashboard/invoices/page.tsx"
+// ...
+ 
+export default async function Page(props: {
+  searchParams?: Promise<{
+    query?: string;
+    page?: string;
+  }>;
+}) {
+  const searchParams = await props.searchParams;
+  const query = searchParams?.query || '';
+  const currentPage = Number(searchParams?.page) || 1;
+  const totalPages = await fetchInvoicesPages(query);
+ 
+  return (
+    <div className="w-full">
+      <div className="flex w-full items-center justify-between">
+        <h1 className={`${lusitana.className} text-2xl`}>الفواتير</h1>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 md:mt-8">
+        <Search placeholder="ابحث في الفواتير..." />
+        <CreateInvoice />
+      </div>
+      <Suspense key={query + currentPage} fallback={<InvoicesTableSkeleton />}>
+        <Table query={query} currentPage={currentPage} />
+      </Suspense>
+      <div className="mt-5 flex w-full justify-center">
+        <Pagination totalPages={totalPages} />
+      </div>
+    </div>
+  );
+}
+```
+
+انتقل إلى مكون `<Pagination/>` واستورد الخطافات `usePathname` و `useSearchParams`. سنستخدمها للحصول على الصفحة الحالية وتعيين الصفحة الجديدة. تأكد أيضًا من إلغاء تعليق الكود في هذا المكون. سيتعطل تطبيقك مؤقتًا لأنك لم تنفذ بعد منطق `<Pagination/>`. لنقم بذلك الآن!
+
+```tsx {7,10,11,12} filename="/app/ui/invoices/pagination.tsx"
+'use client';
+ 
+import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import clsx from 'clsx';
+import Link from 'next/link';
+import { generatePagination } from '@/app/lib/utils';
+import { usePathname, useSearchParams } from 'next/navigation';
+ 
+export default function Pagination({ totalPages }: { totalPages: number }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentPage = Number(searchParams.get('page')) || 1;
+ 
+  // ...
+}
+```
+
+بعد ذلك، أنشئ دالة جديدة داخل مكون `<Pagination>` تسمى `createPageURL`. على غرار البحث، ستستخدم `URLSearchParams` لتعيين رقم الصفحة الجديد، و `pathName` لإنشاء سلسلة عنوان URL.
+
+```tsx {14,15,16,17,18} filename="/app/ui/invoices/pagination.tsx"
+'use client';
+ 
+import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import clsx from 'clsx';
+import Link from 'next/link';
+import { generatePagination } from '@/app/lib/utils';
+import { usePathname, useSearchParams } from 'next/navigation';
+ 
+export default function Pagination({ totalPages }: { totalPages: number }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentPage = Number(searchParams.get('page')) || 1;
+ 
+  const createPageURL = (pageNumber: number | string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', pageNumber.toString());
+    return `${pathname}?${params.toString()}`;
+  };
+ 
+  // ...
+}
+```
+
+إليك تفصيل لما يحدث:
+
+*   تنشئ `createPageURL` نسخة من معلمات البحث الحالية.
+*   ثم تقوم بتحديث معلمة "page" إلى رقم الصفحة المقدم.
+*   أخيرًا، تقوم ببناء عنوان URL الكامل باستخدام مسار الصفحة ومعلمات البحث المحدثة.
+
+يتعامل باقي مكون `<Pagination>` مع التنسيق والحالات المختلفة (الأولى، الأخيرة، النشطة، المعطلة، إلخ). لن نخوض في التفاصيل في هذه الدورة، ولكن لا تتردد في الاطلاع على الكود لترى أين يتم استدعاء `createPageURL`.
+
+أخيرًا، عندما يكتب المستخدم استعلام بحث جديد، تريد إعادة تعيين رقم الصفحة إلى 1. يمكنك القيام بذلك عن طريق تحديث دالة `handleSearch` في مكون `<Search>` الخاص بك:
+
+```tsx {14} filename="/app/ui/search.tsx"
+'use client';
+ 
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useDebouncedCallback } from 'use-debounce';
+ 
+export default function Search({ placeholder }: { placeholder: string }) {
+  const searchParams = useSearchParams();
+  const { replace } = useRouter();
+  const pathname = usePathname();
+ 
+  const handleSearch = useDebouncedCallback((term) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', '1');
+    if (term) {
+      params.set('query', term);
+    } else {
+      params.delete('query');
+    }
+    replace(`${pathname}?${params.toString()}`);
+  }, 300);
+ 
+```
+
+[ملخص](#summary)
+-------------------
+
+تهانينا! لقد نجحت في تنفيذ ميزتي البحث وترقيم الصفحات باستخدام معلمات URL وواجهات برمجة التطبيقات (APIs) الخاصة بـ Next.js.
+
+لتلخيص ما في هذا الفصل:
+
+*   قمت بإدارة البحث وترقيم الصفحات باستخدام معلمات URL بدلاً من حالة العميل (client state).
+*   قمت بجلب البيانات على الخادم.
+*   أنت تستخدم خطاف `useRouter` لتحقيق انتقالات أكثر سلاسة على جانب العميل.
+
+هذه الأنماط تختلف عما قد تكون معتادًا عليه عند العمل مع React على جانب العميل، ولكن نأمل أنك الآن تفهم بشكل أفضل فوائد استخدام معلمات URL ورفع هذه الحالة إلى الخادم.

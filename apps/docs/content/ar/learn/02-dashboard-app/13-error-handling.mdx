@@ -1,0 +1,203 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:45:54.864Z
+title: معالجة الأخطاء
+headline: 'موجه التطبيق (App Router): معالجة الأخطاء'
+description: تعلم كيفية معالجة الأخطاء بسلاسة باستخدام error.tsx و notFound.
+image: 'https://nextjs.org/api/learn-og?title=Handling%20Errors&amp;chapter=13'
+---
+
+في الفصل السابق، تعلمت كيفية تعديل البيانات باستخدام إجراءات الخادم (Server Actions). لنرى الآن كيف يمكنك معالجة الأخطاء _بسلاسة_ باستخدام عبارات `try/catch` في جافاسكريبت وواجهات برمجة التطبيقات (APIs) الخاصة بـ Next.js للاستثناءات غير المعالجة.
+
+[إضافة `try/catch` إلى إجراءات الخادم](#adding-trycatch-to-server-actions)
+--------------------------------------------------------------------------
+
+أولاً، لنضيف عبارات `try/catch` الخاصة بجافاسكريبت إلى إجراءات الخادم الخاصة بك للسماح لك بمعالجة الأخطاء بسلاسة.
+
+إذا كنت تعرف كيفية القيام بذلك، خذ بضع دقائق لتحديث إجراءات الخادم الخاصة بك، أو يمكنك نسخ الكود أدناه:
+
+لاحظ كيف يتم استدعاء `redirect` خارج كتلة `try/catch`. هذا لأن `redirect` يعمل عن طريق طرح خطأ، والذي سيتم التقاطه بواسطة كتلة `catch`. لتجنب ذلك، يمكنك استدعاء `redirect` **بعد** `try/catch`. سيكون `redirect` قابلاً للوصول فقط إذا نجحت `try`.
+
+نقوم بمعالجة هذه الأخطاء بسلاسة عن طريق التقاط مشكلة قاعدة البيانات، وإعادة رسالة مفيدة من إجراء الخادم الخاص بنا.
+
+ماذا يحدث إذا كان هناك استثناء غير معالج في إجراءك؟ يمكننا محاكاة ذلك عن طريق طرح خطأ يدويًا. على سبيل المثال، في إجراء `deleteInvoice`، اطرح خطأ في أعلى الدالة:
+
+```ts {2} filename="/app/lib/actions.ts"
+export async function deleteInvoice(id: string) {
+  throw new Error('Failed to Delete Invoice');
+ 
+  // كود غير قابل للتنفيذ
+  await sql`DELETE FROM invoices WHERE id = ${id}`;
+  revalidatePath('/dashboard/invoices');
+}
+```
+
+عند محاولة حذف فاتورة، يجب أن ترى الخطأ على localhost. عند الانتقال إلى الإنتاج، تريد أن تعرض رسالة أكثر سلاسة للمستخدم عندما يحدث شيء غير متوقع.
+
+هنا يأتي دور ملف [`error.tsx`](https://nextjs.org/docs/app/api-reference/file-conventions/error) في Next.js. تأكد من إزالة هذا الخطأ المضاف يدويًا بعد الاختبار وقبل الانتقال إلى القسم التالي.
+
+[معالجة جميع الأخطاء باستخدام `error.tsx`](#handling-all-errors-with-errortsx)
+--------------------------------------------------------------------------
+
+يمكن استخدام ملف `error.tsx` لتعريف حدود واجهة المستخدم (UI boundary) لقطاع مسار (route segment). يعمل كـ **شبكة أمان** للاستثناءات غير المتوقعة ويسمح لك بعرض واجهة مستخدم بديلة للمستخدمين.
+
+داخل مجلد `/dashboard/invoices` الخاص بك، أنشئ ملفًا جديدًا يسمى `error.tsx` والصق الكود التالي:
+
+```tsx filename="/dashboard/invoices/error.tsx"
+'use client';
+ 
+import { useEffect } from 'react';
+ 
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    // اختياريًا: تسجيل الخطأ في خدمة تقارير الأخطاء
+    console.error(error);
+  }, [error]);
+ 
+  return (
+    <main className="flex h-full flex-col items-center justify-center">
+      <h2 className="text-center">حدث خطأ ما!</h2>
+      <button
+        className="mt-4 rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-400"
+        onClick={
+          // محاولة الاسترداد عن طريق إعادة عرض مسار الفواتير
+          () => reset()
+        }
+      >
+        حاول مرة أخرى
+      </button>
+    </main>
+  );
+}
+```
+
+هناك بعض الأشياء التي ستلاحظها في الكود أعلاه:
+
+*   **"use client"** - يحتاج `error.tsx` إلى أن يكون مكون عميل (Client Component).
+*   يقبل خاصيتين (props):
+    *   `error`: هذا الكائن هو نسخة من كائن [`Error`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error) الأصلي في جافاسكريبت.
+    *   `reset`: هذه دالة لإعادة تعيين حدود الخطأ. عند التنفيذ، ستقوم الدالة بمحاولة إعادة عرض قطاع المسار.
+
+عند محاولة حذف فاتورة مرة أخرى، يجب أن ترى واجهة المستخدم التالية:
+
+<Image
+  alt="ملف error.tsx يظهر الخصائص التي يقبلها"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/error-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/error-page.png"
+  width="960"
+  height="568"
+/>
+
+[معالجة أخطاء 404 باستخدام دالة `notFound`](#handling-404-errors-with-the-notfound-function)
+---------------------------------------------------------------------------------------------------
+
+طريقة أخرى يمكنك من خلالها معالجة الأخطاء بسلاسة هي باستخدام دالة `notFound`. بينما يكون `error.tsx` مفيدًا للاستثناءات غير المعالجة، يمكن استخدام `notFound` عندما تحاول جلب مورد غير موجود.
+
+على سبيل المثال، قم بزيارة [http://localhost:3000/dashboard/invoices/2e94d1ed-d220-449f-9f11-f0bbceed9645/edit](http://localhost:3000/dashboard/invoices/2e94d1ed-d220-449f-9f11-f0bbceed9645/edit).
+
+هذا UUID مزيف غير موجود في قاعدة البيانات الخاصة بك.
+
+سترى على الفور أن `error.tsx` يبدأ العمل لأن هذا مسار فرعي لـ `/invoices` حيث يتم تعريف `error.tsx`.
+
+ومع ذلك، إذا كنت تريد أن تكون أكثر تحديدًا، يمكنك عرض خطأ 404 لإخبار المستخدم أن المورد الذي يحاول الوصول إليه لم يتم العثور عليه.
+
+يمكنك التأكد من أن المورد غير موجود بالذهاب إلى دالة `fetchInvoiceById` في `data.ts`، وتسجيل الفاتورة التي تم إرجاعها في الكونسول:
+
+```ts {6} filename="/app/lib/data.ts"
+export async function fetchInvoiceById(id: string) {
+  try {
+    // ...
+ 
+    console.log(invoice); // الفاتورة هي مصفوفة فارغة []
+    return invoice[0];
+  } catch (error) {
+    console.error('خطأ في قاعدة البيانات:', error);
+    throw new Error('فشل في جلب الفاتورة.');
+  }
+}
+```
+
+الآن بعد أن عرفت أن الفاتورة غير موجودة في قاعدة البيانات الخاصة بك، دعنا نستخدم `notFound` لمعالجتها. انتقل إلى `/dashboard/invoices/[id]/edit/page.tsx`، واستورد `{ notFound }` من `'next/navigation'`.
+
+ثم، يمكنك استخدام شرط لاستدعاء `notFound` إذا لم تكن الفاتورة موجودة:
+
+```tsx {3,12,13,14} filename="/dashboard/invoices/[id]/edit/page.tsx"
+import { fetchInvoiceById, fetchCustomers } from '@/app/lib/data';
+import { notFound } from 'next/navigation';
+ 
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
+  const [invoice, customers] = await Promise.all([
+    fetchInvoiceById(id),
+    fetchCustomers(),
+  ]);
+ 
+  if (!invoice) {
+    notFound();
+  }
+ 
+  // ...
+}
+```
+
+ثم، لعرض واجهة مستخدم الخطأ للمستخدم، أنشئ ملف `not-found.tsx` داخل مجلد `/edit`.
+
+<Image
+  alt="ملف not-found.tsx داخل مجلد edit"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/not-found-file.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/not-found-file.png"
+  width="1600"
+  height="525"
+/>
+
+داخل ملف `not-found.tsx`، الصق الكود التالي:
+
+```tsx filename="/dashboard/invoices/[id]/edit/not-found.tsx"
+import Link from 'next/link';
+import { FaceFrownIcon } from '@heroicons/react/24/outline';
+ 
+export default function NotFound() {
+  return (
+    <main className="flex h-full flex-col items-center justify-center gap-2">
+      <FaceFrownIcon className="w-10 text-gray-400" />
+      <h2 className="text-xl font-semibold">404 غير موجود</h2>
+      <p>تعذر العثور على الفاتورة المطلوبة.</p>
+      <Link
+        href="/dashboard/invoices"
+        className="mt-4 rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-400"
+      >
+        العودة
+      </Link>
+    </main>
+  );
+}
+```
+
+قم بتحديث المسار، ويجب أن ترى الآن واجهة المستخدم التالية:
+
+<Image
+  alt="صفحة 404 غير موجود"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/404-not-found-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/404-not-found-page.png"
+  width="960"
+  height="568"
+/>
+
+هذا شيء يجب تذكره، `notFound` سيكون له الأسبقية على `error.tsx`، لذا يمكنك اللجوء إليه عندما تريد معالجة أخطاء أكثر تحديدًا!
+
+[قراءة إضافية](#further-reading)
+-----------------------------------
+
+لمعرفة المزيد عن معالجة الأخطاء في Next.js، راجع الوثائق التالية:
+
+*   [معالجة الأخطاء](https://nextjs.org/docs/app/building-your-application/routing/error-handling)
+*   [مرجع واجهة برمجة التطبيقات لـ `error.js`](https://nextjs.org/docs/app/api-reference/file-conventions/error)
+*   [مرجع واجهة برمجة التطبيقات لـ `notFound()`](https://nextjs.org/docs/app/api-reference/functions/not-found)
+*   [مرجع واجهة برمجة التطبيقات لـ `not-found.js`](https://nextjs.org/docs/app/api-reference/file-conventions/not-found)
