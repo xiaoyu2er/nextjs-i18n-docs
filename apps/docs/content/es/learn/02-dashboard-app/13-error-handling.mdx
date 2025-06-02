@@ -1,0 +1,203 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:22:53.150Z
+title: Manejo de Errores
+headline: 'App Router: Manejo de Errores'
+description: Maneja errores de forma elegante con error.tsx y notFound.
+image: 'https://nextjs.org/api/learn-og?title=Handling%20Errors&amp;chapter=13'
+---
+
+En el capítulo anterior, aprendiste cómo mutar datos usando Acciones del Servidor (Server Actions). Veamos ahora cómo puedes manejar errores _de forma elegante_ usando sentencias `try/catch` de JavaScript y las APIs de Next.js para excepciones no capturadas.
+
+[Añadiendo `try/catch` a las Acciones del Servidor](#adding-trycatch-to-server-actions)
+--------------------------------------------------------------------------
+
+Primero, añadamos las sentencias `try/catch` de JavaScript a tus Acciones del Servidor para permitirte manejar errores de forma elegante.
+
+Si sabes cómo hacer esto, tómate unos minutos para actualizar tus Acciones del Servidor, o puedes copiar el siguiente código:
+
+Observa cómo `redirect` se llama fuera del bloque `try/catch`. Esto se debe a que `redirect` funciona lanzando un error, que sería capturado por el bloque `catch`. Para evitar esto, puedes llamar a `redirect` **después** de `try/catch`. `redirect` solo sería accesible si `try` tiene éxito.
+
+Estamos manejando estos errores de forma elegante capturando el problema de la base de datos y devolviendo un mensaje útil desde nuestra Acción del Servidor.
+
+¿Qué sucede si hay una excepción no capturada en tu acción? Podemos simular esto lanzando un error manualmente. Por ejemplo, en la acción `deleteInvoice`, lanza un error al inicio de la función:
+
+```ts {2} filename="/app/lib/actions.ts"
+export async function deleteInvoice(id: string) {
+  throw new Error('Failed to Delete Invoice');
+ 
+  // Bloque de código inalcanzable
+  await sql`DELETE FROM invoices WHERE id = ${id}`;
+  revalidatePath('/dashboard/invoices');
+}
+```
+
+Cuando intentes eliminar una factura, deberías ver el error en localhost. Al pasar a producción, querrás mostrar un mensaje más elegante al usuario cuando ocurra algo inesperado.
+
+Aquí es donde entra el archivo [`error.tsx`](https://nextjs.org/docs/app/api-reference/file-conventions/error) de Next.js. Asegúrate de eliminar este error añadido manualmente después de probar y antes de pasar a la siguiente sección.
+
+[Manejando todos los errores con `error.tsx`](#handling-all-errors-with-errortsx)
+--------------------------------------------------------------------------
+
+El archivo `error.tsx` se puede usar para definir un límite de UI para un segmento de ruta. Sirve como un **capturador global** para errores inesperados y te permite mostrar una UI de respaldo a tus usuarios.
+
+Dentro de tu carpeta `/dashboard/invoices`, crea un nuevo archivo llamado `error.tsx` y pega el siguiente código:
+
+```tsx filename="/dashboard/invoices/error.tsx"
+'use client';
+ 
+import { useEffect } from 'react';
+ 
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    // Opcionalmente registrar el error en un servicio de reporte de errores
+    console.error(error);
+  }, [error]);
+ 
+  return (
+    <main className="flex h-full flex-col items-center justify-center">
+      <h2 className="text-center">¡Algo salió mal!</h2>
+      <button
+        className="mt-4 rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-400"
+        onClick={
+          // Intentar recuperarse re-renderizando la ruta de facturas
+          () => reset()
+        }
+      >
+        Intentar de nuevo
+      </button>
+    </main>
+  );
+}
+```
+
+Hay algunas cosas que notarás sobre el código anterior:
+
+*   **"use client"** - `error.tsx` debe ser un Componente de Cliente.
+*   Acepta dos props:
+    *   `error`: Este objeto es una instancia del objeto nativo [`Error`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error) de JavaScript.
+    *   `reset`: Esta es una función para reiniciar el límite de error. Cuando se ejecuta, la función intentará re-renderizar el segmento de ruta.
+
+Cuando intentes eliminar una factura nuevamente, deberías ver la siguiente UI:
+
+<Image
+  alt="El archivo error.tsx mostrando las props que acepta"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/error-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/error-page.png"
+  width="960"
+  height="568"
+/>
+
+[Manejo de errores 404 con la función `notFound`](#handling-404-errors-with-the-notfound-function)
+---------------------------------------------------------------------------------------------------
+
+Otra forma de manejar errores de forma elegante es usando la función `notFound`. Mientras que `error.tsx` es útil para capturar excepciones no capturadas, `notFound` se puede usar cuando intentas obtener un recurso que no existe.
+
+Por ejemplo, visita [http://localhost:3000/dashboard/invoices/2e94d1ed-d220-449f-9f11-f0bbceed9645/edit](http://localhost:3000/dashboard/invoices/2e94d1ed-d220-449f-9f11-f0bbceed9645/edit).
+
+Este es un UUID falso que no existe en tu base de datos.
+
+Inmediatamente verás que `error.tsx` entra en acción porque esta es una ruta hija de `/invoices` donde `error.tsx` está definido.
+
+Sin embargo, si quieres ser más específico, puedes mostrar un error 404 para indicar al usuario que el recurso que intenta acceder no se ha encontrado.
+
+Puedes confirmar que el recurso no se ha encontrado yendo a tu función `fetchInvoiceById` en `data.ts`, y registrando en consola la `invoice` devuelta:
+
+```ts {6} filename="/app/lib/data.ts"
+export async function fetchInvoiceById(id: string) {
+  try {
+    // ...
+ 
+    console.log(invoice); // Invoice es un array vacío []
+    return invoice[0];
+  } catch (error) {
+    console.error('Database Error:', error);
+    throw new Error('Failed to fetch invoice.');
+  }
+}
+```
+
+Ahora que sabes que la factura no existe en tu base de datos, usemos `notFound` para manejarlo. Navega a `/dashboard/invoices/[id]/edit/page.tsx`, e importa `{ notFound }` desde `'next/navigation'`.
+
+Luego, puedes usar un condicional para invocar `notFound` si la factura no existe:
+
+```tsx {3,12,13,14} filename="/dashboard/invoices/[id]/edit/page.tsx"
+import { fetchInvoiceById, fetchCustomers } from '@/app/lib/data';
+import { notFound } from 'next/navigation';
+ 
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
+  const [invoice, customers] = await Promise.all([
+    fetchInvoiceById(id),
+    fetchCustomers(),
+  ]);
+ 
+  if (!invoice) {
+    notFound();
+  }
+ 
+  // ...
+}
+```
+
+Luego, para mostrar la UI de error al usuario, crea un archivo `not-found.tsx` dentro de la carpeta `/edit`.
+
+<Image
+  alt="El archivo not-found.tsx dentro de la carpeta edit"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/not-found-file.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/not-found-file.png"
+  width="1600"
+  height="525"
+/>
+
+Dentro del archivo `not-found.tsx`, pega el siguiente código:
+
+```tsx filename="/dashboard/invoices/[id]/edit/not-found.tsx"
+import Link from 'next/link';
+import { FaceFrownIcon } from '@heroicons/react/24/outline';
+ 
+export default function NotFound() {
+  return (
+    <main className="flex h-full flex-col items-center justify-center gap-2">
+      <FaceFrownIcon className="w-10 text-gray-400" />
+      <h2 className="text-xl font-semibold">404 No Encontrado</h2>
+      <p>No se pudo encontrar la factura solicitada.</p>
+      <Link
+        href="/dashboard/invoices"
+        className="mt-4 rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-400"
+      >
+        Volver
+      </Link>
+    </main>
+  );
+}
+```
+
+Actualiza la ruta, y ahora deberías ver la siguiente UI:
+
+<Image
+  alt="Página 404 No Encontrado"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/404-not-found-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/404-not-found-page.png"
+  width="960"
+  height="568"
+/>
+
+Esto es algo a tener en cuenta, `notFound` tendrá precedencia sobre `error.tsx`, por lo que puedes recurrir a él cuando quieras manejar errores más específicos.
+
+[Lectura adicional](#further-reading)
+-----------------------------------
+
+Para aprender más sobre el manejo de errores en Next.js, consulta la siguiente documentación:
+
+*   [Manejo de Errores](https://nextjs.org/docs/app/building-your-application/routing/error-handling)
+*   [Referencia de API de `error.js`](https://nextjs.org/docs/app/api-reference/file-conventions/error)
+*   [Referencia de API de `notFound()`](https://nextjs.org/docs/app/api-reference/functions/not-found)
+*   [Referencia de API de `not-found.js`](https://nextjs.org/docs/app/api-reference/file-conventions/not-found)

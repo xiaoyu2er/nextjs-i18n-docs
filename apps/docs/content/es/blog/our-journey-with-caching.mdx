@@ -1,0 +1,219 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:12:15.095Z
+title: Nuestro recorrido con el almacenamiento en caché
+description: Conoce nuestra experiencia con el almacenamiento en caché en el App Router de Next.js.
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2024-10-24T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/our-journey-with-caching/twitter-card.png
+---
+
+El rendimiento del frontend puede ser difícil de optimizar. Incluso en aplicaciones altamente optimizadas, el principal culpable suelen ser las cascadas cliente-servidor. Al introducir el App Router de Next.js, sabíamos que queríamos resolver este problema. Para lograrlo, necesitábamos mover las solicitudes REST cliente-servidor al servidor usando React Server Components en un solo viaje de ida y vuelta. Esto significaba que el servidor a veces debía ser dinámico, sacrificando el gran rendimiento de carga inicial de Jamstack. Creamos el prerenderizado parcial para resolver este compromiso y obtener lo mejor de ambos mundos.
+
+Sin embargo, en el camino, la experiencia del desarrollador se vio afectada por los valores predeterminados y controles de caché que proporcionamos. El valor por defecto de `fetch()` cambió para favorecer el rendimiento almacenando en caché de forma predeterminada, pero el prototipado rápido y las aplicaciones altamente dinámicas sufrieron. No proporcionamos suficiente control sobre el acceso a bases de datos locales que no utilizaban `fetch()`. Teníamos `unstable_cache()`, pero no era ergonómico. Esto llevó a la necesidad de configuraciones a nivel de segmento, como `export const dynamic, runtime, fetchCache, dynamicParams, revalidate = ...`, como solución alternativa.
+
+Por supuesto, seguiremos dando soporte a esto por compatibilidad con versiones anteriores. Pero por un momento, me gustaría que olvidaras todo eso. Creemos que tenemos una idea para algo más simple.
+
+Hemos estado trabajando en un nuevo modo experimental que se basa en solo dos conceptos: `<Suspense>` y `use cache`.
+
+[Elige tu aventura](#elige-tu-aventura)
+---------------------------------------
+
+Lo primero que notarás es que cuando agregas datos a tus componentes, ahora obtendrás un error.
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // error
+}
+ 
+export default async function Page() {
+  return <Component />
+}
+```
+
+Para usar datos, cookies, encabezados, la hora actual o valores aleatorios, ahora tienes una opción: ¿quieres que los datos se almacenen en caché (en el servidor o en el cliente) o que se ejecuten en cada solicitud? Estoy usando `fetch()` como ejemplo, pero esto se aplica a cualquier API asíncrona de Node, como bases de datos o temporizadores.
+
+[Dinámico](#dinámico)
+---------------------
+
+Si todavía estás iterando o construyendo un panel altamente dinámico, puedes envolver el componente en un límite `<Suspense>`. `<Suspense>` opta por la obtención dinámica de datos y el streaming.
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // sin error
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+También puedes hacer esto en tu layout raíz o usar `loading.tsx`.
+
+Esto asegura que el esqueleto de tu aplicación permanezca instantáneo. Puedes seguir agregando más datos dentro de tu página, sabiendo que todo será dinámico por defecto. Nada se almacena en caché por defecto. No más cachés ocultas.
+
+[Estático](#estático)
+---------------------
+
+Si estás construyendo algo estático y no quieres usar funcionalidad dinámica, puedes usar la nueva directiva `use cache`.
+
+```tsx filename="app/page.tsx"
+"use cache"
+ 
+export default async function Page() {
+  return fetch(...) // sin error
+}
+```
+
+Al marcar la página con `use cache`, estás indicando que todo el segmento debe almacenarse en caché. Esto significa que cualquier dato que obtengas ahora puede almacenarse en caché, permitiendo que la página se renderice estáticamente. No se usa ningún límite `<Suspense>` para contenido estático. Puedes agregar más datos a la página, y todo se almacenará en caché.
+
+[Parcial](#parcial)
+-------------------
+
+También puedes mezclar y combinar. Por ejemplo, puedes poner `use cache` en tu layout raíz para asegurarte de que se almacene en caché. Cada layout o página puede almacenarse en caché de forma independiente.
+
+```tsx filename="app/layout.tsx"
+"use cache"
+ 
+export default async function Layout({ children }) {
+  const response = await fetch(...)
+  const data = await response.json()
+  return <html>
+    <body>
+      <div>{data.notice}</div>
+      {children}
+    </body>
+  </html>
+}
+```
+
+Mientras usas datos dinámicos dentro de una página específica:
+
+```tsx filename="app/page.tsx"
+import { Suspense } from 'react'
+async function Component() {
+  return fetch(...) // sin error
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+[Funciones en caché](#funciones-en-caché)
+----------------------------------------
+
+Cuando usas un enfoque híbrido como este, puede ser más conveniente agregar el almacenamiento en caché más cerca de las llamadas a la API.
+
+Puedes agregar `use cache` a cualquier función asíncrona, al igual que `use server`. Piensa en ello como una Server Action, pero en lugar de llamar a un servidor, estás llamando a una caché. Admite los mismos tipos ricos de argumentos y valores de retorno más allá de solo JSON. La clave de caché incluye automáticamente cualquier argumento y cierres, por lo que no necesitas especificar una clave de caché manualmente.
+
+```tsx filename="app/layout.tsx"
+async function getNotice() {
+  "use cache"
+  const response = await fetch(...)
+  const data = await response.json()
+  return data.notice;
+}
+ 
+export default async function Layout({ children }) {
+  return <html>
+    <body>
+      <h1>{await getNotice()}</h1>
+      {children}
+    </body>
+  </html>
+}
+```
+
+Como no se usaron otros datos en este layout, puede permanecer estático. Un beneficio de este enfoque es que si accidentalmente agregas nuevos datos dinámicos al layout, se activará un error durante la compilación, obligándote a tomar una nueva decisión. Si agregas `use cache` a todo el layout, se almacenará en caché sin error. El enfoque que elijas dependerá de tu caso de uso.
+
+[Etiquetado de caché](#etiquetado-de-caché)
+-------------------------------------------
+
+Si deseas borrar explícitamente una entrada de caché por etiqueta, puedes usar la nueva API `cacheTag()` dentro de la función `use cache`.
+
+```ts filename="app/utils.ts"
+import { cacheTag } from 'next/cache';
+ 
+async function getNotice() {
+  'use cache';
+  cacheTag('my-tag');
+}
+```
+
+Luego, simplemente llama a `revalidateTag('my-tag')` desde una Server Action como antes.
+
+Como esta API se puede llamar después de la carga de datos, ahora puedes usar datos para etiquetar tus entradas de caché.
+
+```ts filename="app/actions.ts"
+import { unstable_cacheTag as cacheTag } from 'next/cache';
+ 
+async function getBlogPosts(page) {
+  'use cache';
+  const posts = await fetchPosts(page);
+  for (let post of posts) {
+    cacheTag('blog-post-' + post.id);
+  }
+  return posts;
+}
+```
+
+[Definiendo la vida útil de una caché](#definiendo-la-vida-útil-de-una-caché)
+----------------------------------------------------------------------------
+
+Si deseas controlar cuánto tiempo debe vivir una entrada o página particular en la caché, puedes usar la API `cacheLife()`:
+
+```tsx filename="app/page.tsx"
+"use cache"
+import { unstable_cacheLife as cacheLife } from 'next/cache'
+ 
+export default async function Page() {
+  cacheLife("minutes")
+  return ...
+}
+```
+
+Por defecto, acepta los siguientes valores:
+
+*   `"seconds"` (segundos)
+*   `"minutes"` (minutos)
+*   `"hours"` (horas)
+*   `"days"` (días)
+*   `"weeks"` (semanas)
+*   `"max"` (máximo)
+
+Elige un rango aproximado que mejor se adapte a tu caso de uso. No es necesario especificar un número exacto y calcular cuántos segundos (¿o eran milisegundos?) hay en una semana. Sin embargo, también puedes especificar valores específicos o configurar tus propios perfiles de caché con nombre.
+
+Además de `revalidate`, esta API puede controlar el tiempo `stale` de la caché del cliente, así como `expire`, que dicta cuándo debe expirar una página si no ha tenido mucho tráfico durante un tiempo.
+
+[Experimental](#experimental)
+----------------------------
+
+Esto sigue siendo un proyecto muy experimental. No está listo para producción y todavía tiene funciones faltantes y errores. En particular, sabemos que necesitamos mejorar los stacks de errores para este nuevo tipo de error. Sin embargo, si te sientes aventurero, nos encantaría recibir tus comentarios tempranos.
+
+Publicaremos una ruta de actualización más detallada. Aparte de los primeros errores, el principal cambio disruptivo aquí es deshacer el almacenamiento en caché predeterminado de `fetch()`. Dicho esto, recomendamos experimentar solo en proyectos nuevos en esta etapa experimental temprana. Si funciona bien, esperamos enviar una versión opcional en una versión menor y hacerla predeterminada en una futura versión mayor.
+
+Para probarlo, debes estar en la versión `canary` de Next.js:
+
+```
+npx create-next-app@canary
+```
+
+También debes habilitar la bandera experimental dynamicIO en `next.config.ts`:
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  experimental: {
+    dynamicIO: true,
+  }
+};
+ 
+export default nextConfig;
+```
+
+Lee más sobre [`use cache`](/docs/canary/app/api-reference/directives/use-cache), [`cacheLife`](/docs/canary/app/api-reference/next-config-js/cacheLife) y [`cacheTag`](/docs/canary/app/api-reference/functions/cacheTag) en nuestra documentación.
