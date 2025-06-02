@@ -1,0 +1,1653 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:10:24.280Z
+title: كيفية تنفيذ المصادقة في Next.js
+nav_title: المصادقة
+description: تعلم كيفية تنفيذ المصادقة في تطبيق Next.js الخاص بك.
+---
+
+فهم المصادقة أمر بالغ الأهمية لحماية بيانات تطبيقك. سيرشدك هذه الصفحة إلى ميزات React وNext.js التي يمكن استخدامها لتنفيذ المصادقة.
+
+قبل البدء، من المفيد تقسيم العملية إلى ثلاثة مفاهيم:
+
+1. **[المصادقة (Authentication)](#authentication)**: التحقق مما إذا كان المستخدم هو من يدعي أنه هو. يتطلب من المستخدم إثبات هويته بشيء يمتلكه، مثل اسم المستخدم وكلمة المرور.
+2. **[إدارة الجلسة (Session Management)](#session-management)**: تتبع حالة مصادقة المستخدم عبر الطلبات.
+3. **[الترخيص (Authorization)](#authorization)**: تحديد المسارات والبيانات التي يمكن للمستخدم الوصول إليها.
+
+يُظهر هذا الرسم البياني تدفق المصادقة باستخدام ميزات React وNext.js:
+
+<Image
+  alt="رسم بياني يوضح تدفق المصادقة باستخدام ميزات React وNext.js"
+  srcLight="/docs/light/authentication-overview.png"
+  srcDark="/docs/dark/authentication-overview.png"
+  width="1600"
+  height="1383"
+/>
+
+تقدم الأمثلة في هذه الصفحة شرحًا للمصادقة الأساسية باستخدام اسم المستخدم وكلمة المرور لأغراض تعليمية. بينما يمكنك تنفيذ حل مصادقة مخصص، إلا أنه لزيادة الأمان والبساطة، نوصي باستخدام مكتبة مصادقة. توفر هذه المكتبات حلولًا مدمجة للمصادقة وإدارة الجلسات والترخيص، بالإضافة إلى ميزات إضافية مثل تسجيلات الدخول الاجتماعية والمصادقة متعددة العوامل والتحكم في الوصول بناءً على الأدوار. يمكنك العثور على قائمة في قسم [مكتبات المصادقة (Auth Libraries)](#auth-libraries).
+
+## المصادقة
+
+<AppOnly>
+
+### وظائف التسجيل وتسجيل الدخول
+
+يمكنك استخدام عنصر [`<form>`](https://react.dev/reference/react-dom/components/form) مع [إجراءات الخادم (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) في React و`useActionState` لالتقاط بيانات اعتماد المستخدم، والتحقق من صحة حقول النموذج، واستدعاء API أو قاعدة بيانات موفر المصادقة الخاص بك.
+
+نظرًا لأن إجراءات الخادم تعمل دائمًا على الخادم، فإنها توفر بيئة آمنة للتعامل مع منطق المصادقة.
+
+فيما يلي الخطوات لتنفيذ وظائف التسجيل/تسجيل الدخول:
+
+#### 1. التقاط بيانات اعتماد المستخدم
+
+للتقاط بيانات اعتماد المستخدم، أنشئ نموذجًا يستدعي إجراء خادم عند الإرسال. على سبيل المثال، نموذج تسجيل يقبل اسم المستخدم والبريد الإلكتروني وكلمة المرور:
+
+```tsx filename="app/ui/signup-form.tsx" switcher
+import { signup } from '@/app/actions/auth'
+
+export function SignupForm() {
+  return (
+    <form action={signup}>
+      <div>
+        <label htmlFor="name">Name</label>
+        <input id="name" name="name" placeholder="Name" />
+      </div>
+      <div>
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="Email" />
+      </div>
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      <button type="submit">Sign Up</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup-form.js" switcher
+import { signup } from '@/app/actions/auth'
+
+export function SignupForm() {
+  return (
+    <form action={signup}>
+      <div>
+        <label htmlFor="name">Name</label>
+        <input id="name" name="name" placeholder="Name" />
+      </div>
+      <div>
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="Email" />
+      </div>
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      <button type="submit">Sign Up</button>
+    </form>
+  )
+}
+```
+
+```tsx filename="app/actions/auth.ts" switcher
+export async function signup(formData: FormData) {}
+```
+
+```jsx filename="app/actions/auth.js" switcher
+export async function signup(formData) {}
+```
+
+#### 2. التحقق من صحة حقول النموذج على الخادم
+
+استخدم إجراء الخادم للتحقق من صحة حقول النموذج على الخادم. إذا لم يوفر موفر المصادقة الخاص بك التحقق من صحة النموذج، يمكنك استخدام مكتبة تحقق من المخطط مثل [Zod](https://zod.dev/) أو [Yup](https://github.com/jquense/yup).
+
+باستخدام Zod كمثال، يمكنك تعريف مخطط نموذج مع رسائل خطأ مناسبة:
+
+```ts filename="app/lib/definitions.ts" switcher
+import { z } from 'zod'
+
+export const SignupFormSchema = z.object({
+  name: z
+    .string()
+    .min(2, { message: 'Name must be at least 2 characters long.' })
+    .trim(),
+  email: z.string().email({ message: 'Please enter a valid email.' }).trim(),
+  password: z
+    .string()
+    .min(8, { message: 'Be at least 8 characters long' })
+    .regex(/[a-zA-Z]/, { message: 'Contain at least one letter.' })
+    .regex(/[0-9]/, { message: 'Contain at least one number.' })
+    .regex(/[^a-zA-Z0-9]/, {
+      message: 'Contain at least one special character.',
+    })
+    .trim(),
+})
+
+export type FormState =
+  | {
+      errors?: {
+        name?: string[]
+        email?: string[]
+        password?: string[]
+      }
+      message?: string
+    }
+  | undefined
+```
+
+```js filename="app/lib/definitions.js" switcher
+import { z } from 'zod'
+
+export const SignupFormSchema = z.object({
+  name: z
+    .string()
+    .min(2, { message: 'Name must be at least 2 characters long.' })
+    .trim(),
+  email: z.string().email({ message: 'Please enter a valid email.' }).trim(),
+  password: z
+    .string()
+    .min(8, { message: 'Be at least 8 characters long' })
+    .regex(/[a-zA-Z]/, { message: 'Contain at least one letter.' })
+    .regex(/[0-9]/, { message: 'Contain at least one number.' })
+    .regex(/[^a-zA-Z0-9]/, {
+      message: 'Contain at least one special character.',
+    })
+    .trim(),
+})
+```
+
+لمنع استدعاءات غير ضرورية لـ API أو قاعدة بيانات موفر المصادقة الخاص بك، يمكنك `إرجاع` مبكرًا في إجراء الخادم إذا كانت أي حقول نموذج لا تتطابق مع المخطط المحدد.
+
+```ts filename="app/actions/auth.ts" switcher
+import { SignupFormSchema, FormState } from '@/app/lib/definitions'
+
+export async function signup(state: FormState, formData: FormData) {
+  // Validate form fields
+  const validatedFields = SignupFormSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+  })
+
+  // If any form fields are invalid, return early
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // Call the provider or db to create a user...
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { SignupFormSchema } from '@/app/lib/definitions'
+
+export async function signup(state, formData) {
+  // Validate form fields
+  const validatedFields = SignupFormSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+  })
+
+  // If any form fields are invalid, return early
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // Call the provider or db to create a user...
+}
+```
+
+بالعودة إلى `<SignupForm />` الخاص بك، يمكنك استخدام خطاف React `useActionState` لعرض أخطاء التحقق أثناء إرسال النموذج:
+
+```tsx filename="app/ui/signup-form.tsx" switcher highlight={7,15,21,27-36}
+'use client'
+
+import { signup } from '@/app/actions/auth'
+import { useActionState } from 'react'
+
+export default function SignupForm() {
+  const [state, action, pending] = useActionState(signup, undefined)
+
+  return (
+    <form action={action}>
+      <div>
+        <label htmlFor="name">Name</label>
+        <input id="name" name="name" placeholder="Name" />
+      </div>
+      {state?.errors?.name && <p>{state.errors.name}</p>}
+
+      <div>
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" placeholder="Email" />
+      </div>
+      {state?.errors?.email && <p>{state.errors.email}</p>}
+
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      {state?.errors?.password && (
+        <div>
+          <p>Password must:</p>
+          <ul>
+            {state.errors.password.map((error) => (
+              <li key={error}>- {error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button disabled={pending} type="submit">
+        Sign Up
+      </button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup-form.js" switcher highlight={7,15,21,27-36}
+'use client'
+
+import { signup } from '@/app/actions/auth'
+import { useActionState } from 'react'
+
+export default function SignupForm() {
+  const [state, action, pending] = useActionState(signup, undefined)
+
+  return (
+    <form action={action}>
+      <div>
+        <label htmlFor="name">Name</label>
+        <input id="name" name="name" placeholder="Name" />
+      </div>
+      {state?.errors?.name && <p>{state.errors.name}</p>}
+
+      <div>
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" placeholder="Email" />
+      </div>
+      {state?.errors?.email && <p>{state.errors.email}</p>}
+
+      <div>
+        <label htmlFor="password">Password</label>
+        <input id="password" name="password" type="password" />
+      </div>
+      {state?.errors?.password && (
+        <div>
+          <p>Password must:</p>
+          <ul>
+            {state.errors.password.map((error) => (
+              <li key={error}>- {error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button disabled={pending} type="submit">
+        Sign Up
+      </button>
+    </form>
+  )
+}
+```
+
+> **جيد أن تعرف:**
+>
+> - في React 19، يتضمن `useFormStatus` مفاتيح إضافية على الكائن المعاد، مثل data وmethod وaction. إذا كنت لا تستخدم React 19، فإن مفتاح `pending` فقط هو المتاح.
+> - قبل تعديل البيانات، يجب عليك دائمًا التأكد من أن المستخدم مخول أيضًا لتنفيذ الإجراء. راجع [المصادقة والترخيص (Authentication and Authorization)](#authorization).
+
+#### 3. إنشاء مستخدم أو التحقق من بيانات الاعتماد
+
+بعد التحقق من صحة حقول النموذج، يمكنك إنشاء حساب مستخدم جديد أو التحقق من وجود المستخدم عن طريق استدعاء واجهة برمجة التطبيقات (API) أو قاعدة البيانات الخاصة بمزود المصادقة.
+
+استكمالًا للمثال السابق:
+
+```tsx filename="app/actions/auth.tsx" switcher
+export async function signup(state: FormState, formData: FormData) {
+  // 1. التحقق من صحة حقول النموذج
+  // ...
+
+  // 2. تحضير البيانات للإدراج في قاعدة البيانات
+  const { name, email, password } = validatedFields.data
+  // على سبيل المثال: تشفير كلمة مرور المستخدم قبل تخزينها
+  const hashedPassword = await bcrypt.hash(password, 10)
+
+  // 3. إدراج المستخدم في قاعدة البيانات أو استدعاء واجهة برمجة التطبيقات لمكتبة المصادقة
+  const data = await db
+    .insert(users)
+    .values({
+      name,
+      email,
+      password: hashedPassword,
+    })
+    .returning({ id: users.id })
+
+  const user = data[0]
+
+  if (!user) {
+    return {
+      message: 'حدث خطأ أثناء إنشاء حسابك.',
+    }
+  }
+
+  // TODO:
+  // 4. إنشاء جلسة المستخدم
+  // 5. إعادة توجيه المستخدم
+}
+```
+
+```jsx filename="app/actions/auth.js" switcher
+export async function signup(state, formData) {
+  // 1. التحقق من صحة حقول النموذج
+  // ...
+
+  // 2. تحضير البيانات للإدراج في قاعدة البيانات
+  const { name, email, password } = validatedFields.data
+  // على سبيل المثال: تشفير كلمة مرور المستخدم قبل تخزينها
+  const hashedPassword = await bcrypt.hash(password, 10)
+
+  // 3. إدراج المستخدم في قاعدة البيانات أو استدعاء واجهة برمجة التطبيقات لمكتبة المصادقة
+  const data = await db
+    .insert(users)
+    .values({
+      name,
+      email,
+      password: hashedPassword,
+    })
+    .returning({ id: users.id })
+
+  const user = data[0]
+
+  if (!user) {
+    return {
+      message: 'حدث خطأ أثناء إنشاء حسابك.',
+    }
+  }
+
+  // TODO:
+  // 4. إنشاء جلسة المستخدم
+  // 5. إعادة توجيه المستخدم
+}
+```
+
+بعد إنشاء حساب المستخدم بنجاح أو التحقق من بيانات الاعتماد، يمكنك إنشاء جلسة لإدارة حالة المصادقة للمستخدم. اعتمادًا على استراتيجية إدارة الجلسات، يمكن تخزين الجلسة في ملف تعريف الارتباط (cookie) أو قاعدة البيانات، أو كليهما. انتقل إلى قسم [إدارة الجلسات](#session-management) لمعرفة المزيد.
+
+> **نصائح:**
+>
+> - المثال أعلاه مفصل لأنه يفصل خطوات المصادقة لأغراض تعليمية. هذا يسلط الضوء على أن تنفيذ حل آمن خاص بك يمكن أن يصبح معقدًا بسرعة. فكر في استخدام [مكتبة مصادقة](#auth-libraries) لتبسيط العملية.
+> - لتحسين تجربة المستخدم، قد ترغب في التحقق من تكرار البريد الإلكتروني أو اسم المستخدم في وقت مبكر من عملية التسجيل. على سبيل المثال، أثناء كتابة المستخدم لاسم المستخدم أو عند فقدان حقل الإدخال للتركيز. يمكن أن يساعد ذلك في منع عمليات إرسال النماذج غير الضرورية وتقديم ملاحظات فورية للمستخدم. يمكنك التحكم في تكرار هذه الفحوصات باستخدام مكتبات مثل [use-debounce](https://www.npmjs.com/package/use-debounce).
+
+</AppOnly>
+
+<PagesOnly>
+
+إليك خطوات تنفيذ نموذج تسجيل و/أو تسجيل الدخول:
+
+1. يقدم المستخدم بيانات الاعتماد الخاصة به من خلال نموذج.
+2. يرسل النموذج طلبًا يتم معالجته بواسطة مسار API.
+3. عند التحقق الناجح، تكتمل العملية، مما يشير إلى نجاح مصادقة المستخدم.
+4. إذا فشل التحقق، يتم عرض رسالة خطأ.
+
+فكر في نموذج تسجيل دخول حيث يمكن للمستخدمين إدخال بيانات الاعتماد الخاصة بهم:
+
+```tsx filename="pages/login.tsx" switcher
+import { FormEvent } from 'react'
+import { useRouter } from 'next/router'
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (response.ok) {
+      router.push('/profile')
+    } else {
+      // معالجة الأخطاء
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Password" required />
+      <button type="submit">Login</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="pages/login.jsx" switcher
+import { FormEvent } from 'react'
+import { useRouter } from 'next/router'
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (response.ok) {
+      router.push('/profile')
+    } else {
+      // معالجة الأخطاء
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Password" required />
+      <button type="submit">Login</button>
+    </form>
+  )
+}
+```
+
+يحتوي النموذج أعلاه على حقلين إدخال لجمع بريد المستخدم الإلكتروني وكلمة المرور. عند الإرسال، يتم تشغيل وظيفة ترسل طلب POST إلى مسار API (`/api/auth/login`).
+
+يمكنك بعد ذلك استدعاء واجهة برمجة التطبيقات لمزود المصادقة في مسار API لمعالجة المصادقة:
+
+```ts filename="pages/api/auth/login.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { signIn } from '@/auth'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    const { email, password } = req.body
+    await signIn('credentials', { email, password })
+
+    res.status(200).json({ success: true })
+  } catch (error) {
+    if (error.type === 'CredentialsSignin') {
+      res.status(401).json({ error: 'بيانات الاعتماد غير صالحة.' })
+    } else {
+      res.status(500).json({ error: 'حدث خطأ ما.' })
+    }
+  }
+}
+```
+
+```js filename="pages/api/auth/login.js" switcher
+import { signIn } from '@/auth'
+
+export default async function handler(req, res) {
+  try {
+    const { email, password } = req.body
+    await signIn('credentials', { email, password })
+
+    res.status(200).json({ success: true })
+  } catch (error) {
+    if (error.type === 'CredentialsSignin') {
+      res.status(401).json({ error: 'بيانات الاعتماد غير صالحة.' })
+    } else {
+      res.status(500).json({ error: 'حدث خطأ ما.' })
+    }
+  }
+}
+```
+
+</PagesOnly>
+
+## إدارة الجلسات
+
+تضمن إدارة الجلسات الحفاظ على حالة المصادقة للمستخدم عبر الطلبات. وتشمل إنشاء الجلسات وتخزينها وتحديثها وحذفها.
+
+هناك نوعان من الجلسات:
+
+1. [**بدون حالة (Stateless)**](#stateless-sessions): يتم تخزين بيانات الجلسة (أو الرمز المميز) في ملفات تعريف الارتباط (cookies) للمتصفح. يتم إرسال ملف تعريف الارتباط مع كل طلب، مما يسمح بالتحقق من الجلسة على الخادم. هذه الطريقة أبسط، ولكنها قد تكون أقل أمانًا إذا لم يتم تنفيذها بشكل صحيح.
+2. [**قاعدة البيانات (Database)**](#database-sessions): يتم تخزين بيانات الجلسة في قاعدة بيانات، مع تلقي متصفح المستخدم فقط لمعرف الجلسة المشفر. هذه الطريقة أكثر أمانًا، ولكنها قد تكون معقدة وتستهلك موارد الخادم.
+
+> **جيد أن تعرف:** بينما يمكنك استخدام أي من الطريقتين، أو كليهما، نوصي باستخدام مكتبة لإدارة الجلسات مثل [iron-session](https://github.com/vvo/iron-session) أو [Jose](https://github.com/panva/jose).
+
+### الجلسات بدون حالة (Stateless)
+
+<AppOnly>
+
+لإنشاء وإدارة الجلسات بدون حالة، هناك بعض الخطوات التي تحتاج إلى اتباعها:
+
+1. إنشاء مفتاح سري، والذي سيستخدم لتوقيع جلسة المستخدم، وتخزينه كـ [متغير بيئة](/docs/app/guides/environment-variables).
+2. كتابة منطق لتشفير/فك تشفير بيانات الجلسة باستخدام مكتبة إدارة الجلسات.
+3. إدارة ملفات تعريف الارتباط باستخدام واجهة برمجة التطبيقات [`cookies`](/docs/app/api-reference/functions/cookies) في Next.js.
+
+بالإضافة إلى ما سبق، فكر في إضافة وظيفة [لتحديث (أو تجديد)](#updating-or-refreshing-sessions) الجلسة عندما يعود المستخدم إلى التطبيق، و[حذف](#deleting-the-session) الجلسة عندما يسجل المستخدم خروجًا.
+
+> **جيد أن تعرف:** تحقق مما إذا كانت [مكتبة المصادقة](#auth-libraries) الخاصة بك تتضمن إدارة الجلسات.
+
+#### 1. إنشاء مفتاح سري
+
+هناك عدة طرق يمكنك من خلالها إنشاء مفتاح سري لتوقيع جلسة المستخدم. على سبيل المثال، يمكنك استخدام أمر `openssl` في طرفيتك:
+
+```bash filename="terminal"
+openssl rand -base64 32
+```
+
+ينشئ هذا الأمر سلسلة عشوائية مكونة من 32 حرفًا يمكنك استخدامها كمفتاح سري وتخزينها في [ملف متغيرات البيئة](/docs/app/guides/environment-variables):
+
+```bash filename=".env"
+SESSION_SECRET=your_secret_key
+```
+
+يمكنك بعد ذلك الرجوع إلى هذا المفتاح في منطق إدارة الجلسات:
+
+```js filename="app/lib/session.js"
+const secretKey = process.env.SESSION_SECRET
+```
+
+#### 2. تشفير وفك تشفير الجلسات
+
+بعد ذلك، يمكنك استخدام [مكتبة إدارة الجلسات](#session-management-libraries) المفضلة لديك لتشفير وفك تشفير الجلسات. متابعة للمثال السابق، سنستخدم [Jose](https://www.npmjs.com/package/jose) (متوافق مع [Edge Runtime](/docs/app/api-reference/edge)) وحزمة [`server-only`](https://www.npmjs.com/package/server-only) من React لضمان تنفيذ منطق إدارة الجلسات على الخادم فقط.
+
+```tsx filename="app/lib/session.ts" switcher
+import 'server-only'
+import { SignJWT, jwtVerify } from 'jose'
+import { SessionPayload } from '@/app/lib/definitions'
+
+const secretKey = process.env.SESSION_SECRET
+const encodedKey = new TextEncoder().encode(secretKey)
+
+export async function encrypt(payload: SessionPayload) {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(encodedKey)
+}
+
+export async function decrypt(session: string | undefined = '') {
+  try {
+    const { payload } = await jwtVerify(session, encodedKey, {
+      algorithms: ['HS256'],
+    })
+    return payload
+  } catch (error) {
+    console.log('فشل التحقق من الجلسة')
+  }
+}
+```
+
+```jsx filename="app/lib/session.js" switcher
+import 'server-only'
+import { SignJWT, jwtVerify } from 'jose'
+
+const secretKey = process.env.SESSION_SECRET
+const encodedKey = new TextEncoder().encode(secretKey)
+
+export async function encrypt(payload) {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(encodedKey)
+}
+
+export async function decrypt(session) {
+  try {
+    const { payload } = await jwtVerify(session, encodedKey, {
+      algorithms: ['HS256'],
+    })
+    return payload
+  } catch (error) {
+    console.log('فشل التحقق من الجلسة')
+  }
+}
+```
+
+> **نصائح**:
+>
+> - يجب أن يحتوي الحمولة (payload) على **الحد الأدنى** من بيانات المستخدم الفريدة التي سيتم استخدامها في الطلبات اللاحقة، مثل معرف المستخدم، الدور، إلخ. لا يجب أن تحتوي على معلومات شخصية مثل رقم الهاتف، عنوان البريد الإلكتروني، معلومات بطاقة الائتمان، إلخ، أو بيانات حساسة مثل كلمات المرور.
+
+#### 3. تعيين ملفات تعريف الارتباط (خيارات موصى بها)
+
+لتخزين الجلسة في ملف تعريف الارتباط، استخدم واجهة برمجة التطبيقات [`cookies`](/docs/app/api-reference/functions/cookies) في Next.js. يجب تعيين ملف تعريف الارتباط على الخادم، ويتضمن الخيارات الموصى بها:
+
+- **HttpOnly**: يمنع JavaScript من الوصول إلى ملف تعريف الارتباط من جانب العميل.
+- **Secure**: استخدم https لإرسال ملف تعريف الارتباط.
+- **SameSite**: حدد ما إذا كان يمكن إرسال ملف تعريف الارتباط مع طلبات Cross-site.
+- **Max-Age أو Expires**: احذف ملف تعريف الارتباط بعد فترة معينة.
+- **Path**: حدد مسار URL لملف تعريف الارتباط.
+
+يرجى الرجوع إلى [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies) لمزيد من المعلومات حول كل من هذه الخيارات.
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function createSession(userId: string) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const session = await encrypt({ userId, expiresAt })
+  const cookieStore = await cookies()
+
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function createSession(userId) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const session = await encrypt({ userId, expiresAt })
+  const cookieStore = await cookies()
+
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+بالعودة إلى وظيفة الخادم (Server Action)، يمكنك استدعاء وظيفة `createSession()`، واستخدام واجهة برمجة التطبيقات [`redirect()`](/docs/app/guides/redirecting) لإعادة توجيه المستخدم إلى الصفحة المناسبة:
+
+```ts filename="app/actions/auth.ts" switcher
+import { createSession } from '@/app/lib/session'
+
+export async function signup(state: FormState, formData: FormData) {
+  // الخطوات السابقة:
+  // 1. التحقق من صحة حقول النموذج
+  // 2. تحضير البيانات للإدراج في قاعدة البيانات
+  // 3. إدراج المستخدم في قاعدة البيانات أو استدعاء واجهة برمجة التطبيقات لمكتبة المصادقة
+
+  // الخطوات الحالية:
+  // 4. إنشاء جلسة المستخدم
+  await createSession(user.id)
+  // 5. إعادة توجيه المستخدم
+  redirect('/profile')
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { createSession } from '@/app/lib/session'
+
+export async function signup(state, formData) {
+  // الخطوات السابقة:
+  // 1. التحقق من صحة حقول النموذج
+  // 2. تحضير البيانات للإدراج في قاعدة البيانات
+  // 3. إدراج المستخدم في قاعدة البيانات أو استدعاء واجهة برمجة التطبيقات لمكتبة المصادقة
+
+  // الخطوات الحالية:
+  // 4. إنشاء جلسة المستخدم
+  await createSession(user.id)
+  // 5. إعادة توجيه المستخدم
+  redirect('/profile')
+}
+```
+
+> **نصائح**:
+>
+> - **يجب تعيين ملفات تعريف الارتباط على الخادم** لمنع العبث بها من جانب العميل.
+> - 🎥 شاهد: تعلم المزيد عن الجلسات بدون حالة والمصادقة مع Next.js → [YouTube (11 دقيقة)](https://www.youtube.com/watch?v=DJvM2lSPn6w).
+
+#### تحديث (أو تجديد) الجلسات
+
+يمكنك أيضًا تمديد وقت انتهاء صلاحية الجلسة. هذا مفيد لإبقاء المستخدم مسجل الدخول بعد عودته إلى التطبيق. على سبيل المثال:
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export async function updateSession() {
+  const session = (await cookies()).get('session')?.value
+  const payload = await decrypt(session)
+
+  if (!session || !payload) {
+    return null
+  }
+
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expires,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export async function updateSession() {
+  const session = (await cookies()).get('session')?.value
+  const payload = await decrypt(session)
+
+  if (!session || !payload) {
+    return null
+  }
+
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)(
+    await cookies()
+  ).set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expires,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+> **نصيحة:** تحقق مما إذا كانت مكتبة المصادقة الخاصة بك تدعم رموز التحديث (refresh tokens)، والتي يمكن استخدامها لتمديد جلسة المستخدم.
+
+#### حذف الجلسة
+
+لحذف الجلسة، يمكنك حذف ملف تعريف الارتباط (cookie):
+
+```ts filename="app/lib/session.ts" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function deleteSession() {
+  const cookieStore = await cookies()
+  cookieStore.delete('session')
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import 'server-only'
+import { cookies } from 'next/headers'
+
+export async function deleteSession() {
+  const cookieStore = await cookies()
+  cookieStore.delete('session')
+}
+```
+
+ثم يمكنك إعادة استخدام دالة `deleteSession()` في تطبيقك، على سبيل المثال عند تسجيل الخروج:
+
+```ts filename="app/actions/auth.ts" switcher
+import { cookies } from 'next/headers'
+import { deleteSession } from '@/app/lib/session'
+
+export async function logout() {
+  await deleteSession()
+  redirect('/login')
+}
+```
+
+```js filename="app/actions/auth.js" switcher
+import { cookies } from 'next/headers'
+import { deleteSession } from '@/app/lib/session'
+
+export async function logout() {
+  await deleteSession()
+  redirect('/login')
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+#### تعيين وحذف ملفات تعريف الارتباط
+
+يمكنك استخدام [مسارات API](/docs/pages/building-your-application/routing/api-routes) لتعيين الجلسة كملف تعريف ارتباط على الخادم:
+
+```ts filename="pages/api/login.ts" switcher
+import { serialize } from 'cookie'
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { encrypt } from '@/app/lib/session'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const sessionData = req.body
+  const encryptedSessionData = encrypt(sessionData)
+
+  const cookie = serialize('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // أسبوع واحد
+    path: '/',
+  })
+  res.setHeader('Set-Cookie', cookie)
+  res.status(200).json({ message: 'تم تعيين ملف تعريف الارتباط بنجاح!' })
+}
+```
+
+```js filename="pages/api/login.js" switcher
+import { serialize } from 'cookie'
+import { encrypt } from '@/app/lib/session'
+
+export default function handler(req, res) {
+  const sessionData = req.body
+  const encryptedSessionData = encrypt(sessionData)
+
+  const cookie = serialize('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // أسبوع واحد
+    path: '/',
+  })
+  res.setHeader('Set-Cookie', cookie)
+  res.status(200).json({ message: 'تم تعيين ملف تعريف الارتباط بنجاح!' })
+}
+```
+
+</PagesOnly>
+
+### جلسات قاعدة البيانات
+
+لإنشاء وإدارة جلسات قاعدة البيانات، ستحتاج إلى اتباع هذه الخطوات:
+
+1. إنشاء جدول في قاعدة البيانات لتخزين الجلسة والبيانات (أو التحقق مما إذا كانت مكتبة المصادقة الخاصة بك تتعامل مع هذا).
+2. تنفيذ وظائف لإدراج وتحديث وحذف الجلسات
+3. تشفير معرف الجلسة قبل تخزينه في متصفح المستخدم، والتأكد من تزامن قاعدة البيانات وملف تعريف الارتباط (هذا اختياري، ولكنه موصى به للتحقق المتفائل في [الوسيطة](#optimistic-checks-with-middleware-optional)).
+
+<AppOnly>
+
+على سبيل المثال:
+
+```ts filename="app/lib/session.ts" switcher
+import cookies from 'next/headers'
+import { db } from '@/app/lib/db'
+import { encrypt } from '@/app/lib/session'
+
+export async function createSession(id: number) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  // 1. إنشاء جلسة في قاعدة البيانات
+  const data = await db
+    .insert(sessions)
+    .values({
+      userId: id,
+      expiresAt,
+    })
+    // إرجاع معرف الجلسة
+    .returning({ id: sessions.id })
+
+  const sessionId = data[0].id
+
+  // 2. تشفير معرف الجلسة
+  const session = await encrypt({ sessionId, expiresAt })
+
+  // 3. تخزين الجلسة في ملفات تعريف الارتباط للتحقق المتفائل من المصادقة
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+```js filename="app/lib/session.js" switcher
+import cookies from 'next/headers'
+import { db } from '@/app/lib/db'
+import { encrypt } from '@/app/lib/session'
+
+export async function createSession(id) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  // 1. إنشاء جلسة في قاعدة البيانات
+  const data = await db
+    .insert(sessions)
+    .values({
+      userId: id,
+      expiresAt,
+    })
+    // إرجاع معرف الجلسة
+    .returning({ id: sessions.id })
+
+  const sessionId = data[0].id
+
+  // 2. تشفير معرف الجلسة
+  const session = await encrypt({ sessionId, expiresAt })
+
+  // 3. تخزين الجلسة في ملفات تعريف الارتباط للتحقق المتفائل من المصادقة
+  const cookieStore = await cookies()
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: true,
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+```
+
+> **نصائح**:
+>
+> - للوصول الأسرع، يمكنك النظر في إضافة تخزين مؤقت على الخادم لمدة حياة الجلسة. يمكنك أيضًا الاحتفاظ ببيانات الجلسة في قاعدة البيانات الأساسية الخاصة بك، وجمع طلبات البيانات لتقليل عدد الاستعلامات.
+> - يمكنك اختيار استخدام جلسات قاعدة البيانات لحالات استخدام أكثر تقدمًا، مثل تتبع آخر مرة قام فيها المستخدم بتسجيل الدخول، أو عدد الأجهزة النشطة، أو منح المستخدمين القدرة على تسجيل الخروج من جميع الأجهزة.
+
+بعد تنفيذ إدارة الجلسات، ستحتاج إلى إضافة منطق التفويض للتحكم فيما يمكن للمستخدمين الوصول إليه والقيام به داخل تطبيقك. تابع إلى قسم [التفويض](#authorization) لمعرفة المزيد.
+
+</AppOnly>
+
+<PagesOnly>
+
+**إنشاء جلسة على الخادم**:
+
+```ts filename="pages/api/create-session.ts" switcher
+import db from '../../lib/db'
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    const user = req.body
+    const sessionId = generateSessionId()
+    await db.insertSession({
+      sessionId,
+      userId: user.id,
+      createdAt: new Date(),
+    })
+
+    res.status(200).json({ sessionId })
+  } catch (error) {
+    res.status(500).json({ error: 'خطأ في الخادم الداخلي' })
+  }
+}
+```
+
+```js filename="pages/api/create-session.js" switcher
+import db from '../../lib/db'
+
+export default async function handler(req, res) {
+  try {
+    const user = req.body
+    const sessionId = generateSessionId()
+    await db.insertSession({
+      sessionId,
+      userId: user.id,
+      createdAt: new Date(),
+    })
+
+    res.status(200).json({ sessionId })
+  } catch (error) {
+    res.status(500).json({ error: 'خطأ في الخادم الداخلي' })
+  }
+}
+```
+
+</PagesOnly>
+
+## التفويض
+
+بعد مصادقة المستخدم وإنشاء جلسة، يمكنك تنفيذ التفويض للتحكم فيما يمكن للمستخدم الوصول إليه والقيام به داخل تطبيقك.
+
+هناك نوعان رئيسيان من عمليات التحقق من التفويض:
+
+1. **المتفائل**: يتحقق مما إذا كان المستخدم مخولًا للوصول إلى مسار أو تنفيذ إجراء باستخدام بيانات الجلسة المخزنة في ملف تعريف الارتباط. هذه الفحوصات مفيدة للعمليات السريعة، مثل إظهار/إخفاء عناصر واجهة المستخدم أو إعادة توجيه المستخدمين بناءً على الأذونات أو الأدوار.
+2. **الآمن**: يتحقق مما إذا كان المستخدم مخولًا للوصول إلى مسار أو تنفيذ إجراء باستخدام بيانات الجلسة المخزنة في قاعدة البيانات. هذه الفحوصات أكثر أمانًا وتستخدم للعمليات التي تتطلب الوصول إلى بيانات حساسة أو إجراءات.
+
+لكلا الحالتين، نوصي بـ:
+
+- إنشاء [طبقة وصول البيانات](#creating-a-data-access-layer-dal) لمركزية منطق التفويض الخاص بك
+- استخدام [كائنات نقل البيانات (DTO)](#using-data-transfer-objects-dto) لإرجاع البيانات الضرورية فقط
+- استخدام [الوسيطة](#optimistic-checks-with-middleware-optional) اختياريًا لإجراء فحوصات متفائلة.
+
+### فحوصات متفائلة مع الوسيطة (اختياري)
+
+هناك بعض الحالات التي قد ترغب فيها في استخدام [الوسيطة](/docs/app/building-your-application/routing/middleware) وإعادة توجيه المستخدمين بناءً على الأذونات:
+
+- لإجراء فحوصات متفائلة. نظرًا لأن الوسيطة تعمل في كل مسار، فهي طريقة جيدة لمركزية منطق إعادة التوجيه وتصفية مسبقة للمستخدمين غير المصرح لهم.
+- لحماية المسارات الثابتة التي تشارك البيانات بين المستخدمين (مثل المحتوى خلف جدار الدفع).
+
+ومع ذلك، نظرًا لأن الوسيطة تعمل في كل مسار، بما في ذلك المسارات [المحملة مسبقًا](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching)، من المهم قراءة الجلسة فقط من ملف تعريف الارتباط (فحوصات متفائلة)، وتجنب فحوصات قاعدة البيانات لمنع مشكلات الأداء.
+
+على سبيل المثال:
+
+```tsx filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+import { decrypt } from '@/app/lib/session'
+import { cookies } from 'next/headers'
+
+// 1. تحديد المسارات المحمية والعامة
+const protectedRoutes = ['/dashboard']
+const publicRoutes = ['/login', '/signup', '/']
+
+export default async function middleware(req: NextRequest) {
+  // 2. التحقق مما إذا كان المسار الحالي محميًا أو عامًا
+  const path = req.nextUrl.pathname
+  const isProtectedRoute = protectedRoutes.includes(path)
+  const isPublicRoute = publicRoutes.includes(path)
+
+  // 3. فك تشفير الجلسة من ملف تعريف الارتباط
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  // 4. إعادة التوجيه إلى /login إذا لم يكن المستخدم مصادقًا عليه
+  if (isProtectedRoute && !session?.userId) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl))
+  }
+
+  // 5. إعادة التوجيه إلى /dashboard إذا كان المستخدم مصادقًا عليه
+  if (
+    isPublicRoute &&
+    session?.userId &&
+    !req.nextUrl.pathname.startsWith('/dashboard')
+  ) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
+  }
+
+  return NextResponse.next()
+}
+
+// المسارات التي لا يجب أن تعمل عليها الوسيطة
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { decrypt } from '@/app/lib/session'
+import { cookies } from 'next/headers'
+
+// 1. تحديد المسارات المحمية والعامة
+const protectedRoutes = ['/dashboard']
+const publicRoutes = ['/login', '/signup', '/']
+
+export default async function middleware(req) {
+  // 2. التحقق مما إذا كان المسار الحالي محميًا أو عامًا
+  const path = req.nextUrl.pathname
+  const isProtectedRoute = protectedRoutes.includes(path)
+  const isPublicRoute = publicRoutes.includes(path)
+
+  // 3. فك تشفير الجلسة من ملف تعريف الارتباط
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  // 5. إعادة التوجيه إلى /login إذا لم يكن المستخدم مصادقًا عليه
+  if (isProtectedRoute && !session?.userId) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl))
+  }
+
+  // 6. إعادة التوجيه إلى /dashboard إذا كان المستخدم مصادقًا عليه
+  if (
+    isPublicRoute &&
+    session?.userId &&
+    !req.nextUrl.pathname.startsWith('/dashboard')
+  ) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
+  }
+
+  return NextResponse.next()
+}
+
+// المسارات التي لا يجب أن تعمل عليها الوسيطة
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+}
+```
+
+بينما يمكن أن تكون الوسيطة مفيدة للفحوصات الأولية، لا يجب أن تكون خط دفاعك الوحيد في حماية بياناتك. يجب إجراء معظم فحوصات الأمان بالقرب من مصدر البيانات قدر الإمكان، راجع [طبقة وصول البيانات](#creating-a-data-access-layer-dal) لمزيد من المعلومات.
+
+> **نصائح**:
+>
+> - في الوسيطة، يمكنك أيضًا قراءة ملفات تعريف الارتباط باستخدام `req.cookies.get('session').value`.
+> - تستخدم الوسيطة [وقت تشغيل الحافة (Edge Runtime)](/docs/app/api-reference/edge)، تحقق مما إذا كانت مكتبة المصادقة الخاصة بك ومكتبة إدارة الجلسات متوافقة.
+> - يمكنك استخدام خاصية `matcher` في الوسيطة لتحديد المسارات التي يجب أن تعمل عليها الوسيطة. ومع ذلك، للمصادقة، يوصى بأن تعمل الوسيطة على جميع المسارات.
+
+<AppOnly>
+
+### إنشاء طبقة وصول البيانات (DAL)
+
+نوصي بإنشاء DAL لمركزية طلبات البيانات ومنطق التفويض.
+
+يجب أن تتضمن DAL دالة تتحقق من جلسة المستخدم أثناء تفاعله مع تطبيقك. على الأقل، يجب أن تتحقق الدالة مما إذا كانت الجلسة صالحة، ثم تقوم بإعادة التوجيه أو إرجاع معلومات المستخدم اللازمة لإجراء المزيد من الطلبات.
+
+على سبيل المثال، قم بإنشاء ملف منفصل لـ DAL يتضمن دالة `verifySession()`. ثم استخدم واجهة برمجة التطبيقات [cache](https://react.dev/reference/react/cache) الخاصة بـ React لحفظ القيمة المرجعة للدالة أثناء تمرير عرض React:
+
+```tsx filename="app/lib/dal.ts" switcher
+import 'server-only'
+
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export const verifySession = cache(async () => {
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  if (!session?.userId) {
+    redirect('/login')
+  }
+
+  return { isAuth: true, userId: session.userId }
+})
+```
+
+```js filename="app/lib/dal.js" switcher
+import 'server-only'
+
+import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session'
+
+export const verifySession = cache(async () => {
+  const cookie = (await cookies()).get('session')?.value
+  const session = await decrypt(cookie)
+
+  if (!session.userId) {
+    redirect('/login')
+  }
+
+  return { isAuth: true, userId: session.userId }
+})
+```
+
+يمكنك بعد ذلك استدعاء دالة `verifySession()` في طلبات البيانات، إجراءات الخادم، ومعالجات المسار:
+
+```tsx filename="app/lib/dal.ts" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  try {
+    const data = await db.query.users.findMany({
+      where: eq(users.id, session.userId),
+      // إرجاع الأعمدة التي تحتاجها صراحة بدلاً من كائن المستخدم بالكامل
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    })
+
+    const user = data[0]
+
+    return user
+  } catch (error) {
+    console.log('فشل في جلب المستخدم')
+    return null
+  }
+})
+```
+
+```jsx filename="app/lib/dal.js" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  try {
+    const data = await db.query.users.findMany({
+      where: eq(users.id, session.userId),
+      // إرجاع الأعمدة التي تحتاجها صراحة بدلاً من كائن المستخدم بالكامل
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    })
+
+    const user = data[0]
+
+    return user
+  } catch (error) {
+    console.log('فشل في جلب المستخدم')
+    return null
+  }
+})
+```
+
+> **نصيحة**:
+>
+> - يمكن استخدام DAL لحماية البيانات التي يتم جلبها في وقت الطلب. ومع ذلك، بالنسبة للمسارات الثابتة التي تشارك البيانات بين المستخدمين، سيتم جلب البيانات في وقت البناء وليس في وقت الطلب. استخدم [الوسيطة](#optimistic-checks-with-middleware-optional) لحماية المسارات الثابتة.
+> - بالنسبة للفحوصات الآمنة، يمكنك التحقق مما إذا كانت الجلسة صالحة عن طريق مقارنة معرف الجلسة مع قاعدة البيانات الخاصة بك. استخدم دالة [cache](https://react.dev/reference/react/cache) الخاصة بـ React لتجنب طلبات مكررة غير ضرورية إلى قاعدة البيانات أثناء تمرير العرض.
+> - قد ترغب في توحيد طلبات البيانات ذات الصلة في فئة JavaScript تقوم بتشغيل `verifySession()` قبل أي طرق.
+
+### استخدام كائنات نقل البيانات (DTO)
+
+عند استرجاع البيانات، يُنصح بإرجاع البيانات الضرورية فقط التي سيتم استخدامها في تطبيقك، وليس الكائنات الكاملة. على سبيل المثال، إذا كنت تقوم بجلب بيانات المستخدم، فقد ترجع فقط معرف المستخدم واسمه، بدلاً من كائن المستخدم الكامل الذي قد يحتوي على كلمات المرور وأرقام الهواتف، إلخ.
+
+ومع ذلك، إذا لم يكن لديك تحكم في بنية البيانات المرتجعة، أو كنت تعمل ضمن فريق حيث تريد تجنب تمرير كائنات كاملة إلى العميل، يمكنك استخدام استراتيجيات مثل تحديد الحقول الآمنة للعرض على العميل.
+
+```tsx filename="app/lib/dto.ts" switcher
+import 'server-only'
+import { getUser } from '@/app/lib/dal'
+
+function canSeeUsername(viewer: User) {
+  return true
+}
+
+function canSeePhoneNumber(viewer: User, team: string) {
+  return viewer.isAdmin || team === viewer.team
+}
+
+export async function getProfileDTO(slug: string) {
+  const data = await db.query.users.findMany({
+    where: eq(users.slug, slug),
+    // Return specific columns here
+  })
+  const user = data[0]
+
+  const currentUser = await getUser(user.id)
+
+  // Or return only what's specific to the query here
+  return {
+    username: canSeeUsername(currentUser) ? user.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, user.team)
+      ? user.phonenumber
+      : null,
+  }
+}
+```
+
+```js filename="app/lib/dto.js" switcher
+import 'server-only'
+import { getUser } from '@/app/lib/dal'
+
+function canSeeUsername(viewer) {
+  return true
+}
+
+function canSeePhoneNumber(viewer, team) {
+  return viewer.isAdmin || team === viewer.team
+}
+
+export async function getProfileDTO(slug) {
+  const data = await db.query.users.findMany({
+    where: eq(users.slug, slug),
+    // Return specific columns here
+  })
+  const user = data[0]
+
+  const currentUser = await getUser(user.id)
+
+  // Or return only what's specific to the query here
+  return {
+    username: canSeeUsername(currentUser) ? user.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, user.team)
+      ? user.phonenumber
+      : null,
+  }
+}
+```
+
+من خلال تركيز طلبات البيانات ومنطق التفويض في طبقة الوصول إلى البيانات (DAL) واستخدام كائنات نقل البيانات (DTOs)، يمكنك ضمان أن جميع طلبات البيانات آمنة ومتسقة، مما يسهل الصيانة والمراجعة والتصحيح مع توسع تطبيقك.
+
+> **معلومة مفيدة**:
+>
+> - هناك عدة طرق مختلفة لتحديد كائن نقل البيانات (DTO)، بدءًا من استخدام `toJSON()`، إلى دوال فردية كما في المثال أعلاه، أو فئات جافاسكربت. نظرًا لأن هذه أنماط جافاسكربت وليست ميزة في React أو Next.js، نوصي بإجراء بعض البحث للعثور على النمط الأنسب لتطبيقك.
+> - تعلم المزيد عن أفضل ممارسات الأمان في [مقال الأمان في Next.js](/blog/security-nextjs-server-components-actions).
+
+### مكونات الخادم (Server Components)
+
+فحص التفويض في [مكونات الخادم](/docs/app/getting-started/server-and-client-components) مفيد للوصول القائم على الأدوار. على سبيل المثال، لعرض المكونات بشكل مشروط بناءً على دور المستخدم:
+
+```tsx filename="app/dashboard/page.tsx" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export default function Dashboard() {
+  const session = await verifySession()
+  const userRole = session?.user?.role // بافتراض أن 'role' جزء من كائن الجلسة
+
+  if (userRole === 'admin') {
+    return <AdminDashboard />
+  } else if (userRole === 'user') {
+    return <UserDashboard />
+  } else {
+    redirect('/login')
+  }
+}
+```
+
+```jsx filename="app/dashboard/page.jsx" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export default function Dashboard() {
+  const session = await verifySession()
+  const userRole = session.role // بافتراض أن 'role' جزء من كائن الجلسة
+
+  if (userRole === 'admin') {
+    return <AdminDashboard />
+  } else if (userRole === 'user') {
+    return <UserDashboard />
+  } else {
+    redirect('/login')
+  }
+}
+```
+
+في المثال، نستخدم الدالة `verifySession()` من طبقة الوصول إلى البيانات (DAL) للتحقق من أدوار 'admin' و'user' والأدوار غير المصرح بها. يضمن هذا النمط أن كل مستخدم يتفاعل فقط مع المكونات المناسبة لدوره.
+
+### التخطيطات وفحوصات التفويض
+
+بسبب [التصيير الجزئي (Partial Rendering)](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering)، كن حذرًا عند إجراء الفحوصات في [التخطيطات (Layouts)](/docs/app/api-reference/file-conventions/layout) لأنها لا تعيد التصيير عند التنقل، مما يعني أن جلسة المستخدم لن يتم التحقق منها في كل تغيير للمسار.
+
+بدلاً من ذلك، يجب إجراء الفحوصات بالقرب من مصدر البيانات أو المكون الذي سيتم عرضه بشكل مشروط.
+
+على سبيل المثال، ضع في الاعتبار تخطيطًا مشتركًا يجلب بيانات المستخدم ويعرض صورة المستخدم في شريط التنقل. بدلاً من إجراء فحص التفويض في التخطيط، يجب جلب بيانات المستخدم (`getUser()`) في التخطيط وإجراء فحص التفويض في طبقة الوصول إلى البيانات (DAL).
+
+هذا يضمن أنه في أي مكان يتم فيه استدعاء `getUser()` داخل تطبيقك، يتم إجراء فحص التفويض، ويمنع المطورين من نسيان التحقق من أن المستخدم مصرح له بالوصول إلى البيانات.
+
+```tsx filename="app/layout.tsx" switcher
+export default async function Layout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await getUser();
+
+  return (
+    // ...
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default async function Layout({ children }) {
+  const user = await getUser();
+
+  return (
+    // ...
+  )
+}
+```
+
+```ts filename="app/lib/dal.ts" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  // الحصول على معرف المستخدم من الجلسة وجلب البيانات
+})
+```
+
+```js filename="app/lib/dal.js" switcher
+export const getUser = cache(async () => {
+  const session = await verifySession()
+  if (!session) return null
+
+  // الحصول على معرف المستخدم من الجلسة وجلب البيانات
+})
+```
+
+> **معلومة مفيدة:**
+>
+> - نمط شائع في التطبيقات ذات الصفحة الواحدة (SPAs) هو `return null` في تخطيط أو مكون رئيسي إذا لم يكن المستخدم مصرحًا له. هذا النمط **غير موصى به** لأن تطبيقات Next.js لديها نقاط دخول متعددة، مما لن يمنع أجزاء المسار المتداخل وإجراءات الخادم من الوصول.
+
+### إجراءات الخادم (Server Actions)
+
+تعامل مع [إجراءات الخادم](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) بنفس اعتبارات الأمان مثل نقاط نهاية API الموجهة للجمهور، وتحقق مما إذا كان المستخدم مسموحًا له بإجراء التغيير.
+
+في المثال أدناه، نتحقق من دور المستخدم قبل السماح بتنفيذ الإجراء:
+
+```ts filename="app/lib/actions.ts" switcher
+'use server'
+import { verifySession } from '@/app/lib/dal'
+
+export async function serverAction(formData: FormData) {
+  const session = await verifySession()
+  const userRole = session?.user?.role
+
+  // الإرجاع مبكرًا إذا لم يكن المستخدم مصرحًا له بتنفيذ الإجراء
+  if (userRole !== 'admin') {
+    return null
+  }
+
+  // المتابعة بالإجراء للمستخدمين المصرح لهم
+}
+```
+
+```js filename="app/lib/actions.js" switcher
+'use server'
+import { verifySession } from '@/app/lib/dal'
+
+export async function serverAction() {
+  const session = await verifySession()
+  const userRole = session.user.role
+
+  // الإرجاع مبكرًا إذا لم يكن المستخدم مصرحًا له بتنفيذ الإجراء
+  if (userRole !== 'admin') {
+    return null
+  }
+
+  // المتابعة بالإجراء للمستخدمين المصرح لهم
+}
+```
+
+### معالجات المسار (Route Handlers)
+
+تعامل مع [معالجات المسار](/docs/app/building-your-application/routing/route-handlers) بنفس اعتبارات الأمان مثل نقاط نهاية API الموجهة للجمهور، وتحقق مما إذا كان المستخدم مسموحًا له بالوصول إلى معالج المسار.
+
+على سبيل المثال:
+
+```ts filename="app/api/route.ts" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export async function GET() {
+  // التحقق من هوية المستخدم ودوره
+  const session = await verifySession()
+
+  // التحقق مما إذا كان المستخدم مصادقًا عليه
+  if (!session) {
+    // المستخدم غير مصادق عليه
+    return new Response(null, { status: 401 })
+  }
+
+  // التحقق مما إذا كان للمستخدم دور 'admin'
+  if (session.user.role !== 'admin') {
+    // المستخدم مصادق عليه ولكن ليس لديه الصلاحيات المناسبة
+    return new Response(null, { status: 403 })
+  }
+
+  // المتابعة للمستخدمين المصرح لهم
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { verifySession } from '@/app/lib/dal'
+
+export async function GET() {
+  // التحقق من هوية المستخدم ودوره
+  const session = await verifySession()
+
+  // التحقق مما إذا كان المستخدم مصادقًا عليه
+  if (!session) {
+    // المستخدم غير مصادق عليه
+    return new Response(null, { status: 401 })
+  }
+
+  // التحقق مما إذا كان للمستخدم دور 'admin'
+  if (session.user.role !== 'admin') {
+    // المستخدم مصادق عليه ولكن ليس لديه الصلاحيات المناسبة
+    return new Response(null, { status: 403 })
+  }
+
+  // المتابعة للمستخدمين المصرح لهم
+}
+```
+
+يوضح المثال أعلاه معالج مسار بفحص أمان من مستويين. أولاً يتحقق من وجود جلسة نشطة، ثم يتحقق مما إذا كان المستخدم المسجل دخوله هو 'admin'.
+
+## موفرو السياق (Context Providers)
+
+استخدام موفري السياق للتفويض يعمل بسبب [التشابك (interleaving)](/docs/app/getting-started/server-and-client-components#examples#interleaving-server-and-client-components). ومع ذلك، `context` في React غير مدعوم في مكونات الخادم، مما يجعلها قابلة للتطبيق فقط على مكونات العميل.
+
+هذا يعمل، ولكن أي مكونات خادم فرعية سيتم تصييرها على الخادم أولاً، ولن يكون لديها وصول إلى بيانات الجلسة من موفر السياق:
+
+```tsx filename="app/layout.ts" switcher
+import { ContextProvider } from 'auth-lib'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <ContextProvider>{children}</ContextProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```tsx filename="app/ui/profile.ts switcher
+'use client';
+
+import { useSession } from "auth-lib";
+
+export default function Profile() {
+  const { userId } = useSession();
+  const { data } = useSWR(`/api/user/${userId}`, fetcher)
+
+  return (
+    // ...
+  );
+}
+```
+
+```jsx filename="app/ui/profile.js switcher
+'use client';
+
+import { useSession } from "auth-lib";
+
+export default function Profile() {
+  const { userId } = useSession();
+  const { data } = useSWR(`/api/user/${userId}`, fetcher)
+
+  return (
+    // ...
+  );
+}
+```
+
+إذا كانت بيانات الجلسة مطلوبة في مكونات العميل (مثل جلب البيانات من جانب العميل)، استخدم واجهة برمجة التطبيقات [`taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) في React لمنع بيانات الجلسة الحساسة من التعرض للعميل.
+
+</AppOnly>
+
+<PagesOnly>
+
+### إنشاء طبقة الوصول إلى البيانات (DAL)
+
+#### حماية مسارات API
+
+مسارات API في Next.js ضرورية للتعامل مع منطق الخادم وإدارة البيانات. من الضروري تأمين هذه المسارات لضمان أن المستخدمين المصرح لهم فقط يمكنهم الوصول إلى وظائف معينة. يتضمن هذا عادةً التحقق من حالة مصادقة المستخدم وصلاحياته القائمة على الأدوار.
+
+إليك مثالاً لتأمين مسار API:
+
+```ts filename="pages/api/route.ts" switcher
+import { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const session = await getSession(req)
+
+  // التحقق مما إذا كان المستخدم مصادقًا عليه
+  if (!session) {
+    res.status(401).json({
+      error: 'User is not authenticated',
+    })
+    return
+  }
+
+  // التحقق مما إذا كان للمستخدم دور 'admin'
+  if (session.user.role !== 'admin') {
+    res.status(401).json({
+      error: 'Unauthorized access: User does not have admin privileges.',
+    })
+    return
+  }
+
+  // المتابعة مع المسار للمستخدمين المصرح لهم
+  // ... تنفيذ مسار API
+}
+```
+
+```js filename="pages/api/route.js" switcher
+export default async function handler(req, res) {
+  const session = await getSession(req)
+
+  // التحقق مما إذا كان المستخدم مصادقًا عليه
+  if (!session) {
+    res.status(401).json({
+      error: 'User is not authenticated',
+    })
+    return
+  }
+
+  // التحقق مما إذا كان للمستخدم دور 'admin'
+  if (session.user.role !== 'admin') {
+    res.status(401).json({
+      error: 'Unauthorized access: User does not have admin privileges.',
+    })
+    return
+  }
+
+  // المتابعة مع المسار للمستخدمين المصرح لهم
+  // ... تنفيذ مسار API
+}
+```
+
+يوضح هذا المثال مسار API بفحص أمان من مستويين للمصادقة والتفويض. أولاً يتحقق من وجود جلسة نشطة، ثم يتحقق مما إذا كان المستخدم المسجل دخوله هو 'admin'. يضمن هذا النهج وصولاً آمناً، محدودًا بالمستخدمين المصادق عليهم والمصرح لهم، مع الحفاظ على أمان قوي لمعالجة الطلبات.
+
+</PagesOnly>
+
+## الموارد
+
+الآن بعد أن تعلمت عن المصادقة في Next.js، إليك مكتبات وموارد متوافقة مع Next.js لمساعدتك في تنفيذ مصادقة آمنة وإدارة الجلسات:
+
+### مكتبات المصادقة
+
+- [Auth0](https://auth0.com/docs/quickstart/webapp/nextjs/01-login)
+- [Better Auth](https://www.better-auth.com/docs/integrations/next)
+- [Clerk](https://clerk.com/docs/quickstarts/nextjs)
+- [Kinde](https://kinde.com/docs/developer-tools/nextjs-sdk)
+- [Logto](https://docs.logto.io/quick-starts/next-app-router)
+- [NextAuth.js](https://authjs.dev/getting-started/installation?framework=next.js)
+- [Ory](https://www.ory.sh/docs/getting-started/integrate-auth/nextjs)
+- [Stack Auth](https://docs.stack-auth.com/getting-started/setup)
+- [Supabase](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs)
+- [Stytch](https://stytch.com/docs/guides/quickstarts/nextjs)
+- [WorkOS](https://workos.com/docs/user-management/nextjs)
+
+### مكتبات إدارة الجلسات
+
+- [Iron Session](https://github.com/vvo/iron-session)
+- [Jose](https://github.com/panva/jose)
+
+## قراءة إضافية
+
+لمواصلة التعلم عن المصادقة والأمان، تحقق من الموارد التالية:
+
+- [كيف تفكر في الأمان في Next.js](/blog/security-nextjs-server-components-actions)
+- [فهم هجمات XSS](https://vercel.com/guides/understanding-xss-attacks)
+- [فهم هجمات CSRF](https://vercel.com/guides/understanding-csrf-attacks)
+- [The Copenhagen Book](https://thecopenhagenbook.com/)

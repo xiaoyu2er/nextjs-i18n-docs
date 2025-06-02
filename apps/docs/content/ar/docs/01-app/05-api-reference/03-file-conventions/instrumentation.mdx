@@ -1,0 +1,141 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:09:21.866Z
+title: ملف instrumentation.js
+description: مرجع API لملف instrumentation.js.
+related:
+  title: تعرف على المزيد حول الأداة (Instrumentation)
+  links:
+    - app/guides/instrumentation
+---
+
+يُستخدم ملف `instrumentation.js|ts` لدمج أدوات المراقبة (observability) في تطبيقك، مما يسمح لك بتتبع الأداء والسلوك، وتصحيح الأخطاء في بيئة الإنتاج.
+
+لاستخدامه، ضع الملف في **الجذر** لتطبيقك أو داخل مجلد [`src`](/docs/app/api-reference/file-conventions/src-folder) إذا كنت تستخدم واحدًا.
+
+## التصديرات
+
+### `register` (اختياري)
+
+يصدّر الملف دالة `register` يتم استدعاؤها **مرة واحدة** عند بدء تشغيل مثيل جديد لخادم Next.js. يمكن أن تكون دالة `register` غير متزامنة (async).
+
+```ts filename="instrumentation.ts" switcher
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel('next-app')
+}
+```
+
+```js filename="instrumentation.js" switcher
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel('next-app')
+}
+```
+
+### `onRequestError` (اختياري)
+
+يمكنك تصدير دالة `onRequestError` بشكل اختياري لتتبع أخطاء **الخادم** لأي مزود مراقبة مخصص.
+
+- إذا كنت تقوم بتشغيل أي مهام غير متزامنة في `onRequestError`، تأكد من انتظارها (await). سيتم تشغيل `onRequestError` عندما يلتقط خادم Next.js الخطأ.
+- قد لا يكون مثيل `error` هو مثيل الخطأ الأصلي الذي تم طرحه، حيث قد يتم معالجته بواسطة React إذا حدث أثناء عرض مكونات الخادم (Server Components). إذا حدث هذا، يمكنك استخدام خاصية `digest` على الخطأ لتحديد نوع الخطأ الفعلي.
+
+```ts filename="instrumentation.ts" switcher
+import { type Instrumentation } from 'next'
+
+export const onRequestError: Instrumentation.onRequestError = async (
+  err,
+  request,
+  context
+) => {
+  await fetch('https://.../report-error', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: err.message,
+      request,
+      context,
+    }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+}
+```
+
+```js filename="instrumentation.js" switcher
+export async function onRequestError(err, request, context) {
+  await fetch('https://.../report-error', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: err.message,
+      request,
+      context,
+    }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+}
+```
+
+#### المعاملات (Parameters)
+
+تقبل الدالة ثلاثة معاملات: `error`، `request`، و `context`.
+
+```ts filename="Types"
+export function onRequestError(
+  error: { digest: string } & Error,
+  request: {
+    path: string // مسار المورد، مثل /blog?name=foo
+    method: string // طريقة الطلب، مثل GET, POST، إلخ
+    headers: { [key: string]: string }
+  },
+  context: {
+    routerKind: 'Pages Router' | 'App Router' // نوع الموجه
+    routePath: string // مسار ملف المسار، مثل /app/blog/[dynamic]
+    routeType: 'render' | 'route' | 'action' | 'middleware' // السياق الذي حدث فيه الخطأ
+    renderSource:
+      | 'react-server-components'
+      | 'react-server-components-payload'
+      | 'server-rendering'
+    revalidateReason: 'on-demand' | 'stale' | undefined // undefined يعني طلبًا عاديًا بدون إعادة التحقق
+    renderType: 'dynamic' | 'dynamic-resume' // 'dynamic-resume' لـ PPR
+  }
+): void | Promise<void>
+```
+
+- `error`: الخطأ الذي تم التقاطه (النوع دائمًا `Error`)، وخاصية `digest` وهي المعرف الفريد للخطأ.
+- `request`: معلومات الطلب المقروءة فقط المرتبطة بالخطأ.
+- `context`: السياق الذي حدث فيه الخطأ. يمكن أن يكون نوع الموجه (App أو Pages Router)، و/أو (مكونات الخادم (`'render'`)، معالجات المسار (`'route'`)، إجراءات الخادم (`'action'`)، أو Middleware (`'middleware'`)).
+
+### تحديد بيئة التشغيل (Runtime)
+
+يعمل ملف `instrumentation.js` في كل من بيئة تشغيل Node.js و Edge، ولكن يمكنك استخدام `process.env.NEXT_RUNTIME` لاستهداف بيئة تشغيل محددة.
+
+```js filename="instrumentation.js"
+export function register() {
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    return require('./register.edge')
+  } else {
+    return require('./register.node')
+  }
+}
+
+export function onRequestError() {
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    return require('./on-request-error.edge')
+  } else {
+    return require('./on-request-error.node')
+  }
+}
+```
+
+## سجل الإصدارات
+
+| الإصدار   | التغييرات                                                 |
+| --------- | ------------------------------------------------------- |
+| `v15.0.0` | إدخال `onRequestError`، تثبيت `instrumentation`          |
+| `v14.0.4` | دعم Turbopack لـ `instrumentation`                       |
+| `v13.2.0` | إدخال `instrumentation` كخاصية تجريبية                   |

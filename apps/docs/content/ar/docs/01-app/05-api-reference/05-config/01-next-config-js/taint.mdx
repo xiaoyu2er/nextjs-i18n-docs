@@ -1,0 +1,228 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:14:26.606Z
+title: تلويث (taint)
+description: تمكين تلويث الكائنات والقيم.
+version: experimental
+---
+
+## الاستخدام
+
+خيار `taint` يمكّن دعم واجهات برمجة تطبيقات React التجريبية لتلويث الكائنات والقيم. هذه الميزة تساعد في منع تمرير البيانات الحساسة عن طريق الخطأ إلى العميل. عند التمكين، يمكنك استخدام:
+
+- [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) لتلويث مراجع الكائنات.
+- [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) لتلويث القيم الفريدة.
+
+> **معلومة مفيدة**: تفعيل هذا الخيار يُفعّل أيضًا قناة `experimental` في React لمجلد `app`.
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **تحذير:** لا تعتمد على واجهة برمجة التطبيقات الخاصة بالتلويث كآلية وحيدة لمنع كشف البيانات الحساسة للعميل. راجع [توصيات الأمان](/blog/security-nextjs-server-components-actions).
+
+تسمح واجهات برمجة التطبيقات الخاصة بالتلويث بأن تكون دفاعيًا، من خلال تحديد البيانات التي لا يُسمح بمرورها عبر حدود الخادم-العميل بشكل صريح وإعلاني. عندما يتم تمرير كائن أو قيمة عبر حدود الخادم-العميل، يطرح React خطأ.
+
+هذا مفيد في الحالات التالية:
+
+- عندما تكون طرق قراءة البيانات خارج نطاق سيطرتك
+- عندما تضطر للعمل مع أشكال بيانات حساسة لم تقم بتعريفها
+- عندما يتم الوصول إلى بيانات حساسة أثناء عرض مكون الخادم (Server Component)
+
+يوصى بنمذجة البيانات وواجهات برمجة التطبيقات بحيث لا يتم إرجاع البيانات الحساسة إلى السياقات التي لا تحتاجها.
+
+## محاذير
+
+- يمكن للتلويث تتبع الكائنات فقط عن طريق المرجع. نسخ كائن ينشئ نسخة غير ملوثة، مما يفقد كل الضمانات التي توفرها واجهة برمجة التطبيقات. ستحتاج إلى تلويث النسخة.
+- لا يمكن للتلويث تتبع البيانات المشتقة من قيمة ملوثة. ستحتاج أيضًا إلى تلويث القيمة المشتقة.
+- تظل القيم ملوثة طالما أن مرجع عمرها ضمن النطاق. راجع [مرجع معلمات `experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue#parameters) لمزيد من المعلومات.
+
+## أمثلة
+
+### تلويث مرجع كائن
+
+في هذه الحالة، تقوم الدالة `getUserDetails` بإرجاع بيانات حول مستخدم معين. نقوم بتلويث مرجع كائن المستخدم، بحيث لا يمكنه عبور حدود الخادم-العميل. على سبيل المثال، بافتراض أن `UserCard` هو مكون عميل (Client Component).
+
+```ts switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id: string): UserDetails {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'لا تستخدم كامل معلومات المستخدم. بدلاً من ذلك، اختر فقط الحقول التي تحتاجها.',
+    user
+  )
+
+  return user
+}
+```
+
+```js switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id) {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'لا تستخدم كامل معلومات المستخدم. بدلاً من ذلك، اختر فقط الحقول التي تحتاجها.',
+    user
+  )
+
+  return user
+}
+```
+
+لا يزال بإمكاننا الوصول إلى الحقول الفردية من كائن `userDetails` الملوث.
+
+```tsx filename="app/contact/page.tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+```jsx filename="app/contact/page.js switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+الآن، تمرير الكائن بالكامل إلى مكون العميل سيثير خطأ.
+
+```tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const userDetails = await getUserDetails(id)
+
+  // يثير خطأ
+  return <UserCard user={userDetails} />
+}
+```
+
+```jsx switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  // يثير خطأ
+  return <UserCard user={userDetails} />
+}
+```
+
+### تلويث قيمة فريدة
+
+في هذه الحالة، يمكننا الوصول إلى تكوين الخادم عن طريق انتظار استدعاءات `config.getConfigDetails`. ومع ذلك، يحتوي تكوين النظام على `SERVICE_API_KEY` الذي لا نريد كشفه للعملاء.
+
+يمكننا تلويث قيمة `config.SERVICE_API_KEY`.
+
+```ts switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig(): SystemConfig {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'لا تمرر رموز التكوين إلى العميل',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+```js switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig() {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'لا تمرر رموز التكوين إلى العميل',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+لا يزال بإمكاننا الوصول إلى خصائص أخرى من كائن `systemConfig`.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+
+  return <ClientDashboard version={systemConfig.SERVICE_API_VERSION} />
+}
+```
+
+ومع ذلك، تمرير `SERVICE_API_KEY` إلى `ClientDashboard` سيثير خطأ.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // يقوم أحدهم بخطأ في طلب سحب (PR)
+  const version = systemConfig.SERVICE_API_KEY
+
+  return <ClientDashboard version={version} />
+}
+```
+
+لاحظ أنه حتى مع إعادة تعيين `systemConfig.SERVICE_API_KEY` إلى متغير جديد، فإن تمريره إلى مكون العميل سيظل يثير خطأ.
+
+بينما سيتم كشف قيمة مشتقة من قيمة فريدة ملوثة إلى العميل.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // يقوم أحدهم بخطأ في طلب سحب (PR)
+  const version = `version::${systemConfig.SERVICE_API_KEY}`
+
+  return <ClientDashboard version={version} />
+}
+```
+
+نهج أفضل هو إزالة `SERVICE_API_KEY` من البيانات التي تُرجعها `getSystemConfig`.

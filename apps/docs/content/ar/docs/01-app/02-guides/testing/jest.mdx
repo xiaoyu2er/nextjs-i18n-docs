@@ -1,0 +1,389 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:13:13.732Z
+title: كيفية إعداد Jest مع Next.js
+nav_title: Jest
+description: تعلم كيفية إعداد Jest مع Next.js لإجراء اختبارات الوحدة واختبارات اللقطات (Snapshot Testing).
+---
+
+{/* المحتوى مشترك بين موجه التطبيق وموجه الصفحات. يمكنك استخدام مكون `<PagesOnly>محتوى</PagesOnly>` لإضافة محتوى خاص بموجه الصفحات. أي محتوى مشترك يجب ألا يكون مغلفًا بمكون. */}
+
+يتم استخدام Jest و React Testing Library معًا بشكل متكرر لإجراء **اختبارات الوحدة** و**اختبارات اللقطات**. سيوضح لك هذا الدليل كيفية إعداد Jest مع Next.js وكتابة أول اختباراتك.
+
+> **معلومة مفيدة:** نظرًا لأن مكونات الخادم (Server Components) غير المتزامنة (`async`) جديدة في نظام React البيئي، فإن Jest لا يدعمها حاليًا. بينما يمكنك إجراء **اختبارات الوحدة** لمكونات الخادم والعميل المتزامنة، نوصي باستخدام **اختبارات من النهاية إلى النهاية (E2E)** للمكونات غير المتزامنة (`async`).
+
+## البدء السريع
+
+يمكنك استخدام `create-next-app` مع مثال Next.js [with-jest](https://github.com/vercel/next.js/tree/canary/examples/with-jest) للبدء بسرعة:
+
+```bash filename="Terminal"
+npx create-next-app@latest --example with-jest with-jest-app
+```
+
+## الإعداد اليدوي
+
+منذ إصدار [Next.js 12](https://nextjs.org/blog/next-12)، أصبح لدى Next.js تكوين مدمج لـ Jest.
+
+لإعداد Jest، قم بتثبيت `jest` والحزم التالية كتبعيات تطوير:
+
+```bash filename="Terminal"
+npm install -D jest jest-environment-jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom ts-node @types/jest
+# أو
+yarn add -D jest jest-environment-jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom ts-node @types/jest
+# أو
+pnpm install -D jest jest-environment-jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom ts-node @types/jest
+```
+
+قم بإنشاء ملف تكوين أساسي لـ Jest عن طريق تشغيل الأمر التالي:
+
+```bash filename="Terminal"
+npm init jest@latest
+# أو
+yarn create jest@latest
+# أو
+pnpm create jest@latest
+```
+
+سيأخذك هذا عبر سلسلة من الخطوات لإعداد Jest لمشروعك، بما في ذلك إنشاء ملف `jest.config.ts|js` تلقائيًا.
+
+قم بتحديث ملف التكوين لاستخدام `next/jest`. يحتوي هذا المحول على جميع خيارات التكوين اللازمة ليعمل Jest مع Next.js:
+
+```ts filename="jest.config.ts" switcher
+import type { Config } from 'jest'
+import nextJest from 'next/jest.js'
+
+const createJestConfig = nextJest({
+  // حدد مسار تطبيق Next.js لتحميل next.config.js وملفات .env في بيئة الاختبار
+  dir: './',
+})
+
+// أضف أي تكوين مخصص لتمريره إلى Jest
+const config: Config = {
+  coverageProvider: 'v8',
+  testEnvironment: 'jsdom',
+  // أضف المزيد من خيارات الإعداد قبل تشغيل كل اختبار
+  // setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+}
+
+// يتم تصدير createJestConfig بهذه الطريقة لضمان أن next/jest يمكنه تحميل تكوين Next.js غير المتزامن
+export default createJestConfig(config)
+```
+
+```js filename="jest.config.js" switcher
+const nextJest = require('next/jest')
+
+/** @type {import('jest').Config} */
+const createJestConfig = nextJest({
+  // حدد مسار تطبيق Next.js لتحميل next.config.js وملفات .env في بيئة الاختبار
+  dir: './',
+})
+
+// أضف أي تكوين مخصص لتمريره إلى Jest
+const config = {
+  coverageProvider: 'v8',
+  testEnvironment: 'jsdom',
+  // أضف المزيد من خيارات الإعداد قبل تشغيل كل اختبار
+  // setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+}
+
+// يتم تصدير createJestConfig بهذه الطريقة لضمان أن next/jest يمكنه تحميل تكوين Next.js غير المتزامن
+module.exports = createJestConfig(config)
+```
+
+تحت الغطاء، يقوم `next/jest` بتكوين Jest تلقائيًا لك، بما في ذلك:
+
+- إعداد `transform` باستخدام [Next.js Compiler](/docs/architecture/nextjs-compiler).
+- المحاكاة التلقائية لملفات الأنماط (`.css`, `.module.css`، ومتغيرات scss الخاصة بها)، واستيراد الصور و[`next/font`](/docs/app/api-reference/components/font).
+- تحميل `.env` (وجميع المتغيرات) إلى `process.env`.
+- تجاهل `node_modules` من تحويلات وحل الاختبارات.
+- تجاهل `.next` من حل الاختبارات.
+- تحميل `next.config.js` للإشارات التي تمكن تحويلات SWC.
+
+> **معلومة مفيدة:** لاختبار متغيرات البيئة مباشرة، قم بتحميلها يدويًا في سيناريو إعداد منفصل أو في ملف `jest.config.ts`. لمزيد من المعلومات، راجع [متغيرات بيئة الاختبار](/docs/app/guides/environment-variables#test-environment-variables).
+
+<PagesOnly>
+
+## إعداد Jest (مع Babel)
+
+إذا اخترت عدم استخدام [Next.js Compiler](/docs/architecture/nextjs-compiler) واستخدام Babel بدلاً من ذلك، فستحتاج إلى تكوين Jest يدويًا وتثبيت `babel-jest` و`identity-obj-proxy` بالإضافة إلى الحزم المذكورة أعلاه.
+
+إليك الخيارات الموصى بها لتكوين Jest لـ Next.js:
+
+```js filename="jest.config.js"
+module.exports = {
+  collectCoverage: true,
+  // في node 14.x يوفر coverage provider v8 سرعة جيدة وتقريرًا جيدًا إلى حد ما
+  coverageProvider: 'v8',
+  collectCoverageFrom: [
+    '**/*.{js,jsx,ts,tsx}',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+    '!<rootDir>/out/**',
+    '!<rootDir>/.next/**',
+    '!<rootDir>/*.config.js',
+    '!<rootDir>/coverage/**',
+  ],
+  moduleNameMapper: {
+    // التعامل مع استيراد CSS (مع وحدات CSS)
+    // https://jestjs.io/docs/webpack#mocking-css-modules
+    '^.+\\.module\\.(css|sass|scss)$': 'identity-obj-proxy',
+
+    // التعامل مع استيراد CSS (بدون وحدات CSS)
+    '^.+\\.(css|sass|scss)$': '<rootDir>/__mocks__/styleMock.js',
+
+    // التعامل مع استيراد الصور
+    // https://jestjs.io/docs/webpack#handling-static-assets
+    '^.+\\.(png|jpg|jpeg|gif|webp|avif|ico|bmp|svg)$': `<rootDir>/__mocks__/fileMock.js`,
+
+    // التعامل مع أسماء مستعارة للوحدات
+    '^@/components/(.*)$': '<rootDir>/components/$1',
+
+    // التعامل مع @next/font
+    '@next/font/(.*)': `<rootDir>/__mocks__/nextFontMock.js`,
+    // التعامل مع next/font
+    'next/font/(.*)': `<rootDir>/__mocks__/nextFontMock.js`,
+    // تعطيل server-only
+    'server-only': `<rootDir>/__mocks__/empty.js`,
+  },
+  // أضف المزيد من خيارات الإعداد قبل تشغيل كل اختبار
+  // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/'],
+  testEnvironment: 'jsdom',
+  transform: {
+    // استخدم babel-jest لتحويل الاختبارات مع الإعداد المسبق next/babel
+    // https://jestjs.io/docs/configuration#transform-objectstring-pathtotransformer--pathtotransformer-object
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
+  },
+  transformIgnorePatterns: [
+    '/node_modules/',
+    '^.+\\.module\\.(css|sass|scss)$',
+  ],
+}
+```
+
+يمكنك معرفة المزيد عن كل خيار تكوين في [وثائق Jest](https://jestjs.io/docs/configuration). نوصي أيضًا بمراجعة [تكوين next/jest](https://github.com/vercel/next.js/blob/e02fe314dcd0ae614c65b505c6daafbdeebb920e/packages/next/src/build/jest/jest.ts) لمعرفة كيفية تكوين Next.js لـ Jest.
+
+### التعامل مع ملفات الأنماط واستيراد الصور
+
+لا يتم استخدام ملفات الأنماط والصور في الاختبارات ولكن استيرادها قد يسبب أخطاء، لذا يجب محاكاتها.
+
+قم بإنشاء ملفات المحاكاة المشار إليها في التكوين أعلاه - `fileMock.js` و`styleMock.js` - داخل دليل `__mocks__`:
+
+```js filename="__mocks__/fileMock.js"
+module.exports = 'test-file-stub'
+```
+
+```js filename="__mocks__/styleMock.js"
+module.exports = {}
+```
+
+لمزيد من المعلومات حول التعامل مع الأصول الثابتة، راجع [وثائق Jest](https://jestjs.io/docs/webpack#handling-static-assets).
+
+## التعامل مع الخطوط
+
+للتعامل مع الخطوط، قم بإنشاء ملف `nextFontMock.js` داخل دليل `__mocks__`، وأضف التكوين التالي:
+
+```js filename="__mocks__/nextFontMock.js"
+module.exports = new Proxy(
+  {},
+  {
+    get: function getter() {
+      return () => ({
+        className: 'className',
+        variable: 'variable',
+        style: { fontFamily: 'fontFamily' },
+      })
+    },
+  }
+)
+```
+
+</PagesOnly>
+
+## اختياري: التعامل مع الاستيراد المطلق وأسماء مسارات الوحدات
+
+إذا كان مشروعك يستخدم [أسماء مسارات الوحدات](/docs/app/getting-started/installation#set-up-absolute-imports-and-module-path-aliases)، فستحتاج إلى تكوين Jest لحل عمليات الاستيراد عن طريق مطابقة خيار paths في ملف `jsconfig.json` مع خيار `moduleNameMapper` في ملف `jest.config.js`. على سبيل المثال:
+
+```json filename="tsconfig.json أو jsconfig.json"
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "baseUrl": "./",
+    "paths": {
+      "@/components/*": ["components/*"]
+    }
+  }
+}
+```
+
+```js filename="jest.config.js"
+moduleNameMapper: {
+  // ...
+  '^@/components/(.*)$': '<rootDir>/components/$1',
+}
+```
+
+## اختياري: توسيع Jest مع مطابقات مخصصة
+
+يتضمن `@testing-library/jest-dom` مجموعة من [المطابقات المخصصة](https://github.com/testing-library/jest-dom#custom-matchers) الملائمة مثل `.toBeInTheDocument()` مما يجعل كتابة الاختبارات أسهل. يمكنك استيراد المطابقات المخصصة لكل اختبار عن طريق إضافة الخيار التالي إلى ملف تكوين Jest:
+
+```ts filename="jest.config.ts" switcher
+setupFilesAfterEnv: ['<rootDir>/jest.setup.ts']
+```
+
+```js filename="jest.config.js" switcher
+setupFilesAfterEnv: ['<rootDir>/jest.setup.js']
+```
+
+ثم، داخل `jest.setup`، أضف الاستيراد التالي:
+
+```ts filename="jest.setup.ts" switcher
+import '@testing-library/jest-dom'
+```
+
+```js filename="jest.setup.js" switcher
+import '@testing-library/jest-dom'
+```
+
+> **معلومة مفيدة:** تمت إزالة [`extend-expect` في الإصدار `v6.0`](https://github.com/testing-library/jest-dom/releases/tag/v6.0.0)، لذا إذا كنت تستخدم `@testing-library/jest-dom` قبل الإصدار 6، فستحتاج إلى استيراد `@testing-library/jest-dom/extend-expect` بدلاً من ذلك.
+
+إذا كنت بحاجة إلى إضافة المزيد من خيارات الإعداد قبل كل اختبار، يمكنك إضافتها إلى ملف `jest.setup` أعلاه.
+
+## إضافة سيناريو اختبار إلى `package.json`
+
+أخيرًا، أضف سيناريو `test` لـ Jest إلى ملف `package.json` الخاص بك:
+
+```json filename="package.json" highlight={6-7}
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  }
+}
+```
+
+سيقوم `jest --watch` بإعادة تشغيل الاختبارات عند تغيير ملف. لمزيد من خيارات واجهة سطر أوامر Jest، راجع [وثائق Jest](https://jestjs.io/docs/cli#reference).
+
+### إنشاء أول اختبار لك
+
+مشروعك جاهز الآن لتشغيل الاختبارات. قم بإنشاء مجلد يسمى `__tests__` في الدليل الجذري لمشروعك.
+
+<PagesOnly>
+
+على سبيل المثال، يمكننا إضافة اختبار للتحقق مما إذا كان مكون `<Home />` يعرض عنوانًا بنجاح:
+
+```jsx filename="pages/index.js
+export default function Home() {
+  return <h1>Home</h1>
+}
+```
+
+```jsx filename="__tests__/index.test.js"
+import '@testing-library/jest-dom'
+import { render, screen } from '@testing-library/react'
+import Home from '../pages/index'
+
+describe('Home', () => {
+  it('يعرض عنوانًا', () => {
+    render(<Home />)
+
+    const heading = screen.getByRole('heading', { level: 1 })
+
+    expect(heading).toBeInTheDocument()
+  })
+})
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+على سبيل المثال، يمكننا إضافة اختبار للتحقق مما إذا كان مكون `<Page />` يعرض عنوانًا بنجاح:
+
+```jsx filename="app/page.js"
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <Link href="/about">About</Link>
+    </div>
+  )
+}
+```
+
+```jsx filename="__tests__/page.test.jsx"
+import '@testing-library/jest-dom'
+import { render, screen } from '@testing-library/react'
+import Page from '../app/page'
+
+describe('Page', () => {
+  it('يعرض عنوانًا', () => {
+    render(<Page />)
+
+    const heading = screen.getByRole('heading', { level: 1 })
+
+    expect(heading).toBeInTheDocument()
+  })
+})
+```
+
+</AppOnly>
+
+اختياريًا، أضف [اختبار لقطة](https://jestjs.io/docs/snapshot-testing) لتتبع أي تغييرات غير متوقعة في مكونك:
+
+<PagesOnly>
+
+```jsx filename="__tests__/snapshot.js"
+import { render } from '@testing-library/react'
+import Home from '../pages/index'
+
+it('يعرض الصفحة الرئيسية دون تغيير', () => {
+  const { container } = render(<Home />)
+  expect(container).toMatchSnapshot()
+})
+```
+
+> **معلومة مفيدة:** لا يجب تضمين ملفات الاختبار داخل موجه الصفحات لأن أي ملف داخل موجه الصفحات يعتبر مسارًا.
+
+</PagesOnly>
+
+<AppOnly>
+
+```jsx filename="__tests__/snapshot.js"
+import { render } from '@testing-library/react'
+import Page from '../app/page'
+
+it('يعرض الصفحة الرئيسية دون تغيير', () => {
+  const { container } = render(<Page />)
+  expect(container).toMatchSnapshot()
+})
+```
+
+</AppOnly>
+
+## تشغيل الاختبارات
+
+ثم، قم بتشغيل الأمر التالي لتشغيل اختباراتك:
+
+```bash filename="Terminal"
+npm run test
+# أو
+yarn test
+# أو
+pnpm test
+```
+
+## موارد إضافية
+
+لمزيد من القراءة، قد تجد هذه الموارد مفيدة:
+
+- [مثال Next.js مع Jest](https://github.com/vercel/next.js/tree/canary/examples/with-jest)
+- [وثائق Jest](https://jestjs.io/docs/getting-started)
+- [وثائق React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- [Testing Playground](https://testing-playground.com/) - استخدم ممارسات اختبار جيدة لمطابقة العناصر.

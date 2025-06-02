@@ -1,0 +1,218 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-06-02T20:00:41.475Z
+title: التدويل
+description: إضافة دعم للغات متعددة مع توجيه دولي ومحتوى مترجم.
+---
+
+يتيح لك Next.js تكوين التوجيه وعرض المحتوى لدعم لغات متعددة. جعل موقعك قابلاً للتكيف مع المناطق المحلية المختلفة يتضمن محتوى مترجم (توطين) وطرق دولية.
+
+## المصطلحات
+
+- **المنطقة المحلية (Locale):** معرف لمجموعة من تفضيلات اللغة والتنسيق. يشمل هذا عادة اللغة المفضلة للمستخدم وربما منطقته الجغرافية.
+  - `en-US`: الإنجليزية كما تُستخدم في الولايات المتحدة
+  - `nl-NL`: الهولندية كما تُستخدم في هولندا
+  - `nl`: الهولندية بدون منطقة محددة
+
+## نظرة عامة على التوجيه
+
+يُوصى باستخدام تفضيلات لغة المستخدم في المتصفح لتحديد المنطقة المحلية المراد استخدامها. تغيير لغتك المفضلة سيعدل رأس `Accept-Language` الوارد إلى تطبيقك.
+
+على سبيل المثال، باستخدام المكتبات التالية، يمكنك النظر إلى `Request` الوارد لتحديد المنطقة المحلية المطلوبة، بناءً على `Headers`، والمناطق المحلية التي تخطط لدعمها، والمنطقة المحلية الافتراضية.
+
+```js filename="middleware.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+يمكن تدويل التوجيه إما عن طريق المسار الفرعي (`/fr/products`) أو النطاق (`my-site.fr/products`). باستخدام هذه المعلومات، يمكنك الآن إعادة توجيه المستخدم بناءً على المنطقة المحلية داخل [البرمجية الوسيطة (Middleware)](/docs/app/building-your-application/routing/middleware).
+
+```js filename="middleware.js"
+import { NextResponse } from "next/server";
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// الحصول على المنطقة المحلية المفضلة، مشابه لما سبق أو باستخدام مكتبة
+function getLocale(request) { ... }
+
+export function middleware(request) {
+  // التحقق مما إذا كان هناك أي منطقة محلية مدعومة في مسار العنوان
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  // إعادة التوجيه إذا لم تكن هناك منطقة محلية
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // على سبيل المثال، الطلب الوارد هو /products
+  // عنوان URL الجديد الآن هو /en-US/products
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // تخطي جميع المسارات الداخلية (_next)
+    '/((?!_next).*)',
+    // اختياري: التشغيل فقط على عنوان URL الجذر (/)
+    // '/'
+  ],
+}
+```
+
+أخيرًا، تأكد من أن جميع الملفات الخاصة داخل `app/` متداخلة تحت `app/[lang]`. هذا يمكّن موجه Next.js من التعامل ديناميكيًا مع المناطق المحلية المختلفة في المسار، وإعادة معلمة `lang` إلى كل تخطيط وصفحة. على سبيل المثال:
+
+```tsx filename="app/[lang]/page.tsx" switcher
+// لديك الآن حق الوصول إلى المنطقة المحلية الحالية
+// على سبيل المثال، /en-US/products -> `lang` هي "en-US"
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
+  const { lang } = await params
+  return ...
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+// لديك الآن حق الوصول إلى المنطقة المحلية الحالية
+// على سبيل المثال، /en-US/products -> `lang` هي "en-US"
+export default async function Page({ params }) {
+  const { lang } = await params
+  return ...
+}
+```
+
+يمكن أيضًا تداخل التخطيط الجذر في المجلد الجديد (على سبيل المثال `app/[lang]/layout.js`).
+
+## التوطين
+
+تغيير المحتوى المعروض بناءً على المنطقة المحلية المفضلة للمستخدم، أو التوطين، ليس شيئًا خاصًا بـ Next.js. الأنماط الموضحة أدناه ستعمل بنفس الطريقة مع أي تطبيق ويب.
+
+لنفترض أننا نريد دعم المحتوى بالإنجليزية والهولندية داخل تطبيقنا. قد نحتفظ بـ "قواميس" مختلفة، وهي كائنات تعطينا تعيينًا من مفتاح معين إلى سلسلة مترجمة. على سبيل المثال:
+
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+يمكننا بعد ذلك إنشاء دالة `getDictionary` لتحميل الترجمات للمنطقة المحلية المطلوبة:
+
+```ts filename="app/[lang]/dictionaries.ts" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale: 'en' | 'nl') =>
+  dictionaries[locale]()
+```
+
+```js filename="app/[lang]/dictionaries.js" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale) => dictionaries[locale]()
+```
+
+بالنظر إلى اللغة المحددة حاليًا، يمكننا جلب القاموس داخل تخطيط أو صفحة.
+
+```tsx filename="app/[lang]/page.tsx" switcher
+import { getDictionary } from './dictionaries'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ lang: 'en' | 'nl' }>
+}) {
+  const { lang } = await params
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+import { getDictionary } from './dictionaries'
+
+export default async function Page({ params }) {
+  const { lang } = await params
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+لأن جميع التخطيطات والصفحات في دليل `app/` تعمل افتراضيًا كمكونات [خادم (Server Components)](/docs/app/getting-started/server-and-client-components)، لا داعي للقلق بشأن حجم ملفات الترجمة التي تؤثر على حجم حزمة JavaScript على جانب العميل. هذا الرمز سيعمل **فقط على الخادم**، وسيتم إرسال HTML الناتج فقط إلى المتصفح.
+
+## العرض الثابت
+
+لإنشاء مسارات ثابتة لمجموعة معينة من المناطق المحلية، يمكننا استخدام `generateStaticParams` مع أي صفحة أو تخطيط. يمكن أن يكون هذا عالميًا، على سبيل المثال، في التخطيط الجذر:
+
+```tsx filename="app/[lang]/layout.tsx" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({
+  children,
+  params,
+}: Readonly<{
+  children: React.ReactNode
+  params: Promise<{ lang: 'en-US' | 'de' }>
+}>) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/[lang]/layout.js" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({ children, params }) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## الموارد
+
+- [توجيه وترجمة دولية بسيطة](https://github.com/vercel/next.js/tree/canary/examples/i18n-routing)
+- [`next-intl`](https://next-intl.dev)
+- [`next-international`](https://github.com/QuiiBz/next-international)
+- [`next-i18n-router`](https://github.com/i18nexus/next-i18n-router)
+- [`paraglide-next`](https://inlang.com/m/osslbuzt/paraglide-next-i18n)
+- [`lingui`](https://lingui.dev)
