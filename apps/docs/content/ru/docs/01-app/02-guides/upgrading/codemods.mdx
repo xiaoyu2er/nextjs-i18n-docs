@@ -1,0 +1,554 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:12:00.534Z
+title: Codemods
+description: Используйте codemods для обновления кодовой базы Next.js при выходе новых функций.
+---
+
+Codemods — это преобразования, которые программно применяются к вашей кодовой базе. Это позволяет автоматически вносить множество изменений без необходимости ручного редактирования каждого файла.
+
+Next.js предоставляет преобразования Codemod для помощи в обновлении кодовой базы Next.js при изменении или устаревании API.
+
+## Использование
+
+В терминале перейдите (`cd`) в папку вашего проекта и выполните:
+
+```bash filename="Terminal"
+npx @next/codemod <transform> <path>
+```
+
+Замените `<transform>` и `<path>` соответствующими значениями.
+
+- `transform` — название преобразования
+- `path` — файлы или директория для преобразования
+- `--dry` Пробный запуск без внесения изменений в код
+- `--print` Выводит изменённый код для сравнения
+
+## Codemods
+
+### 15.0
+
+#### Преобразование значения `runtime` в конфигурации сегментов маршрута App Router с `experimental-edge` на `edge`
+
+##### `app-dir-runtime-config-experimental-edge`
+
+> **Примечание**: Этот codemod специфичен для App Router.
+
+```bash filename="Terminal"
+npx @next/codemod@latest app-dir-runtime-config-experimental-edge .
+```
+
+Этот codemod преобразует значение `runtime` в [конфигурации сегментов маршрута](https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config#runtime) с `experimental-edge` на `edge`.
+
+Например:
+
+```ts
+export const runtime = 'experimental-edge'
+```
+
+Преобразуется в:
+
+```ts
+export const runtime = 'edge'
+```
+
+#### Миграция на асинхронные Dynamic API
+
+API, поддерживающие динамический рендеринг, которые ранее работали синхронно, теперь стали асинхронными. Подробнее об этом критическом изменении можно прочитать в [руководстве по обновлению](/docs/app/guides/upgrading/version-15).
+
+##### `next-async-request-api`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-async-request-api .
+```
+
+Этот codemod преобразует динамические API (`cookies()`, `headers()` и `draftMode()` из `next/headers`), которые теперь асинхронны, добавляя `await` или оборачивая их в `React.use()`, если применимо.
+Если автоматическая миграция невозможна, codemod добавит приведение типов (для TypeScript-файлов) или комментарий, информирующий о необходимости ручного обновления.
+
+Например:
+
+```tsx
+import { cookies, headers } from 'next/headers'
+const token = cookies().get('token')
+
+function useToken() {
+  const token = cookies().get('token')
+  return token
+}
+
+export default function Page() {
+  const name = cookies().get('name')
+}
+
+function getHeader() {
+  return headers().get('x-foo')
+}
+```
+
+Преобразуется в:
+
+```tsx
+import { use } from 'react'
+import {
+  cookies,
+  headers,
+  type UnsafeUnwrappedCookies,
+  type UnsafeUnwrappedHeaders,
+} from 'next/headers'
+const token = (cookies() as unknown as UnsafeUnwrappedCookies).get('token')
+
+function useToken() {
+  const token = use(cookies()).get('token')
+  return token
+}
+
+export default async function Page() {
+  const name = (await cookies()).get('name')
+}
+
+function getHeader() {
+  return (headers() as unknown as UnsafeUnwrappedHeaders).get('x-foo')
+}
+```
+
+При обнаружении доступа к свойствам `params` или `searchParams` в страницах / маршрутах (`page.js`, `layout.js`, `route.js` или `default.js`) или в API `generateMetadata` / `generateViewport`,
+codemod попытается преобразовать вызов из синхронного в асинхронный и добавить `await` для доступа к свойствам. Если это невозможно (например, в Client Component), будет использован `React.use` для разворачивания промиса.
+
+Например:
+
+```tsx
+// page.tsx
+export default function Page({
+  params,
+  searchParams,
+}: {
+  params: { slug: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
+  const { value } = searchParams
+  if (value === 'foo') {
+    // ...
+  }
+}
+
+export function generateMetadata({ params }: { params: { slug: string } }) {
+  const { slug } = params
+  return {
+    title: `My Page - ${slug}`,
+  }
+}
+```
+
+Преобразуется в:
+
+```tsx
+// page.tsx
+export default async function Page(props: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const searchParams = await props.searchParams
+  const { value } = searchParams
+  if (value === 'foo') {
+    // ...
+  }
+}
+
+export async function generateMetadata(props: {
+  params: Promise<{ slug: string }>
+}) {
+  const params = await props.params
+  const { slug } = params
+  return {
+    title: `My Page - ${slug}`,
+  }
+}
+```
+
+> **Полезно знать:** Когда codemod обнаруживает место, требующее ручного вмешательства, но не может определить точное исправление, он добавит комментарий или приведение типов с пометкой о необходимости ручного обновления. Эти комментарии начинаются с **@next/codemod**, а приведения типов — с `UnsafeUnwrapped`.
+> Сборка будет завершаться ошибкой, пока эти комментарии не будут удалены. [Подробнее](/docs/messages/sync-dynamic-apis).
+
+#### Замена свойств `geo` и `ip` в `NextRequest` на `@vercel/functions`
+
+##### `next-request-geo-ip`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-request-geo-ip .
+```
+
+Этот codemod устанавливает `@vercel/functions` и заменяет свойства `geo` и `ip` в `NextRequest` на соответствующие функции из `@vercel/functions`.
+
+Например:
+
+```ts
+import type { NextRequest } from 'next/server'
+
+export function GET(req: NextRequest) {
+  const { geo, ip } = req
+}
+```
+
+Преобразуется в:
+
+```ts
+import type { NextRequest } from 'next/server'
+import { geolocation, ipAddress } from '@vercel/functions'
+
+export function GET(req: NextRequest) {
+  const geo = geolocation(req)
+  const ip = ipAddress(req)
+}
+```
+
+### 14.0
+
+#### Миграция импортов `ImageResponse`
+
+##### `next-og-import`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-og-import .
+```
+
+Этот codemod переносит импорты из `next/server` в `next/og` для использования [динамической генерации OG-изображений](/docs/app/getting-started/metadata-and-og-images#generated-open-graph-images).
+
+Например:
+
+```js
+import { ImageResponse } from 'next/server'
+```
+
+Преобразуется в:
+
+```js
+import { ImageResponse } from 'next/og'
+```
+
+#### Использование экспорта `viewport`
+
+##### `metadata-to-viewport-export`
+
+```bash filename="Terminal"
+npx @next/codemod@latest metadata-to-viewport-export .
+```
+
+Этот codemod переносит определённые метаданные viewport в экспорт `viewport`.
+
+Например:
+
+```js
+export const metadata = {
+  title: 'My App',
+  themeColor: 'dark',
+  viewport: {
+    width: 1,
+  },
+}
+```
+
+Преобразуется в:
+
+```js
+export const metadata = {
+  title: 'My App',
+}
+
+export const viewport = {
+  width: 1,
+  themeColor: 'dark',
+}
+```
+
+### 13.2
+
+#### Использование встроенного шрифта
+
+##### `built-in-next-font`
+
+```bash filename="Terminal"
+npx @next/codemod@latest built-in-next-font .
+```
+
+Этот codemod удаляет пакет `@next/font` и преобразует импорты `@next/font` во встроенный `next/font`.
+
+Например:
+
+```js
+import { Inter } from '@next/font/google'
+```
+
+Преобразуется в:
+
+```js
+import { Inter } from 'next/font/google'
+```
+
+### 13.0
+
+#### Переименование импортов Next Image
+
+##### `next-image-to-legacy-image`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-image-to-legacy-image .
+```
+
+Безопасно переименовывает импорты `next/image` в приложениях Next.js 10, 11 или 12 в `next/legacy/image` для Next.js 13. Также переименовывает `next/future/image` в `next/image`.
+
+Например:
+
+```jsx filename="pages/index.js"
+import Image1 from 'next/image'
+import Image2 from 'next/future/image'
+
+export default function Home() {
+  return (
+    <div>
+      <Image1 src="/test.jpg" width="200" height="300" />
+      <Image2 src="/test.png" width="500" height="400" />
+    </div>
+  )
+}
+```
+
+Преобразуется в:
+
+```jsx filename="pages/index.js"
+// 'next/image' становится 'next/legacy/image'
+import Image1 from 'next/legacy/image'
+// 'next/future/image' становится 'next/image'
+import Image2 from 'next/image'
+
+export default function Home() {
+  return (
+    <div>
+      <Image1 src="/test.jpg" width="200" height="300" />
+      <Image2 src="/test.png" width="500" height="400" />
+    </div>
+  )
+}
+```
+
+#### Миграция на новый компонент Image
+
+##### `next-image-experimental`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-image-experimental .
+```
+
+Опасная миграция с `next/legacy/image` на новый `next/image` путём добавления встроенных стилей и удаления неиспользуемых пропсов.
+
+- Удаляет проп `layout` и добавляет `style`.
+- Удаляет проп `objectFit` и добавляет `style`.
+- Удаляет проп `objectPosition` и добавляет `style`.
+- Удаляет проп `lazyBoundary`.
+- Удаляет проп `lazyRoot`.
+
+#### Удаление тегов `<a>` из компонентов Link
+
+##### `new-link`
+
+```bash filename="Terminal"
+npx @next/codemod@latest new-link .
+```
+
+<AppOnly>
+
+Удаляет теги `<a>` внутри [компонентов Link](/docs/app/api-reference/components/link) или добавляет проп `legacyBehavior` для ссылок, которые не могут быть автоматически исправлены.
+
+</AppOnly>
+
+<PagesOnly>
+
+Удаляет теги `<a>` внутри [компонентов Link](/docs/pages/api-reference/components/link) или добавляет проп `legacyBehavior` для ссылок, которые не могут быть автоматически исправлены.
+
+</PagesOnly>
+
+Например:
+
+```jsx
+<Link href="/about">
+  <a>About</a>
+</Link>
+// преобразуется в
+<Link href="/about">
+  About
+</Link>
+
+<Link href="/about">
+  <a onClick={() => console.log('clicked')}>About</a>
+</Link>
+// преобразуется в
+<Link href="/about" onClick={() => console.log('clicked')}>
+  About
+</Link>
+```
+
+В случаях, когда автоматическое исправление невозможно, добавляется проп `legacyBehavior`. Это позволяет приложению продолжать работать со старым поведением для конкретной ссылки.
+
+```jsx
+const Component = () => <a>About</a>
+
+<Link href="/about">
+  <Component />
+</Link>
+// становится
+<Link href="/about" legacyBehavior>
+  <Component />
+</Link>
+```
+
+### 11
+
+#### Миграция с Create React App
+
+##### `cra-to-next`
+
+```bash filename="Terminal"
+npx @next/codemod cra-to-next
+```
+
+Мигрирует проект с Create React App на Next.js, создавая Pages Router и необходимую конфигурацию для соответствия поведению. Изначально используется рендеринг только на стороне клиента, чтобы избежать проблем с использованием `window` при SSR, и может быть постепенно переведён на использование специфичных функций Next.js.
+
+Поделитесь отзывами об этом преобразовании [в этом обсуждении](https://github.com/vercel/next.js/discussions/25858).
+
+### 10
+
+#### Добавление импортов React
+
+##### `add-missing-react-import`
+
+```bash filename="Terminal"
+npx @next/codemod add-missing-react-import
+```
+
+Преобразует файлы, не содержащие импорт `React`, добавляя его для работы с новым [преобразованием JSX в React](https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html).
+
+Например:
+
+```jsx filename="my-component.js"
+export default class Home extends React.Component {
+  render() {
+    return <div>Hello World</div>
+  }
+}
+```
+
+Преобразуется в:
+
+```jsx filename="my-component.js"
+import React from 'react'
+export default class Home extends React.Component {
+  render() {
+    return <div>Hello World</div>
+  }
+}
+```
+
+### 9
+
+#### Преобразование анонимных компонентов в именованные
+
+##### `name-default-component`
+
+```bash filename="Terminal"
+npx @next/codemod name-default-component
+```
+
+**Версии 9 и выше.**
+
+Преобразует анонимные компоненты в именованные, чтобы они работали с [Fast Refresh](https://nextjs.org/blog/next-9-4#fast-refresh).
+
+Например:
+
+```jsx filename="my-component.js"
+export default function () {
+  return <div>Hello World</div>
+}
+```
+
+Преобразуется в:
+
+```jsx filename="my-component.js"
+export default function MyComponent() {
+  return <div>Hello World</div>
+}
+```
+
+Компонент получает имя в camelCase на основе имени файла, и это также работает со стрелочными функциями.
+
+### 8
+
+#### Преобразование HOC AMP в конфигурацию страницы
+
+##### `withamp-to-config`
+
+```bash filename="Terminal"
+npx @next/codemod withamp-to-config
+```
+
+Преобразует HOC `withAmp` в конфигурацию страницы для Next.js 9.
+
+Например:
+
+```js
+// До
+import { withAmp } from 'next/amp'
+
+function Home() {
+  return <h1>My AMP Page</h1>
+}
+
+export default withAmp(Home)
+```
+
+```js
+// После
+export default function Home() {
+  return <h1>My AMP Page</h1>
+}
+
+export const config = {
+  amp: true,
+}
+```
+
+### 6
+
+#### Использование `withRouter`
+
+##### `url-to-withrouter`
+
+```bash filename="Terminal"
+npx @next/codemod url-to-withrouter
+```
+
+Преобразует устаревшее автоматически внедряемое свойство `url` на страницах верхнего уровня в использование `withRouter` и свойства `router`, которое оно внедряет. Подробнее: [https://nextjs.org/docs/messages/url-deprecated](/docs/messages/url-deprecated)
+
+Например:
+
+```js filename="До"
+import React from 'react'
+export default class extends React.Component {
+  render() {
+    const { pathname } = this.props.url
+    return <div>Current pathname: {pathname}</div>
+  }
+}
+```
+
+```js filename="После"
+import React from 'react'
+import { withRouter } from 'next/router'
+export default withRouter(
+  class extends React.Component {
+    render() {
+      const { pathname } = this.props.router
+      return <div>Current pathname: {pathname}</div>
+    }
+  }
+)
+```
+
+Это один из случаев. Все преобразуемые случаи (и тесты) можно найти в [директории `__testfixtures__`](https://github.com/vercel/next.js/tree/canary/packages/next-codemod/transforms/__testfixtures__/url-to-withrouter).

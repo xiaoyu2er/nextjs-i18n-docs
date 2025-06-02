@@ -1,0 +1,583 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:14:44.734Z
+title: Как мигрировать с Create React App на Next.js
+nav_title: Create React App
+description: Узнайте, как перенести существующее React-приложение с Create React App на Next.js.
+---
+
+Это руководство поможет вам перенести существующий сайт с Create React App (CRA) на Next.js.
+
+## Почему стоит перейти?
+
+Есть несколько причин, по которым вы можете захотеть перейти с Create React App на Next.js:
+
+### Медленная начальная загрузка страницы
+
+Create React App использует исключительно клиентский React. Приложения, работающие только на стороне клиента, также известные как [одностраничные приложения (SPA)](/docs/app/guides/single-page-applications), часто сталкиваются с медленной начальной загрузкой страницы. Это происходит по нескольким причинам:
+
+1. Браузеру нужно дождаться загрузки и выполнения кода React и всего бандла вашего приложения, прежде чем ваш код сможет отправить запросы на загрузку данных.
+2. Код вашего приложения растёт с каждым новым функционалом и зависимостью.
+
+### Отсутствие автоматического разделения кода
+
+Проблему медленной загрузки можно частично решить с помощью разделения кода. Однако при ручном разделении кода вы можете непреднамеренно создать "водопад" запросов. Next.js предоставляет автоматическое разделение кода и tree-shaking, встроенные в его роутер и процесс сборки.
+
+### "Водопад" запросов
+
+Частой причиной плохой производительности является последовательная цепочка клиент-серверных запросов для получения данных. Один из подходов к получению данных в [SPA](/docs/app/guides/single-page-applications) — это отображение заглушки с последующей загрузкой данных после монтирования компонента. К сожалению, дочерний компонент может начать загрузку данных только после того, как родительский компонент завершит загрузку своих данных, что приводит к "водопаду" запросов.
+
+Хотя Next.js поддерживает загрузку данных на стороне клиента, он также позволяет перенести загрузку данных на сервер. Это часто полностью устраняет "водопад" клиент-серверных запросов.
+
+### Быстрые и контролируемые состояния загрузки
+
+Благодаря встроенной поддержке [стриминга через React Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense), вы можете определить, какие части вашего интерфейса загружаются первыми и в каком порядке, без создания "водопада" запросов.
+
+Это позволяет создавать страницы, которые загружаются быстрее и исключают [сдвиги макета](https://vercel.com/blog/how-core-web-vitals-affect-seo).
+
+### Выбор стратегии загрузки данных
+
+В зависимости от ваших потребностей, Next.js позволяет выбирать стратегию загрузки данных на уровне страницы или компонента. Например, вы можете получать данные из вашей CMS и рендерить блог-посты во время сборки (SSG) для быстрой загрузки или загружать данные во время запроса (SSR), когда это необходимо.
+
+### Middleware
+
+[Next.js Middleware](/docs/app/building-your-application/routing/middleware) позволяет выполнять код на сервере до завершения запроса. Например, вы можете избежать мелькания неаутентифицированного контента, перенаправляя пользователя на страницу входа в middleware для страниц, требующих аутентификации. Вы также можете использовать его для таких функций, как A/B-тестирование, эксперименты и [интернационализация](/docs/app/guides/internationalization).
+
+### Встроенные оптимизации
+
+[Изображения](/docs/app/api-reference/components/image), [шрифты](/docs/app/api-reference/components/font) и [сторонние скрипты](/docs/app/guides/scripts) часто сильно влияют на производительность приложения. Next.js включает специализированные компоненты и API, которые автоматически оптимизируют их для вас.
+
+## Шаги миграции
+
+Наша цель — как можно быстрее получить работающее Next.js-приложение, чтобы затем постепенно внедрять функции Next.js. Для начала мы будем рассматривать ваше приложение как чисто клиентское приложение ([SPA](/docs/app/guides/single-page-applications)) без немедленной замены существующего роутера. Это уменьшает сложность и конфликты слияния.
+
+> **Примечание**: Если вы используете расширенные конфигурации CRA, такие как пользовательское поле `homepage` в вашем `package.json`, пользовательский service worker или специфические настройки Babel/webpack, ознакомьтесь с разделом **Дополнительные соображения** в конце этого руководства для советов по воспроизведению или адаптации этих функций в Next.js.
+
+### Шаг 1: Установка зависимости Next.js
+
+Установите Next.js в ваш существующий проект:
+
+```bash filename="Terminal"
+npm install next@latest
+```
+
+### Шаг 2: Создание конфигурационного файла Next.js
+
+Создайте файл `next.config.ts` в корне вашего проекта (на том же уровне, что и `package.json`). Этот файл содержит [опции конфигурации Next.js](/docs/app/api-reference/config/next-config-js).
+
+```js filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  output: 'export', // Создаёт одностраничное приложение (SPA)
+  distDir: 'build', // Изменяет директорию сборки на `build`
+}
+
+export default nextConfig
+```
+
+> **Примечание**: Использование `output: 'export'` означает, что вы делаете статический экспорт. У вас **не** будет доступа к серверным функциям, таким как SSR или API. Вы можете удалить эту строку, чтобы использовать серверные функции Next.js.
+
+### Шаг 3: Создание корневого макета
+
+Приложение Next.js с [App Router](/docs/app) должно включать файл [корневого макета](/docs/app/api-reference/file-conventions/layout#root-layout), который является [React Server Component](/docs/app/getting-started/server-and-client-components), оборачивающим все ваши страницы.
+
+Ближайшим аналогом файла корневого макета в приложении CRA является `public/index.html`, который включает ваши теги `<html>`, `<head>` и `<body>`.
+
+1. Создайте новую директорию `app` внутри вашей папки `src` (или в корне проекта, если вы предпочитаете `app` в корне).
+2. Внутри директории `app` создайте файл `layout.tsx` (или `layout.js`):
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return '...'
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return '...'
+}
+```
+
+Теперь скопируйте содержимое вашего старого `index.html` в этот компонент `<RootLayout>`. Замените `body div#root` (и `body noscript`) на `<div id="root">{children}</div>`.
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="UTF-8" />
+        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+> **Полезно знать**: Next.js игнорирует `public/manifest.json` CRA, дополнительные иконки и [конфигурацию тестирования](/docs/app/guides/testing) по умолчанию. Если они вам нужны, Next.js поддерживает их с помощью [Metadata API](/docs/app/getting-started/metadata-and-og-images) и [настройки тестирования](/docs/app/guides/testing).
+
+### Шаг 4: Метаданные
+
+Next.js автоматически включает теги `<meta charset="UTF-8" />` и `<meta name="viewport" content="width=device-width, initial-scale=1" />`, поэтому вы можете удалить их из `<head>`:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+Любые [файлы метаданных](/docs/app/getting-started/metadata-and-og-images#file-based-metadata), такие как `favicon.ico`, `icon.png`, `robots.txt`, автоматически добавляются в тег `<head>` приложения, если они размещены на верхнем уровне директории `app`. После перемещения [всех поддерживаемых файлов](/docs/app/getting-started/metadata-and-og-images#file-based-metadata) в директорию `app` вы можете безопасно удалить их теги `<link>`:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+Наконец, Next.js может управлять вашими последними тегами `<head>` с помощью [Metadata API](/docs/app/getting-started/metadata-and-og-images). Перенесите ваши последние метаданные в экспортированный объект [`metadata`](/docs/app/api-reference/functions/generate-metadata#metadata-object):
+
+```tsx filename="app/layout.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'React App',
+  description: 'Web site created with Next.js.',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export const metadata = {
+  title: 'React App',
+  description: 'Web site created with Next.js.',
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+С этими изменениями вы перешли от объявления всего в вашем `index.html` к использованию соглашений Next.js, встроенных в фреймворк ([Metadata API](/docs/app/getting-started/metadata-and-og-images)). Этот подход позволяет вам легче улучшить SEO и возможность совместного использования ваших страниц.
+
+### Шаг 5: Стили
+
+Как и CRA, Next.js поддерживает [CSS Modules](/docs/app/getting-started/css#css-modules) из коробки. Он также поддерживает [глобальный импорт CSS](/docs/app/getting-started/css#global-css).
+
+Если у вас есть глобальный CSS-файл, импортируйте его в ваш `app/layout.tsx`:
+
+```tsx filename="app/layout.tsx" switcher
+import '../index.css'
+
+export const metadata = {
+  title: 'React App',
+  description: 'Web site created with Next.js.',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+Если вы используете Tailwind CSS, ознакомьтесь с нашей [документацией по установке](/docs/app/guides/tailwind-css).
+
+### Шаг 6: Создание точки входа страницы
+
+Create React App использует `src/index.tsx` (или `index.js`) в качестве точки входа. В Next.js (App Router) каждая папка внутри директории `app` соответствует маршруту, и каждая папка должна иметь `page.tsx`.
+
+Поскольку мы хотим сохранить приложение как SPA пока и перехватывать **все** маршруты, мы будем использовать [опциональный catch-all маршрут](/docs/app/api-reference/file-conventions/dynamic-routes#optional-catch-all-segments).
+
+1. **Создайте директорию `[[...slug]]` внутри `app`.**
+
+```bash
+app
+ ┣ [[...slug]]
+ ┃ ┗ page.tsx
+ ┣ layout.tsx
+```
+
+2. **Добавьте следующее в `page.tsx`**:
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // Мы обновим это
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // Мы обновим это
+}
+```
+
+Это говорит Next.js сгенерировать один маршрут для пустого slug (`/`), эффективно сопоставляя **все** маршруты одной странице. Эта страница является [Server Component](/docs/app/getting-started/server-and-client-components), предварительно отрендеренным в статический HTML.
+
+### Шаг 7: Добавление точки входа только для клиента
+
+Далее мы встроим корневой App-компонент CRA внутрь [Client Component](/docs/app/getting-started/server-and-client-components), чтобы вся логика оставалась на стороне клиента. Если вы впервые используете Next.js, стоит знать, что клиентские компоненты (по умолчанию) всё равно предварительно рендерятся на сервере. Вы можете думать о них как о компонентах с дополнительной возможностью выполнения клиентского JavaScript.
+
+Создайте `client.tsx` (или `client.js`) в `app/[[...slug]]/`:
+
+```tsx filename="app/[[...slug]]/client.tsx" switcher
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+```jsx filename="app/[[...slug]]/client.js" switcher
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+- Директива `'use client'` делает этот файл **Client Component**.
+- Динамический импорт с `ssr: false` отключает серверный рендеринг для компонента `<App />`, делая его действительно клиентским (SPA).
+
+Теперь обновите ваш `page.tsx` (или `page.js`), чтобы использовать новый компонент:
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+### Шаг 8: Обновление статических импортов изображений
+
+В CRA импорт файла изображения возвращает его публичный URL в виде строки:
+
+```tsx
+import image from './img.png'
+
+export default function App() {
+  return <img src={image} />
+}
+```
+
+В Next.js статический импорт изображений возвращает объект. Этот объект можно использовать напрямую с компонентом [`<Image>`](/docs/app/api-reference/components/image) от Next.js или использовать свойство `src` объекта с существующим тегом `<img>`.
+
+Компонент `<Image>` предоставляет дополнительные преимущества, такие как [автоматическая оптимизация изображений](/docs/app/api-reference/components/image). Компонент `<Image>` автоматически устанавливает атрибуты `width` и `height` результирующего тега `<img>` на основе размеров изображения. Это предотвращает сдвиги макета при загрузке изображения. Однако это может вызвать проблемы, если в вашем приложении есть изображения, у которых стилизована только одна из размерностей, а другая не установлена в `auto`. Если размерность не установлена в `auto`, она будет использовать значение атрибута тега `<img>`, что может привести к искажению изображения.
+
+Использование тега `<img>` уменьшит количество изменений в вашем приложении и предотвратит указанные проблемы. В дальнейшем вы можете перейти на компонент `<Image>`, чтобы воспользоваться оптимизацией изображений, [настроив загрузчик](/docs/app/api-reference/components/image#loader) или перейдя на стандартный сервер Next.js, который поддерживает автоматическую оптимизацию изображений.
+
+**Преобразуйте абсолютные пути импорта для изображений из `/public` в относительные:**
+
+```tsx
+// До
+import logo from '/logo.png'
+
+// После
+import logo from '../public/logo.png'
+```
+
+**Передавайте свойство `src` изображения вместо всего объекта в тег `<img>`:**
+
+```tsx
+// До
+<img src={logo} />
+
+// После
+<img src={logo.src} />
+```
+
+Альтернативно, вы можете ссылаться на публичный URL изображения на основе имени файла. Например, `public/logo.png` будет доступен по адресу `/logo.png` в вашем приложении, который можно использовать как значение `src`.
+
+> **Предупреждение:** Если вы используете TypeScript, при обращении к свойству `src` могут возникнуть ошибки типов. Чтобы их исправить, добавьте `next-env.d.ts` в массив [`include`](https://www.typescriptlang.org/tsconfig#include) вашего файла `tsconfig.json`. Next.js автоматически сгенерирует этот файл при запуске приложения на шаге 9.
+
+### Шаг 9: Миграция переменных окружения
+
+Next.js поддерживает [переменные окружения](/docs/app/guides/environment-variables) аналогично CRA, но **требует** префикса `NEXT_PUBLIC_` для переменных, которые должны быть доступны в браузере.
+
+Основное отличие — префикс для экспорта переменных на клиентской стороне. Замените все переменные окружения с префиксом `REACT_APP_` на `NEXT_PUBLIC_`.
+
+### Шаг 10: Обновление скриптов в `package.json`
+
+Обновите скрипты в `package.json` для использования команд Next.js. Также добавьте `.next` и `next-env.d.ts` в ваш `.gitignore`:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "npx serve@latest ./build"
+  }
+}
+```
+
+```txt filename=".gitignore"
+# ...
+.next
+next-env.d.ts
+```
+
+Теперь вы можете выполнить:
+
+```bash
+npm run dev
+```
+
+Откройте [http://localhost:3000](http://localhost:3000). Вы должны увидеть ваше приложение, работающее на Next.js (в режиме SPA).
+
+### Шаг 11: Очистка
+
+Теперь вы можете удалить артефакты, специфичные для Create React App:
+
+- `public/index.html`
+- `src/index.tsx`
+- `src/react-app-env.d.ts`
+- Настройку `reportWebVitals`
+- Зависимость `react-scripts` (удалите её из `package.json`)
+
+## Дополнительные соображения
+
+### Использование кастомного `homepage` в CRA
+
+Если вы использовали поле `homepage` в `package.json` CRA для размещения приложения по определённому подпути, вы можете воспроизвести это в Next.js с помощью конфигурации [`basePath`](/docs/app/api-reference/config/next-config-js/basePath) в `next.config.ts`:
+
+```ts filename="next.config.ts"
+import { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  basePath: '/my-subpath',
+  // ...
+}
+
+export default nextConfig
+```
+
+### Работа с кастомным `Service Worker`
+
+Если вы использовали сервис-воркер CRA (например, `serviceWorker.js` из `create-react-app`), вы можете узнать, как создавать [Прогрессивные Веб-Приложения (PWA)](/docs/app/guides/progressive-web-apps) с Next.js.
+
+### Проксирование API-запросов
+
+Если ваше приложение CRA использовало поле `proxy` в `package.json` для перенаправления запросов на бэкенд-сервер, вы можете воспроизвести это с помощью [rewrites в Next.js](/docs/app/api-reference/config/next-config-js/rewrites) в `next.config.ts`:
+
+```ts filename="next.config.ts"
+import { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'https://your-backend.com/:path*',
+      },
+    ]
+  },
+}
+```
+
+### Кастомная конфигурация Webpack / Babel
+
+Если у вас была кастомная конфигурация webpack или Babel в CRA, вы можете расширить конфигурацию Next.js в `next.config.ts`:
+
+```ts filename="next.config.ts"
+import { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  webpack: (config, { isServer }) => {
+    // Модифицируйте конфигурацию webpack здесь
+    return config
+  },
+}
+
+export default nextConfig
+```
+
+> **Примечание**: Для этого потребуется отключить Turbopack, удалив `--turbopack` из скрипта `dev`.
+
+### Настройка TypeScript
+
+Next.js автоматически настраивает TypeScript при наличии `tsconfig.json`. Убедитесь, что `next-env.d.ts` указан в массиве `include` вашего `tsconfig.json`:
+
+```json
+{
+  "include": ["next-env.d.ts", "app/**/*", "src/**/*"]
+}
+```
+
+## Совместимость с бандлерами
+
+И Create React App, и Next.js по умолчанию используют webpack для сборки. Next.js также предлагает [Turbopack](/docs/app/api-reference/config/next-config-js/turbopack) для более быстрой локальной разработки:
+
+```bash
+next dev --turbopack
+```
+
+Вы также можете предоставить [кастомную конфигурацию webpack](/docs/app/api-reference/config/next-config-js/webpack), если вам нужно перенести сложные настройки webpack из CRA.
+
+## Следующие шаги
+
+Если всё работает, у вас теперь есть функционирующее приложение Next.js, работающее как одностраничное приложение. Вы пока не используете такие возможности Next.js, как рендеринг на стороне сервера (SSR) или файловая маршрутизация, но теперь можете внедрять их постепенно:
+
+- **Перейдите с React Router** на [App Router Next.js](/docs/app/building-your-application/routing) для:
+  - Автоматического разделения кода
+  - [Потокового серверного рендеринга](/docs/app/building-your-application/routing/loading-ui-and-streaming)
+  - [Серверных компонентов React](/docs/app/getting-started/server-and-client-components)
+- **Оптимизируйте изображения** с помощью [компонента `<Image>`](/docs/app/api-reference/components/image)
+- **Оптимизируйте шрифты** с помощью [`next/font`](/docs/app/api-reference/components/font)
+- **Оптимизируйте сторонние скрипты** с помощью [компонента `<Script>`](/docs/app/guides/scripts)
+- **Включите ESLint** с рекомендованными правилами Next.js, выполнив `npx next lint` и настроив его под нужды проекта
+
+> **Примечание**: Использование статического экспорта (`output: 'export'`) [пока не поддерживает](https://github.com/vercel/next.js/issues/54393) хук `useParams` и другие серверные функции. Чтобы использовать все возможности Next.js, удалите `output: 'export'` из вашего `next.config.ts`.

@@ -1,0 +1,587 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-06-02T20:16:52.927Z
+title: Заголовки
+description: Добавление пользовательских HTTP-заголовков в ваше Next.js приложение.
+---
+
+{/* Содержание этого документа является общим для маршрутизаторов app и pages. Вы можете использовать компонент `<PagesOnly>Content</PagesOnly>` для добавления контента, специфичного для маршрутизатора Pages. Любой общий контент не должен быть обернут в компонент. */}
+
+Заголовки позволяют устанавливать пользовательские HTTP-заголовки в ответ на входящий запрос по заданному пути.
+
+Для установки пользовательских HTTP-заголовков можно использовать ключ `headers` в `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/about',
+        headers: [
+          {
+            key: 'x-custom-header',
+            value: 'my custom header value',
+          },
+          {
+            key: 'x-another-custom-header',
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+`headers` — это асинхронная функция, которая ожидает возврата массива объектов со свойствами `source` и `headers`:
+
+- `source` — шаблон пути входящего запроса.
+- `headers` — массив объектов заголовков ответа с свойствами `key` и `value`.
+- `basePath`: `false` или `undefined` — если false, basePath не будет учитываться при сопоставлении, может использоваться только для внешних перезаписей.
+- `locale`: `false` или `undefined` — указывает, следует ли исключать локаль при сопоставлении.
+- `has` — массив [объектов has](#header-cookie-and-query-matching) со свойствами `type`, `key` и `value`.
+- `missing` — массив [объектов missing](#header-cookie-and-query-matching) со свойствами `type`, `key` и `value`.
+
+Заголовки проверяются до файловой системы, которая включает страницы и файлы `/public`.
+
+## Поведение переопределения заголовков
+
+Если два заголовка соответствуют одному и тому же пути и устанавливают один и тот же ключ заголовка, последний ключ заголовка переопределит первый. Используя приведенные ниже заголовки, путь `/hello` приведет к тому, что заголовок `x-hello` будет иметь значение `world`, поскольку последнее установленное значение заголовка — `world`.
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'there',
+          },
+        ],
+      },
+      {
+        source: '/hello',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Сопоставление путей
+
+Разрешено сопоставление путей, например `/blog/:slug` будет соответствовать `/blog/hello-world` (без вложенных путей):
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug', // Сопоставленные параметры могут использоваться в значении
+          },
+          {
+            key: 'x-slug-:slug', // Сопоставленные параметры могут использоваться в ключе
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Сопоставление путей с подстановочными знаками
+
+Для сопоставления пути с подстановочным знаком можно использовать `*` после параметра, например `/blog/:slug*` будет соответствовать `/blog/a/b/c/d/hello-world`:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug*',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug*', // Сопоставленные параметры могут использоваться в значении
+          },
+          {
+            key: 'x-slug-:slug*', // Сопоставленные параметры могут использоваться в ключе
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Сопоставление путей с регулярными выражениями
+
+Для сопоставления пути с регулярным выражением можно заключить регулярное выражение в скобки после параметра, например `/blog/:slug(\\d{1,})` будет соответствовать `/blog/123`, но не `/blog/abc`:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:post(\\d{1,})',
+        headers: [
+          {
+            key: 'x-post',
+            value: ':post',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+Следующие символы `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` используются для сопоставления путей с регулярными выражениями, поэтому при использовании в `source` как неспециальные значения они должны быть экранированы добавлением `\\` перед ними:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        // это будет соответствовать запросу `/english(default)/something`
+        source: '/english\\(default\\)/:slug',
+        headers: [
+          {
+            key: 'x-header',
+            value: 'value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Сопоставление заголовков, куки и запросов
+
+Чтобы применить заголовок только при совпадении значений заголовка, куки или запроса, можно использовать поле `has` или поле `missing`. И `source`, и все элементы `has` должны совпадать, а все элементы `missing` не должны совпадать для применения заголовка.
+
+Элементы `has` и `missing` могут иметь следующие поля:
+
+- `type`: `String` — должно быть `header`, `cookie`, `host` или `query`.
+- `key`: `String` — ключ из выбранного типа для сопоставления.
+- `value`: `String` или `undefined` — значение для проверки, если undefined, будет соответствовать любое значение. Можно использовать строку, подобную регулярному выражению, для захвата определенной части значения, например, если значение `first-(?<paramName>.*)` используется для `first-second`, то `second` можно будет использовать в назначении с `:paramName`.
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      // если присутствует заголовок `x-add-header`,
+      // будет применен заголовок `x-another-header`
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-add-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // если заголовок `x-no-header` отсутствует,
+      // будет применен заголовок `x-another-header`
+      {
+        source: '/:path*',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-no-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // если совпадают source, query и cookie,
+      // будет применен заголовок `x-authorized`
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // значение page не будет доступно в ключах/значениях заголовка,
+            // так как значение предоставлено и не использует именованную группу захвата, например (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-authorized',
+            value: ':authorized',
+          },
+        ],
+      },
+      // если заголовок `x-authorized` присутствует и
+      // содержит соответствующее значение, будет применен `x-another-header`
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+      // если хост — `example.com`,
+      // этот заголовок будет применен
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Заголовки с поддержкой basePath
+
+При использовании [поддержки `basePath`](/docs/app/api-reference/config/next-config-js/basePath) с заголовками каждый `source` автоматически дополняется `basePath`, если вы не добавите `basePath: false` к заголовку:
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async headers() {
+    return [
+      {
+        source: '/with-basePath', // становится /docs/with-basePath
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        source: '/without-basePath', // не изменяется, так как установлено basePath: false
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+        basePath: false,
+      },
+    ]
+  },
+}
+```
+
+## Заголовки с поддержкой i18n
+
+<AppOnly>
+
+При использовании [поддержки `i18n`](/docs/app/guides/internationalization) с заголовками каждый `source` автоматически дополняется для обработки настроенных `locales`, если вы не добавите `locale: false` к заголовку. Если используется `locale: false`, вы должны добавить локаль к `source` для правильного сопоставления.
+
+</AppOnly>
+
+<PagesOnly>
+
+При использовании [поддержки `i18n`](/docs/pages/guides/internationalization) с заголовками каждый `source` автоматически дополняется для обработки настроенных `locales`, если вы не добавите `locale: false` к заголовку. Если используется `locale: false`, вы должны добавить локаль к `source` для правильного сопоставления.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async headers() {
+    return [
+      {
+        source: '/with-locale', // автоматически обрабатывает все локали
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // не обрабатывает локали автоматически, так как установлено locale: false
+        source: '/nl/with-locale-manual',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // соответствует '/', так как `en` — defaultLocale
+        source: '/en',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // преобразуется в /(en|fr|de)/(.*), поэтому не будет соответствовать корневым
+        // маршрутам `/` или `/fr`, как это сделал бы /:path*
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Cache-Control
+
+Next.js устанавливает заголовок `Cache-Control` со значением `public, max-age=31536000, immutable` для действительно неизменяемых ресурсов. Это нельзя переопределить. Эти неизменяемые файлы содержат SHA-хэш в имени файла, поэтому их можно безопасно кэшировать на неопределенный срок. Например, [Статические импорты изображений](/docs/app/getting-started/images#local-images). Вы не можете установить заголовки `Cache-Control` в `next.config.js` для этих ресурсов.
+
+Однако вы можете установить заголовки `Cache-Control` для других ответов или данных.
+
+<AppOnly>
+
+Узнайте больше о [кэшировании](/docs/app/deep-dive/caching) с помощью маршрутизатора App.
+
+</AppOnly>
+
+<PagesOnly>
+
+Если вам нужно перепроверить кэш страницы, которая была [статически сгенерирована](/docs/pages/building-your-application/rendering/static-site-generation), вы можете сделать это, установив свойство `revalidate` в функции [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) страницы.
+
+Чтобы кэшировать ответ из [API Route](/docs/pages/building-your-application/routing/api-routes), вы можете использовать `res.setHeader`:
+
+```ts filename="pages/api/hello.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+type ResponseData = {
+  message: string
+}
+
+export default function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ResponseData>
+) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+```js filename="pages/api/hello.js" switcher
+export default function handler(req, res) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+Вы также можете использовать заголовки кэширования (`Cache-Control`) внутри `getServerSideProps` для кэширования динамических ответов. Например, используя [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/).
+
+```ts filename="pages/index.tsx" switcher
+import { GetStaticProps, GetStaticPaths, GetServerSideProps } from 'next'
+
+// Это значение считается свежим в течение десяти секунд (s-maxage=10).
+// Если запрос повторяется в течение следующих 10 секунд, ранее
+// закэшированное значение все еще будет считаться свежим. Если запрос повторяется до 59 секунд,
+// закэшированное значение будет устаревшим, но все равно будет отображаться (stale-while-revalidate=59).
+//
+// На фоне будет выполнен запрос на перепроверку для заполнения кэша
+// новым значением. Если вы обновите страницу, вы увидите новое значение.
+export const getServerSideProps = (async (context) => {
+  context.res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}) satisfies GetServerSideProps
+```
+
+```js filename="pages/index.js" switcher
+// Это значение считается свежим в течение десяти секунд (s-maxage=10).
+// Если запрос повторяется в течение следующих 10 секунд, ранее
+// закэшированное значение все еще будет считаться свежим. Если запрос повторяется до 59 секунд,
+// закэшированное значение будет устаревшим, но все равно будет отображаться (stale-while-revalidate=59).
+//
+// На фоне будет выполнен запрос на перепроверку для заполнения кэша
+// новым значением. Если вы обновите страницу, вы увидите новое значение.
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+</PagesOnly>
+
+## Опции
+
+### CORS
+
+[Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/docs/Web/HTTP/CORS) — это функция безопасности, которая позволяет контролировать, какие сайты могут получать доступ к вашим ресурсам. Вы можете установить заголовок `Access-Control-Allow-Origin`, чтобы разрешить доступ к вашим <PagesOnly>API Endpoints</PagesOnly><AppOnly>Route Handlers</AppOnly> с определенного источника.
+
+```js
+async headers() {
+    return [
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*", // Укажите ваш источник
+          },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET, POST, PUT, DELETE, OPTIONS",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value: "Content-Type, Authorization",
+          },
+        ],
+      },
+    ];
+  },
+```
+
+### X-DNS-Prefetch-Control
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-DNS-Prefetch-Control) управляет предварительной выборкой DNS, позволяя браузерам заранее выполнять разрешение доменных имен для внешних ссылок, изображений, CSS, JavaScript и других ресурсов. Эта предварительная выборка выполняется в фоновом режиме, поэтому [DNS](https://developer.mozilla.org/docs/Glossary/DNS) с большей вероятностью будет разрешен к моменту, когда ссылки понадобятся. Это уменьшает задержку при переходе пользователя по ссылке.
+
+```js
+{
+  key: 'X-DNS-Prefetch-Control',
+  value: 'on'
+}
+```
+
+### Strict-Transport-Security
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security) сообщает браузерам, что доступ должен осуществляться только через HTTPS, а не через HTTP. Используя приведенную ниже конфигурацию, все текущие и будущие поддомены будут использовать HTTPS в течение `max-age` 2 года. Это блокирует доступ к страницам или поддоменам, которые могут быть доступны только через HTTP.
+
+```js
+{
+  key: 'Strict-Transport-Security',
+  value: 'max-age=63072000; includeSubDomains; preload'
+}
+```
+
+### X-Frame-Options
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Frame-Options) указывает, разрешено ли отображение сайта внутри `iframe`. Это может предотвратить атаки типа clickjacking.
+
+**Этот заголовок заменен опцией `frame-ancestors` в CSP**, которая имеет лучшую поддержку в современных браузерах (см. [Content Security Policy](/docs/app/guides/content-security-policy) для деталей конфигурации).
+
+```js
+{
+  key: 'X-Frame-Options',
+  value: 'SAMEORIGIN'
+}
+```
+
+### Permissions-Policy
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/Permissions-Policy) позволяет управлять, какие функции и API могут использоваться в браузере. Ранее он назывался `Feature-Policy`.
+
+```js
+{
+  key: 'Permissions-Policy',
+  value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()'
+}
+```
+
+### X-Content-Type-Options
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Content-Type-Options) предотвращает попытки браузера угадать тип контента, если заголовок `Content-Type` не задан явно. Это может предотвратить XSS-атаки на сайтах, которые позволяют пользователям загружать и обмениваться файлами.
+
+Например, когда пользователь пытается скачать изображение, но оно обрабатывается как другой `Content-Type`, например исполняемый файл, который может быть вредоносным. Этот заголовок также применяется к загрузке расширений браузера. Единственное допустимое значение для этого заголовка — `nosniff`.
+
+```js
+{
+  key: 'X-Content-Type-Options',
+  value: 'nosniff'
+}
+```
+
+### Referrer-Policy
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/Referrer-Policy) контролирует, сколько информации браузер включает при переходе с текущего сайта (источника) на другой.
+
+```js
+{
+  key: 'Referrer-Policy',
+  value: 'origin-when-cross-origin'
+}
+```
+
+### Content-Security-Policy
+
+Узнайте больше о добавлении [Политики безопасности контента (Content Security Policy)](/docs/app/guides/content-security-policy) в ваше приложение.
+
+## История версий
+
+| Версия    | Изменения          |
+| --------- | ------------------ |
+| `v13.3.0` | Добавлено `missing`. |
+| `v10.2.0` | Добавлено `has`.     |
+| `v9.5.0`  | Добавлены заголовки. |
