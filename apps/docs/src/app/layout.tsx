@@ -55,6 +55,13 @@ export default async function Layout({
       className={`${geist.variable} ${mono.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8237457949590602"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="flex flex-col min-h-screen" dir={direction}>
         <NextIntlClientProvider>
           <Provider dir={direction}>{children}</Provider>
