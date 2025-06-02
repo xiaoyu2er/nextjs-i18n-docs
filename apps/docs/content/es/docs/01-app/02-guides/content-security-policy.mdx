@@ -1,0 +1,299 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:01:48.546Z
+title: Cómo configurar una Política de Seguridad de Contenido (CSP) para tu aplicación Next.js
+nav_title: Política de Seguridad de Contenido
+description: Aprende a configurar una Política de Seguridad de Contenido (CSP) para tu aplicación Next.js.
+related:
+  links:
+    - app/building-your-application/routing/middleware
+    - app/api-reference/functions/headers
+---
+
+{/* El contenido de este documento se comparte entre el enrutador de app y pages. Puedes usar el componente `<PagesOnly>Contenido</PagesOnly>` para agregar contenido específico del enrutador Pages. Cualquier contenido compartido no debe estar envuelto en un componente. */}
+
+[La Política de Seguridad de Contenido (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP) es importante para proteger tu aplicación Next.js contra diversas amenazas de seguridad como cross-site scripting (XSS), clickjacking y otros ataques de inyección de código.
+
+Al usar CSP, los desarrolladores pueden especificar qué orígenes son permitidos para fuentes de contenido, scripts, hojas de estilo, imágenes, fuentes, objetos, medios (audio, video), iframes y más.
+
+<details>
+  <summary>Ejemplos</summary>
+
+- [CSP estricto](https://github.com/vercel/next.js/tree/canary/examples/with-strict-csp)
+
+</details>
+
+## Nonces
+
+Un [nonce](https://developer.mozilla.org/docs/Web/HTML/Global_attributes/nonce) es una cadena única y aleatoria de caracteres creada para un uso único. Se utiliza junto con CSP para permitir selectivamente que ciertos scripts o estilos en línea se ejecuten, evitando las directivas estrictas de CSP.
+
+### ¿Por qué usar un nonce?
+
+Aunque las CSP están diseñadas para bloquear scripts maliciosos, hay escenarios legítimos donde los scripts en línea son necesarios. En tales casos, los nonces ofrecen una forma de permitir que estos scripts se ejecuten si tienen el nonce correcto.
+
+### Agregar un nonce con Middleware
+
+[Middleware](/docs/app/building-your-application/routing/middleware) te permite agregar encabezados y generar nonces antes de que la página se renderice.
+
+Cada vez que se visualiza una página, se debe generar un nuevo nonce. Esto significa que **debes usar renderizado dinámico para agregar nonces**.
+
+Por ejemplo:
+
+```ts filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // Reemplazar saltos de línea y espacios
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // Reemplazar saltos de línea y espacios
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+Por defecto, Middleware se ejecuta en todas las solicitudes. Puedes filtrar Middleware para que se ejecute en rutas específicas usando un [`matcher`](/docs/app/building-your-application/routing/middleware#matcher).
+
+Recomendamos ignorar las coincidencias de prefetch (de `next/link`) y los recursos estáticos que no necesitan el encabezado CSP.
+
+```ts filename="middleware.ts" switcher
+export const config = {
+  matcher: [
+    /*
+     * Coincidir con todas las rutas excepto las que comienzan con:
+     * - api (rutas API)
+     * - _next/static (archivos estáticos)
+     * - _next/image (archivos de optimización de imágenes)
+     * - favicon.ico (archivo de favicon)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+```js filename="middleware.js" switcher
+export const config = {
+  matcher: [
+    /*
+     * Coincidir con todas las rutas excepto las que comienzan con:
+     * - api (rutas API)
+     * - _next/static (archivos estáticos)
+     * - _next/image (archivos de optimización de imágenes)
+     * - favicon.ico (archivo de favicon)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+### Leyendo el nonce
+
+<PagesOnly>
+  Puedes proporcionar el nonce a tu página usando
+  [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props):
+
+```tsx filename="pages/index.tsx" switcher
+import Script from 'next/script'
+
+import type { GetServerSideProps } from 'next'
+
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+import Script from 'next/script'
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export async function getServerSideProps({ req }) {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+Puedes leer el nonce desde un [Componente de Servidor](/docs/app/getting-started/server-and-client-components) usando [`headers`](/docs/app/api-reference/functions/headers):
+
+```tsx filename="app/page.tsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+</AppOnly>
+
+## Sin Nonces
+
+Para aplicaciones que no requieren nonces, puedes configurar el encabezado CSP directamente en tu archivo [`next.config.js`](/docs/app/api-reference/config/next-config-js):
+
+```js filename="next.config.js"
+const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-eval' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Historial de versiones
+
+Recomendamos usar `v13.4.20+` de Next.js para manejar y aplicar correctamente los nonces.

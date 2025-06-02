@@ -1,0 +1,144 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T19:59:45.882Z
+title: Cómo construir micro-frontends usando multi-zonas con Next.js
+nav_title: Multi-zonas
+description: Aprende a construir micro-frontends utilizando Multi-Zonas de Next.js para desplegar múltiples aplicaciones Next.js bajo un mismo dominio.
+---
+
+{/* El contenido de este documento es compartido entre el enrutador de app y pages. Puedes usar el componente `<PagesOnly>Contenido</PagesOnly>` para añadir contenido específico del enrutador Pages. Cualquier contenido compartido no debe estar envuelto en un componente. */}
+
+<details open>
+  <summary>Ejemplos</summary>
+
+- [Con Zonas](https://github.com/vercel/next.js/tree/canary/examples/with-zones)
+
+</details>
+
+Las Multi-Zonas son un enfoque de micro-frontends que divide una aplicación grande en un dominio en aplicaciones Next.js más pequeñas, donde cada una sirve un conjunto de rutas. Esto es útil cuando existen colecciones de páginas no relacionadas con otras páginas de la aplicación. Al mover esas páginas a una zona separada (es decir, una aplicación independiente), puedes reducir el tamaño de cada aplicación, lo que mejora los tiempos de compilación y elimina código que solo es necesario para una de las zonas. Como las aplicaciones están desacopladas, las Multi-Zonas también permiten que otras aplicaciones en el dominio utilicen su propio framework de elección.
+
+Por ejemplo, supongamos que tienes el siguiente conjunto de páginas que deseas dividir:
+
+- `/blog/*` para todas las entradas del blog
+- `/dashboard/*` para todas las páginas cuando el usuario ha iniciado sesión en el panel
+- `/*` para el resto de tu sitio web no cubierto por otras zonas
+
+Con el soporte de Multi-Zonas, puedes crear tres aplicaciones que se sirvan en el mismo dominio y parezcan iguales para el usuario, pero puedes desarrollar y desplegar cada una de las aplicaciones de forma independiente.
+
+<Image
+  alt="Tres zonas: A, B, C. Muestra una navegación dura entre rutas de diferentes zonas, y navegaciones suaves entre rutas dentro de la misma zona."
+  srcLight="/docs/light/multi-zones.png"
+  srcDark="/docs/dark/multi-zones.png"
+  width="1600"
+  height="750"
+/>
+
+Navegar entre páginas de la misma zona realizará navegaciones suaves (soft navigations), una navegación que no requiere recargar la página. Por ejemplo, en este diagrama, navegar de `/` a `/products` será una navegación suave.
+
+Navegar de una página en una zona a una página en otra zona, como de `/` a `/dashboard`, realizará una navegación dura (hard navigation), descargando los recursos de la página actual y cargando los recursos de la nueva página. Las páginas que se visitan frecuentemente juntas deberían estar en la misma zona para evitar navegaciones duras.
+
+## Cómo definir una zona
+
+Una zona es una aplicación Next.js normal donde también configuras un [assetPrefix](/docs/app/api-reference/config/next-config-js/assetPrefix) para evitar conflictos con páginas y archivos estáticos en otras zonas.
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+}
+```
+
+Los recursos de Next.js, como JavaScript y CSS, se prefijarán con `assetPrefix` para asegurarse de que no entren en conflicto con los recursos de otras zonas. Estos recursos se servirán bajo `/assetPrefix/_next/...` para cada una de las zonas.
+
+La aplicación predeterminada que maneja todas las rutas no enrutadas a otra zona más específica no necesita un `assetPrefix`.
+
+En versiones anteriores a Next.js 15, también podrías necesitar una reescritura adicional para manejar los recursos estáticos. Esto ya no es necesario en Next.js 15.
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/blog-static/_next/:path+',
+          destination: '/_next/:path+',
+        },
+      ],
+    }
+  },
+}
+```
+
+## Cómo enrutar solicitudes a la zona correcta
+
+Con la configuración de Multi-Zonas, necesitas enrutar las rutas a la zona correcta ya que son servidas por diferentes aplicaciones. Puedes usar cualquier proxy HTTP para hacer esto, pero una de las aplicaciones Next.js también puede usarse para enrutar solicitudes para todo el dominio.
+
+Para enrutar a la zona correcta usando una aplicación Next.js, puedes usar [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites). Para cada ruta servida por una zona diferente, agregarías una regla de reescritura para enviar esa ruta al dominio de la otra zona, y también necesitas reescribir las solicitudes para los recursos estáticos. Por ejemplo:
+
+```js filename="next.config.js"
+async rewrites() {
+    return [
+        {
+            source: '/blog',
+            destination: `${process.env.BLOG_DOMAIN}/blog`,
+        },
+        {
+            source: '/blog/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog/:path+`,
+        },
+        {
+            source: '/blog-static/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog-static/:path+`,
+        }
+    ];
+}
+```
+
+`destination` debe ser una URL servida por la zona, incluyendo esquema y dominio. Esto debería apuntar al dominio de producción de la zona, pero también puede usarse para enrutar solicitudes a `localhost` en desarrollo local.
+
+> **Bueno saber**: Las rutas URL deben ser únicas para una zona. Por ejemplo, dos zonas intentando servir `/blog` crearían un conflicto de enrutamiento.
+
+### Enrutamiento de solicitudes usando middleware
+
+Se recomienda enrutar solicitudes a través de [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites) para minimizar la sobrecarga de latencia, pero también se puede usar middleware cuando hay necesidad de una decisión dinámica al enrutar. Por ejemplo, si estás usando una feature flag para decidir dónde debe enrutarse una ruta, como durante una migración, puedes usar middleware.
+
+```js filename="middleware.js"
+export async function middleware(request) {
+  const { pathname, search } = req.nextUrl;
+  if (pathname === '/your-path' && myFeatureFlag.isEnabled()) {
+    return NextResponse.rewrite(`${rewriteDomain}${pathname}${search});
+  }
+}
+```
+
+## Enlaces entre zonas
+
+Los enlaces a rutas en una zona diferente deben usar una etiqueta `a` en lugar del componente [`<Link>`](/docs/pages/api-reference/components/link) de Next.js. Esto se debe a que Next.js intentará precargar y navegar suavemente a cualquier ruta relativa en el componente `<Link>`, lo que no funcionará entre zonas.
+
+## Compartir código
+
+Las aplicaciones Next.js que componen las diferentes zonas pueden vivir en cualquier repositorio. Sin embargo, a menudo es conveniente colocar estas zonas en un [monorepo](https://es.wikipedia.org/wiki/Monorepositorio) para compartir código más fácilmente. Para zonas que viven en repositorios diferentes, el código también se puede compartir usando paquetes NPM públicos o privados.
+
+Dado que las páginas en diferentes zonas pueden lanzarse en momentos distintos, las feature flags pueden ser útiles para habilitar o deshabilitar características de forma coordinada entre las diferentes zonas.
+
+<AppOnly>
+
+## Server Actions
+
+Cuando uses [Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) con Multi-Zonas, debes permitir explícitamente el origen visible al usuario, ya que tu dominio público puede servir múltiples aplicaciones. En tu archivo `next.config.js`, agrega las siguientes líneas:
+
+```js filename="next.config.js"
+const nextConfig = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['tu-dominio-de-produccion.com'],
+    },
+  },
+}
+```
+
+Consulta [`serverActions.allowedOrigins`](/docs/app/api-reference/config/next-config-js/serverActions#allowedorigins) para más información.
+
+</AppOnly>

@@ -1,0 +1,217 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:01:29.090Z
+title: Cómo previsualizar contenido con el Modo Borrador en Next.js
+nav_title: Modo Borrador
+description: Next.js incluye el modo borrador para alternar entre páginas estáticas y dinámicas. Aquí puedes aprender cómo funciona con el App Router.
+related:
+  title: Próximos pasos
+  description: Consulta la referencia de API para más información sobre cómo usar el Modo Borrador.
+  links:
+    - app/api-reference/functions/draft-mode
+---
+
+El **Modo Borrador** te permite previsualizar contenido en borrador desde tu CMS headless en tu aplicación Next.js. Esto es útil para páginas estáticas generadas en tiempo de compilación, ya que permite cambiar a [renderizado dinámico](/docs/app/getting-started/partial-prerendering#dynamic-rendering) y ver los cambios en borrador sin necesidad de reconstruir todo el sitio.
+
+Esta guía explica cómo habilitar y usar el Modo Borrador.
+
+## Paso 1: Crear un Manejador de Ruta
+
+Crea un [Manejador de Ruta](/docs/app/building-your-application/routing/route-handlers). Puede tener cualquier nombre, por ejemplo, `app/api/draft/route.ts`.
+
+```ts filename="app/api/draft/route.ts" switcher
+export async function GET(request: Request) {
+  return new Response('')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+export async function GET() {
+  return new Response('')
+}
+```
+
+Luego, importa la función [`draftMode`](/docs/app/api-reference/functions/draft-mode) y llama al método `enable()`.
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+Esto establecerá una **cookie** para habilitar el modo borrador. Las solicitudes posteriores que incluyan esta cookie activarán el modo borrador y cambiarán el comportamiento de las páginas generadas estáticamente.
+
+Puedes probar esto manualmente visitando `/api/draft` y revisando las herramientas de desarrollo de tu navegador. Observa el encabezado de respuesta `Set-Cookie` con una cookie llamada `__prerender_bypass`.
+
+## Paso 2: Acceder al Manejador de Ruta desde tu CMS Headless
+
+> Estos pasos asumen que tu CMS headless admite la configuración de **URLs de borrador personalizadas**. Si no es así, aún puedes usar este método para proteger tus URLs de borrador, pero necesitarás construir y acceder a la URL manualmente. Los pasos específicos variarán según el CMS headless que uses.
+
+Para acceder de forma segura al Manejador de Ruta desde tu CMS headless:
+
+1. Crea un **token secreto** usando un generador de tokens de tu elección. Este secreto solo lo conocerán tu aplicación Next.js y tu CMS headless.
+2. Si tu CMS headless admite URLs de borrador personalizadas, especifica una URL de borrador (esto asume que tu Manejador de Ruta está en `app/api/draft/route.ts`). Por ejemplo:
+
+```bash filename="Terminal"
+https://<tu-sitio>/api/draft?secret=<token>&slug=<ruta>
+```
+
+> - `<tu-sitio>` debe ser tu dominio de despliegue.
+> - `<token>` debe reemplazarse con el token secreto que generaste.
+> - `<ruta>` debe ser la ruta de la página que deseas ver. Si quieres ver `/posts/uno`, entonces debes usar `&slug=/posts/uno`.
+>
+> Tu CMS headless podría permitirte incluir una variable en la URL de borrador para que `<ruta>` se establezca dinámicamente según los datos del CMS, como: `&slug=/posts/{entry.fields.slug}`
+
+3. En tu Manejador de Ruta, verifica que el secreto coincida y que exista el parámetro `slug` (si no, la solicitud debe fallar), llama a `draftMode.enable()` para establecer la cookie. Luego, redirige el navegador a la ruta especificada por `slug`:
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // Analiza los parámetros de la cadena de consulta
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Verifica el secreto y los parámetros
+  // Este secreto solo debe conocerse en este Manejador de Ruta y el CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Token inválido', { status: 401 })
+  }
+
+  // Consulta el CMS headless para verificar si existe el `slug` proporcionado
+  // getPostBySlug implementaría la lógica necesaria para consultar el CMS headless
+  const post = await getPostBySlug(slug)
+
+  // Si el slug no existe, evita que se habilite el modo borrador
+  if (!post) {
+    return new Response('Slug inválido', { status: 401 })
+  }
+
+  // Habilita el Modo Borrador estableciendo la cookie
+  const draft = await draftMode()
+  draft.enable()
+
+  // Redirige a la ruta del post obtenido
+  // No redirigimos a searchParams.slug para evitar vulnerabilidades de redirección abierta
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // Analiza los parámetros de la cadena de consulta
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Verifica el secreto y los parámetros
+  // Este secreto solo debe conocerse en este Manejador de Ruta y el CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Token inválido', { status: 401 })
+  }
+
+  // Consulta el CMS headless para verificar si existe el `slug` proporcionado
+  // getPostBySlug implementaría la lógica necesaria para consultar el CMS headless
+  const post = await getPostBySlug(slug)
+
+  // Si el slug no existe, evita que se habilite el modo borrador
+  if (!post) {
+    return new Response('Slug inválido', { status: 401 })
+  }
+
+  // Habilita el Modo Borrador estableciendo la cookie
+  const draft = await draftMode()
+  draft.enable()
+
+  // Redirige a la ruta del post obtenido
+  // No redirigimos a searchParams.slug para evitar vulnerabilidades de redirección abierta
+  redirect(post.slug)
+}
+```
+
+Si tiene éxito, el navegador será redirigido a la ruta que deseas ver con la cookie del modo borrador.
+
+## Paso 3: Previsualizar el Contenido en Borrador
+
+El siguiente paso es actualizar tu página para verificar el valor de `draftMode().isEnabled`.
+
+Si solicitas una página que tiene la cookie establecida, los datos se obtendrán en **tiempo de solicitud** (en lugar de en tiempo de compilación).
+
+Además, el valor de `isEnabled` será `true`.
+
+```tsx filename="app/page.tsx" switcher
+// página que obtiene datos
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// página que obtiene datos
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+Si accedes al Manejador de Ruta de borrador (con `secret` y `slug`) desde tu CMS headless o manualmente usando la URL, ahora deberías poder ver el contenido en borrador. Y, si actualizas tu borrador sin publicar, deberías poder ver los cambios.

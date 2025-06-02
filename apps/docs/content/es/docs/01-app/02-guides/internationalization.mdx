@@ -1,0 +1,218 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-06-02T20:01:04.885Z
+title: Internacionalización
+description: Agrega soporte para múltiples idiomas con enrutamiento internacionalizado y contenido localizado.
+---
+
+Next.js te permite configurar el enrutamiento y renderizado de contenido para soportar múltiples idiomas. Hacer que tu sitio se adapte a diferentes localizaciones incluye contenido traducido (localización) y rutas internacionalizadas.
+
+## Terminología
+
+- **Localización (Locale):** Un identificador para un conjunto de preferencias de idioma y formato. Esto generalmente incluye el idioma preferido del usuario y posiblemente su región geográfica.
+  - `en-US`: Inglés como se habla en Estados Unidos
+  - `nl-NL`: Holandés como se habla en Países Bajos
+  - `nl`: Holandés, sin región específica
+
+## Visión general del enrutamiento
+
+Se recomienda usar las preferencias de idioma del usuario en el navegador para seleccionar qué localización usar. Cambiar tu idioma preferido modificará el encabezado `Accept-Language` que llega a tu aplicación.
+
+Por ejemplo, usando las siguientes bibliotecas, puedes examinar una `Request` entrante para determinar qué localización seleccionar, basado en los `Headers`, las localizaciones que planeas soportar y la localización predeterminada.
+
+```js filename="middleware.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+El enrutamiento puede internacionalizarse mediante sub-rutas (`/fr/products`) o dominios (`my-site.fr/products`). Con esta información, ahora puedes redirigir al usuario basado en la localización dentro de [Middleware](/docs/app/building-your-application/routing/middleware).
+
+```js filename="middleware.js"
+import { NextResponse } from "next/server";
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// Obtener la localización preferida, similar al ejemplo anterior o usando una biblioteca
+function getLocale(request) { ... }
+
+export function middleware(request) {
+  // Verificar si hay alguna localización soportada en el pathname
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  // Redirigir si no hay localización
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // Ejemplo: solicitud entrante es /products
+  // La nueva URL ahora es /en-US/products
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // Omitir todas las rutas internas (_next)
+    '/((?!_next).*)',
+    // Opcional: ejecutar solo en la URL raíz (/)
+    // '/'
+  ],
+}
+```
+
+Finalmente, asegúrate que todos los archivos especiales dentro de `app/` estén anidados bajo `app/[lang]`. Esto permite al enrutador de Next.js manejar dinámicamente diferentes localizaciones en la ruta, y pasar el parámetro `lang` a cada layout y página. Por ejemplo:
+
+```tsx filename="app/[lang]/page.tsx" switcher
+// Ahora tienes acceso a la localización actual
+// Ejemplo: /en-US/products -> `lang` es "en-US"
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
+  const { lang } = await params
+  return ...
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+// Ahora tienes acceso a la localización actual
+// Ejemplo: /en-US/products -> `lang` es "en-US"
+export default async function Page({ params }) {
+  const { lang } = await params
+  return ...
+}
+```
+
+El layout raíz también puede anidarse en la nueva carpeta (ej. `app/[lang]/layout.js`).
+
+## Localización
+
+Cambiar el contenido mostrado basado en la localización preferida del usuario, o localización, no es algo específico de Next.js. Los patrones descritos a continuación funcionarían igual con cualquier aplicación web.
+
+Supongamos que queremos soportar contenido tanto en inglés como en holandés dentro de nuestra aplicación. Podríamos mantener dos "diccionarios" diferentes, que son objetos que nos dan un mapeo de alguna clave a una cadena localizada. Por ejemplo:
+
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+Luego podemos crear una función `getDictionary` para cargar las traducciones para la localización solicitada:
+
+```ts filename="app/[lang]/dictionaries.ts" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale: 'en' | 'nl') =>
+  dictionaries[locale]()
+```
+
+```js filename="app/[lang]/dictionaries.js" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale) => dictionaries[locale]()
+```
+
+Dado el idioma actualmente seleccionado, podemos obtener el diccionario dentro de un layout o página.
+
+```tsx filename="app/[lang]/page.tsx" switcher
+import { getDictionary } from './dictionaries'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ lang: 'en' | 'nl' }>
+}) {
+  const { lang } = await params
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+import { getDictionary } from './dictionaries'
+
+export default async function Page({ params }) {
+  const { lang } = await params
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+Debido a que todos los layouts y páginas en el directorio `app/` son por defecto [Componentes del Servidor](/docs/app/getting-started/server-and-client-components), no necesitamos preocuparnos por el tamaño de los archivos de traducción afectando el tamaño del paquete JavaScript del lado del cliente. Este código **solo se ejecutará en el servidor**, y solo el HTML resultante se enviará al navegador.
+
+## Renderizado estático
+
+Para generar rutas estáticas para un conjunto dado de localizaciones, podemos usar `generateStaticParams` con cualquier página o layout. Esto puede ser global, por ejemplo, en el layout raíz:
+
+```tsx filename="app/[lang]/layout.tsx" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({
+  children,
+  params,
+}: Readonly<{
+  children: React.ReactNode
+  params: Promise<{ lang: 'en-US' | 'de' }>
+}>) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/[lang]/layout.js" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({ children, params }) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## Recursos
+
+- [Enrutamiento i18n y traducciones mínimas](https://github.com/vercel/next.js/tree/canary/examples/i18n-routing)
+- [`next-intl`](https://next-intl.dev)
+- [`next-international`](https://github.com/QuiiBz/next-international)
+- [`next-i18n-router`](https://github.com/i18nexus/next-i18n-router)
+- [`paraglide-next`](https://inlang.com/m/osslbuzt/paraglide-next-i18n)
+- [`lingui`](https://lingui.dev)

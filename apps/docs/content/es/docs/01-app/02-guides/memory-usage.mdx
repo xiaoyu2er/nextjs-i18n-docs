@@ -1,0 +1,139 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:00:00.633Z
+title: Cómo optimizar el uso de memoria
+nav_title: Uso de memoria
+description: Optimiza la memoria utilizada por tu aplicación en desarrollo y producción.
+---
+
+A medida que las aplicaciones crecen y se enriquecen con más funciones, pueden demandar más recursos al desarrollar localmente o al crear builds de producción.
+
+Exploremos algunas estrategias y técnicas para optimizar la memoria y abordar problemas comunes de memoria en Next.js.
+
+## Reducir el número de dependencias
+
+Las aplicaciones con una gran cantidad de dependencias utilizarán más memoria.
+
+El [Analizador de paquetes (Bundle Analyzer)](/docs/app/guides/package-bundling) puede ayudarte a investigar dependencias grandes en tu aplicación que podrían eliminarse para mejorar el rendimiento y el uso de memoria.
+
+## Prueba `experimental.webpackMemoryOptimizations`
+
+A partir de la versión `v15.0.0`, puedes agregar `experimental.webpackMemoryOptimizations: true` a tu archivo `next.config.js` para cambiar el comportamiento en Webpack que reduce el uso máximo de memoria, pero puede aumentar ligeramente los tiempos de compilación.
+
+> **Es bueno saberlo**: Esta característica es actualmente experimental para probarla en más proyectos primero, pero se considera de bajo riesgo.
+
+## Ejecutar `next build` con `--experimental-debug-memory-usage`
+
+A partir de la versión `14.2.0`, puedes ejecutar `next build --experimental-debug-memory-usage` para ejecutar el build en un modo donde Next.js imprimirá información sobre el uso de memoria continuamente durante el build, como el uso del heap y estadísticas de recolección de basura. También se tomarán instantáneas del heap automáticamente cuando el uso de memoria se acerque al límite configurado.
+
+> **Es bueno saberlo**: Esta característica no es compatible con la opción de worker de build de Webpack, que se habilita automáticamente a menos que tengas una configuración personalizada de Webpack.
+
+## Grabar un perfil del heap
+
+Para buscar problemas de memoria, puedes grabar un perfil del heap desde Node.js y cargarlo en Chrome DevTools para identificar posibles fuentes de fugas de memoria.
+
+En tu terminal, pasa el flag `--heap-prof` a Node.js al iniciar tu build de Next.js:
+
+```sh
+node --heap-prof node_modules/next/dist/bin/next build
+```
+
+Al final del build, Node.js creará un archivo `.heapprofile`.
+
+En Chrome DevTools, puedes abrir la pestaña "Memory" y hacer clic en el botón "Load Profile" para visualizar el archivo.
+
+## Analizar una instantánea del heap
+
+Puedes usar una herramienta de inspector para analizar el uso de memoria de la aplicación.
+
+Al ejecutar el comando `next build` o `next dev`, agrega `NODE_OPTIONS=--inspect` al inicio del comando. Esto expondrá el agente de inspector en el puerto predeterminado.
+Si deseas pausar antes de que comience cualquier código de usuario, puedes pasar `--inspect-brk` en su lugar. Mientras el proceso se ejecuta, puedes usar una herramienta como Chrome DevTools para conectarte al puerto de depuración y grabar/analizar una instantánea del heap para ver qué memoria se está reteniendo.
+
+A partir de la versión `14.2.0`, también puedes ejecutar `next build` con el flag `--experimental-debug-memory-usage` para facilitar la toma de instantáneas del heap.
+
+Mientras se ejecuta en este modo, puedes enviar una señal `SIGUSR2` al proceso en cualquier momento, y el proceso tomará una instantánea del heap.
+
+La instantánea del heap se guardará en la raíz del proyecto de la aplicación Next.js y se puede cargar en cualquier analizador de heap, como Chrome DevTools, para ver qué memoria se está reteniendo. Este modo aún no es compatible con los workers de build de Webpack.
+
+Consulta [cómo grabar y analizar instantáneas del heap](https://developer.chrome.com/docs/devtools/memory-problems/heap-snapshots) para obtener más información.
+
+## Worker de build de Webpack
+
+El worker de build de Webpack te permite ejecutar compilaciones de Webpack dentro de un worker separado de Node.js, lo que disminuirá el uso de memoria de tu aplicación durante los builds.
+
+Esta opción está habilitada por defecto si tu aplicación no tiene una configuración personalizada de Webpack a partir de la versión `v14.1.0`.
+
+Si estás usando una versión anterior de Next.js o tienes una configuración personalizada de Webpack, puedes habilitar esta opción configurando `experimental.webpackBuildWorker: true` en tu `next.config.js`.
+
+> **Es bueno saberlo**: Esta característica puede no ser compatible con todos los plugins personalizados de Webpack.
+
+## Deshabilitar la caché de Webpack
+
+La [caché de Webpack](https://webpack.js.org/configuration/cache/) guarda módulos generados de Webpack en memoria y/o en disco para mejorar la velocidad de los builds. Esto puede ayudar con el rendimiento, pero también aumentará el uso de memoria de tu aplicación para almacenar los datos en caché.
+
+Puedes deshabilitar este comportamiento agregando una [configuración personalizada de Webpack](/docs/app/api-reference/config/next-config-js/webpack) a tu aplicación:
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  webpack: (
+    config,
+    { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack }
+  ) => {
+    if (config.cache && !dev) {
+      config.cache = Object.freeze({
+        type: 'memory',
+      })
+    }
+    // Importante: devuelve la configuración modificada
+    return config
+  },
+}
+
+export default nextConfig
+```
+
+## Deshabilitar el análisis estático
+
+La verificación de tipos y el linting pueden requerir mucha memoria, especialmente en proyectos grandes.
+Sin embargo, la mayoría de los proyectos tienen un runner de CI dedicado que ya maneja estas tareas.
+Cuando el build produce problemas de memoria insuficiente durante el paso "Linting and checking validity of types", puedes deshabilitar estas tareas durante los builds:
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  eslint: {
+    // Advertencia: Esto permite que los builds de producción se completen con éxito incluso si
+    // tu proyecto tiene errores de ESLint.
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // !! ADVERTENCIA !!
+    // Permite peligrosamente que los builds de producción se completen con éxito incluso si
+    // tu proyecto tiene errores de tipo.
+    // !! ADVERTENCIA !!
+    ignoreBuildErrors: true,
+  },
+}
+
+export default nextConfig
+```
+
+- [Ignorar errores de TypeScript](/docs/app/api-reference/config/typescript#disabling-typescript-errors-in-production)
+- [ESLint en la configuración de Next.js](/docs/pages/api-reference/config/next-config-js/eslint)
+
+Ten en cuenta que esto puede producir despliegues defectuosos debido a errores de tipo o problemas de linting.
+Recomendamos encarecidamente promover builds a producción solo después de que se haya completado el análisis estático.
+Si despliegas en Vercel, puedes consultar la [guía para despliegues en staging](https://vercel.com/docs/deployments/managing-deployments#staging-and-promoting-a-production-deployment) para aprender cómo promover builds a producción después de que las tareas personalizadas hayan tenido éxito.
+
+## Deshabilitar los source maps
+
+La generación de source maps consume memoria adicional durante el proceso de build.
+
+Puedes deshabilitar la generación de source maps agregando `productionBrowserSourceMaps: false` y `experimental.serverSourceMaps: false` a tu configuración de Next.js.
+
+> **Es bueno saberlo**: Algunos plugins pueden activar los source maps y pueden requerir configuración personalizada para deshabilitarlos.
+
+## Problemas de memoria en Edge
+
+Next.js `v14.1.3` solucionó un problema de memoria al usar el runtime Edge. Actualiza a esta versión (o posterior) para ver si resuelve tu problema.

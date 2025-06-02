@@ -1,0 +1,493 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:02:19.162Z
+title: Cómo crear formularios con Acciones de Servidor (Server Actions)
+nav_title: Formularios
+description: Aprenda a crear formularios en Next.js utilizando Acciones de Servidor (Server Actions) de React.
+---
+
+Las Acciones de Servidor (Server Actions) de React son [Funciones del Servidor](https://react.dev/reference/rsc/server-functions) que se ejecutan en el servidor. Pueden ser llamadas en Componentes del Servidor y del Cliente para manejar envíos de formularios. Esta guía le mostrará cómo crear formularios en Next.js con Acciones de Servidor.
+
+## Cómo funciona
+
+React extiende el elemento HTML [`<form>`](https://developer.mozilla.org/docs/Web/HTML/Element/form) para permitir invocar Acciones de Servidor mediante el atributo [`action`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/form#action).
+
+Cuando se usa en un formulario, la función recibe automáticamente el objeto [`FormData`](https://developer.mozilla.org/docs/Web/API/FormData/FormData). Luego puede extraer los datos utilizando los [métodos nativos de FormData](https://developer.mozilla.org/en-US/docs/Web/API/FormData#instance_methods):
+
+```tsx filename="app/invoices/page.tsx" switcher
+export default function Page() {
+  async function createInvoice(formData: FormData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // mutate data
+    // revalidate the cache
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+```jsx filename="app/invoices/page.js" switcher
+export default function Page() {
+  async function createInvoice(formData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // mutate data
+    // revalidate the cache
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+> **Nota importante:** Cuando trabaje con formularios que tienen múltiples campos, puede usar el método [`entries()`](https://developer.mozilla.org/en-US/docs/Web/API/FormData/entries) con [`Object.fromEntries()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/fromEntries) de JavaScript. Por ejemplo: `const rawFormData = Object.fromEntries(formData)`.
+
+## Pasar argumentos adicionales
+
+Fuera de los campos del formulario, puede pasar argumentos adicionales a una Función del Servidor usando el método [`bind`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind) de JavaScript. Por ejemplo, para pasar el argumento `userId` a la Función del Servidor `updateUser`:
+
+```tsx filename="app/client-component.tsx" highlight={6} switcher
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }: { userId: string }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">Actualizar nombre de usuario</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" highlight={6} switcher
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">Actualizar nombre de usuario</button>
+    </form>
+  )
+}
+```
+
+La Función del Servidor recibirá el `userId` como argumento adicional:
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function updateUser(userId: string, formData: FormData) {}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function updateUser(userId, formData) {}
+```
+
+> **Nota importante**:
+>
+> - Una alternativa es pasar los argumentos como campos ocultos en el formulario (ej. `<input type="hidden" name="userId" value={userId} />`). Sin embargo, el valor será parte del HTML renderizado y no estará codificado.
+> - `bind` funciona tanto en Componentes del Servidor como del Cliente y soporta mejora progresiva.
+
+## Validación de formularios
+
+Los formularios pueden validarse en el cliente o en el servidor.
+
+- Para **validación del lado del cliente**, puede usar atributos HTML como `required` y `type="email"` para validación básica.
+- Para **validación del lado del servidor**, puede usar una biblioteca como [zod](https://zod.dev/) para validar los campos del formulario. Por ejemplo:
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({
+    invalid_type_error: 'Correo electrónico inválido',
+  }),
+})
+
+export default async function createUser(formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  // Retornar temprano si los datos del formulario son inválidos
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // Mutar datos
+}
+```
+
+```jsx filename="app/actions.js" switcher
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({
+    invalid_type_error: 'Correo electrónico inválido',
+  }),
+})
+
+export default async function createsUser(formData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  // Retornar temprano si los datos del formulario son inválidos
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // Mutar datos
+}
+```
+
+## Errores de validación
+
+Para mostrar errores o mensajes de validación, convierta el componente que define el `<form>` en un Componente del Cliente y use el hook [`useActionState`](https://react.dev/reference/react/useActionState) de React.
+
+Al usar `useActionState`, la firma de la función del Servidor cambiará para recibir un nuevo parámetro `prevState` o `initialState` como primer argumento.
+
+```tsx filename="app/actions.ts" highlight={4} switcher
+'use server'
+
+import { z } from 'zod'
+
+export async function createUser(initialState: any, formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+  // ...
+}
+```
+
+```jsx filename="app/actions.ts" highlight={4} switcher
+'use server'
+
+import { z } from 'zod'
+
+// ...
+
+export async function createUser(initialState, formData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+  // ...
+}
+```
+
+Luego puede renderizar condicionalmente el mensaje de error basado en el objeto `state`.
+
+```tsx filename="app/ui/signup.tsx" highlight={11,18-20} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">Correo electrónico</label>
+      <input type="text" id="email" name="email" required />
+      {/* ... */}
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>Registrarse</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" highlight={11,18-20} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">Correo electrónico</label>
+      <input type="text" id="email" name="email" required />
+      {/* ... */}
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>Registrarse</button>
+    </form>
+  )
+}
+```
+
+## Estados pendientes
+
+El hook [`useActionState`](https://react.dev/reference/react/useActionState) expone un booleano `pending` que puede usarse para mostrar un indicador de carga o deshabilitar el botón de envío mientras se ejecuta la acción.
+
+```tsx filename="app/ui/signup.tsx" highlight={7,12} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      {/* Otros elementos del formulario */}
+      <button disabled={pending}>Registrarse</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" highlight={7,12} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      {/* Otros elementos del formulario */}
+      <button disabled={pending}>Registrarse</button>
+    </form>
+  )
+}
+```
+
+Alternativamente, puede usar el hook [`useFormStatus`](https://react.dev/reference/react-dom/hooks/useFormStatus) para mostrar un indicador de carga mientras se ejecuta la acción. Al usar este hook, necesitará crear un componente separado para renderizar el indicador de carga. Por ejemplo, para deshabilitar el botón cuando la acción está pendiente:
+
+```tsx filename="app/ui/button.tsx" highlight={6} switcher
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      Registrarse
+    </button>
+  )
+}
+```
+
+```jsx filename="app/ui/button.js" highlight={6} switcher
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      Registrarse
+    </button>
+  )
+}
+```
+
+Luego puede anidar el componente `SubmitButton` dentro del formulario:
+
+```tsx filename="app/ui/signup.tsx" switcher
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* Otros elementos del formulario */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/signup.js" switcher
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* Otros elementos del formulario */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+> **Nota importante:** En React 19, `useFormStatus` incluye claves adicionales en el objeto retornado, como data, method y action. Si no está usando React 19, solo está disponible la clave `pending`.
+
+## Actualizaciones optimistas
+
+Puede usar el hook [`useOptimistic`](https://react.dev/reference/react/useOptimistic) de React para actualizar optimistamente la UI antes de que la Función del Servidor termine de ejecutarse, en lugar de esperar la respuesta:
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+type Message = {
+  message: string
+}
+
+export function Thread({ messages }: { messages: Message[] }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<
+    Message[],
+    string
+  >(messages, (state, newMessage) => [...state, { message: newMessage }])
+
+  const formAction = async (formData: FormData) => {
+    const message = formData.get('message') as string
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m, i) => (
+        <div key={i}>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">Enviar</button>
+      </form>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+export function Thread({ messages }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state, newMessage) => [...state, { message: newMessage }]
+  )
+
+  const formAction = async (formData) => {
+    const message = formData.get('message')
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m) => (
+        <div>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">Enviar</button>
+      </form>
+    </div>
+  )
+}
+```
+
+## Elementos anidados de formulario
+
+Puede llamar Acciones de Servidor en elementos anidados dentro de `<form>` como `<button>`, `<input type="submit">` y `<input type="image">`. Estos elementos aceptan la prop `formAction` o manejadores de eventos.
+
+Esto es útil en casos donde desea llamar múltiples Acciones de Servidor dentro de un formulario. Por ejemplo, puede crear un elemento `<button>` específico para guardar un borrador de publicación además de publicarlo. Consulte la [documentación de `<form>` de React](https://react.dev/reference/react-dom/components/form#handling-multiple-submission-types) para más información.
+
+## Envío programático de formularios
+
+Puede activar el envío de un formulario programáticamente usando el método [`requestSubmit()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/requestSubmit). Por ejemplo, cuando el usuario envía un formulario usando el atajo de teclado `⌘` + `Enter`, puede escuchar el evento `onKeyDown`:
+
+```tsx filename="app/entry.tsx" switcher
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'Enter' || e.key === 'NumpadEnter')
+    ) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/entry.js" switcher
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e) => {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === 'Enter' || e.key === 'NumpadEnter')
+    ) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```
+
+Esto activará el envío del `<form>` ancestro más cercano, lo que invocará la Función del Servidor.
