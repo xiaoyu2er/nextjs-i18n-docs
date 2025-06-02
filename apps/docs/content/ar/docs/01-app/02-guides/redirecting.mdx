@@ -1,0 +1,649 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:01:16.435Z
+title: كيفية التعامل مع إعادة التوجيه في Next.js
+nav_title: إعادة التوجيه
+description: تعرف على الطرق المختلفة للتعامل مع إعادة التوجيه في Next.js.
+related:
+  links:
+    - app/api-reference/functions/redirect
+    - app/api-reference/functions/permanentRedirect
+    - app/building-your-application/routing/middleware
+    - app/api-reference/config/next-config-js/redirects
+---
+
+هناك عدة طرق يمكنك من خلالها التعامل مع إعادة التوجيه في Next.js. ستغطي هذه الصفحة كل خيار متاح، حالات الاستخدام، وكيفية إدارة أعداد كبيرة من عمليات إعادة التوجيه.
+
+<AppOnly>
+
+| API                                                            | الغرض                                           | المكان                                             | رمز الحالة                            |
+| -------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------- | ------------------------------------- |
+| [`redirect`](#redirect-function)                               | إعادة توجيه المستخدم بعد تغيير أو حدث            | مكونات الخادم، إجراءات الخادم، معالجات المسار      | 307 (مؤقت) أو 303 (إجراء الخادم)      |
+| [`permanentRedirect`](#permanentredirect-function)             | إعادة توجيه المستخدم بعد تغيير أو حدث             | مكونات الخادم، إجراءات الخادم، معالجات المسار       | 308 (دائم)                            |
+| [`useRouter`](#userouter-hook)                                 | تنفيذ تنقل من جانب العميل                        | معالجات الأحداث في مكونات العميل                   | غير متاح                              |
+| [`redirects` في `next.config.js`](#redirects-in-nextconfigjs)  | إعادة توجيه طلب وارد بناءً على مسار               | ملف `next.config.js`                               | 307 (مؤقت) أو 308 (دائم)              |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | إعادة توجيه طلب وارد بناءً على شرط                | Middleware                                        | أي                                   |
+
+</AppOnly>
+
+<PagesOnly>
+
+| API                                                            | الغرض                                           | المكان                 | رمز الحالة                        |
+| -------------------------------------------------------------- | ------------------------------------------------ | --------------------- | --------------------------------- |
+| [`useRouter`](#userouter-hook)                                 | تنفيذ تنقل من جانب العميل                        | المكونات              | غير متاح                          |
+| [`redirects` في `next.config.js`](#redirects-in-nextconfigjs)  | إعادة توجيه طلب وارد بناءً على مسار               | ملف `next.config.js`  | 307 (مؤقت) أو 308 (دائم)          |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | إعادة توجيه طلب وارد بناءً على شرط                | Middleware            | أي                               |
+
+</PagesOnly>
+
+<AppOnly>
+
+## دالة `redirect`
+
+تتيح لك دالة `redirect` إعادة توجيه المستخدم إلى عنوان URL آخر. يمكنك استدعاء `redirect` في [مكونات الخادم](/docs/app/getting-started/server-and-client-components)، [معالجات المسار](/docs/app/building-your-application/routing/route-handlers)، و[إجراءات الخادم](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+غالبًا ما تُستخدم `redirect` بعد تغيير أو حدث. على سبيل المثال، إنشاء منشور:
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id: string) {
+  try {
+    // استدعاء قاعدة البيانات
+  } catch (error) {
+    // معالجة الأخطاء
+  }
+
+  revalidatePath('/posts') // تحديث المنشورات المخزنة مؤقتًا
+  redirect(`/post/${id}`) // الانتقال إلى صفحة المنشور الجديدة
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id) {
+  try {
+    // استدعاء قاعدة البيانات
+  } catch (error) {
+    // معالجة الأخطاء
+  }
+
+  revalidatePath('/posts') // تحديث المنشورات المخزنة مؤقتًا
+  redirect(`/post/${id}`) // الانتقال إلى صفحة المنشور الجديدة
+}
+```
+
+> **معلومة مفيدة**:
+>
+> - تُرجع `redirect` رمز حالة 307 (إعادة توجيه مؤقتة) افتراضيًا. عند استخدامها في إجراء خادم، تُرجع 303 (انظر آخر)، والذي يُستخدم عادةً لإعادة التوجيه إلى صفحة نجاح نتيجة لطلب POST.
+> - تُطلق `redirect` خطأ داخليًا لذا يجب استدعاؤها خارج كتل `try/catch`.
+> - يمكن استدعاء `redirect` في مكونات العميل أثناء عملية التصيير ولكن ليس في معالجات الأحداث. يمكنك استخدام [رباط `useRouter`](#userouter-hook) بدلاً من ذلك.
+> - تقبل `redirect` أيضًا عناوين URL المطلقة ويمكن استخدامها لإعادة التوجيه إلى روابط خارجية.
+> - إذا كنت ترغب في إعادة التوجيه قبل عملية التصيير، استخدم [`next.config.js`](#redirects-in-nextconfigjs) أو [Middleware](#nextresponseredirect-in-middleware).
+
+راجع [مرجع API لـ `redirect`](/docs/app/api-reference/functions/redirect) لمزيد من المعلومات.
+
+## دالة `permanentRedirect`
+
+تتيح لك دالة `permanentRedirect` إعادة توجيه المستخدم **بشكل دائم** إلى عنوان URL آخر. يمكنك استدعاء `permanentRedirect` في [مكونات الخادم](/docs/app/getting-started/server-and-client-components)، [معالجات المسار](/docs/app/building-your-application/routing/route-handlers)، و[إجراءات الخادم](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+غالبًا ما تُستخدم `permanentRedirect` بعد تغيير أو حدث يغير عنوان URL الأساسي لكيان، مثل تحديث عنوان URL لملف تعريف المستخدم بعد تغيير اسم المستخدم:
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username: string, formData: FormData) {
+  try {
+    // استدعاء قاعدة البيانات
+  } catch (error) {
+    // معالجة الأخطاء
+  }
+
+  revalidateTag('username') // تحديث جميع الإشارات إلى اسم المستخدم
+  permanentRedirect(`/profile/${username}`) // الانتقال إلى ملف تعريف المستخدم الجديد
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username, formData) {
+  try {
+    // استدعاء قاعدة البيانات
+  } catch (error) {
+    // معالجة الأخطاء
+  }
+
+  revalidateTag('username') // تحديث جميع الإشارات إلى اسم المستخدم
+  permanentRedirect(`/profile/${username}`) // الانتقال إلى ملف تعريف المستخدم الجديد
+}
+```
+
+> **معلومة مفيدة**:
+>
+> - تُرجع `permanentRedirect` رمز حالة 308 (إعادة توجيه دائمة) افتراضيًا.
+> - تقبل `permanentRedirect` أيضًا عناوين URL المطلقة ويمكن استخدامها لإعادة التوجيه إلى روابط خارجية.
+> - إذا كنت ترغب في إعادة التوجيه قبل عملية التصيير، استخدم [`next.config.js`](#redirects-in-nextconfigjs) أو [Middleware](#nextresponseredirect-in-middleware).
+
+راجع [مرجع API لـ `permanentRedirect`](/docs/app/api-reference/functions/permanentRedirect) لمزيد من المعلومات.
+
+</AppOnly>
+
+## ربط `useRouter()`
+
+<AppOnly>
+
+إذا كنت بحاجة إلى إعادة التوجيه داخل معالج حدث في مكون عميل، يمكنك استخدام طريقة `push` من ربط `useRouter`. على سبيل المثال:
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      لوحة التحكم
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      لوحة التحكم
+    </button>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+إذا كنت بحاجة إلى إعادة التوجيه داخل مكون، يمكنك استخدام طريقة `push` من ربط `useRouter`. على سبيل المثال:
+
+```tsx filename="app/page.tsx" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      لوحة التحكم
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      لوحة التحكم
+    </button>
+  )
+}
+```
+
+</PagesOnly>
+
+> **معلومة مفيدة**:
+>
+> - إذا لم تكن بحاجة إلى التنقل برمجيًا للمستخدم، يجب استخدام مكون [`<Link>`](/docs/app/api-reference/components/link).
+
+<AppOnly>
+
+راجع [مرجع API لـ `useRouter`](/docs/app/api-reference/functions/use-router) لمزيد من المعلومات.
+
+</AppOnly>
+
+<PagesOnly>
+
+راجع [مرجع API لـ `useRouter`](/docs/pages/api-reference/functions/use-router) لمزيد من المعلومات.
+
+</PagesOnly>
+
+## `redirects` في `next.config.js`
+
+يتيح لك خيار `redirects` في ملف `next.config.js` إعادة توجيه مسار طلب وارد إلى مسار وجهة مختلف. يكون هذا مفيدًا عند تغيير بنية URL للصفحات أو عند وجود قائمة بعمليات إعادة التوجيه معروفة مسبقًا.
+
+يدعم `redirects` [مطابقة المسار](/docs/app/api-reference/config/next-config-js/redirects#path-matching)، [مطابقة الرأس، الكوكيز، والاستعلام](/docs/app/api-reference/config/next-config-js/redirects#header-cookie-and-query-matching)، مما يمنحك المرونة في إعادة توجيه المستخدمين بناءً على طلب وارد.
+
+لاستخدام `redirects`، أضف الخيار إلى ملف `next.config.js` الخاص بك:
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      // إعادة توجيه أساسية
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // مطابقة مسار باستخدام حرف البدل
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  async redirects() {
+    return [
+      // إعادة توجيه أساسية
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // مطابقة مسار باستخدام حرف البدل
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+راجع [مرجع API لـ `redirects`](/docs/app/api-reference/config/next-config-js/redirects) لمزيد من المعلومات.
+
+> **معلومة مفيدة**:
+>
+> - يمكن أن يُرجع `redirects` رمز حالة 307 (إعادة توجيه مؤقتة) أو 308 (إعادة توجيه دائمة) مع خيار `permanent`.
+> - قد يكون لـ `redirects` حد على بعض المنصات. على سبيل المثال، في Vercel، هناك حد لـ 1,024 إعادة توجيه. لإدارة عدد كبير من عمليات إعادة التوجيه (1000+)، فكر في إنشاء حل مخصص باستخدام [Middleware](/docs/app/building-your-application/routing/middleware). راجع [إدارة عمليات إعادة التوجيه على نطاق واسع](#managing-redirects-at-scale-advanced) للمزيد.
+> - يعمل `redirects` **قبل** Middleware.
+
+## `NextResponse.redirect` في Middleware
+
+يسمح لك Middleware بتشغيل الكود قبل اكتمال الطلب. ثم، بناءً على الطلب الوارد، يمكنك إعادة توجيه إلى عنوان URL مختلف باستخدام `NextResponse.redirect`. يكون هذا مفيدًا إذا كنت ترغب في إعادة توجيه المستخدمين بناءً على شرط (مثل المصادقة، إدارة الجلسة، إلخ) أو لديك [عدد كبير من عمليات إعادة التوجيه](#managing-redirects-at-scale-advanced).
+
+على سبيل المثال، لإعادة توجيه المستخدم إلى صفحة `/login` إذا لم يكن مصادقًا عليه:
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request: NextRequest) {
+  const isAuthenticated = authenticate(request)
+
+  // إذا كان المستخدم مصادقًا عليه، تابع بشكل طبيعي
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // إعادة توجيه إلى صفحة تسجيل الدخول إذا لم يكن مصادقًا عليه
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request) {
+  const isAuthenticated = authenticate(request)
+
+  // إذا كان المستخدم مصادقًا عليه، تابع بشكل طبيعي
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // إعادة توجيه إلى صفحة تسجيل الدخول إذا لم يكن مصادقًا عليه
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+> **معلومة مفيدة**:
+>
+> - يعمل Middleware **بعد** `redirects` في `next.config.js` و**قبل** التصيير.
+
+راجع وثائق [Middleware](/docs/app/building-your-application/routing/middleware) لمزيد من المعلومات.
+
+## إدارة عمليات إعادة التوجيه على نطاق واسع (متقدم)
+
+لإدارة عدد كبير من عمليات إعادة التوجيه (1000+)، يمكنك التفكير في إنشاء حل مخصص باستخدام Middleware. هذا يسمح لك بالتعامل مع عمليات إعادة التوجيه برمجيًا دون الحاجة إلى إعادة نشر تطبيقك.
+
+للقيام بذلك، ستحتاج إلى النظر في:
+
+1. إنشاء وتخزين خريطة إعادة توجيه.
+2. تحسين أداء البحث عن البيانات.
+
+> **مثال Next.js**: راجع مثالنا [Middleware مع مرشح Bloom](https://redirects-bloom-filter.vercel.app/) لتنفيذ التوصيات أدناه.
+
+### 1. إنشاء وتخزين خريطة إعادة توجيه
+
+خريطة إعادة التوجيه هي قائمة بعمليات إعادة التوجيه التي يمكنك تخزينها في قاعدة بيانات (عادةً مخزن مفتاح-قيمة) أو ملف JSON.
+
+ضع في الاعتبار بنية البيانات التالية:
+
+```json
+{
+  "/old": {
+    "destination": "/new",
+    "permanent": true
+  },
+  "/blog/post-old": {
+    "destination": "/blog/post-new",
+    "permanent": true
+  }
+}
+```
+
+في [Middleware](/docs/app/building-your-application/routing/middleware)، يمكنك القراءة من قاعدة بيانات مثل [Edge Config](https://vercel.com/docs/edge-config/get-started) من Vercel أو [Redis](https://vercel.com/docs/redis)، وإعادة توجيه المستخدم بناءً على الطلب الوارد:
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData && typeof redirectData === 'string') {
+    const redirectEntry: RedirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // لم يتم العثور على إعادة توجيه، تابع بدون إعادة توجيه
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+export async function middleware(request) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData) {
+    const redirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // لم يتم العثور على إعادة توجيه، تابع بدون إعادة توجيه
+  return NextResponse.next()
+}
+```
+
+### 2. تحسين أداء البحث عن البيانات
+
+قراءة مجموعة بيانات كبيرة لكل طلب وارد يمكن أن تكون بطيئة ومكلفة. هناك طريقتان لتحسين أداء البحث عن البيانات:
+
+- استخدام قاعدة بيانات مُحسّنة للقراءة السريعة
+- استخدام استراتيجية بحث عن البيانات مثل [مرشح بلوم (Bloom filter)](https://en.wikipedia.org/wiki/Bloom_filter) للتحقق بكفاءة مما إذا كان هناك إعادة توجيه موجودة **قبل** قراءة ملف أو قاعدة بيانات إعادة التوجيه الأكبر.
+
+بالنظر إلى المثال السابق، يمكنك استيراد ملف مرشح بلوم المُنشأ إلى Middleware، ثم التحقق مما إذا كان مسار الطلب الوارد موجودًا في مرشح بلوم.
+
+إذا كان موجودًا، يتم تمرير الطلب إلى <AppOnly>[معالج المسار (Route Handler)](/docs/app/building-your-application/routing/route-handlers)</AppOnly> <PagesOnly>[مسارات API](/docs/pages/building-your-application/routing/api-routes)</PagesOnly> والذي سيتحقق من الملف الفعلي ويعيد توجيه المستخدم إلى الرابط المناسب. هذا يتجنب استيراد ملف إعادة توجيه كبير إلى Middleware، مما يمكن أن يُبطئ كل طلب وارد.
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+// Initialize bloom filter from a generated JSON file
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter as any)
+
+export async function middleware(request: NextRequest) {
+  // Get the path for the incoming request
+  const pathname = request.nextUrl.pathname
+
+  // Check if the path is in the bloom filter
+  if (bloomFilter.has(pathname)) {
+    // Forward the pathname to the Route Handler
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // Fetch redirect data from the Route Handler
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry: RedirectEntry | undefined =
+          await redirectData.json()
+
+        if (redirectEntry) {
+          // Determine the status code
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // Redirect to the destination
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // No redirect found, continue the request without redirecting
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+// Initialize bloom filter from a generated JSON file
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter)
+
+export async function middleware(request) {
+  // Get the path for the incoming request
+  const pathname = request.nextUrl.pathname
+
+  // Check if the path is in the bloom filter
+  if (bloomFilter.has(pathname)) {
+    // Forward the pathname to the Route Handler
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // Fetch redirect data from the Route Handler
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry = await redirectData.json()
+
+        if (redirectEntry) {
+          // Determine the status code
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // Redirect to the destination
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // No redirect found, continue the request without redirecting
+  return NextResponse.next()
+}
+```
+
+<AppOnly>
+
+ثم، في معالج المسار (Route Handler):
+
+```ts filename="app/api/redirects/route.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export function GET(request: NextRequest) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // Get the redirect entry from the redirects.json file
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // Account for bloom filter false positives
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // Return the redirect entry
+  return NextResponse.json(redirect)
+}
+```
+
+```js filename="app/api/redirects/route.js" switcher
+import { NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+export function GET(request) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // Get the redirect entry from the redirects.json file
+  const redirect = redirects[pathname]
+
+  // Account for bloom filter false positives
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // Return the redirect entry
+  return NextResponse.json(redirect)
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+ثم، في مسار API:
+
+```ts filename="pages/api/redirects.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // Get the redirect entry from the redirects.json file
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // Account for bloom filter false positives
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // Return the redirect entry
+  return res.json(redirect)
+}
+```
+
+```js filename="pages/api/redirects.js" switcher
+import redirects from '@/app/redirects/redirects.json'
+
+export default function handler(req, res) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // Get the redirect entry from the redirects.json file
+  const redirect = redirects[pathname]
+
+  // Account for bloom filter false positives
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // Return the redirect entry
+  return res.json(redirect)
+}
+```
+
+</PagesOnly>
+
+> **معلومة مفيدة:**
+>
+> - لإنشاء مرشح بلوم، يمكنك استخدام مكتبة مثل [`bloom-filters`](https://www.npmjs.com/package/bloom-filters).
+> - يجب عليك التحقق من صحة الطلبات المرسلة إلى معالج المسار (Route Handler) لمنع الطلبات الضارة.

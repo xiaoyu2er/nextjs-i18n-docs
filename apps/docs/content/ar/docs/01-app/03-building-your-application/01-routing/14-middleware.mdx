@@ -1,0 +1,663 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:13:58.562Z
+title: Middleware
+description: تعرف على كيفية استخدام Middleware لتشغيل الكود قبل اكتمال الطلب.
+---
+
+{/* المحتوى مشترك بين تطبيق التوجيه وصفحات التوجيه. يمكنك استخدام المكون `<PagesOnly>Content</PagesOnly>` لإضافة محتوى خاص بتوجيه الصفحات. أي محتوى مشترك يجب ألا يكون مغلفًا في مكون. */}
+
+يسمح لك Middleware بتشغيل الكود قبل اكتمال الطلب. ثم بناءً على الطلب الوارد، يمكنك تعديل الاستجابة عن طريق إعادة الكتابة، إعادة التوجيه، تعديل رؤوس الطلب أو الاستجابة، أو الرد مباشرة.
+
+يعمل Middleware قبل مطابقة المحتوى المخزن والمسارات. راجع [مطابقة المسارات](#matching-paths) لمزيد من التفاصيل.
+
+## حالات الاستخدام
+
+بعض السيناريوهات الشائعة حيث يكون Middleware فعالًا تشمل:
+
+- إعادة التوجيه السريع بعد قراءة أجزاء من الطلب الوارد
+- إعادة الكتابة إلى صفحات مختلفة بناءً على اختبارات A/B أو التجارب
+- تعديل الرؤوس لجميع الصفحات أو مجموعة فرعية من الصفحات
+
+Middleware _ليس_ مناسبًا لـ:
+
+- جلب البيانات البطيء
+- إدارة الجلسات
+
+## الاتفاقية
+
+استخدم ملف `middleware.ts` (أو `.js`) في جذر مشروعك لتحديد Middleware. على سبيل المثال، في نفس مستوى `pages` أو `app`، أو داخل `src` إذا كان ذلك ينطبق.
+
+> **ملاحظة**: بينما يتم دعم ملف `middleware.ts` واحد فقط لكل مشروع، لا يزال بإمكانك تنظيم منطق Middleware الخاص بك بطريقة نمطية. قم بتقسيم وظائف Middleware إلى ملفات `.ts` أو `.js` منفصلة واستوردها إلى ملف `middleware.ts` الرئيسي الخاص بك. هذا يسمح بإدارة أنظف لـ Middleware الخاص بالمسار، مجمعة في `middleware.ts` للتحكم المركزي. من خلال فرض ملف Middleware واحد، يبسط التكوين، يمنع التعارضات المحتملة، ويحسن الأداء عن طريق تجنب طبقات متعددة من Middleware.
+
+## مثال
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+// يمكن وضع علامة `async` على هذه الدالة إذا كنت تستخدم `await` داخلها
+export function middleware(request: NextRequest) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// راجع "مطابقة المسارات" أدناه لمعرفة المزيد
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+// يمكن وضع علامة `async` على هذه الدالة إذا كنت تستخدم `await` داخلها
+export function middleware(request) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// راجع "مطابقة المسارات" أدناه لمعرفة المزيد
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+## مطابقة المسارات
+
+سيتم استدعاء Middleware لـ **كل مسار في مشروعك**. نظرًا لهذا، من الضروري استخدام matchers لاستهداف أو استبعاد مسارات محددة بدقة. فيما يلي ترتيب التنفيذ:
+
+1. `headers` من `next.config.js`
+2. `redirects` من `next.config.js`
+3. Middleware (`rewrites`, `redirects`, إلخ.)
+4. `beforeFiles` (`rewrites`) من `next.config.js`
+5. مسارات نظام الملفات (`public/`, `_next/static/`, `pages/`, `app/`, إلخ.)
+6. `afterFiles` (`rewrites`) من `next.config.js`
+7. المسارات الديناميكية (`/blog/[slug]`)
+8. `fallback` (`rewrites`) من `next.config.js`
+
+هناك طريقتان لتحديد المسارات التي سيعمل عليها Middleware:
+
+1. [تكوين matcher مخصص](#matcher)
+2. [عبارات شرطية](#conditional-statements)
+
+### Matcher
+
+يسمح لك `matcher` بتصفية Middleware ليعمل على مسارات محددة.
+
+```js filename="middleware.js"
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+يمكنك مطابقة مسار واحد أو مسارات متعددة مع بناء جملة المصفوفة:
+
+```js filename="middleware.js"
+export const config = {
+  matcher: ['/about/:path*', '/dashboard/:path*'],
+}
+```
+
+يسمح تكوين `matcher` بتعبير عادي كامل بحيث يتم دعم المطابقة مثل negative lookaheads أو مطابقة الأحرف. يمكن رؤية مثال على negative lookahead لمطابقة كل شيء باستثناء مسارات محددة هنا:
+
+```js filename="middleware.js"
+export const config = {
+  matcher: [
+    /*
+     * تطابق كل مسارات الطلب باستثناء تلك التي تبدأ بـ:
+     * - api (مسارات API)
+     * - _next/static (ملفات ثابتة)
+     * - _next/image (ملفات تحسين الصور)
+     * - favicon.ico, sitemap.xml, robots.txt (ملفات بيانات وصفية)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+  ],
+}
+```
+
+يمكنك أيضًا تخطي Middleware لطلبات معينة باستخدام مصفوفات `missing` أو `has`، أو مزيج من الاثنين:
+
+```js filename="middleware.js"
+export const config = {
+  matcher: [
+    /*
+     * تطابق كل مسارات الطلب باستثناء تلك التي تبدأ بـ:
+     * - api (مسارات API)
+     * - _next/static (ملفات ثابتة)
+     * - _next/image (ملفات تحسين الصور)
+     * - favicon.ico, sitemap.xml, robots.txt (ملفات بيانات وصفية)
+     */
+    {
+      source:
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+
+    {
+      source:
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+      has: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+
+    {
+      source:
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+      has: [{ type: 'header', key: 'x-present' }],
+      missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
+    },
+  ],
+}
+```
+
+> **جيد للمعرفة**: يجب أن تكون قيم `matcher` ثوابت حتى يمكن تحليلها بشكل ثابت في وقت البناء. سيتم تجاهل القيم الديناميكية مثل المتغيرات.
+
+تكوين matchers:
+
+1. يجب أن يبدأ بـ `/`
+2. يمكن أن يتضمن معلمات مسماة: `/about/:path` تطابق `/about/a` و `/about/b` ولكن ليس `/about/a/c`
+3. يمكن أن يكون لديه معدلات على المعلمات المسماة (تبدأ بـ `:`): `/about/:path*` تطابق `/about/a/b/c` لأن `*` تعني _صفر أو أكثر_. `?` تعني _صفر أو واحد_ و `+` تعني _واحد أو أكثر_
+4. يمكن استخدام التعبير العادي المحاط بين قوسين: `/about/(.*)` هو نفسه `/about/:path*`
+
+اقرأ المزيد من التفاصيل في [path-to-regexp](https://github.com/pillarjs/path-to-regexp#path-to-regexp-1) التوثيق.
+
+> **جيد للمعرفة**: لأغراض التوافق مع الإصدارات السابقة، يعتبر Next.js دائمًا `/public` كـ `/public/index`. لذلك، فإن matcher لـ `/public/:path` سيطابق.
+
+### العبارات الشرطية
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+## NextResponse
+
+يسمح لك واجهة برمجة التطبيقات `NextResponse` بـ:
+
+- `redirect` الطلب الوارد إلى عنوان URL مختلف
+- `rewrite` الاستجابة عن طريق عرض عنوان URL معين
+- تعيين رؤوس الطلب لمسارات API، `getServerSideProps`، وأوجه `rewrite`
+- تعيين ملفات تعريف الارتباط للاستجابة
+- تعيين رؤوس الاستجابة
+
+<AppOnly>
+
+لإنتاج استجابة من Middleware، يمكنك:
+
+1. `rewrite` إلى مسار ([صفحة](/docs/app/api-reference/file-conventions/page) أو [معالج المسار](/docs/app/building-your-application/routing/route-handlers)) الذي ينتج استجابة
+2. إرجاع `NextResponse` مباشرة. راجع [إنتاج استجابة](#producing-a-response)
+
+</AppOnly>
+
+<PagesOnly>
+
+لإنتاج استجابة من Middleware، يمكنك:
+
+1. `rewrite` إلى مسار ([صفحة](/docs/pages/building-your-application/routing/pages-and-layouts) أو [مسار حافة API](/docs/pages/building-your-application/routing/api-routes)) الذي ينتج استجابة
+2. إرجاع `NextResponse` مباشرة. راجع [إنتاج استجابة](#producing-a-response)
+
+</PagesOnly>
+
+## استخدام ملفات تعريف الارتباط
+
+ملفات تعريف الارتباط هي رؤوس عادية. في `Request`، يتم تخزينها في رأس `Cookie`. في `Response` تكون في رأس `Set-Cookie`. يوفر Next.js طريقة ملائمة للوصول إلى ملفات تعريف الارتباط هذه ومعالجتها من خلال امتداد `cookies` على `NextRequest` و `NextResponse`.
+
+1. للطلبات الواردة، يأتي `cookies` مع الطرق التالية: `get`، `getAll`، `set`، و `delete` ملفات تعريف الارتباط. يمكنك التحقق من وجود ملف تعريف ارتباط باستخدام `has` أو إزالة جميع ملفات تعريف الارتباط باستخدام `clear`.
+2. للاستجابات الصادرة، يحتوي `cookies` على الطرق التالية `get`، `getAll`، `set`، و `delete`.
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // افترض وجود رأس "Cookie:nextjs=fast" في الطلب الوارد
+  // الحصول على ملفات تعريف الارتباط من الطلب باستخدام واجهة برمجة التطبيقات `RequestCookies`
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // تعيين ملفات تعريف الارتباط على الاستجابة باستخدام واجهة برمجة التطبيقات `ResponseCookies`
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // سيكون للاستجابة الصادرة رأس `Set-Cookie:vercel=fast;path=/`.
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  // افترض وجود رأس "Cookie:nextjs=fast" في الطلب الوارد
+  // الحصول على ملفات تعريف الارتباط من الطلب باستخدام واجهة برمجة التطبيقات `RequestCookies`
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // تعيين ملفات تعريف الارتباط على الاستجابة باستخدام واجهة برمجة التطبيقات `ResponseCookies`
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // سيكون للاستجابة الصادرة رأس `Set-Cookie:vercel=fast;path=/test`.
+
+  return response
+}
+```
+
+## تعيين الرؤوس
+
+يمكنك تعيين رؤوس الطلب والاستجابة باستخدام واجهة برمجة التطبيقات `NextResponse` (تعيين رؤوس _الطلب_ متاح منذ Next.js v13.0.0).
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // استنساخ رؤوس الطلب وتعيين رأس جديد `x-hello-from-middleware1`
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-middleware1', 'hello')
+
+  // يمكنك أيضًا تعيين رؤوس الطلب في NextResponse.next
+  const response = NextResponse.next({
+    request: {
+      // رؤوس طلب جديدة
+      headers: requestHeaders,
+    },
+  })
+
+  // تعيين رأس استجابة جديد `x-hello-from-middleware2`
+  response.headers.set('x-hello-from-middleware2', 'hello')
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  // استنساخ رؤوس الطلب وتعيين رأس جديد `x-hello-from-middleware1`
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-middleware1', 'hello')
+
+  // يمكنك أيضًا تعيين رؤوس الطلب في NextResponse.next
+  const response = NextResponse.next({
+    request: {
+      // رؤوس طلب جديدة
+      headers: requestHeaders,
+    },
+  })
+
+  // تعيين رأس استجابة جديد `x-hello-from-middleware2`
+  response.headers.set('x-hello-from-middleware2', 'hello')
+  return response
+}
+```
+
+> **جيد للمعرفة**: تجنب تعيين رؤوس كبيرة لأنها قد تسبب خطأ [431 Request Header Fields Too Large](https://developer.mozilla.org/docs/Web/HTTP/Status/431) اعتمادًا على تكوين خادم الويب الخلفي الخاص بك.
+
+### CORS
+
+يمكنك تعيين رؤوس CORS في Middleware للسماح بطلبات cross-origin، بما في ذلك [طلبات بسيطة](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#simple_requests) و [طلبات مسبقة](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#preflighted_requests).
+
+```tsx filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+const allowedOrigins = ['https://acme.com', 'https://my-app.org']
+
+const corsOptions = {
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+export function middleware(request: NextRequest) {
+  // التحقق من الأصل من الطلب
+  const origin = request.headers.get('origin') ?? ''
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+
+  // معالجة الطلبات المسبقة
+  const isPreflight = request.method === 'OPTIONS'
+
+  if (isPreflight) {
+    const preflightHeaders = {
+      ...(isAllowedOrigin && { 'Access-Control-Allow-Origin': origin }),
+      ...corsOptions,
+    }
+    return NextResponse.json({}, { headers: preflightHeaders })
+  }
+
+  // معالجة الطلبات البسيطة
+  const response = NextResponse.next()
+
+  if (isAllowedOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+  }
+
+  Object.entries(corsOptions).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+
+  return response
+}
+
+export const config = {
+  matcher: '/api/:path*',
+}
+```
+
+```jsx filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+const allowedOrigins = ['https://acme.com', 'https://my-app.org']
+
+const corsOptions = {
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+export function middleware(request) {
+  // التحقق من الأصل من الطلب
+  const origin = request.headers.get('origin') ?? ''
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+
+  // معالجة الطلبات المسبقة
+  const isPreflight = request.method === 'OPTIONS'
+
+  if (isPreflight) {
+    const preflightHeaders = {
+      ...(isAllowedOrigin && { 'Access-Control-Allow-Origin': origin }),
+      ...corsOptions,
+    }
+    return NextResponse.json({}, { headers: preflightHeaders })
+  }
+
+  // معالجة الطلبات البسيطة
+  const response = NextResponse.next()
+
+  if (isAllowedOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+  }
+
+  Object.entries(corsOptions).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+
+  return response
+}
+
+export const config = {
+  matcher: '/api/:path*',
+}
+```
+
+<AppOnly>
+
+> **جيد للمعرفة:** يمكنك تكوين رؤوس CORS لمسارات فردية في [معالجات المسار](/docs/app/building-your-application/routing/route-handlers#cors).
+
+</AppOnly>
+
+## إنتاج استجابة
+
+يمكنك الرد مباشرة من طبقة الوسيط (Middleware) عن طريق إعادة نسخة من `Response` أو `NextResponse`. (هذه الميزة متاحة منذ [Next.js v13.1.0](https://nextjs.org/blog/next-13-1#nextjs-advanced-middleware))
+
+```ts filename="middleware.ts" switcher
+import type { NextRequest } from 'next/server'
+import { isAuthenticated } from '@lib/auth'
+
+// تحديد عمل الوسيط على المسارات التي تبدأ بـ `/api/`
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function middleware(request: NextRequest) {
+  // استدعاء دالة المصادقة للتحقق من الطلب
+  if (!isAuthenticated(request)) {
+    // الرد ببيانات JSON تشير إلى رسالة خطأ
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+```js filename="middleware.js" switcher
+import { isAuthenticated } from '@lib/auth'
+
+// تحديد عمل الوسيط على المسارات التي تبدأ بـ `/api/`
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function middleware(request) {
+  // استدعاء دالة المصادقة للتحقق من الطلب
+  if (!isAuthenticated(request)) {
+    // الرد ببيانات JSON تشير إلى رسالة خطأ
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+### `waitUntil` و `NextFetchEvent`
+
+كائن `NextFetchEvent` يمتد من كائن [`FetchEvent`](https://developer.mozilla.org/docs/Web/API/FetchEvent) الأصلي، ويتضمن طريقة [`waitUntil()`](https://developer.mozilla.org/docs/Web/API/ExtendableEvent/waitUntil).
+
+تأخذ طريقة `waitUntil()` وعدًا (promise) كوسيط، وتُمدد عمر طبقة الوسيط حتى يتم تنفيذ الوعد. هذا مفيد لأداء المهام في الخلفية.
+
+```ts filename="middleware.ts"
+import { NextResponse } from 'next/server'
+import type { NextFetchEvent, NextRequest } from 'next/server'
+
+export function middleware(req: NextRequest, event: NextFetchEvent) {
+  event.waitUntil(
+    fetch('https://my-analytics-platform.com', {
+      method: 'POST',
+      body: JSON.stringify({ pathname: req.nextUrl.pathname }),
+    })
+  )
+
+  return NextResponse.next()
+}
+```
+
+## أعلام متقدمة لطبقة الوسيط
+
+في الإصدار `v13.1` من Next.js، تم إدخال علمين إضافيين لطبقة الوسيط، `skipMiddlewareUrlNormalize` و `skipTrailingSlashRedirect` للتعامل مع حالات الاستخدام المتقدمة.
+
+`skipTrailingSlashRedirect` يعطل عمليات إعادة التوجيه في Next.js لإضافة أو إزالة الشرطة المائلة في نهاية المسار. هذا يسمح بالتعامل المخصص داخل طبقة الوسيط للحفاظ على الشرطة المائلة لبعض المسارات وليس غيرها، مما قد يجعل عمليات الترحيل التدريجي أسهل.
+
+```js filename="next.config.js"
+module.exports = {
+  skipTrailingSlashRedirect: true,
+}
+```
+
+```js filename="middleware.js"
+const legacyPrefixes = ['/docs', '/blog']
+
+export default async function middleware(req) {
+  const { pathname } = req.nextUrl
+
+  if (legacyPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next()
+  }
+
+  // تطبيق معالجة الشرطة المائلة في النهاية
+  if (
+    !pathname.endsWith('/') &&
+    !pathname.match(/((?!\.well-known(?:\/.*)?)(?:[^/]+\/)*[^/]+\.\w+)/)
+  ) {
+    return NextResponse.redirect(
+      new URL(`${req.nextUrl.pathname}/`, req.nextUrl)
+    )
+  }
+}
+```
+
+`skipMiddlewareUrlNormalize` يسمح بتعطيل تطبيع URL في Next.js لجعل التعامل مع الزيارات المباشرة والانتقالات من العميل متشابهة. في بعض الحالات المتقدمة، يوفر هذا الخيار تحكمًا كاملاً باستخدام URL الأصلي.
+
+```js filename="next.config.js"
+module.exports = {
+  skipMiddlewareUrlNormalize: true,
+}
+```
+
+```js filename="middleware.js"
+export default async function middleware(req) {
+  const { pathname } = req.nextUrl
+
+  // GET /_next/data/build-id/hello.json
+
+  console.log(pathname)
+  // مع العلم هذا سيكون /_next/data/build-id/hello.json
+  // بدون العلم سيكون طبيعيًا إلى /hello
+}
+```
+
+## اختبار الوحدات (تجريبي)
+
+بدءًا من Next.js 15.1، تحتوي حزمة `next/experimental/testing/server` على أدوات لمساعدة في اختبار وحدات ملفات الوسيط. يمكن لاختبار الوحدات لطبقة الوسيط أن يساعد في التأكد من أنها تعمل فقط على المسارات المطلوبة وأن منطق التوجيه المخصص يعمل كما هو مقصود قبل وصول الكود إلى الإنتاج.
+
+يمكن استخدام الدالة `unstable_doesMiddlewareMatch` للتحقق مما إذا كانت طبقة الوسيط ستعمل لـ URL، ورؤوس، وملفات تعريف الارتباط المقدمة.
+
+```js
+import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server'
+
+expect(
+  unstable_doesMiddlewareMatch({
+    config,
+    nextConfig,
+    url: '/test',
+  })
+).toEqual(false)
+```
+
+يمكن أيضًا اختبار دالة الوسيط بالكامل.
+
+```js
+import { isRewrite, getRewrittenUrl } from 'next/experimental/testing/server'
+
+const request = new NextRequest('https://nextjs.org/docs')
+const response = await middleware(request)
+expect(isRewrite(response)).toEqual(true)
+expect(getRewrittenUrl(response)).toEqual('https://other-domain.com/docs')
+// يمكن أيضًا استخدام getRedirectUrl إذا كانت الاستجابة إعادة توجيه
+```
+
+## وقت التشغيل
+
+تعمل طبقة الوسيط افتراضيًا باستخدام وقت تشغيل الحافة (Edge runtime). اعتبارًا من v15.2 (كاناري)، لدينا دعم تجريبي لاستخدام وقت تشغيل Node.js. للتمكين، أضف العلم إلى ملف `next.config` الخاص بك:
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    nodeMiddleware: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+const nextConfig = {
+  experimental: {
+    nodeMiddleware: true,
+  },
+}
+
+export default nextConfig
+```
+
+ثم في ملف الوسيط الخاص بك، اضبط وقت التشغيل على `nodejs` في كائن `config`:
+
+```js highlight={2} filename="middleware.js" switcher
+export const config = {
+  runtime: 'nodejs',
+}
+```
+
+```ts highlight={2} filename="middleware.ts" switcher
+export const config = {
+  runtime: 'nodejs',
+}
+```
+
+> **ملاحظة**: هذه الميزة غير موصى بها بعد للاستخدام في الإنتاج. لذلك، سيقوم Next.js بإرجاع خطأ ما لم تستخدم إصدار next@canary بدلاً من الإصدار المستقر.
+
+## دعم المنصات
+
+| خيار النشر                                                     | مدعوم            |
+| -------------------------------------------------------------- | ---------------- |
+| [خادم Node.js](/docs/app/getting-started/deploying#nodejs-server) | نعم              |
+| [حاوية Docker](/docs/app/getting-started/deploying#docker)      | نعم              |
+| [تصدير ثابت](/docs/app/getting-started/deploying#static-export) | لا               |
+| [المحولات](/docs/app/getting-started/deploying#adapters)        | حسب المنصة       |
+
+تعلم كيفية [تكوين طبقة الوسيط](/docs/app/guides/self-hosting#middleware) عند استضافة Next.js ذاتيًا.
+
+## سجل الإصدارات
+
+| الإصدار    | التغييرات                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| `v15.2.0`  | يمكن لطبقة الوسيط الآن استخدام وقت تشغيل Node.js (تجريبي)                                   |
+| `v13.1.0`  | تمت إضافة أعلام متقدمة لطبقة الوسيط                                                         |
+| `v13.0.0`  | يمكن لطبقة الوسيط تعديل رؤوس الطلب، رؤوس الاستجابة، وإرسال الردود                           |
+| `v12.2.0`  | طبقة الوسيط مستقرة، يرجى الاطلاع على [دليل الترقية](/docs/messages/middleware-upgrade-guide) |
+| `v12.0.9`  | فرض استخدام عناوين URL المطلقة في وقت تشغيل الحافة ([PR](https://github.com/vercel/next.js/pull/33410)) |
+| `v12.0.0`  | تمت إضافة طبقة الوسيط (بيتا)                                                                |
