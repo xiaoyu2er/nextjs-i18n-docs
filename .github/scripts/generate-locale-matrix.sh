@@ -96,7 +96,6 @@ process_manual_trigger() {
                 local secret_project_id=$(get_locale_config "$locale_config" "$locale" "secret_project_id")
                 local orama_private_api_key=$(get_locale_config "$locale_config" "$locale" "orama_private_api_key")
                 
-                log "Adding $locale to deployment matrix"
                 matrix_include=$(add_locale_to_matrix "$matrix_include" "$locale" "$secret_project_id" "$orama_private_api_key")
                 has_changes="true"
             fi
@@ -122,7 +121,6 @@ process_manual_trigger() {
                 local orama_private_api_key=$(get_locale_config "$locale_config" "$locale" "orama_private_api_key")
                 
                 if [ -n "$secret_project_id" ]; then
-                    log "Adding $locale to deployment matrix"
                     matrix_include=$(add_locale_to_matrix "$matrix_include" "$locale" "$secret_project_id" "$orama_private_api_key")
                     has_changes="true"
                 else
@@ -148,12 +146,8 @@ process_auto_trigger() {
     local matrix_include="[]"
     local has_changes="false"
     
-    log "Processing automatic/docs-pr trigger"
-    log "Changes JSON: $changes_json"
-    
     # Check core changes
     local core_changed=$(echo "$changes_json" | jq -r '.core_any_changed // "false"')
-    log "Core changed: $core_changed"
     
     # Check each locale dynamically from config
     for locale in $(echo "$locale_config" | jq -r 'keys[]'); do
@@ -164,11 +158,8 @@ process_auto_trigger() {
             # Get locale change status dynamically from the changes JSON
             local locale_changed=$(echo "$changes_json" | jq -r ".[\"${locale}_any_changed\"] // \"false\"")
             
-            log "Checking $locale: enabled=true, changed=$locale_changed, core_changed=$core_changed"
-            
             # Add to matrix if enabled and (core changed or locale changed)
             if [ "$core_changed" == "true" ] || [ "$locale_changed" == "true" ]; then
-                log "Adding $locale to deployment matrix"
                 matrix_include=$(add_locale_to_matrix "$matrix_include" "$locale" "$secret_project_id" "$orama_private_api_key")
                 has_changes="true"
             fi
@@ -220,7 +211,6 @@ main() {
     
     log "=== Locale Matrix Generator ==="
     log "Trigger type: $trigger_type"
-    log "Locale config file: $LOCALE_CONFIG_FILE"
     
     # Initialize global result variables
     RESULT_MATRIX_INCLUDE=""
@@ -261,8 +251,6 @@ main() {
         has_changes="$RESULT_HAS_CHANGES"
     fi
     
-    log "Final matrix: $matrix_include"
-    
     # Ensure the matrix is properly formatted as a single line
     local matrix_output
     if ! matrix_output=$(echo "$matrix_include" | jq -c '.'); then
@@ -270,11 +258,8 @@ main() {
         exit 1
     fi
     
-    log "Matrix output (compact): $matrix_output"
-    
     # Validate final JSON
     if validate_json "$matrix_output"; then
-        log "JSON is valid"
         echo "include=$matrix_output"
         echo "has-changes=$has_changes"
     else
