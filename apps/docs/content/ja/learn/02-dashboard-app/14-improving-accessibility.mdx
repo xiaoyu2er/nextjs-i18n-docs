@@ -1,0 +1,369 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:23:24.526Z
+title: アクセシビリティの向上
+headline: 'App Router: アクセシビリティの向上'
+description: サーバーサイドフォームバリデーションを実装し、フォームのアクセシビリティを向上させましょう。
+image: 'https://nextjs.org/api/learn-og?title=Improving%20Accessibility&amp;chapter=14'
+---
+
+前章では、エラー（404エラーを含む）をキャッチしてユーザーにフォールバックを表示する方法を見てきました。しかし、まだパズルのもう一つのピースが残っています：フォームバリデーションです。サーバーアクションを使ったサーバーサイドバリデーションの実装方法と、Reactの[`useActionState`](https://react.dev/reference/react/useActionState)フックを使ってフォームエラーを表示する方法を見ていきましょう - アクセシビリティにも配慮しながら！
+
+[アクセシビリティとは？](#what-is-accessibility)
+------------------------------------------------
+
+アクセシビビリティとは、障害を持つ人々を含む誰もが利用できるウェブアプリケーションを設計・実装することを指します。キーボードナビゲーション、セマンティックHTML、画像、色、動画など、多くの領域をカバーする広範なトピックです。
+
+このコースではアクセシビリティについて深く掘り下げませんが、Next.jsで利用可能なアクセシビリティ機能と、アプリケーションをよりアクセシブルにするための一般的なプラクティスについて説明します。
+
+> アクセシビリティについてさらに学びたい場合は、[web.dev](https://web.dev/)の[アクセシビリティ学習コース](https://web.dev/learn/accessibility/)をお勧めします。
+
+[Next.jsでのESLintアクセシビリティプラグインの使用](#using-the-eslint-accessibility-plugin-in-nextjs)
+----------------------------------------------------------------------------------------------------
+
+Next.jsにはESLint設定に[`eslint-plugin-jsx-a11y`](https://www.npmjs.com/package/eslint-plugin-jsx-a11y)プラグインが含まれており、アクセシビリティ問題を早期に発見するのに役立ちます。例えば、このプラグインは`alt`テキストのない画像がある場合や、`aria-*`属性や`role`属性を誤って使用している場合に警告を出します。
+
+オプションとして、これを試したい場合は、`package.json`ファイルに`next lint`スクリプトを追加してください：
+
+```json {5} filename="/package.json"
+"scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start",
+    "lint": "next lint"
+},
+```
+
+そしてターミナルで`pnpm lint`を実行します：
+
+```bash filename="Terminal"
+pnpm lint
+```
+
+これにより、プロジェクトにESLintをインストールして設定する手順が表示されます。今`pnpm lint`を実行すると、次のような出力が表示されるはずです：
+
+```bash filename="Terminal"
+✔ ESLintの警告やエラーはありません
+```
+
+しかし、`alt`テキストのない画像があった場合どうなるでしょうか？試してみましょう！
+
+`/app/ui/invoices/table.tsx`に移動し、画像から`alt`プロパティを削除します。エディタの検索機能を使って`<Image>`を素早く見つけることができます：
+
+```tsx {6} filename="/app/ui/invoices/table.tsx"
+<Image
+  src={invoice.image_url}
+  className="rounded-full"
+  width={28}
+  height={28}
+  alt={`${invoice.name}'s profile picture`} // この行を削除
+/>
+```
+
+再度`pnpm lint`を実行すると、次の警告が表示されるはずです：
+
+```bash filename="Terminal"
+./app/ui/invoices/table.tsx
+45:25  警告: 画像要素にはaltプロパティが必要です。
+意味のあるテキストか、装飾画像の場合は空文字列を指定してください。 jsx-a11y/alt-text
+```
+
+リンターの追加と設定は必須のステップではありませんが、開発プロセスでアクセシビリティ問題を発見するのに役立ちます。
+
+[フォームアクセシビリティの向上](#improving-form-accessibility)
+-------------------------------------------------------------
+
+私たちのフォームでは、すでにアクセシビリティを向上させるために3つのことを行っています：
+
+*   **セマンティックHTML**: `<div>`の代わりにセマンティック要素（`<input>`、`<option>`など）を使用しています。これにより、支援技術（AT）が入力要素にフォーカスを当て、ユーザーに適切な文脈情報を提供できるため、フォームのナビゲーションと理解が容易になります。
+*   **ラベリング**: `<label>`と`htmlFor`属性を含めることで、各フォームフィールドに説明的なテキストラベルが付きます。これはATサポートを向上させるとともに、ユーザーがラベルをクリックして対応する入力フィールドにフォーカスを当てられるようにすることでユーザビリティも向上させます。
+*   **フォーカスアウトライン**: フィールドはフォーカス時にアウトラインを表示するように適切にスタイル設定されています。これはアクセシビリティにとって重要で、ページ上のアクティブな要素を視覚的に示すことで、キーボードとスクリーンリーダーユーザーの両方がフォーム上の位置を理解するのに役立ちます。`tab`キーを押すことでこれを確認できます。
+
+これらのプラクティスは、多くのユーザーにとってフォームをよりアクセシブルにするための良い基盤を提供します。しかし、**フォームバリデーション**と**エラー**には対応していません。
+
+[フォームバリデーション](#form-validation)
+-----------------------------------
+
+[http://localhost:3000/dashboard/invoices/create](http://localhost:3000/dashboard/invoices/create)にアクセスし、空のフォームを送信してください。何が起こりますか？
+
+エラーが発生します！これは空のフォーム値をサーバーアクションに送信しているためです。クライアントまたはサーバーでフォームを検証することでこれを防ぐことができます。
+
+### [クライアントサイドバリデーション](#client-side-validation)
+
+クライアントでフォームを検証する方法はいくつかあります。最も簡単な方法は、ブラウザが提供するフォームバリデーションを利用することです。フォームの`<input>`と`<select>`要素に`required`属性を追加します。例えば：
+
+```tsx {7} filename="/app/ui/invoices/create-form.tsx"
+<input
+  id="amount"
+  name="amount"
+  type="number"
+  placeholder="Enter USD amount"
+  className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+  required
+/>
+```
+
+再度フォームを送信してください。ブラウザは空の値でフォームを送信しようとすると警告を表示します。
+
+このアプローチは一般的に問題ありません。一部のATはブラウザバリデーションをサポートしているためです。
+
+クライアントサイドバリデーションの代替として、サーバーサイドバリデーションがあります。次のセクションでその実装方法を見ていきましょう。今のところ、追加した`required`属性は削除してください。
+
+### [サーバーサイドバリデーション](#server-side-validation)
+
+サーバーサイドでフォームを検証することで、以下のことが可能になります：
+
+* データベースに送信する前にデータが期待される形式であることを保証
+* 悪意のあるユーザーがクライアントサイドバリデーションを回避するリスクを低減
+* 有効なデータの基準となる「単一の信頼できる情報源」を保持
+
+`create-form.tsx`コンポーネントで、`react`から`useActionState`フックをインポートします。`useActionState`はフックであるため、`"use client"`ディレクティブを使用してフォームをクライアントコンポーネントにする必要があります：
+
+```tsx {1,4} filename="/app/ui/invoices/create-form.tsx"
+'use client';
+ 
+// ...
+import { useActionState } from 'react';
+```
+
+フォームコンポーネント内で、`useActionState`フックは：
+
+* 2つの引数を受け取ります：`(action, initialState)`
+* 2つの値を返します：`[state, formAction]` - フォームの状態と、フォーム送信時に呼び出される関数
+
+`useActionState`の引数として`createInvoice`アクションを渡し、`<form action={}>`属性内で`formAction`を呼び出します。
+
+```tsx {5,7} filename="/app/ui/invoices/create-form.tsx"
+// ...
+import { useActionState } from 'react';
+ 
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const [state, formAction] = useActionState(createInvoice, initialState);
+ 
+  return <form action={formAction}>...</form>;
+}
+```
+
+`initialState`は任意に定義できます。この例では、`message`と`errors`という2つの空のキーを持つオブジェクトを作成し、`actions.ts`ファイルから`State`型をインポートします。`State`はまだ存在しませんが、次に作成します：
+
+```tsx {2,6} filename="/app/ui/invoices/create-form.tsx"
+// ...
+import { createInvoice, State } from '@/app/lib/actions';
+import { useActionState } from 'react';
+ 
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const initialState: State = { message: null, errors: {} };
+  const [state, formAction] = useActionState(createInvoice, initialState);
+ 
+  return <form action={formAction}>...</form>;
+}
+```
+
+最初は混乱するかもしれませんが、サーバーアクションを更新すれば理解できるようになります。さっそく更新しましょう。
+
+`action.ts`ファイルで、Zodを使用してフォームデータを検証できます。`FormSchema`を以下のように更新します：
+
+```ts {4,8,10} filename="/app/lib/actions.ts"
+const FormSchema = z.object({
+  id: z.string(),
+  customerId: z.string({
+    invalid_type_error: '顧客を選択してください。',
+  }),
+  amount: z.coerce
+    .number()
+    .gt(0, { message: '0より大きい金額を入力してください。' }),
+  status: z.enum(['pending', 'paid'], {
+    invalid_type_error: '請求書のステータスを選択してください。',
+  }),
+  date: z.string(),
+});
+```
+
+* `customerId` - 顧客フィールドが空の場合、Zodはすでにエラーをスローします（`string`型を期待しているため）。しかし、ユーザーが顧客を選択しなかった場合に親切なメッセージを追加します。
+* `amount` - 金額の型を`string`から`number`に強制変換しているため、文字列が空の場合はゼロになります。`.gt()`関数を使用して、常に0より大きい金額を必要とするようにZodに指示します。
+* `status` - ステータスフィールドが空の場合、Zodはすでにエラーをスローします（"pending"または"paid"を期待しているため）。ユーザーがステータスを選択しなかった場合にも親切なメッセージを追加します。
+
+次に、`createInvoice`アクションを更新して、`prevState`と`formData`の2つのパラメータを受け取るようにします：
+
+```ts {1,2,3,4,5,6,7,8,10} filename="/app/lib/actions.ts"
+export type State = {
+  errors?: {
+    customerId?: string[];
+    amount?: string[];
+    status?: string[];
+  };
+  message?: string | null;
+};
+ 
+export async function createInvoice(prevState: State, formData: FormData) {
+  // ...
+}
+```
+
+* `formData` - 以前と同じ
+* `prevState` - `useActionState`フックから渡された状態を含みます。この例ではアクション内で使用しませんが、必須のプロパティです
+
+次に、Zodの`parse()`関数を`safeParse()`に変更します：
+
+```ts {3} filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Zodを使用してフォームフィールドを検証
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // ...
+}
+```
+
+`safeParse()`は、`success`または`error`フィールドを含むオブジェクトを返します。これにより、`try/catch`ブロック内にこのロジックを配置することなく、より優雅にバリデーションを処理できます。
+
+データベースに情報を送信する前に、条件分岐を使用してフォームフィールドが正しく検証されたかどうかを確認します：
+
+```ts {10,11,12,13,14,15} filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Zodを使用してフォームフィールドを検証
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // フォームバリデーションが失敗した場合、早期にエラーを返す。そうでなければ続行。
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'フィールドが不足しています。請求書の作成に失敗しました。',
+    };
+  }
+ 
+  // ...
+}
+```
+
+`validatedFields`が成功しなかった場合、Zodからのエラーメッセージと共に関数を早期に返します。
+
+> **ヒント:** 空のフォームを送信して`validatedFields`をconsole.logし、その形状を確認してください。
+
+最後に、フォームバリデーションをtry/catchブロックの外で個別に処理しているため、データベースエラーに対して特定のメッセージを返すことができます。最終的なコードは次のようになります：
+
+```ts filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Zodを使用してフォームを検証
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // フォームバリデーションが失敗した場合、早期にエラーを返す。そうでなければ続行。
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'フィールドが不足しています。請求書の作成に失敗しました。',
+    };
+  }
+ 
+  // データベース挿入用のデータを準備
+  const { customerId, amount, status } = validatedFields.data;
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+ 
+  // データベースにデータを挿入
+  try {
+    await sql`
+      INSERT INTO invoices (customer_id, amount, status, date)
+      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+    `;
+  } catch (error) {
+    // データベースエラーが発生した場合、より具体的なエラーを返す。
+    return {
+      message: 'データベースエラー：請求書の作成に失敗しました。',
+    };
+  }
+ 
+  // 請求書ページのキャッシュを再検証し、ユーザーをリダイレクト。
+  revalidatePath('/dashboard/invoices');
+  redirect('/dashboard/invoices');
+}
+```
+
+では、フォームコンポーネントでエラーを表示しましょう。`create-form.tsx`コンポーネントに戻り、フォームの`state`を使用してエラーにアクセスできます。
+
+各特定のエラーをチェックする**三項演算子**を追加します。例えば、顧客フィールドの後に以下を追加できます：
+
+```tsx {14,27,28,29,30,31,32,33,34} filename="/app/ui/invoices/create-form.tsx"
+<form action={formAction}>
+  <div className="rounded-md bg-gray-50 p-4 md:p-6">
+    {/* 顧客名 */}
+    <div className="mb-4">
+      <label htmlFor="customer" className="mb-2 block text-sm font-medium">
+        顧客を選択
+      </label>
+      <div className="relative">
+        <select
+          id="customer"
+          name="customerId"
+          className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+          defaultValue=""
+          aria-describedby="customer-error"
+        >
+          <option value="" disabled>
+            顧客を選択
+          </option>
+          {customers.map((name) => (
+            <option key={name.id} value={name.id}>
+              {name.name}
+            </option>
+          ))}
+        </select>
+        <UserCircleIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
+      </div>
+      <div id="customer-error" aria-live="polite" aria-atomic="true">
+        {state.errors?.customerId &&
+          state.errors.customerId.map((error: string) => (
+            <p className="mt-2 text-sm text-red-500" key={error}>
+              {error}
+            </p>
+          ))}
+      </div>
+    </div>
+    // ...
+  </div>
+</form>
+```
+
+> **ヒント:** コンポーネント内で`state`をconsole.logし、すべてが正しく接続されているか確認できます。フォームがクライアントコンポーネントになったので、Dev Toolsのコンソールを確認してください。
+
+上記のコードでは、以下のariaラベルも追加しています：
+
+* `aria-describedby="customer-error"`: `select`要素とエラーメッセージコンテナの関係を確立します。`id="customer-error"`を持つコンテナが`select`要素を説明していることを示します。スクリーンリーダーは、ユーザーが`select`ボックスを操作したときにこの説明を読み上げ、エラーを通知します。
+* `id="customer-error"`: この`id`属性は、`select`入力のエラーメッセージを保持するHTML要素を一意に識別します。`aria-describedby`が関係を確立するために必要です。
+* `aria-live="polite"`: スクリーンリーダーは、`div`内のエラーが更新されたときにユーザーに丁寧に通知する必要があります。コンテンツが変更されると（例えばユーザーがエラーを修正した場合）、スクリーンリーダーはこれらの変更をアナウンスしますが、ユーザーが操作中でないときにのみ行われ、中断しないようにします。
+
+[実践: ariaラベルの追加](#practice-adding-aria-labels)
+============================================================
+
+上記の例を使用して、残りのフォームフィールドにエラーを追加します。また、フィールドが不足している場合、フォームの下部にメッセージを表示する必要があります。UIは次のようになります：
+
+<Image
+  alt="各フィールドのエラーメッセージを表示する請求書作成フォーム"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/form-validation-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/form-validation-page.png"
+  width="960"
+  height="568"
+/>
+
+準備ができたら、`pnpm lint`を実行してariaラベルが正しく使用されているか確認してください。
+
+挑戦したい場合は、この章で学んだ知識を活用して、`edit-form.tsx`コンポーネントにフォームバリデーションを追加してください。
+
+以下の作業が必要です：
+
+* `edit-form.tsx`コンポーネントに`useActionState`を追加
+* `updateInvoice`アクションを編集して、Zodからのバリデーションエラーを処理
+* コンポーネントでエラーを表示し、アクセシビリティを向上させるためにariaラベルを追加
+
+準備ができたら、以下のコードスニペットを展開して解決策を確認してください：

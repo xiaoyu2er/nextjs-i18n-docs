@@ -1,0 +1,396 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:21:36.133Z
+title: Next.jsでAPIを構築する
+description: Next.jsを使用してAPIを構築する方法について学びます。
+author:
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+date: 2025-02-28T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/building-apis-with-nextjs/twitter-card.png
+---
+
+このガイドでは、Next.jsでAPIを構築する方法について説明します。プロジェクトのセットアップ、App RouterとRoute Handlersの理解、複数のHTTPメソッドの処理、動的ルーティングの実装、再利用可能なミドルウェアロジックの作成、専用APIレイヤーを構築するタイミングの決定などをカバーします。
+
+*   [1. はじめに](#1-はじめに)
+    *   [1.1 Next.jsアプリの作成](#11-nextjsアプリの作成)
+    *   [1.2 App RouterとPages Router](#12-app-routerとpages-router)
+*   [2. Next.jsでAPIを構築する理由（とタイミング）](#2-nextjsでapiを構築する理由とタイミング)
+*   [3. Route HandlersでAPIを作成](#3-route-handlersでapiを作成)
+    *   [3.1 基本的なファイル設定](#31-基本的なファイル設定)
+    *   [3.2 1つのファイルで複数のHTTPメソッドを扱う](#32-1つのファイルで複数のhttpメソッドを扱う)
+*   [4. Web APIとの連携](#4-web-apiとの連携)
+    *   [4.1 Request & Responseの直接使用](#41-request--responseの直接使用)
+    *   [4.2 クエリパラメータ](#42-クエリパラメータ)
+    *   [4.3 ヘッダーとクッキー](#43-ヘッダーとクッキー)
+*   [5. 動的ルート](#5-動的ルート)
+*   [6. Next.jsをプロキシまたは転送層として使用](#6-nextjsをプロキシまたは転送層として使用)
+*   [7. 共有「ミドルウェア」ロジックの構築](#7-共有ミドルウェアロジックの構築)
+*   [8. デプロイと「SPAモード」の考慮事項](#8-デプロイとspaモードの考慮事項)
+    *   [8.1 標準的なNode.jsデプロイ](#81-標準的なnodejsデプロイ)
+    *   [8.2 SPA/静的エクスポート](#82-spa静的エクスポート)
+    *   [8.3 VercelでのAPIデプロイ](#83-vercelでのapiデプロイ)
+*   [9. APIエンドポイントを作成しない場合](#9-apiエンドポイントを作成しない場合)
+*   [10. すべてをまとめる](#10-すべてをまとめる)
+*   [結論](#結論)
+*   [よくある質問](#よくある質問)
+    *   [Server Actionsについては？](#server-actionsについては)
+    *   [Route HandlersでTypeScriptは使えますか？](#route-handlersでtypescriptは使えますか)
+    *   [認証のベストプラクティスは？](#認証のベストプラクティスは)
+
+[1. はじめに](#1-はじめに)
+-----------------------------------------
+
+### [1.1 Next.jsアプリの作成](#11-nextjs-appの作成)
+
+新規プロジェクトを作成する場合は、次のコマンドを使用します：
+
+```bash filename="ターミナル"
+npx create-next-app@latest --api
+```
+
+> **注:** `--api` フラグを指定すると、新しいプロジェクトの `app/` フォルダにサンプルの `route.ts` が自動的に含まれ、APIエンドポイントの作成方法が示されます。
+
+### [1.2 App RouterとPages Router](#12-app-routerとpages-router)
+
+*   **Pages Router**: 従来、Next.jsはAPIに `pages/api/*` を使用していました。このアプローチはNode.jsのリクエスト/レスポンスオブジェクトとExpress風のAPIに依存していました。
+*   **App Router (デフォルト)**: Next.js 13で導入されたApp Routerは、Web標準のRequest/Response APIを完全に採用しています。`pages/api/*` の代わりに、`app/` ディレクトリ内の任意の場所に `route.ts` または `route.js` ファイルを配置できます。
+
+> **なぜ切り替えるのか？** App Routerの「Route Handlers」はNode.js固有のAPIではなく[Web Platform Request/Response APIs](https://developer.mozilla.org/ja/docs/Web/API)に依存しているため、学習が簡素化され、異なるツール間で知識を再利用できます。
+
+[2. Next.jsでAPIを構築する理由（とタイミング）](#2-nextjsでapiを構築する理由とタイミング)
+------------------------------------------------------------------------------------------
+
+1.  **複数クライアント向けの公開API**
+    
+    *   Next.jsウェブアプリ、別のモバイルアプリ、またはサードパーティサービスが消費する公開APIを構築できます。例えば、ReactウェブサイトとReact Nativeモバイルアプリの両方から `/api/users` をフェッチする場合などです。
+2.  **既存バックエンドへのプロキシ**
+    
+    *   外部の[マイクロサービス](https://vercel.com/blog/how-vercel-adopted-microfrontends)を単一のエンドポイントの背後に隠したり統合したりしたい場合があります。Next.js Route Handlersは、別の既存バックエンドへのプロキシまたは中間層として機能できます。例えば、リクエストをインターセプトし、認証を処理し、データを変換してから、アップストリームAPIにリクエストを渡すことができます。
+3.  **Webhooksと統合**
+    
+    *   Stripe、GitHub、Twilioなどからの外部コールバックやWebhookを受信する場合、Route Handlersで処理できます。
+4.  **カスタム認証**
+    
+    *   セッション、トークン、その他の認証ロジックが必要な場合、Next.js API層でクッキーを保存したり、ヘッダーを読み取ったり、適切なデータで応答したりできます。
+
+> **注:** 独自のNext.jsアプリのためのサーバーサイドデータフェッチのみが必要で（そのデータを外部と共有する必要がない場合）、Server Componentsがレンダリング中に直接データをフェッチするのに十分であれば、別のAPI層は必要ありません。
+
+[3. Route HandlersでAPIを作成](#3-route-handlersでapiを作成)
+---------------------------------------------------------------------------------
+
+### [3.1 基本的なファイル設定](#31-基本的なファイル設定)
+
+App Router (`app/`) で、ルートを表すフォルダを作成し、その中に `route.ts` ファイルを配置します。
+
+例えば、`/api/users` にエンドポイントを作成する場合：
+
+```
+app
+└── api
+    └── users
+        └── route.ts
+```
+
+### [3.2 1つのファイルで複数のHTTPメソッドを扱う](#32-1つのファイルで複数のhttpメソッドを扱う)
+
+Pages RouterのAPIルート（単一のデフォルトエクスポートがあった）とは異なり、同じファイルから異なるHTTPメソッドを表す複数の関数をエクスポートできます。
+
+```ts filename="app/api/users/route.ts"
+export async function GET(request: Request) {
+  // 例えば、ここでDBからデータをフェッチ
+  const users = [
+    { id: 1, name: 'Alice' },
+    { id: 2, name: 'Bob' }
+  ];
+  return new Response(JSON.stringify(users), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+ 
+export async function POST(request: Request) {
+  // リクエストボディを解析
+  const body = await request.json();
+  const { name } = body;
+ 
+  // 例: DBに新しいユーザーを挿入
+  const newUser = { id: Date.now(), name };
+ 
+  return new Response(JSON.stringify(newUser), {
+    status: 201,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+```
+
+これで、`/api/users` にGETリクエストを送信するとユーザーリストが返され、同じURLにPOSTリクエストを送信すると新しいユーザーが追加されます。
+
+[4. Web APIとの連携](#4-web-apiとの連携)
+-----------------------------------------------------
+
+### [4.1 Request & Responseの直接使用](#41-request--responseの直接使用)
+
+デフォルトでは、Route Handlerメソッド（`GET`、`POST`など）は標準の[Request](https://developer.mozilla.org/ja/docs/Web/API/Request)オブジェクトを受け取り、標準の[Response](https://developer.mozilla.org/ja/docs/Web/API/Response)オブジェクトを返す必要があります。
+
+### [4.2 クエリパラメータ](#42-クエリパラメータ)
+
+```ts filename="app/api/search/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const query = searchParams.get('query'); // 例: `/api/search?query=hello`
+ 
+  return new Response(
+    JSON.stringify({ result: `検索クエリ: ${query}` }),
+    {
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+}
+```
+
+### [4.3 ヘッダーとクッキー](#43-ヘッダーとクッキー)
+
+```ts filename="app/api/auth/route.ts"
+import { NextRequest } from 'next/server';
+import { cookies, headers } from 'next/headers';
+ 
+export async function GET(request: NextRequest) {
+  // 1. 'next/headers'ヘルパーの使用
+  const cookieStore = await cookies();
+  const token = cookieStore.get('token');
+ 
+  const headersList = await headers();
+  const referer = headersList.get('referer');
+ 
+  // 2. 標準Web APIの使用
+  const userAgent = request.headers.get('user-agent');
+ 
+  return new Response(JSON.stringify({ token, referer, userAgent }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+```
+
+`cookies()` と `headers()` 関数は、Next.jsの他のサーバーサイドコードで共有ロジックを再利用する場合に便利です。Next.jsはまた、基本のWeb APIを拡張した `NextRequest` と `NextResponse` も提供します。
+
+[5. 動的ルート](#5-動的ルート)
+---------------------------------------
+
+動的パス（例: `/api/users/:id`）を作成するには、フォルダ構造で**動的セグメント**を使用します：
+
+```
+app
+└── api
+    └── users
+        └── [id]
+            └── route.ts
+```
+
+このファイルは `/api/users/123` のようなURLに対応し、`123` がパラメータとしてキャプチャされます。
+
+```ts filename="app/api/users/[id]/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const id = (await params).id;
+  // 例: ID `id` のユーザーをDBからクエリ
+  return new Response(JSON.stringify({ id, name: `ユーザー ${id}` }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const id = (await params).id;
+  // 例: DBからID `id` のユーザーを削除
+  return new Response(null, { status: 204 });
+}
+```
+
+ここで、`params.id` が動的セグメントを提供します。
+
+[6. Next.jsをプロキシまたは転送層として使用](#6-nextjsをプロキシまたは転送層として使用)
+--------------------------------------------------------------------------------------------------
+
+一般的なシナリオは、既存のバックエンドサービスを**プロキシ**することです。リモートサーバーやバックエンドに送信する前に、リクエストを認証したり、ログを記録したり、データを変換したりできます：
+
+```ts filename="app/api/external/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export async function GET(request: NextRequest) {
+  const response = await fetch('https://example.com/api/data', {
+    // オプション: ヘッダーの転送、認証トークンの追加など
+    headers: { Authorization: `Bearer ${process.env.API_TOKEN}` },
+  });
+ 
+  // レスポンスを変換または転送
+  const data = await response.json();
+  const transformed = { ...data, source: 'nextjs経由でプロキシ' };
+ 
+  return new Response(JSON.stringify(transformed), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+```
+
+これでクライアントは `/api/external` を呼び出すだけでよく、Next.jsが残りを処理します。これは「Backend for Frontend（BFF）」とも呼ばれます。
+
+[7. 共有「ミドルウェア」ロジックの構築](#7-共有ミドルウェアロジックの構築)
+-----------------------------------------------------------------------------
+
+複数のRoute Handlerに同じロジック（認証チェック、ロギングなど）を適用したい場合、ハンドラーをラップする再利用可能な関数を作成できます：
+
+```ts filename="lib/with-auth.ts"
+import { NextRequest } from 'next/server';
+ 
+type Handler = (req: NextRequest, context?: any) => Promise<Response>;
+ 
+export function withAuth(handler: Handler): Handler {
+  return async (req, context) => {
+    const token = req.cookies.get('token')?.value;
+    if (!token) {
+      return new Response(JSON.stringify({ error: '認証されていません' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+ 
+    // 認証済みの場合、元のハンドラーを呼び出し
+    return handler(req, context);
+  };
+}
+```
+
+Route Handlerでは：
+
+```ts filename="app/api/secret/route.ts"
+import { NextRequest } from 'next/server';
+import { withAuth } from '@/lib/with-auth';
+ 
+async function secretGET(request: NextRequest) {
+  return new Response(JSON.stringify({ secret: 'ここにドラゴンがいます' }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export const GET = withAuth(secretGET);
+```
+
+[8. デプロイと「SPAモード」の考慮事項](#8-デプロイとspaモードの考慮事項)
+-----------------------------------------------------------------------------------------
+
+### [8.1 標準的なNode.jsデプロイ](#81-標準的なnodejsデプロイ)
+
+標準のNext.jsサーバーデプロイ（next startを使用）では、Route Handlers、Server Components、Middlewareなどの機能を使用でき、動的なリクエスト時情報を活用できます。
+
+追加の設定は不要です。詳細は[デプロイ](/docs/app/building-your-application/deploying)を参照してください。
+
+### [8.2 SPA/静的エクスポート](#82-spa静的エクスポート)
+
+Next.jsはまた、サイト全体を[静的シングルページアプリケーション（SPA）](/docs/app/building-your-application/upgrading/single-page-applications)として出力することをサポートしています。
+
+次の設定で有効にできます：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  output: 'export',
+};
+ 
+export default nextConfig;
+```
+
+**静的エクスポートモード**では、Next.jsは純粋な静的HTML、CSS、JSを生成します。**サーバーサイドコード（APIエンドポイントなど）は実行できません**。APIが必要な場合は、別途ホストする（スタンドアロンのNode.jsサーバーなど）必要があります。
+
+> **注:**
+> 
+> *   **GET Route Handlers** は、動的リクエストデータに依存しない場合[静的エクスポート可能](/docs/app/building-your-application/deploying/static-exports#route-handlers)です。これらはoutフォルダ内の静的ファイルになります。
+> *   **他のすべてのサーバー機能**（動的リクエスト、クッキーの書き換えなど）は、純粋なSPAエクスポートでは**サポートされていません**。
+
+### [8.3 VercelでのAPIデプロイ](#83-deploying-apis-on-vercel)
+
+Next.jsアプリケーションをVercelにデプロイする場合、[APIデプロイガイド](https://vercel.com/guides/hosting-backend-apis)を参照してください。これには、Vercel Firewallを通じた[プログラムによるレート制限](https://vercel.com/docs/security/vercel-waf/rate-limiting-sdk)などのVercel機能も含まれます。Vercelはまた、APIアプローチで一般的に必要とされる[Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs)も提供しています。
+
+[9\. APIエンドポイント作成をスキップする場合](#9-when-to-skip-creating-an-api-endpoint)
+-------------------------------------------------------------------------------------
+
+App Routerの**React Server Components**を使用すると、公開エンドポイントを公開せずにサーバー上で直接データを取得できます:
+
+```tsx filename="app/users/page.tsx"
+// (Server Component)
+export default async function UsersPage() {
+  // このfetchはサーバー上で実行されます（クライアントサイドのコードは不要）
+  const res = await fetch('https://api.example.com/users');
+  const data = await res.json();
+ 
+  return (
+    <main>
+      <h1>ユーザー一覧</h1>
+      <ul>
+        {data.map((user: any) => (
+          <li key={user.id}>{user.name}</li>
+        ))}
+      </ul>
+    </main>
+  );
+}
+```
+
+データがNext.jsアプリ内でのみ使用される場合、公開APIはまったく必要ないかもしれません。
+
+[10\. 全体のまとめ](#10-putting-it-all-together)
+-----------------------------------------------------------
+
+1.  **新しいNext.jsプロジェクトを作成**: `npx create-next-app@latest --api`
+2.  **Route Handlersを追加**: `app/`ディレクトリ内に作成（例: `app/api/users/route.ts`）
+3.  **HTTPメソッドをエクスポート**: 同じファイル内で`GET`、`POST`、`PUT`、`DELETE`などを定義
+4.  **Web標準APIを使用**: `Request`オブジェクトを操作し、`Response`を返す
+5.  **公開APIを構築**: 他のクライアントがデータを利用する必要がある場合、またはバックエンドサービスをプロキシする場合
+6.  **新しいAPIルートをフェッチ**: クライアント側から（例: Client Component内または`fetch('/api/...')`で）
+7.  **API作成を完全にスキップ**: Server Componentで直接データを取得できる場合
+8.  **共有「ミドルウェア」パターンを追加**: 認証やその他の繰り返しロジック用（例: `withAuth()`）
+9.  **デプロイ**: サーバー機能が必要な場合はNode.js対応環境へ、静的SPAのみの場合は静的エクスポート
+
+[結論](#conclusion)
+-------------------------
+
+Next.jsの**App Router**と**Route Handlers**を使用すると、**Webプラットフォーム**を直接活用した柔軟でモダンなAPI構築方法が得られます。これで次のことが可能です:
+
+*   **完全な公開APIを作成**: Web、モバイル、サードパーティのクライアントで共有
+*   **プロキシ**: 既存の外部サービスへの呼び出しをカスタマイズ
+*   **再利用可能な「ミドルウェア」層を実装**: 認証、ロギング、その他の繰り返しロジック用
+*   **動的ルーティング**: `[id]`セグメントフォルダ構造を使用してリクエストをルーティング
+
+[よくある質問](#frequently-asked-questions)
+---------------------------------------------------------
+
+### [Server Actionsについては？](#what-about-server-actions)
+
+[Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations)は、クライアントから呼び出せる自動生成された`POST` APIルートと考えることができます。
+
+これらはデータの作成、更新、削除などの変更操作用に設計されています。Server Actionは、定義されたAPIルートへの明示的な`fetch`を行うのではなく、通常のJavaScript関数のように呼び出します。
+
+ネットワークリクエストは発生しますが、明示的に管理する必要はありません。URLパスは自動生成され、[暗号化](/docs/app/building-your-application/data-fetching/server-actions-and-mutations#security)されているため、ブラウザで`/api/users`のようなルートに手動でアクセスすることはできません。
+
+Server Actionsを使用しつつ公開APIも提供する予定の場合は、コアロジックを[Data Access Layer](/blog/security-nextjs-server-components-actions)に移動し、Server ActionとAPIルートの両方から同じロジックを呼び出すことを推奨します。
+
+### [Route HandlersでTypeScriptは使えますか？](#can-i-use-typescript-with-route-handlers)
+
+はい、Route HandlersでTypeScriptを使用できます。例えば、`route`ファイルで`Request`と`Response`の型を定義できます。
+
+[Next.jsでのTypeScript使用](/docs/app/api-reference/config/typescript)について詳しく学べます。
+
+### [認証のベストプラクティスは？](#what-are-the-best-practices-for-authentication)
+
+[認証ドキュメント](/docs/app/building-your-application/authentication)で詳しく説明しています。

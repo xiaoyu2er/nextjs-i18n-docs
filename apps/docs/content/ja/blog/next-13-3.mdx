@@ -1,0 +1,272 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-06-02T19:17:42.400Z
+title: Next.js 13.3
+description: >-
+  Next.js 13.3では、動的なOpen Graph画像、高度な静的エクスポート、並列ルートとインターセプション、OTELサポートなど、コミュニティから要望の多かった機能が導入されました。
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2023-04-06T18:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-3/twitter-card.png
+---
+
+Next.js 13.3では、以下のようなコミュニティから要望の多かった機能が追加されました：
+
+*   [**ファイルベースのメタデータAPI**](#file-based-metadata-api)：サイトマップ、robots.txt、ファビコンなどを動的に生成
+*   [**動的Open Graph画像生成**](#dynamic-open-graph-image-generation)：JSX、HTML、CSSを使用してOG画像を生成
+*   [**App Routerの静的エクスポート**](#static-export-for-app-router)：サーバーコンポーネントの静的/シングルページアプリケーション（SPA）サポート
+*   [**並列ルートとインターセプション**](#parallel-routes-and-interception)：App Router向けの高度なルーティング機能
+
+以下のコマンドを実行して今日からアップデートできます：
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+次のマイナーリリースでApp Routerを安定版としてマークする準備を進めており、パフォーマンスの最適化、動作の改善、バグ修正に注力しています。
+
+Mutationsなどのいくつかの機能についてはまだ作業中ですが、これらが他のApp Router機能のAPIサーフェスに影響を与えることはないと予想しています。App Routerで皆さんが何を構築するのか楽しみにしています。[フィードバックをお待ちしています](https://github.com/vercel/next.js/discussions/41745)。
+
+[ファイルベースのメタデータAPI](#file-based-metadata-api)
+---------------------------------------------------
+
+[Next.js 13.2](https://nextjs.org/blog/next-13-2#built-in-seo-support-with-new-metadata-api)では、レイアウトやページからMetadataオブジェクトをエクスポートすることでメタデータ（HTMLの`head`要素内の`title`、`meta`、`link`タグなど）を定義できる新しいMetadata APIを発表しました。
+
+```js filename="layout.js or page.js"
+// 静的メタデータ
+export const metadata = {
+  title: 'Home',
+};
+// 出力:
+// <head>
+//	 <title>Home</title>
+// </head>
+ 
+// または動的メタデータ
+export async function generateMetadata({ params, searchParams }) {
+  const product = await getProduct(params.id);
+  return { title: product.title };
+}
+// 出力:
+// <head>
+//	 <title>My Unique Product</title>
+// </head>
+ 
+export default function Page() {}
+```
+
+設定ベースのメタデータに加え、Metadata APIでは新しいファイル規約がサポートされ、SEOやウェブ上での共有を改善するためにページを便利にカスタマイズできるようになりました：
+
+*   `opengraph-image.(jpg|png|svg)`
+*   `twitter-image.(jpg|png|svg)`
+*   `favicon.ico`
+*   `icon.(ico|jpg|png|svg)`
+*   `sitemap.(xml|js|jsx|ts|tsx)`
+*   `robots.(txt|js|jsx|ts|tsx)`
+*   `manifest.(json|js|jsx|ts|tsx)`
+
+例えば、ファイルベースのメタデータを使用してアプリのファビコンや`/about`ページのOpen Graph画像を追加できます：
+
+```
+app
+├── favicon.ico
+├── layout.js
+├── page.js
+└── about
+    ├── opengraph-image.jpg
+    └── page.js
+```
+
+Next.jsは本番環境でこれらのファイルをハッシュ付き（ファイル名用）で自動的に提供し、アセットのURL、ファイルタイプ、画像サイズなどの正しいメタデータ情報で関連する`head`要素を更新します。
+
+```
+// "/"にアクセス時
+<link rel="icon" href="<computedUrl>"/>
+ 
+// "/about"にアクセス時
+<link rel="icon" href="<computedUrl>"/>
+<meta property="og:image" content="<computedUrl>" type="<computedType>" ... />
+```
+
+アプリケーションに静的ファイルを追加するのが最も簡単なアプローチですが、ファイルを動的に作成する必要がある場合もあります。各静的ファイル規約には、ファイルを生成するコードを記述できる動的な`(.js|.jsx|.ts|.tsx)`バリアントが用意されています。
+
+例えば、静的な`sitemap.xml`ファイルを追加できますが、ほとんどのサイトには外部データソースを使用して動的に生成されるページがあります。動的なサイトマップを生成するには、動的ルートの配列を返す`sitemap.js`ファイルを追加できます。
+
+```js filename="app/sitemap.js"
+export default async function sitemap() {
+  const res = await fetch('https://.../posts');
+  const allPosts = await res.json();
+ 
+  const posts = allPosts.map((post) => ({
+    url: `https://acme.com/blog/${post.slug}`,
+    lastModified: post.publishedAt,
+  }));
+ 
+  const routes = ['', '/about', '/blog'].map((route) => ({
+    url: `https://acme.com${route}`,
+    lastModified: new Date().toISOString(),
+  }));
+ 
+  return [...routes, ...posts];
+}
+```
+
+[設定ベース](/docs/app/api-reference/file-conventions/metadata#metadata-object)と新しいファイルベースのオプションにより、静的および動的メタデータの両方をカバーする包括的なMetadata APIが利用可能になりました。
+
+Metadata APIはApp Router（`app`）で13.3から利用可能です。`pages`ディレクトリでは利用できません。[ファイルベースのメタデータとAPIリファレンスについて詳しく学ぶ](/docs/app/api-reference/file-conventions/metadata#file-based-metadata)。
+
+[動的Open Graph画像生成](#dynamic-open-graph-image-generation)
+---------------------------------------------------------------------------
+
+6ヶ月前に、JSX、HTML、CSSを使用して画像を動的に生成できるライブラリ[@vercel/og](https://vercel.com/blog/introducing-vercel-og-image-generation-fast-dynamic-social-card-images)と[Satori](https://github.com/vercel/satori)をリリースしました。
+
+`@vercel/og`は[Next.js Conf](https://nextjs.org/conf)でテストされ、すべての参加者向けに10万枚以上の動的なチケット画像を生成しました。Vercelの顧客間での広範な採用とリリース以来90万回以上のダウンロードを経て、外部パッケージなしで全てのNext.jsアプリケーションに動的に生成された画像を提供できることを嬉しく思います。
+
+`next/server`から`ImageResponse`をインポートして画像を生成できるようになりました：
+
+```tsx filename="/app/about/opengraph-image.tsx"
+import { ImageResponse } from 'next/server';
+ 
+export const size = { width: 1200, height: 600 };
+export const alt = 'About Acme';
+export const contentType = 'image/png';
+export const runtime = 'edge';
+ 
+export default function og() {
+  return new ImageResponse();
+  // ...
+}
+```
+
+`ImageResponse`は、Route HandlersやファイルベースのMetadataを含む他のNext.js APIと自然に統合されます。例えば、`opengraph-image.tsx`ファイルで`ImageResponse`を使用して、ビルド時またはリクエスト時に動的にOpen GraphとTwitter画像を生成できます。
+
+[Image Response APIについて詳しく学ぶ](/docs/app/building-your-application/optimizing/metadata#dynamic-image-generation)
+
+[App Routerの静的エクスポート](#static-export-for-app-router)
+-------------------------------------------------------------
+
+Next.js App Routerで完全な静的エクスポートがサポートされました。
+
+静的サイトまたはシングルページアプリケーション（SPA）として開始し、後で必要に応じてサーバーを必要とするNext.js機能を使用するようにアップグレードできます。
+
+`next build`を実行すると、Next.jsはルートごとにHTMLファイルを生成します。厳密なSPAを個別のHTMLファイルに分割することで、Next.jsはクライアントサイドで不要なJavaScriptコードの読み込みを回避し、バンドルサイズを削減してページの読み込みを高速化できます。
+
+```js filename="next.config.js"
+/**
+ * @type {import('next').NextConfig}
+ */
+const nextConfig = {
+  output: 'export',
+};
+ 
+module.exports = nextConfig;
+```
+
+静的エクスポートは、静的Route Handlers、Open Graph画像、Reactサーバーコンポーネントなど、`app`ルーターの新機能と連携します。
+
+例えば、サーバーコンポーネントはビルド中に実行され、従来の静的サイト生成と同様に、初期ページ読み込み用の静的HTMLとルート間のクライアントナビゲーション用の静的ペイロードにコンポーネントがレンダリングされます。
+
+以前は、`pages`ディレクトリで静的エクスポートを使用するには`next export`を実行する必要がありました。しかし、`next.config.js`オプションを使用すると、`output: 'export'`が設定されている場合に`next build`が`out`ディレクトリを出力します。`app`ルーターと`pages`ディレクトリに同じ設定を使用できます。これにより`next export`は不要になりました。
+
+高度な静的エクスポートサポートにより、`cookies()`や`headers()`などのサーバーを必要とする動的関数を使用しようとした場合など、開発プロセス（`next dev`）の早い段階でエラーが表示されます。
+
+[静的エクスポートについて詳しく学ぶ](/docs/app/building-your-application/deploying/static-exports)。
+
+[並列ルートとインターセプション](#parallel-routes-and-interception)
+---------------------------------------------------------------------
+
+Next.js 13.3では、高度なルーティングケースを実装できる新しい動的規約が導入されました：**並列ルートとインターセプティングルート**。これらの機能により、複雑なダッシュボードやモーダルのように、同じビューで複数のページを表示できます。
+
+並列ルートを使用すると、独立してナビゲート可能な1つ以上のページを_同じビュー_で同時にレンダリングできます。また、条件付きでページをレンダリングするためにも使用できます。
+
+並列ルートは**「スロット」**という名前で作成されます。スロットは`@folder`規約で定義されます：
+
+```
+dashboard
+├── @user
+│   └── page.js
+├── @team
+│   └── page.js
+├── layout.js
+└── page.js
+```
+
+同じルートセグメント内のレイアウトは、スロットをプロップとして受け入れます：
+
+```js filename="app/dashboard/layout.js"
+export default async function Layout({ children, user, team }) {
+  const userType = getCurrentUserType();
+ 
+  return (
+    <>
+      {userType === 'user' ? user : team}
+      {children}
+    </>
+  );
+}
+```
+
+上記の例では、`@user`と`@team`の並列ルートスロット（明示的）がロジックに基づいて条件付きでレンダリングされます。`children`は`@folder`にマップする必要のない暗黙的なルートスロットです。例えば、`dashboard/page.js`は`dashboard/@children/page.js`と同等です。
+
+インターセプティングルートを使用すると、現在のレイアウト内で新しいルートを読み込みながら、ブラウザのURLを「マスク」できます。これは、フィード内の写真をモーダルで拡大表示する場合など、現在のページのコンテキストを保持することが重要な場合に便利です。
+
+インターセプティングルートは、相対パス`../`と同様の`(..)`規約で定義できます。また、`app`ディレクトリからの相対パスを作成するために`(...)`規約も使用できます。
+
+```
+feed
+├── @modal
+│   └── (..)photo
+│       └── [id]
+│           └── page.tsx
+├── page.tsx
+└── layout.tsx
+photo
+└── [id]
+    └── page.tsx
+```
+
+上記の例では、ユーザーのプロフィールから写真をクリックすると、クライアントサイドナビゲーション中にモーダルで写真が開きます。しかし、ページを更新したり共有したりすると、デフォルトのレイアウトで写真が読み込まれます。
+
+![並列ルートとインターセプションにより、Instagramのようなモーダルルーティングが可能になります。](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-3/modal-routing.png)
+
+並列ルートとインターセプションにより、Instagramのようなモーダルルーティングが可能になります。
+
+これにより、モーダルコンテンツをURLで共有可能にすること、ページが更新されたときにコンテキストが失われるのを防ぐこと、後方および前方ナビゲーションでモーダルを閉じて再度開くことなど、モーダル作成時の課題が解決されます。
+
+その他の例や動作については、[並列ルート](/docs/app/building-your-application/routing/parallel-routes)と[インターセプティングルートのドキュメント](/docs/app/building-your-application/routing/intercepting-routes)を参照してください。
+
+[その他の改善点](#other-improvements)
+-----------------------------------------
+
+*   **デザインの更新：** Next.jsの[ホームページ](https://nextjs.org/)と[ショーケース](https://nextjs.org/showcase)が新しいデザインでリフレッシュされました。
+*   **Turbopack：** ミドルウェアのサポート、すべての`next/font`オプション、ベータ版に近づくサーバーコンポーネントのストリーミングが追加されました（[デモを参照](https://twitter.com/padmaia/status/1641130761775464448)）。また、[vercel.com](https://vercel.com)や[nextjs.org](https://nextjs.org/)などの成熟したNext.jsアプリで使用しながら発見された追加のバグも修正しました。[詳細を学ぶ](/docs/architecture/turbopack)。
+*   **`next.config.js`のFast Refresh：** `next.config.js`への変更がローカル開発サーバーを自動的に再起動するようになりました。これにより、`.env`、`.env.*`、`jsconfig.json`、`tsconfig.json`設定ファイルの自動リロードが拡張されます。
+*   **アクセシビリティ：** App Routerに`pages`からのルートアナウンスが含まれるようになりました。この機能は、クライアントサイドのルート遷移をスクリーンリーダーやその他の支援技術に通知します。[詳細を学ぶ](/docs/accessibility)。
+*   **静的に型付けされたリンク：** `next.config.js`で設定された`redirects`と`rewrites`が型チェック時に考慮されるようになりました。[詳細を学ぶ](/docs/app/building-your-application/configuring/typescript#statically-typed-links)。
+*   **`create-next-app`のTailwind CSS：** `npx create-next-app@latest`で新しいプロジェクトを開始する際、Tailwind CSSをオプションで選択するか、`--tailwind`フラグを使用して、このスタイリングソリューションでアプリケーションを事前設定できるようになりました。
+*   **Route Handlers：** [サポートされているHTTP動詞](/docs/app/api-reference/file-conventions/route)の代わりに`export default`を使用すると、`route.ts`で役立つエラーがスローされるようになりました。[Route Handlersについて詳しく学ぶ](/docs/app/building-your-application/routing/route-handlers)。
+*   **画像：** `next/image`が[`fetchPriority="high"`](https://developer.mozilla.org/docs/Web/HTML/Element/img#:~:text=elementtiming%20attribute%20page.-,fetchpriority,-Experimental)属性をサポートするようになりました。
+*   **メタデータ：** 13.2で非推奨となった以前のメタデータAPI（`head.js`）が削除されました。代わりに、[Metadata](/docs/app/api-reference/file-conventions/metadata) APIを通じたSEOの組み込みサポートを使用してください。
+*   **ルーティングからフォルダを除外：** フォルダ名の前に_を付けることで、そのフォルダと子セグメントをルーティングから除外できます。例えば、`app/_dashboard/page.tsx`はルーティング可能ではありません。
+*   **App Router：** 与えられたルートセグメントの動的パラメータを読み取るための新しい`useParams`クライアントコンポーネントフックが追加されました。[詳細を学ぶ](/docs/app/api-reference/functions/use-params)。
+*   **スタイルシートの読み込みの改善：** Next.jsはReactのSuspensey CSSを実装し、特にナビゲーション中のCSSの読み込みやスタイル未適用コンテンツのちらつきに関する多くの問題を修正しました。
+*   **Not Found処理の改善：** 予期される`notFound()`エラーをキャッチするだけでなく、ルートの`app/not-found.js`ファイルはアプリケーション全体でマッチしないURLも処理します。つまり、アプリで処理されないURLにアクセスしたユーザーには、`app/not-found.js`ファイルからエクスポートされたUIが表示されます。[詳細を学ぶ](/docs/app/api-reference/file-conventions/not-found)。
+*   **クライアントサイドルーターキャッシュの改善：** `router.refresh()`はキャッシュ全体を無効化し、検索パラメータがキャッシュキーの一部になりました。これにより、2つの検索パラメータ間（例：`/?search=leerob`と`/?search=tim`）をナビゲートすると、パラメータに依存するコンテンツが正しく復元されます。
+
+[コミュニティ](#community)
+-----------------------
+
+Next.jsは、2,600人以上の個人開発者、GoogleやMetaなどの業界パートナー、そしてVercelのコアチームの共同作業の結果です。週に420万回以上のnpmダウンロードと10万4千以上のGitHubスターを獲得しており、Next.jsはWebを構築する最も人気のある方法の1つです。
+
+[GitHub Discussions](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/)、[Discord](https://nextjs.org/discord)でコミュニティに参加してください。
+
+このリリースは以下の方々によってもたらされました：
+
+*   **Next.js**チーム: [Andrew](https://github.com/acdlite), [Balazs](https://github.com/balazsorban44), [Hannes](https://github.com/hanneslund), [Jan](https://github.com/jankaifer), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sebastian](https://github.com/sebmarkbage), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens), [Wyatt](https://github.com/wyattjoh).
+*   **Turbopack**チーム: [Alex](https://github.com/alexkirsz), [Donny](https://github.com/kdy1), [Justin](https://github.com/jridgewell), [Leah](https://github.com/forsakenharmony), [LongYinan](https://github.com/brooooooklyn), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra), [Will](https://github.com/wbinnssmith).
+
+そして以下の方々の貢献: @shuding, @huozhi, @sokra, @hanneslund, @JesseKoldewijn, @kaguya3222, @yangshun, @ijjk, @konomae, @Brooooooklyn, @jridgewell, @zlrlyy, @JohnDaly, @abhiyandhakal, @benjie, @johnnyomair, @nk980113, @dirheimerb, @DerTimonius, @DuCanhGH, @padmaia, @stafyniaksacha, @Gladowar, @zek, @jankaifer, @styfle, @balazsorban44, @wbinnssmith, @chibicode, @ForsakenHarmony, @franktronics, @FSaldanha, @Schniz, @raisedadead, @AdamKatzDev, @wyattjoh, @leerob, @meesvandongen, @vladikoff, @feedthejim, @tka5, @pyjun01, @gdborton, @M3kH, @aretrace, @shivanshubisht, @alexkirsz, @agrattan0820, @vinaykulk621, @heyitsuzair, @mrkldshv, @timneutkens, @furkanmavili, @swaminator, @EndangeredMassa, @DevEsteves, @rishabhpoddar, @schehata, @molebox, @dlehmhus, @akshaynox, @sp00ls, @janicklas-ralph, @tomryanx, @kwonoj, @karlhorky, @kdy1, @dante-robinson, @lachlanjc, @ianmacartney, @hotters, @isaackatayev, @insik-han, @jayair, @ivanhofer, @javivelasco, @SukkaW, @visshaljagtap, @imranbarbhuiya, @nivak-monarch, @HarshaVardhanReddyDuvvuru, @ianldgs, @ricardofiorani, @swarnava, @gustavostz.

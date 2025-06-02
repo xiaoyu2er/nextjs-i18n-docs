@@ -1,0 +1,910 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-06-02T19:26:41.533Z
+title: Layouts RFC（リクエストフォーコメント）
+description: >-
+  ネストされたルートとレイアウト、クライアントとサーバーのルーティング、React 18の機能、そしてサーバーコンポーネント向けに設計されています。
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2022-05-23T20:30:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/twitter-card.png
+---
+
+このRFC（Request for Comment）は、Next.jsが2016年に導入されて以来の最大のアップデートを概説しています：
+
+*   **ネストされたレイアウト:** ネストされたルートで複雑なアプリケーションを構築
+*   **サーバーコンポーネント向け設計:** サブツリーナビゲーションに最適化
+*   **データ取得の改善:** ウォーターフォールを避けつつレイアウトでデータ取得
+*   **React 18機能の活用:** ストリーミング、トランジション、サスペンス
+*   **クライアントとサーバーのルーティング:** SPAのような動作を持つサーバー中心のルーティング
+*   **100%段階的採用可能:** 破壊的変更なしで徐々に導入可能
+*   **高度なルーティングパターン:** 並列ルート、インターセプトルートなど
+
+新しいNext.jsルーターは、[最近リリースされたReact 18](https://reactjs.org/blog/2022/03/29/react-v18.html)の機能を基盤として構築されます。これらの新機能を簡単に採用し、その利点を活かせるよう、デフォルトと規約を導入する予定です。
+
+> このRFCの作業は進行中であり、新機能が利用可能になった際には発表します。フィードバックを提供するには、[Github Discussions](https://github.com/vercel/next.js/discussions/37136)の会話に参加してください。
+
+[目次](#目次)
+---------------------------------------
+
+*   [動機](#動機)
+*   [用語](#用語)
+*   [現在のルーティングの仕組み](#現在のルーティングの仕組み)
+*   [`app`ディレクトリの紹介](#appディレクトリの紹介)
+*   [ルートの定義](#ルートの定義)
+*   [レイアウト](#レイアウト)
+*   [ページ](#ページ)
+*   [Reactサーバーコンポーネント](#reactサーバーコンポーネント)
+*   [データ取得](#データ取得)
+*   [ルートグループ（新機能）](#ルートグループ)
+*   [サーバー中心のルーティング（新機能）](#サーバー中心のルーティング)
+*   [即時ローディング状態（新機能）](#即時ローディング状態)
+*   [エラーハンドリング（新機能）](#エラーハンドリング)
+*   [テンプレート（新機能）](#テンプレート)
+*   [高度なルーティングパターン（新機能）](#高度なルーティングパターン)
+*   [結論](#結論)
+
+[動機](#動機)
+-------------------------
+
+GitHub、Discord、Reddit、および開発者調査から、Next.jsの現在のルーティングの制限に関するコミュニティフィードバックを収集してきました。以下の点が明らかになりました：
+
+*   レイアウト作成の開発者体験は改善の余地がある。ネスト可能で、ルート間で共有でき、ナビゲーション時に状態が保持されるレイアウトを簡単に作成できるべき。
+*   多くのNext.jsアプリケーションはダッシュボードやコンソールであり、より高度なルーティングソリューションの恩恵を受ける。
+
+現在のルーティングシステムはNext.jsの開始以来うまく機能してきましたが、よりパフォーマンスが高く機能豊富なWebアプリケーションを開発者が簡単に構築できるようにしたいと考えています。
+
+フレームワークのメンテナーとしても、後方互換性がありReactの将来と整合するルーティングシステムを構築したいと考えています。
+
+> **注記:** 一部のルーティング規約は、MetaのRelayベースのルーター（サーバーコンポーネントの機能が最初に開発された場所）や、React RouterやEmber.jsなどのクライアントサイドルーターからインスピレーションを得ています。`layout.js`ファイル規約はSvelteKitの作業に触発されました。[Cassidy](https://twitter.com/cassidoo)が[レイアウトに関する以前のRFC](https://github.com/vercel/next.js/discussions/26389)を開いてくれたことにも感謝します。
+
+[用語](#用語)
+---------------------------
+
+このRFCでは、新しいルーティング規約と構文を導入します。用語はReactと標準的なWebプラットフォームの用語に基づいています。RFC全体で、これらの用語が以下の定義にリンクされます。
+
+*   **ツリー:** 階層構造を視覚化するための規約。例えば、親と子コンポーネントを持つコンポーネントツリー、フォルダ構造など。
+*   **サブツリー:** ツリーの一部で、ルート（最初）からリーフ（最後）まで。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/terminology.png)
+
+*   **URLパス:** ドメインの後に続くURLの部分。
+*   **URLセグメント:** スラッシュで区切られたURLパスの部分。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/url-anatomy.png)
+
+[現在のルーティングの仕組み](#現在のルーティングの仕組み)
+-----------------------------------------------------------
+
+現在、Next.jsはファイルシステムを使用して、[Pages](/docs/pages/building-your-application/routing/pages-and-layouts)ディレクトリ内の個々のフォルダとファイルをURLでアクセス可能なルートにマッピングしています。各**ページ**ファイルはReactコンポーネントをエクスポートし、ファイル名に基づいて関連する**ルート**を持ちます。例えば：
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/routing-today.png)
+
+*   **動的ルート:** Next.jsは`[param].js`、`[...param].js`、`[[...param]].js`規約で[動的ルート](/docs/pages/building-your-application/routing/dynamic-routes)（キャッチオールバリエーションを含む）をサポートします。
+*   **レイアウト:** Next.jsは、シンプルな[コンポーネントベース](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern)のレイアウト、コンポーネント[プロパティパターン](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern#per-page-layouts)を使用したページごとのレイアウト、および[カスタムアプリ](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern#single-shared-layout-with-custom-app)を使用した単一のグローバルレイアウトをサポートします。
+*   **データ取得:** Next.jsは、ページ（ルート）レベルで使用できるデータ取得メソッド（[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)、[`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)）を提供します。これらのメソッドは、ページが静的生成（[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)）またはサーバーサイドレンダリング（[`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)）されるべきかを決定するために使用されます。さらに、[増分的静的再生成（ISR）](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)を使用して、サイト構築後に静的ページを作成または更新できます。
+*   **レンダリング:** Next.jsは、[静的生成](https://nextjs.org/learn/foundations/how-nextjs-works/rendering)、[サーバーサイドレンダリング](https://nextjs.org/learn/foundations/how-nextjs-works/rendering)、[クライアントサイドレンダリング](https://nextjs.org/learn/foundations/how-nextjs-works/rendering)の3つのレンダリングオプションを提供します。デフォルトでは、ページはブロッキングデータ取得要件（`getServerSideProps`）がない限り静的に生成されます。
+
+[`app`ディレクトリの紹介](#appディレクトリの紹介)
+-----------------------------------------------------------------
+
+これらの新しい改善を段階的に採用でき、破壊的変更を避けるために、`app`という新しいディレクトリを提案します。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/app-folder.png)
+
+`app`ディレクトリは`pages`ディレクトリと並行して動作します。アプリケーションの一部を新しい`app`ディレクトリに徐々に移動して、新機能の利点を活用できます。後方互換性のために、`pages`ディレクトリの動作は同じままで、引き続きサポートされます。
+
+[ルートの定義](#ルートの定義)
+-----------------------------------
+
+`app`内の**フォルダ**階層を使用してルートを定義できます。**ルート**は、**ルートフォルダ**から最終的な**リーフフォルダ**までの階層に従った、ネストされたフォルダの単一のパスです。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/routes.png)
+
+例えば、`app`ディレクトリに2つの新しいフォルダをネストすることで、新しい`/dashboard/settings`ルートを追加できます。
+
+> **注記:**
+> 
+> *   このシステムでは、フォルダを使用してルートを定義し、ファイルを使用してUIを定義します（`layout.js`、`page.js`、およびRFCの後半で`loading.js`などの新しいファイル規約を使用）。
+> *   これにより、`app`ディレクトリ内に独自のプロジェクトファイル（UIコンポーネント、テストファイル、ストーリーなど）を配置できます。現在、これは[pageExtensions設定](/docs/pages/api-reference/next-config-js/pageExtensions#including-non-page-files-in-the-pages-directory)でのみ可能です。
+
+### [ルートセグメント](#ルートセグメント)
+
+[サブツリー](#用語)内の各フォルダは**ルートセグメント**を表します。各ルートセグメントは、**[URLパス](#用語)**の対応する**セグメント**にマッピングされます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-segments.png)
+
+例えば、`/dashboard/settings`ルートは3つのセグメントで構成されます：
+
+*   `/`ルートセグメント
+*   `dashboard`セグメント
+*   `settings`セグメント
+
+> **注記**: **ルートセグメント**という名前は、[URLパス](#用語)に関する既存の用語と一致するように選択されました。
+
+[レイアウト](#レイアウト)
+-------------------
+
+**新しいファイル規約:** `layout.js`
+
+これまで、アプリケーションのルートを定義するためにフォルダを使用してきました。しかし、空のフォルダはそれ自体では何もしません。新しいファイル規約を使用して、これらのルートにレンダリングされるUIを定義する方法について説明しましょう。
+
+**レイアウト**は、[サブツリー](#用語)内のルートセグメント間で共有されるUIです。レイアウトは[URLパス](#用語)に影響を与えず、ユーザーが兄弟セグメント間をナビゲートしても再レンダリングされません（Reactの状態は保持されます）。
+
+レイアウトは、`layout.js`ファイルからReactコンポーネントをデフォルトエクスポートすることで定義できます。コンポーネントは、レイアウトがラップしているセグメントで埋められる`children`プロップを受け入れる必要があります。
+
+レイアウトには2つのタイプがあります：
+
+*   **ルートレイアウト:** すべてのルートに適用
+*   **通常のレイアウト:** 特定のルートに適用
+
+2つ以上のレイアウトをネストして**ネストされたレイアウト**を形成できます。
+
+### [ルートレイアウト](#ルートレイアウト)
+
+`app`フォルダ内に`layout.js`ファイルを追加することで、アプリケーションのすべてのルートに適用されるルートレイアウトを作成できます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/root-layout.png)
+
+> **注記:**
+> 
+> *   ルートレイアウトは、[カスタムApp（`_app.js`）](/docs/pages/building-your-application/routing/custom-app)と[カスタムDocument（`_document.js`）](/docs/pages/building-your-application/routing/custom-document)の必要性を置き換えます。なぜなら、すべてのルートに適用されるからです。
+> *   ルートレイアウトを使用して、初期ドキュメントシェル（例：`<html>`および`<body>`タグ）をカスタマイズできます。
+> *   ルートレイアウト（および他のレイアウト）内でデータを取得できます。
+
+### [通常のレイアウト](#通常のレイアウト)
+
+特定のフォルダ内に`layout.js`ファイルを追加することで、アプリケーションの一部にのみ適用されるレイアウトも作成できます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/regular-layouts.png)
+
+例えば、`dashboard`フォルダ内に`layout.js`ファイルを作成すると、`dashboard`内のルートセグメントにのみ適用されます。
+
+### [ネストされたレイアウト](#ネストされたレイアウト)
+
+レイアウトはデフォルトで**ネスト**されます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/nested-layouts.png)
+
+例えば、上記の2つのレイアウトを組み合わせるとします。ルートレイアウト（`app/layout.js`）は`dashboard`レイアウトに適用され、`dashboard/*`内のすべてのルートセグメントにも適用されます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/nested-layouts-example.png)
+
+[ページ](#ページ)
+---------------
+
+**新しいファイル規約:** `page.js`
+
+ページは、ルートセグメントに固有のUIです。フォルダ内に`page.js`ファイルを追加することでページを作成できます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page.png)
+
+例えば、`/dashboard/*`ルートのページを作成するには、各フォルダ内に`page.js`ファイルを追加できます。ユーザーが`/dashboard/settings`にアクセスすると、Next.jsは`settings`フォルダの`page.js`ファイルを、[サブツリー](#用語)の上位にあるレイアウトでラップしてレンダリングします。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page-example.png)
+
+`dashboard`フォルダ内に直接`page.js`ファイルを作成して、`/dashboard`ルートにマッチさせることができます。ダッシュボードレイアウトもこのページに適用されます：
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page-nested.png)
+
+このルートは2つのセグメントで構成されます：
+
+*   `/`ルートセグメント
+*   `dashboard`セグメント
+
+> **注記:**
+> 
+> *   ルートが有効であるためには、リーフセグメントにページが必要です。ない場合、ルートはエラーをスローします。
+
+### [レイアウトとページの動作](#レイアウトとページの動作)
+
+*   ファイル拡張子`js|jsx|ts|tsx`は、ページとレイアウトに使用できます。
+*   ページコンポーネントは`page.js`のデフォルトエクスポートです。
+*   レイアウトコンポーネントは`layout.js`のデフォルトエクスポートです。
+*   レイアウトコンポーネントは**必ず**`children`プロップを受け入れる必要があります。
+
+レイアウトコンポーネントがレンダリングされると、`children`プロップは、子レイアウト（[サブツリー](#用語)のさらに下に存在する場合）またはページで埋められます。
+
+親レイアウトが最も近い子レイアウトを選択し、ページに到達するまで続くレイアウト[ツリー](#用語)として視覚化するとわかりやすいかもしれません。
+
+**例:**
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/basic-example.png)
+
+```js filename="app/layout.js"
+// ルートレイアウト
+// - すべてのルートに適用
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <Header />
+        {children}
+        <Footer />
+      </body>
+    </html>
+  );
+}
+```
+
+```js filename="app/dashboard/layout.js"
+// 通常のレイアウト
+// - app/dashboard/*内のルートセグメントに適用
+export default function DashboardLayout({ children }) {
+  return (
+    <>
+      <DashboardSidebar />
+      {children}
+    </>
+  );
+}
+```
+
+```js filename="app/dashboard/analytics/page.js"
+// ページコンポーネント
+// - `app/dashboard/analytics`セグメントのUI
+// - `acme.com/dashboard/analytics`URLパスにマッチ
+export default function AnalyticsPage() {
+  return <main>...</main>;
+}
+```
+
+上記のレイアウトとページの組み合わせは、以下のコンポーネント階層をレンダリングします：
+
+```tsx filename="コンポーネント階層"
+<RootLayout>
+  <Header />
+  <DashboardLayout>
+    <DashboardSidebar />
+    <AnalyticsPage>
+      <main>...</main>
+    </AnalyticsPage>
+  </DashboardLayout>
+  <Footer />
+</RootLayout>
+```
+
+[Reactサーバーコンポーネント](#reactサーバーコンポーネント)
+---------------------------------------------------
+
+> **注記:** Reactは新しいコンポーネントタイプを導入しました：サーバー、クライアント（従来のReactコンポーネント）、および共有。これらの新しいタイプについて詳しく知るには、Reactの[サーバーコンポーネントRFC](https://reactjs.org/blog/2020/12/21/data-fetching-with-react-server-components.html)を読むことをお勧めします。
+
+このRFCでは、Reactの機能を使用し始め、ReactサーバーコンポーネントをNext.jsアプリケーションに段階的に採用できます。
+
+新しいルーティングシステムの内部も、ストリーミング、サスペンス、トランジションなどの最近リリースされたReact機能を活用します。これらはReactサーバーコンポーネントの基礎となるビルディングブロックです。
+
+### [サーバーコンポーネントがデフォルト](#サーバーコンポーネントがデフォルト)
+
+`pages`と`app`ディレクトリの間の最大の変更の1つは、デフォルトで**`app`内のファイルがReactサーバーコンポーネントとしてサーバーでレンダリングされる**ことです。
+
+これにより、`pages`から`app`に移行する際に、自動的にReactサーバーコンポーネントを採用できます。
+
+> **注記:** サーバーコンポーネントは`app`フォルダまたは独自のフォルダで使用できますが、後方互換性のために`pages`ディレクトリでは使用できません。
+
+### [クライアントコンポーネントとサーバーコンポーネントの規約](#client-and-server-components-convention)
+
+`app`フォルダはサーバーコンポーネント、クライアントコンポーネント、共有コンポーネントをサポートし、[これらのコンポーネントをルート内で交互に配置](#interleaving-client-and-server-components-in-a-route)できるようになります。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/server-components.png)
+
+クライアントコンポーネントとサーバーコンポーネントを定義するための正確な規約については[現在議論中](https://github.com/reactjs/rfcs/pull/189#issuecomment-1116482278)です。私たちはこの議論の結論に従います。
+
+*   現時点では、サーバーコンポーネントはファイル名に`.server.js`を追加することで定義できます。例: `layout.server.js`
+*   クライアントコンポーネントはファイル名に`.client.js`を追加することで定義できます。例: `page.client.js`
+*   `.js`ファイルは共有コンポーネントと見なされます。サーバーとクライアントの両方でレンダリングされる可能性があるため、各コンテキストの制約を尊重する必要があります。
+
+> **注記:**
+> 
+> *   クライアントコンポーネントとサーバーコンポーネントには[守るべき制約](https://github.com/josephsavona/rfcs/blob/server-components/text/0000-server-components.md#capabilities--constraints-of-server-and-client-components)があります。クライアントコンポーネントかサーバーコンポーネントを使うか決める際は、クライアントコンポーネントが必要になるまでサーバーコンポーネント（デフォルト）を使用することを推奨します。
+
+### [フック](#hooks)
+
+ヘッダーオブジェクト、クッキー、パス名、検索パラメータなどにアクセスできるクライアントコンポーネントとサーバーコンポーネントのフックを追加予定です。将来的にはより詳細な情報を含むドキュメントを提供します。
+
+### [レンダリング環境](#rendering-environments)
+
+クライアントコンポーネントとサーバーコンポーネントの規約を使用して、クライアントサイドJavaScriptバンドルに含まれるコンポーネントを細かく制御できます。
+
+デフォルトでは、`app`内のルートは静的生成(Static Generation)を使用し、ルートセグメントがリクエストコンテキストを必要とする[サーバーサイドフック](#hooks)を使用すると動的レンダリングに切り替わります。
+
+### [ルート内でのクライアントコンポーネントとサーバーコンポーネントの交互配置](#interleaving-client-and-server-components-in-a-route)
+
+Reactでは、サーバーコンポーネント内にサーバー専用のコード（データベースやファイルシステムユーティリティなど）が含まれる可能性があるため、クライアントコンポーネント内でサーバーコンポーネントをインポートすることに制限があります。
+
+例えば、以下のようにサーバーコンポーネントをインポートしても動作しません:
+
+```js filename="ClientComponent.js"
+import ServerComponent from './ServerComponent.js';
+ 
+export default function ClientComponent() {
+  return (
+    <>
+      <ServerComponent />
+    </>
+  );
+}
+```
+
+しかし、サーバーコンポーネントはクライアントコンポーネントの子として渡すことができます。これを行うには、それらを別のサーバーコンポーネントで**ラップ**します。例えば:
+
+```js filename="ClientComponent.js"
+export default function ClientComponent({ children }) {
+  return (
+    <>
+      <h1>Client Component</h1>
+      {children}
+    </>
+  );
+}
+ 
+// ServerComponent.js
+export default function ServerComponent() {
+  return (
+    <>
+      <h1>Server Component</h1>
+    </>
+  );
+}
+ 
+// page.js
+// このコンポーネントはサーバーでレンダリングされるため、
+// サーバーコンポーネント内でクライアントとサーバーコンポーネントをインポート可能
+import ClientComponent from "./ClientComponent.js";
+import ServerComponent from "./ServerComponent.js";
+ 
+export default function ServerComponentPage() {
+  return (
+    <>
+      <ClientComponent>
+        <ServerComponent />
+      </ClientComponent>
+    </>
+  );
+}
+```
+
+このパターンを使用すると、Reactはサーバー専用コードを含まない結果をクライアントに送信する前に、サーバー上で`ServerComponent`をレンダリングする必要があることを認識します。クライアントコンポーネントの観点から見ると、その子は既にレンダリング済みになります。
+
+レイアウトでは、このパターンは`children`プロップで適用されるため、追加のラッパーコンポーネントを作成する必要はありません。
+
+例えば、`ClientLayout`コンポーネントは`ServerPage`コンポーネントを子として受け入れます:
+
+```js filename="app/dashboard/layout.js"
+// ダッシュボードレイアウトはクライアントコンポーネント
+export default function ClientLayout({ children }) {
+  // useState / useEffectが使用可能
+  return (
+    <>
+      <h1>Layout</h1>
+      {children}
+    </>
+  );
+}
+ 
+// ページはダッシュボードレイアウトに渡されるサーバーコンポーネント
+// app/dashboard/settings/page.js
+export default function ServerPage() {
+  return (
+    <>
+      <h1>Page</h1>
+    </>
+  );
+}
+```
+
+> **注記:** この構成スタイルは、クライアントコンポーネント内でサーバーコンポーネントをレンダリングするための重要なパターンです。学習すべき1つのパターンの先例を設定し、`children`プロップを使用することに決めた理由の1つです。
+
+[データフェッチング](#data-fetching)
+-------------------------------
+
+ルート内の複数のセグメントでデータをフェッチできるようになります。これは`pages`ディレクトリとは異なり、データフェッチングがページレベルに限定されていました。
+
+### [レイアウトでのデータフェッチング](#data-fetching-in-layouts)
+
+Next.jsのデータフェッチングメソッド`getStaticProps`または`getServerSideProps`を使用して、`layout.js`ファイルでデータをフェッチできます。
+
+例えば、ブログレイアウトは`getStaticProps`を使用してCMSからカテゴリを取得し、サイドバーコンポーネントを埋めるために使用できます:
+
+```js filename="app/blog/layout.js"
+export async function getStaticProps() {
+  const categories = await getCategoriesFromCMS();
+ 
+  return {
+    props: { categories },
+  };
+}
+ 
+export default function BlogLayout({ categories, children }) {
+  return (
+    <>
+      <BlogSidebar categories={categories} />
+      {children}
+    </>
+  );
+}
+```
+
+### [ルート内の複数のデータフェッチングメソッド](#multiple-data-fetching-methods-in-a-route)
+
+ルートの複数のセグメントでデータをフェッチすることもできます。例えば、データをフェッチする`layout`は、独自のデータをフェッチする`page`をラップできます。
+
+上記のブログの例を使用すると、単一の投稿ページは`getStaticProps`と`getStaticPaths`を使用してCMSから投稿データをフェッチできます:
+
+```js filename="app/blog/[slug]/page.js"
+export async function getStaticPaths() {
+  const posts = await getPostSlugsFromCMS();
+ 
+  return {
+    paths: posts.map((post) => ({
+      params: { slug: post.slug },
+    })),
+  };
+}
+ 
+export async function getStaticProps({ params }) {
+  const post = await getPostFromCMS(params.slug);
+ 
+  return {
+    props: { post },
+  };
+}
+ 
+export default function BlogPostPage({ post }) {
+  return <Post post={post} />;
+}
+```
+
+`app/blog/layout.js`と`app/blog/[slug]/page.js`の両方が`getStaticProps`を使用しているため、Next.jsはビルド時に`/blog/[slug]`ルート全体を**Reactサーバーコンポーネント**として静的に生成します - これによりクライアントサイドのJavaScriptが減り、ハイドレーションが速くなります。
+
+静的に生成されたルートはこれをさらに改善します。クライアントナビゲーションはキャッシュ（サーバーコンポーネントデータ）を再利用し、作業を再計算しないため、サーバーコンポーネントのスナップショットをレンダリングしているためCPU時間が削減されます。
+
+### [動作と優先順位](#behavior-and-priority)
+
+Next.jsのデータフェッチングメソッド（`getServerSideProps`と`getStaticProps`）は、`app`フォルダ内のサーバーコンポーネントでのみ使用できます。単一のルートにまたがるセグメントでの異なるデータフェッチングメソッドは互いに影響します。
+
+1つのセグメントで`getServerSideProps`を使用すると、他のセグメントの`getStaticProps`に影響します。`getServerSideProps`セグメントのリクエストが既にサーバーに行く必要があるため、サーバーは`getStaticProps`セグメントもレンダリングします。ビルド時にフェッチされたプロップを再利用するため、データは静的のままですが、**レンダリング**は`next build`時に生成されたプロップを使用してリクエストごとにオンデマンドで行われます。
+
+1つのセグメントで**再検証(ISR)**付きの`getStaticProps`を使用すると、他のセグメントの`revalidate`付き`getStaticProps`に影響します。1つのルートに2つの再検証期間がある場合、短い再検証が優先されます。
+
+> **注記:** 将来的には、ルート内で完全なデータフェッチングの細分化を可能にするように最適化される可能性があります。
+
+### [Reactサーバーコンポーネントでのデータフェッチング](#data-fetching-with-react-server-components)
+
+サーバーサイドルーティング、Reactサーバーコンポーネント、Suspense、ストリーミングの組み合わせは、Next.jsでのデータフェッチングとレンダリングにいくつかの影響を与えます:
+
+### [並列データフェッチング](#parallel-data-fetching)
+
+Next.jsはウォーターフォールを最小化するために、データフェッチを並列で積極的に開始します。例えば、データフェッチングが**逐次的**であった場合、ルート内の各ネストされたセグメントは、前のセグメントが完了するまでデータフェッチを開始できませんでした。しかし、**並列**フェッチでは、各セグメントが同時にデータフェッチを開始できます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel.png)
+
+レンダリングはコンテキストに依存する可能性があるため、各セグメントのレンダリングは、データがフェッチされ、親のレンダリングが完了した後に開始されます。
+
+将来的には、Suspenseを使用すると、データが完全にロードされていなくても、レンダリングをすぐに開始できます。データが利用可能になる前に読み取られると、Suspenseがトリガーされます。Reactはリクエストが完了する前にサーバーコンポーネントを楽観的にレンダリングを開始し、リクエストが解決すると結果をスロットインします。
+
+### [部分的なフェッチングとレンダリング](#partial-fetching-and-rendering)
+
+兄弟ルートセグメント間をナビゲートする場合、Next.jsはそのセグメント以下からのみフェッチおよびレンダリングします。それ以上を再フェッチまたは再レンダリングする必要はありません。これは、レイアウトを共有するページでは、ユーザーが兄弟ページ間をナビゲートする際にレイアウトが保持され、Next.jsはそのセグメント以下からのみフェッチおよびレンダリングすることを意味します。
+
+これはReactサーバーコンポーネントにとって特に有用です。そうでなければ、各ナビゲーションでサーバー上でページ全体が再レンダリングされる代わりに、サーバー上で変更されたページの部分のみがレンダリングされます。これにより転送されるデータ量と実行時間が削減され、パフォーマンスが向上します。
+
+例えば、ユーザーが`/analytics`ページと`/settings`ページ間をナビゲートすると、Reactはページセグメントを再レンダリングしますが、レイアウトは保持されます:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/partial-example.png)
+
+> **注記:** [ツリー](#terminology)の上位のデータを強制的に再フェッチすることも可能です。これがどのように見えるかの詳細についてはまだ議論中であり、RFCを更新します。
+
+[ルートグループ](#route-groups)
+-----------------------------
+
+`app`フォルダの階層はURLパスに直接マッピングされます。しかし、ルートグループを作成することでこのパターンから抜け出すことができます。ルートグループは次の目的で使用できます:
+
+*   URL構造に影響を与えずにルートを整理する
+*   レイアウトからルートセグメントを除外する
+*   アプリケーションを分割して複数のルートレイアウトを作成する
+
+### [規約](#convention)
+
+ルートグループはフォルダ名を括弧で囲むことで作成できます: `(folderName)`
+
+> **注記:** ルートグループの命名は組織的な目的のみであり、URLパスには影響しません。
+
+**例: レイアウトからルートを除外する**
+
+レイアウトからルートを除外するには、新しいルートグループ（例: `(shop)`）を作成し、同じレイアウトを共有するルート（例: `account`と`cart`）をグループに移動します。グループ外のルートはレイアウトを共有しません（例: `checkout`）。
+
+変更前:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-opt-out-before.png)
+
+変更後:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-opt-out-after.png)
+
+**例: URLパスに影響を与えずにルートを整理する**
+
+同様に、関連するルートをまとめて整理するためにグループを作成します。括弧内のフォルダはURLから除外されます（例: `(marketing)`や`(shop)`）。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-organisation.png)
+
+**例: 複数のルートレイアウトを作成する**
+
+複数のルートレイアウトを作成するには、`app`ディレクトリのトップレベルに2つ以上のルートグループを作成します。これは、完全に異なるUIやエクスペリエンスを持つセクションにアプリケーションを分割するのに便利です。各ルートレイアウトの`<html>`、`<body>`、`<head>`タグは個別にカスタマイズできます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-multiple-root.png)
+
+[サーバー中心のルーティング](#server-centric-routing)
+-------------------------------------------------
+
+現在、Next.jsはクライアントサイドルーティングを使用しています。初期ロード後およびその後のナビゲーションでは、新しいページのリソースに対してサーバーにリクエストが行われます。これには、（特定の条件下でのみ表示されるコンポーネントを含む）**すべてのコンポーネントのJavaScript**とそのプロップ（`getServerSideProps`または`getStaticProps`からのJSONデータ）が含まれます。JavaScriptとデータの両方がサーバーからロードされると、**Reactはコンポーネントをクライアントサイドでレンダリングします。**
+
+この新しいモデルでは、Next.jsはクライアントサイドの遷移を維持しながらサーバー中心のルーティングを使用します。これはサーバー上で評価される**サーバーコンポーネント**と一致します。
+
+ナビゲーション時には、データがフェッチされ、Reactはコンポーネントを**サーバーサイド**でレンダリングします。サーバーからの出力は、クライアント上のReactがDOMを更新するための特別な命令（HTMLやJSONではない）です。これらの命令にはレンダリングされたサーバーコンポーネントの**結果**が含まれるため、そのコンポーネントのJavaScriptをブラウザにロードする必要なく結果をレンダリングできます。
+
+これは、クライアントサイドでレンダリングするためにコンポーネントのJavaScriptをブラウザに送信する現在のデフォルトのクライアントコンポーネントとは対照的です。
+
+Reactサーバーコンポーネントを使用したサーバー中心のルーティングの利点には以下があります:
+
+*   ルーティングはサーバーコンポーネントに使用される同じリクエストを使用します（追加のサーバーリクエストは行われません）
+*   ルート間をナビゲートする際に変更されるセグメントのみをフェッチおよびレンダリングするため、サーバーでの作業が減少します
+*   新しいクライアントコンポーネントが使用されていない場合、クライアントサイドナビゲーション時にブラウザに追加のJavaScriptがロードされません
+*   ルーターは新しいストリーミングプロトコルを活用するため、すべてのデータがロードされる前にレンダリングを開始できます
+
+ユーザーがアプリ内を移動すると、ルーターはReactサーバーコンポーネントの_ペイロード_の結果をメモリ内のクライアントサイドキャッシュに保存します。キャッシュはルートセグメントごとに分割されるため、任意のレベルで無効化でき、同時レンダリング間で一貫性を確保できます。これにより、特定の場合には以前にフェッチされたセグメントのキャッシュを再利用できます。
+
+> **注記**
+> 
+> *   静的生成とサーバーサイドキャッシュを使用してデータフェッチングを最適化できます
+> *   上記の情報は後続のナビゲーションの動作を説明しています。初期ロードはHTMLを生成するためのサーバーサイドレンダリングを含む異なるプロセスです
+> *   クライアントサイドルーティングはNext.jsでうまく機能してきましたが、潜在的なルートの数が多い場合、クライアントが**ルートマップ**をダウンロードする必要があるため、スケールが悪くなります
+> *   全体として、Reactサーバーコンポーネントを使用することで、ブラウザでロードおよびレンダリングするコンポーネントが少なくなるため、クライアントサイドナビゲーションが速くなります
+
+[インスタントローディング状態](#instant-loading-states)
+-------------------------------------------------
+
+サーバーサイドルーティングでは、ナビゲーションはデータフェッチングとレンダリングの**後**に行われるため、データがフェッチされている間にローディングUIを表示することが重要です。そうしないとアプリケーションが反応しないように見えます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/server-side-routing.png)
+
+新しいルーターは、インスタントローディング状態とデフォルトのスケルトンに[Suspense](https://reactjs.org/docs/react-api.html#reactsuspense)を使用します。これは、新しいセグメントのコンテンツがロードされている間にすぐにローディングUIを表示できることを意味します。サーバー上のレンダリングが完了すると、新しいコンテンツがスワップインされます。
+
+レンダリング中:
+
+*   新しいルートへのナビゲーションは即座に行われます
+*   共有レイアウトは新しいルートセグメントがロードされている間もインタラクティブなままです
+*   ナビゲーションは中断可能です - つまり、1つのルートのコンテンツがロードされている間にユーザーはルート間をナビゲートできます
+
+### [デフォルトのローディングスケルトン](#default-loading-skeletons)
+
+Suspense境界は、`loading.js`という新しいファイル規約によって自動的にバックグラウンドで処理されます。
+
+**例:**
+
+フォルダ内に`loading.js`ファイルを追加することで、デフォルトのローディングスケルトンを作成できます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/loading.png)
+
+`loading.js`はReactコンポーネントをエクスポートする必要があります:
+
+```js filename="loading.js"
+export default function Loading() {
+  return <YourSkeleton />
+}
+ 
+// layout.js
+export default function Layout({children}) {
+  return (
+    <>
+      <Sidebar />
+      {children}
+    </>
+  )
+}
+ 
+// 出力
+<>
+  <Sidebar />
+  <Suspense fallback={<Loading />}>{children}</Suspense>
+</>
+```
+
+これにより、フォルダ内のすべてのセグメントがSuspense境界でラップされます。デフォルトのスケルトンは、レイアウトが最初にロードされた時と兄弟ページ間をナビゲートする際に使用されます。
+
+[エラーハンドリング](#error-handling)
+---------------------------------
+
+[エラー境界](https://reactjs.org/docs/error-boundaries.html)は、子コンポーネントツリー内のJavaScriptエラーをキャッチするReactコンポーネントです。
+
+### [規約](#convention-1)
+
+`error.js`ファイルを追加し、Reactコンポーネントをデフォルトエクスポートすることで、サブツリー内のエラーをキャッチするエラー境界を作成できます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/error.png)
+
+エラーがスローされた場合、このコンポーネントがフォールバックとして表示されます。このコンポーネントを使用して、エラーのログ記録、エラーに関する有用な情報の表示、エラーからの回復機能を実装できます。
+
+セグメントとレイアウトのネストされた性質により、エラー境界を作成することでUIの該当部分にエラーを隔離できます。エラー発生時、境界より上のレイアウトはインタラクティブなまま状態が保持されます。
+
+```js filename="error.js"
+export default function Error({ error, reset }) {
+  return (
+    <>
+      An error occurred: {error.message}
+      <button onClick={() => reset()}>Try again</button>
+    </>
+  );
+}
+ 
+// layout.js
+export default function Layout({children}) {
+  return (
+    <>
+      <Sidebar />
+      {children}
+    </>
+  )
+}
+ 
+// 出力
+<>
+  <Sidebar />
+  <ErrorBoundary fallback={<Error />}>{children}</ErrorBoundary>
+</>
+```
+
+> 注意:
+> 
+> *   `error.js`と同じセグメント内の`layout.js`ファイル内のエラーはキャッチされません。自動的なエラー境界はレイアウトの子をラップし、レイアウト自体はラップしないためです。
+
+[テンプレート](#templates)
+-----------------------
+
+テンプレートは、各子レイアウトまたはページをラップする点でレイアウトと似ています。
+
+ルート間で持続し状態を維持するレイアウトとは異なり、テンプレートは各子要素に対して新しいインスタンスを作成します。つまり、テンプレートを共有するルートセグメント間をユーザーがナビゲートする際、コンポーネントの新しいインスタンスがマウントされます。
+
+> **注:** 特別な理由がない限り、テンプレートではなくレイアウトを使用することを推奨します。
+
+### [規約](#convention-2)
+
+テンプレートは、`template.js`ファイルからデフォルトReactコンポーネントをエクスポートすることで定義できます。コンポーネントはネストされたセグメントが入る`children`プロップを受け入れる必要があります。
+
+### [例](#example)
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/template.png)
+
+```js filename="template.js"
+export default function Template({ children }) {
+  return <Container>{children}</Container>;
+}
+```
+
+レイアウトとテンプレートを持つルートセグメントのレンダリング出力は次のようになります:
+
+```
+<Layout>
+  {/* テンプレートには一意のキーが与えられることに注意 */}
+  <Template key={routeParam}>{children}</Template>
+</Layout>
+```
+
+### [動作](#behavior)
+
+共有UIをマウント/アンマウントする必要がある場合、テンプレートがより適したオプションとなります。例:
+
+*   CSSやアニメーションライブラリを使用した入退出アニメーション
+*   `useEffect`（ページビューのロギングなど）や`useState`（ページごとのフィードバックフォームなど）に依存する機能
+*   デフォルトのフレームワーク動作の変更。例: レイアウト内のSuspense境界はレイアウトが最初にロードされた時のみフォールバックを表示し、ページ切り替え時には表示しません。テンプレートでは、ナビゲーションごとにフォールバックが表示されます。
+
+例えば、すべてのサブページを囲むボーダー付きコンテナを持つネストされたレイアウトの設計を考えます。
+
+親レイアウト(`shop/layout.js`)内にコンテナを配置できます:
+
+```js filename="shop/layout.js"
+export default function Layout({ children }) {
+  return <div className="container">{children}</div>;
+}
+ 
+// shop/page.js
+export default function Page() {
+  return <div>...</div>;
+}
+ 
+// shop/categories/layout.js
+export default function CategoryLayout({ children }) {
+  return <div>{children}</div>;
+}
+```
+
+しかし、共有親レイアウトが再レンダリングされないため、ページ切り替え時に入退出アニメーションは再生されません。
+
+すべてのネストされたレイアウトやページにコンテナを配置することもできます:
+
+```js filename="shop/layout.js"
+export default function Layout({ children }) {
+  return <div>{children}</div>;
+}
+ 
+// shop/page.js
+export default function Page() {
+  return <div className="container">...</div>;
+}
+ 
+// shop/categories/layout.js
+export default function CategoryLayout({ children }) {
+  return <div className="container">{children}</div>;
+}
+```
+
+しかし、より複雑なアプリでは、すべてのネストされたレイアウトやページに手動で配置するのは面倒でエラーが発生しやすくなります。
+
+この規約を使用すると、ナビゲーション時に新しいインスタンスを作成するルート間でテンプレートを共有できます。つまり、DOM要素が再作成され、状態は保持されず、エフェクトが再同期されます。
+
+[高度なルーティングパターン](#advanced-routing-patterns)
+-------------------------------------------------------
+
+エッジケースをカバーし、より高度なルーティングパターンを実装できるようにする規約を導入する予定です。以下は現在検討中の例です:
+
+### [インターセプトルート](#intercepting-routes)
+
+場合によっては、他のルート内からルートセグメントをインターセプトすると便利です。ナビゲーション時、URLは通常通り更新されますが、インターセプトされたセグメントは現在のルートのレイアウト内に表示されます。
+
+#### [例](#example-1)
+
+**Before:** 画像をクリックすると、独自のレイアウトを持つ新しいルートに移動します。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-routes-before.png)
+
+**After:** ルートをインターセプトすることで、画像をクリックすると現在のルートのレイアウト内にセグメントがロードされます（例: モーダルとして）。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-routes-after.png)
+
+`/[username]`セグメント内から`/photo/[id]`ルートをインターセプトするには、`/[username]`フォルダ内に`/photo/[id]`フォルダの複製を作成し、`(..)`規約を接頭辞として付けます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-route.png)
+
+#### [規約](#convention-3)
+
+*   `(..)` - 1つ上のレベルのルートセグメント（親ディレクトリの兄弟）にマッチします。相対パスの`../`に似ています。
+*   `(..)(..)` - 2つ上のレベルのルートセグメントにマッチします。相対パスの`../../`に似ています。
+*   `(...)` - ルートディレクトリのルートセグメントにマッチします。
+
+> **注:** ページを更新または共有すると、デフォルトのレイアウトでルートがロードされます。
+
+### [動的パラレルルート](#dynamic-parallel-routes)
+
+場合によっては、同じビュー内で独立してナビゲート可能な2つ以上のリーフセグメント(`page.js`)を表示すると便利です。
+
+例えば、同じダッシュボード内に2つ以上のタブグループがある場合を考えます。1つのタブグループをナビゲートしても、他のタブグループには影響しません。また、前後にナビゲートする際にタブの組み合わせが正しく復元される必要があります。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes.png)
+
+#### [規約](#convention-4)
+
+デフォルトでは、レイアウトはネストされたレイアウトまたはページを含む`children`プロップを受け入れます。`@`プレフィックスを含む名前付き「スロット」（フォルダ）を作成し、その中にセグメントをネストすることで、このプロップの名前を変更できます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes-children.png)
+
+この変更後、レイアウトは`children`ではなく`customProp`というプロップを受け取ります。
+
+```js filename="analytics/layout.js"
+export default function Layout({ customProp }) {
+  return <>{customProp}</>;
+}
+```
+
+同じレベルに複数の名前付きスロットを追加することで、パラレルルートを作成できます。以下の例では、`@views`と`@audience`の両方がanalyticsレイアウトにプロップとして渡されます。
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes-complete.png)
+
+名前付きスロットを使用して、リーフセグメントを同時に表示できます。
+
+```js filename="analytics/layout.js"
+export default function Layout({ views, audience }) {
+  return (
+    <>
+      <div>
+        <ViewsNav />
+        {views}
+      </div>
+      <div>
+        <AudienceNav />
+        {audience}
+      </div>
+    </>
+  );
+}
+```
+
+ユーザーが最初に`/analytics`にナビゲートすると、各フォルダ(`@views`と`@audience`)の`page.js`セグメントが表示されます。
+
+`/analytics/subscribers`にナビゲートすると、`@audience`のみが更新されます。同様に、`/analytics/impressions`にナビゲートすると`@views`のみが更新されます。
+
+前後にナビゲートすると、パラレルルートの正しい組み合わせが復元されます。
+
+[インターセプトとパラレルルートの組み合わせ](#combining-intercepting-and-parallel-routes)
+-----------------------------------------------------------------------------------------
+
+インターセプトとパラレルルートを組み合わせることで、アプリケーションで特定のルーティング動作を実現できます。
+
+**例**
+
+例えば、モーダルを作成する際、次のような一般的な課題に直面することがあります:
+
+*   URLを通じてモーダルにアクセスできない
+*   ページを更新するとモーダルが閉じる
+*   戻るナビゲーションでモーダルの背後にあるルートではなく前のルートに移動する
+*   進むナビゲーションでモーダルが再開しない
+
+モーダルが開いた時にURLを更新し、前後ナビゲーションでモーダルを開閉したい場合があります。さらに、URLを共有する際、モーダルが開いた状態で背後にあるコンテキストと共にページをロードしたい、またはモーダルなしでコンテンツをロードしたい場合があります。
+
+この良い例は、ソーシャルメディアサイトの写真です。通常、写真はユーザーのフィードやプロフィール内のモーダルからアクセスできます。しかし、写真を共有する際は、独自のページに直接表示されます。
+
+規約を使用することで、モーダルの動作をデフォルトでルーティング動作にマッピングできます。
+
+次のフォルダ構造を考えます:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-route-modal.png)
+
+このパターンでは:
+
+*   `/photo/[id]`のコンテンツは、独自のコンテキスト内でURLを通じてアクセス可能です。また、`/[username]`ルート内からモーダル内でもアクセスできます。
+*   クライアントサイドナビゲーションを使用した前後ナビゲーションでモーダルを閉じたり再開したりできます。
+*   ページを更新（サーバーサイドナビゲーション）すると、モーダルを表示する代わりに元の`/photo/id`ルートに移動します。
+
+`/@modal/(..)photo/[id]/page.js`では、モーダルコンポーネントでラップされたページコンテンツを返せます。
+
+```js filename="/@modal/(..)photo/[id]/page.js"
+export default function PhotoPage() {
+  const router = useRouter();
+ 
+  return (
+    <Modal
+      // ページロード時には常にモーダルを表示
+      isOpen={true}
+      // モーダルを閉じると前のページに戻る
+      onClose={() => router.back()}
+    >
+      {/* ページコンテンツ */}
+    </Modal>
+  );
+}
+```
+
+> **注:** このソリューションはNext.jsでモーダルを作成する唯一の方法ではありませんが、より複雑なルーティング動作を実現するために規約を組み合わせる方法を示すことを目的としています。
+
+[条件付きルート](#conditional-routes)
+-----------------------------------------
+
+データやコンテキストなどの動的情報を使用して、表示するルートを決定する必要がある場合があります。パラレルルートを使用して、条件に応じて1つのルートまたは別のルートをロードできます。
+
+**例**
+
+```js filename="layout.js"
+export async function getServerSideProps({ params }) {
+  const { accountType } = await fetchAccount(params.slug);
+  return { props: { isUser: accountType === 'user' } };
+}
+ 
+export default function UserOrTeamLayout({ isUser, user, team }) {
+  return <>{isUser ? user : team}</>;
+}
+```
+
+上記の例では、スラッグに応じて`user`または`team`ルートを返せます。これにより、データを条件付きでロードし、サブルートを一方または他方のオプションと照合できます。
+
+[結論](#conclusion)
+-------------------------
+
+Next.jsにおけるレイアウト、ルーティング、React 18の未来に興奮しています。実装作業は開始されており、機能が利用可能になり次第発表する予定です。
+
+コメントを残したり、[GitHub Discussionsで会話に参加](https://github.com/vercel/next.js/discussions/37136)してください。

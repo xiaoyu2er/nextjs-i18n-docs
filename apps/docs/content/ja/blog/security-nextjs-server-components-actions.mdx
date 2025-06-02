@@ -1,0 +1,388 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:14:50.889Z
+title: Next.jsにおけるセキュリティの考え方
+description: >-
+  Next.jsに組み込まれたセキュリティ保護機能について学び、アプリケーション監査のガイドを確認しましょう。
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2023-10-23T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/security-nextjs-server-components-actions/twitter-card.png
+---
+
+App RouterのReact Server Components (RSC)は、従来の方法に関連する冗長性と潜在的なリスクの多くを排除する新しいパラダイムです。この新しさゆえ、開発者やセキュリティチームは既存のセキュリティプロトコルをこのモデルに適合させるのに苦労するかもしれません。
+
+このドキュメントは、特に注意すべき点、組み込まれた保護機能、そしてアプリケーション監査のガイドを提供することを目的としています。特に、意図しないデータ漏洩のリスクに焦点を当てます。
+
+[データ処理モデルの選択](#choosing-your-data-handling-model)
+-----------------------------------------------------------------------
+
+[React Server Components](/docs/app/building-your-application/rendering/server-components)はサーバーとクライアントの境界を曖昧にします。データ処理は、情報がどこで処理され、その後利用可能になるかを理解する上で極めて重要です。
+
+最初に行うべきは、プロジェクトに適したデータ処理アプローチを選択することです。
+
+*   [HTTP API](#http-apis)（既存の大規模プロジェクト/組織におすすめ）
+*   [データアクセス層](#data-access-layer)（新規プロジェクトにおすすめ）
+*   [コンポーネントレベルのデータアクセス](#component-level-data-access)（プロトタイピングや学習におすすめ）
+
+1つのアプローチに固執し、あまり混在させないことをお勧めします。これにより、コードベースで作業する開発者とセキュリティ監査担当者の両方が期待するものを明確に理解できます。例外は疑わしいものとして浮き彫りになります。
+
+### [HTTP API](#http-apis)
+
+既存プロジェクトでServer Componentsを採用する場合、推奨されるアプローチは、Server ComponentsをデフォルトでSSRやクライアント内と同様に安全でない/信頼できないものとして扱うことです。つまり、内部ネットワークや信頼ゾーンを前提とせず、エンジニアはゼロトラストの概念を適用できます。代わりに、クライアントで実行される場合と同様に、Server Componentsから`fetch()`を使用してRESTやGraphQLなどのカスタムAPIエンドポイントのみを呼び出します。任意のクッキーを渡します。
+
+データベースに接続する既存の`getStaticProps`/`getServerSideProps`がある場合、モデルを統合し、これらもAPIエンドポイントに移動して一貫した方法を維持することを検討してください。
+
+内部ネットワークからのフェッチが安全であると仮定するアクセス制御に注意してください。
+
+このアプローチにより、セキュリティに特化した既存のバックエンドチームが既存のセキュリティプラクティスを適用できる組織構造を維持できます。これらのチームがJavaScript以外の言語を使用している場合、このアプローチはうまく機能します。
+
+また、クライアントに送信するコードを減らし、固有のデータウォーターフォールを低遅延で実行できるというServer Componentsの多くの利点を活かせます。
+
+### [データアクセス層](#data-access-layer)
+
+新規プロジェクトに推奨するアプローチは、JavaScriptコードベース内に別個のデータアクセス層を作成し、すべてのデータアクセスをそこに統合することです。このアプローチにより、一貫したデータアクセスが確保され、認可バグが発生する可能性が低減されます。また、単一のライブラリに統合することでメンテナンスが容易になります。単一のプログラミング言語を使用することで、チームの結束も強まる可能性があります。また、ランタイムオーバーヘッドが少なく、リクエストのさまざまな部分でメモリ内キャッシュを共有できるため、パフォーマンスも向上します。
+
+呼び出し元に渡す前にカスタムデータアクセスチェックを提供する内部JavaScriptライブラリを構築します。HTTPエンドポイントと似ていますが、同じメモリモデル内にあります。すべてのAPIは現在のユーザーを受け入れ、データを返す前にユーザーがこのデータを表示できるかどうかをチェックする必要があります。原則として、Server Component関数本体は、リクエストを発行している現在のユーザーがアクセスを許可されているデータのみを表示する必要があります。
+
+この時点から、APIを実装するための通常のセキュリティプラクティスが引き継ぎます。
+
+```tsx filename="data/auth.tsx"
+import { cache } from 'react';
+import { cookies } from 'next/headers';
+ 
+// キャッシュされたヘルパーメソッドにより、多くの場所で同じ値を手動で受け渡すことなく簡単に取得できます。
+// これにより、Server ComponentからServer Componentに渡すことが推奨されず、Client Componentに渡すリスクが最小限に抑えられます。
+export const getCurrentUser = cache(async () => {
+  const token = cookies().get('AUTH_TOKEN');
+  const decodedToken = await decryptAndValidate(token);
+  // 秘密トークンや個人情報を公開フィールドとして含めないでください。
+  // クラスを使用して、誤ってオブジェクト全体をクライアントに渡すのを防ぎます。
+  return new User(decodedToken.id);
+});
+```
+
+```tsx filename="data/user-dto.tsx"
+import 'server-only';
+import { getCurrentUser } from './auth';
+ 
+function canSeeUsername(viewer: User) {
+  // 現時点では公開情報ですが、変更可能
+  return true;
+}
+ 
+function canSeePhoneNumber(viewer: User, team: string) {
+  // プライバシールール
+  return viewer.isAdmin || team === viewer.team;
+}
+ 
+export async function getProfileDTO(slug: string) {
+  // 値を渡さず、キャッシュされた値を読み戻します。また、コンテキストを解決し、遅延させやすくします
+ 
+  // クエリの安全なテンプレート化をサポートするデータベースAPIを使用
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`;
+  const userData = rows[0];
+ 
+  const currentUser = await getCurrentUser();
+ 
+  // このクエリに関連するデータのみを返し、すべてを返さない
+  // <https://www.w3.org/2001/tag/doc/APIMinimization>
+  return {
+    username: canSeeUsername(currentUser) ? userData.username : null,
+    phonenumber: canSeePhoneNumber(currentUser, userData.team)
+      ? userData.phonenumber
+      : null,
+  };
+}
+```
+
+これらのメソッドは、クライアントにそのまま転送しても安全なオブジェクトを公開する必要があります。これらをクライアントが消費できるように準備されたデータ転送オブジェクト（DTO）と呼ぶのが適切です。
+
+実際にはServer Componentsによってのみ消費される場合があります。これにより、セキュリティ監査が主にデータアクセス層に集中でき、UIは迅速に反復できるようになります。対象範囲が小さく、カバーするコードが少ないため、セキュリティ問題を捕捉しやすくなります。
+
+```
+import {getProfile} from '../../data/user'
+export async function Page({ params: { slug } }) {
+  // このページは、機密情報を含まないことを知って安全にこのプロファイルを渡せます
+  const profile = await getProfile(slug);
+  ...
+}
+```
+
+秘密鍵は環境変数に保存できますが、このアプローチではデータアクセス層のみが`process.env`にアクセスする必要があります。
+
+### [コンポーネントレベルのデータアクセス](#component-level-data-access)
+
+もう1つのアプローチは、データベースクエリを直接Server Componentsに配置することです。このアプローチは、迅速な反復とプロトタイピングにのみ適しています。例えば、リスクと監視方法を全員が認識している小規模な製品やチーム向けです。
+
+このアプローチでは、`"use client"`ファイルを注意深く監査する必要があります。監査とPRレビュー時に、エクスポートされたすべての関数を確認し、型シグネチャが`User`のような過度に広範なオブジェクトを受け入れるか、`token`や`creditCard`のようなプロップを含むかを確認します。`phoneNumber`のようなプライバシーに敏感なフィールドも追加の精査が必要です。Client Componentは、そのジョブを実行するために必要な最小限のデータ以上のデータを受け入れるべきではありません。
+
+```
+import Profile from './components/profile.tsx';
+ 
+export async function Page({ params: { slug } }) {
+  const [rows] = await sql`SELECT * FROM user WHERE slug = ${slug}`;
+  const userData = rows[0];
+  // 公開: これはuserData内のすべてのフィールドをクライアントに公開します。
+  // Server ComponentからClientにデータを渡しているためです。
+  // これは`getServerSideProps`で`userData`を返すのと似ています
+  return <Profile user={userData} />;
+}
+```
+
+```
+'use client';
+// 悪い例: これはClient Componentが必要とするデータよりもはるかに多くのデータを受け入れるため、悪いpropsインターフェースです。
+// Server Componentsがすべてのデータを渡すことを促進します。より良い解決策は、
+// プロファイルのレンダリングに必要なフィールドのみを含む限定されたオブジェクトを受け入れることです。
+export default async function Profile({ user }: { user: User }) {
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      ...
+    </div>
+  );
+}
+```
+
+SQLインジェクション攻撃を避けるために、常にパラメータ化されたクエリ、またはそれを代行するデータベースライブラリを使用してください。
+
+[サーバー専用](#server-only)
+---------------------------
+
+サーバーでのみ実行されるべきコードは次のようにマークできます：
+
+```
+import 'server-only';
+```
+
+これにより、Client Componentがこのモジュールをインポートしようとするとビルドエラーが発生します。これにより、独自/機密コードや内部ビジネスロジックが誤ってクライアントに漏洩するのを防げます。
+
+データ転送の主要な方法は、React Server Componentsプロトコルを使用することです。これは、Client Componentsにpropsを渡すときに自動的に行われます。このシリアライゼーションはJSONのスーパーセットをサポートします。カスタムクラスの転送はサポートされておらず、エラーになります。
+
+したがって、誤ってクライアントに公開される過大なオブジェクトを避けるための良い方法は、データアクセスレコードに`class`を使用することです。
+
+今後のNext.js 14リリースでは、`next.config.js`で`taint`フラグを有効にすることで、実験的な[React Taint API](https://react.dev/reference/react/experimental_taintObjectReference)を試すこともできます。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    taint: true,
+  },
+};
+```
+
+これにより、クライアントにそのまま渡されるべきでないオブジェクトをマークできます。
+
+```ts filename="app/data.ts"
+import { experimental_taintObjectReference } from 'react';
+ 
+export async function getUserData(id) {
+  const data = ...;
+  experimental_taintObjectReference(
+    'ユーザーデータをクライアントに渡さないでください',
+    data
+  );
+  return data;
+}
+```
+
+```tsx filename="app/page.tsx"
+import { getUserData } from './data';
+ 
+export async function Page({ searchParams }) {
+  const userData = getUserData(searchParams.id);
+  return <ClientComponent user={userData} />; // エラー
+}
+```
+
+これは、このオブジェクトからデータフィールドを抽出して渡すことに対しては保護しません：
+
+```tsx filename="app/page.tsx"
+export async function Page({ searchParams }) {
+  const { name, phone } = getUserData(searchParams.id);
+  // 個人データを意図的に公開
+  return <ClientComponent name={name} phoneNumber={phone} />;
+}
+```
+
+トークンなどの一意の文字列については、[`taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue)を使用して生の値もブロックできます。
+
+```ts filename="app/data.ts"
+import { experimental_taintObjectReference, experimental_taintUniqueValue } from 'react';
+ 
+export async function getUserData(id) {
+  const data = ...;
+  experimental_taintObjectReference(
+    'ユーザーデータをクライアントに渡さないでください',
+    data
+  );
+  experimental_taintUniqueValue(
+    'トークンをクライアントに渡さないでください',
+    data,
+    data.token
+  );
+  return data;
+}
+```
+
+ただし、これでも派生値はブロックされません。
+
+データがServer Componentsに入らないようにすることが最善です - データアクセス層を使用してください。Taintチェックは、関数やクラスが既にClient Componentsに渡されるのをブロックされていることに注意しながら、ミスに対する追加の保護層を提供します。より多くの層で何かがすり抜けるリスクを最小限に抑えます。
+
+デフォルトでは、環境変数はサーバーでのみ利用可能です。慣例により、Next.jsは`NEXT_PUBLIC_`で始まる環境変数もクライアントに公開します。これにより、クライアントが利用できるようにする必要がある明示的な設定を公開できます。
+
+[SSR対RSC](#ssr-vs-rsc)
+-------------------------
+
+初期ロード時、Next.jsはHTMLを生成するためにServer ComponentsとClient Componentsの両方をサーバーで実行します。
+
+Server Components (RSC)は、2つのモジュール間で情報が誤って公開されるのを防ぐために、Client Componentsとは別のモジュールシステムで実行されます。
+
+サーバーサイドレンダリング (SSR) を介してレンダリングされるClient Componentsは、ブラウザクライアントと同じセキュリティポリシーと見なす必要があります。特権データやプライベートAPIにアクセスできてはなりません。この保護を回避しようとするハック（グローバルオブジェクトにデータを隠すなど）の使用は強く推奨されません。原則として、このコードはサーバーとクライアントの両方で同じように実行できる必要があります。デフォルトで安全なプラクティスに沿って、Next.jsはClient Componentから`server-only`モジュールがインポートされるとビルドを失敗させます。
+
+[読み取り](#read)
+-------------
+
+Next.js App Routerでは、データベースやAPIからのデータ読み取りは、Server Componentページをレンダリングすることで実装されます。
+
+ページへの入力は、URLのsearchParams、URLからマップされた動的パラメータ、およびヘッダーです。これらはクライアントによって異なる値に悪用される可能性があります。これらは信頼されるべきではなく、読み取られるたびに再検証する必要があります。例えば、searchParamを`?isAdmin=true`のようなものの追跡に使用すべきではありません。ユーザーが`/[team]/`にいるからといって、そのチームにアクセスできるわけではなく、データを読み取るときに検証する必要があります。原則として、アクセス制御と`cookies()`を読み取るたびに再読み取りしてください。propsやparamsとして渡さないでください。
+
+Server Componentのレンダリングは、変更のような副作用を引き起こすべきではありません。これはServer Componentsに特有のことではありません。Reactは、useEffectの外側でClient Componentsをレンダリングする場合でも、二重レンダリングなどのことを行うことで、副作用を自然に抑制します。
+
+さらに、Next.jsでは、レンダリング中にクッキーを設定したり、キャッシュの再検証をトリガーしたりする方法はありません。これもレンダリングを変更に使用することを抑制します。
+
+例えば、`searchParams`は変更を保存したりログアウトしたりするような副作用を実行するために使用すべきではありません。代わりにServer Actionsを使用する必要があります。
+
+これは、Next.jsモデルが意図通りに使用された場合、副作用のためにGETリクエストを使用しないことを意味します。これにより、CSRF問題の大きな原因を回避できます。
+
+Next.jsはカスタムルートハンドラー（`route.tsx`）のサポートを提供しており、GETでクッキーを設定できます。これは一般的なモデルの一部ではなく、エスケープハッチと見なされます。これらはGETリクエストを受け入れることを明示的にオプトインする必要があります。誤ってGETリクエストを受信する可能性のあるキャッチオールハンドラーはありません。カスタムGETハンドラーを作成する場合は、追加の監査が必要になる場合があります。
+
+[書き込み](#write)
+---------------
+
+Next.js App Routerで書き込みや変更を実行する慣用的な方法は、[Server Actions](/docs/app/building-your-application/data-fetching/forms-and-mutations)を使用することです。
+
+```ts filename="actions.ts"
+'use server';
+ 
+export function logout() {
+  cookies().delete('AUTH_TOKEN');
+}
+```
+
+`"use server"`アノテーションは、クライアントによって呼び出し可能なすべてのエクスポートされた関数を公開するエンドポイントを作成します。識別子は現在、ソースコードの位置のハッシュです。ユーザーがアクションのIDへのハンドルを取得する限り、任意の引数でそれを呼び出すことができます。
+
+その結果、これらの関数は常に、現在のユーザーがこのアクションを呼び出すことを許可されていることを検証することから始める必要があります。関数はまた、各引数の整合性を検証する必要があります。これは手動で行うか、`zod`のようなツールを使用して行うことができます。
+
+```ts filename="actions.ts"
+"use server";
+ 
+export async function deletePost(id: number) {
+  if (typeof id !== 'number') {
+    // TypeScriptアノテーションは強制されないため、
+    // idが私たちが考えるものであることを確認する必要があるかもしれません。
+    throw new Error();
+  }
+  const user = await getCurrentUser();
+  if (!canDeletePost(user, id)) {
+    throw new Error();
+  }
+  ...
+}
+```
+
+### [クロージャ (Closures)](#closures)
+
+サーバーアクション (Server Actions) は[クロージャ](https://developer.mozilla.org/ja/docs/Web/JavaScript/Closures)としてもエンコードできます。これにより、アクションがレンダリング時に使用されたデータのスナップショットと関連付けられるため、アクションが呼び出された際にこのデータを使用できます:
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  const publishVersion = await getLatestVersion();
+  async function publish() {
+    "use server";
+    if (publishVersion !== await getLatestVersion()) {
+      throw new Error('公開ボタンが押された後にバージョンが変更されました');
+    }
+    ...
+  }
+  return <button action={publish}>公開</button>;
+}
+ 
+```
+
+クロージャのスナップショットはクライアントに送信され、サーバーが呼び出された際に戻されます。
+
+Next.js 14では、クロージャで囲まれた変数はアクションIDで暗号化されてからクライアントに送信されます。デフォルトでは、Next.jsプロジェクトのビルド時に自動的に秘密鍵が生成されます。リビルドごとに新しい秘密鍵が生成されるため、各サーバーアクションは特定のビルドに対してのみ呼び出すことができます。再デプロイ時に常に正しいバージョンを呼び出すためには[スキュー保護 (Skew Protection)](https://vercel.com/blog/version-skew-protection)を使用することを検討してください。
+
+より頻繁にローテーションする鍵や、複数のビルドにわたって永続的な鍵が必要な場合は、`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`環境変数を使用して手動で設定できます。
+
+クロージャで囲まれたすべての変数を暗号化することで、誤って機密情報を公開することを防ぎます。署名することで、攻撃者がアクションへの入力を改ざんすることを困難にします。
+
+クロージャを使用する別の方法として、JavaScriptの`.bind(...)`関数を使用できます。**これらは暗号化されません**。これはパフォーマンスのためのオプトアウトを提供し、クライアント側の`.bind()`とも一貫性があります。
+
+```tsx filename="app/page.tsx"
+async function deletePost(id: number) {
+  "use server";
+  // IDを検証し、まだ削除できるか確認
+  ...
+}
+ 
+export async function Page({ slug }) {
+  const post = await getPost(slug);
+  return <button action={deletePost.bind(null, post.id)}>
+    削除
+  </button>;
+}
+```
+
+原則として、サーバーアクション (`"use server"`) の引数リストは常に敵対的と見なされ、入力を検証する必要があります。
+
+### [CSRF](#csrf)
+
+すべてのサーバーアクションはプレーンな`<form>`で呼び出すことができるため、CSRF攻撃に対して脆弱になる可能性があります。内部的には、サーバーアクションは常にPOSTを使用して実装され、このHTTPメソッドのみが呼び出しを許可されます。これだけで、特にSame-Siteクッキーがデフォルトであるため、現代のブラウザにおけるほとんどのCSRF脆弱性を防ぎます。
+
+追加の保護として、Next.js 14のサーバーアクションは`Origin`ヘッダーを`Host`ヘッダー（または`X-Forwarded-Host`）と比較します。これらが一致しない場合、アクションは拒否されます。つまり、サーバーアクションは、それをホストするページと同じホストでのみ呼び出すことができます。`Origin`ヘッダーをサポートしていない非常に古く、サポートされていないブラウザはリスクにさらされる可能性があります。
+
+サーバーアクションはCSRFトークンを使用しないため、HTMLのサニタイズが重要です。
+
+カスタムルートハンドラー (`route.tsx`) が代わりに使用される場合、CSRF保護を手動で行う必要があるため、追加の監査が必要になることがあります。従来のルールが適用されます。
+
+[エラーハンドリング (Error Handling)](#error-handling)
+---------------------------------
+
+バグは発生します。サーバーでエラーがスローされると、最終的にクライアントコードで再スローされ、UIで処理されます。エラーメッセージとスタックトレースには機密情報が含まれる可能性があります。例: `[クレジットカード番号] は有効な電話番号ではありません`。
+
+本番モードでは、Reactはエラーや拒否されたプロミスをクライアントに送信しません。代わりに、エラーを表すハッシュが送信されます。このハッシュを使用して、同じエラーの複数のインスタンスを関連付け、サーバーログとエラーを関連付けることができます。Reactはエラーメッセージを独自の汎用的なメッセージに置き換えます。
+
+開発モードでは、デバッグを支援するために、サーバーエラーはプレーンテキストでクライアントに送信されます。
+
+本番ワークロードでは、常にNext.jsを本番モードで実行することが重要です。開発モードはセキュリティとパフォーマンスを最適化していません。
+
+[カスタムルートとミドルウェア (Custom Routes and Middleware)](#custom-routes-and-middleware)
+-------------------------------------------------------------
+
+[カスタムルートハンドラー](/docs/app/building-your-application/routing/route-handlers)と[ミドルウェア](/docs/app/building-your-application/routing/middleware)は、他の組み込み機能では実装できない機能のための低レベルのエスケープハッチと見なされます。これにより、フレームワークが保護している潜在的な危険も開かれます。大きな力には大きな責任が伴います。
+
+前述のように、`route.tsx`ルートはカスタムGETおよびPOSTハンドラーを実装できますが、正しく行われない場合、CSRFの問題が発生する可能性があります。
+
+ミドルウェアを使用して、特定のページへのアクセスを制限できます。通常、拒否リストではなく許可リストを使用するのが最適です。これは、リライトやクライアントリクエストなど、データにアクセスするさまざまな方法をすべて知ることが難しいためです。
+
+たとえば、HTMLページのみを考えるのが一般的です。Next.jsは、RSC/JSONペイロードをロードできるクライアントナビゲーションもサポートしています。Pages Routerでは、これはカスタムURLにありました。
+
+マッチャーの作成を容易にするため、Next.js App Routerは常に初期HTML、クライアントナビゲーション、およびサーバーアクションの両方にページのプレーンURLを使用します。クライアントナビゲーションはキャッシュブレーカーとして`?_rsc=...`検索パラメータを使用します。
+
+サーバーアクションは、使用されるページ上に存在し、同じアクセス制御を継承します。ミドルウェアがページの読み取りを許可する場合、そのページのアクションも呼び出すことができます。ページ上のサーバーアクションへのアクセスを制限するには、そのページでPOST HTTPメソッドを禁止できます。
+
+[監査 (Audit)](#audit)
+---------------
+
+Next.js App Routerプロジェクトの監査を行う場合、以下を特に確認することをお勧めします:
+
+*   **データアクセス層 (Data Access Layer)**。分離されたデータアクセス層の確立された慣行はありますか？データベースパッケージと環境変数がデータアクセス層の外部でインポートされていないことを確認してください。
+*   **`"use client"`ファイル**。コンポーネントのpropsがプライベートデータを期待していますか？型シグネチャが過度に広範ではありませんか？
+*   **`"use server"`ファイル**。アクションの引数はアクション内またはデータアクセス層内で検証されていますか？アクション内でユーザーが再承認されていますか？
+*   **`/[param]/`**。括弧付きのフォルダはユーザー入力です。パラメータは検証されていますか？
+*   **`middleware.tsx`**および**`route.tsx`**は多くの権限を持っています。従来の技術を使用してこれらの監査に追加の時間を費やしてください。ペネトレーションテストまたは脆弱性スキャンを定期的に、またはチームのソフトウェア開発ライフサイクルに合わせて実行してください。
