@@ -86,6 +86,9 @@ export const metadata: Metadata = {
     },
   },
   category: 'technology',
+  other: {
+    'google-adsense-account': 'ca-pub-8237457949590602',
+  },
 };
 
 export default function RootLayout({

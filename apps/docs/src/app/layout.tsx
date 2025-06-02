@@ -19,6 +19,7 @@ export async function generateMetadata() {
     },
     description: t('description'),
     metadataBase: baseUrl,
+    other: { 'google-adsense-account': 'ca-pub-8237457949590602' },
   });
 }
 
