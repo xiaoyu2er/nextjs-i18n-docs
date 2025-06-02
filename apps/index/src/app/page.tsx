@@ -70,7 +70,9 @@ const LANGUAGE_INFO = {
 } as const;
 
 export default function Home() {
-  const siteEntries = Object.entries(SITES);
+  const siteEntries = Object.entries(SITES).filter(
+    ([locale]) => locale !== 'en',
+  );
   const pendingSiteEntries = Object.entries(PENDING_SITES);
   const totalTranslations = siteEntries.length;
 
