@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Script to generate locale deployment matrix based on trigger type and changes
-# Usage: ./generate-locale-matrix.sh <trigger-type> [manual-locales] [changes-json]
+# Usage: ./generate-locale-matrix.sh <trigger-type> [manual-locales] [changes-json-file]
 #
 # trigger-type: "manual", "auto", or "docs-pr"
 # manual-locales: comma-separated list of locales (for manual trigger)
-# changes-json: JSON output from changed-files action (for auto/docs-pr triggers)
+# changes-json-file: File path containing JSON output from changed-files action (for auto/docs-pr triggers)
 
 set -e
 
@@ -20,17 +20,17 @@ LOCALE_CONFIG_FILE="$ROOT_DIR/.github/locales-config.json"
 
 # Function to print usage
 usage() {
-    echo "Usage: $0 <trigger-type> [manual-locales] [changes-json]"
+    echo "Usage: $0 <trigger-type> [manual-locales] [changes-json-file]"
     echo ""
     echo "Arguments:"
-    echo "  trigger-type    Type of trigger: 'manual', 'auto', or 'docs-pr'"
-    echo "  manual-locales  Comma-separated list of locales (optional, for manual trigger)"
-    echo "  changes-json    JSON output from changed-files action (for auto/docs-pr triggers)"
+    echo "  trigger-type       Type of trigger: 'manual', 'auto', or 'docs-pr'"
+    echo "  manual-locales     Comma-separated list of locales (optional, for manual trigger)"
+    echo "  changes-json-file  File path containing JSON output from changed-files action (for auto/docs-pr triggers)"
     echo ""
     echo "Examples:"
     echo "  $0 manual"
     echo "  $0 manual 'en,zh-hans'"
-    echo "  $0 docs-pr '{\"core_any_changed\": \"true\", \"en_any_changed\": \"false\"}'"
+    echo "  $0 docs-pr '/tmp/changes.json'"
     exit 1
 }
 
@@ -186,7 +186,7 @@ process_auto_trigger() {
 main() {
     local trigger_type="$1"
     local manual_locales="$2"
-    local changes_json="$3"
+    local changes_json_file="$3"
     
     # Validate arguments
     if [ -z "$trigger_type" ]; then
@@ -231,15 +231,28 @@ main() {
         matrix_include="$RESULT_MATRIX_INCLUDE"
         has_changes="$RESULT_HAS_CHANGES"
     else
-        # For auto and docs-pr triggers, changes_json is required
-        if [ -z "$changes_json" ]; then
-            echo "Error: changes-json is required for auto/docs-pr triggers" >&2
+        # For auto and docs-pr triggers, changes_json_file is required
+        if [ -z "$changes_json_file" ]; then
+            echo "Error: changes-json-file is required for auto/docs-pr triggers" >&2
             usage
+        fi
+        
+        # Check if changes JSON file exists
+        if [ ! -f "$changes_json_file" ]; then
+            echo "Error: Changes JSON file not found: $changes_json_file" >&2
+            exit 1
+        fi
+        
+        # Read changes JSON from file
+        local changes_json
+        if ! changes_json=$(cat "$changes_json_file"); then
+            echo "Error: Failed to read changes JSON file: $changes_json_file" >&2
+            exit 1
         fi
         
         # Validate changes JSON
         if ! validate_json "$changes_json"; then
-            echo "Error: Invalid changes JSON provided" >&2
+            echo "Error: Invalid changes JSON in file: $changes_json_file" >&2
             exit 1
         fi
         

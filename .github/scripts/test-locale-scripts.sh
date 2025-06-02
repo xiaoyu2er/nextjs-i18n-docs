@@ -97,37 +97,49 @@ main() {
     
     print_header "Test 4: Auto Trigger - No Changes"
     local no_changes_json='{"core_any_changed": "false", "en_any_changed": "false", "zh-hans_any_changed": "false"}'
+    local temp_file=$(mktemp)
+    echo "$no_changes_json" > "$temp_file"
     if run_test "Auto trigger (no changes)" \
-               "$SCRIPT_DIR/generate-locale-matrix.sh auto '' '$no_changes_json'" \
+               "$SCRIPT_DIR/generate-locale-matrix.sh auto '' '$temp_file'" \
                "has-changes=false"; then
         ((passed_count++))
     fi
+    rm -f "$temp_file"
     ((test_count++))
     
     print_header "Test 5: Auto Trigger - Core Changes"
     local core_changes_json='{"core_any_changed": "true", "en_any_changed": "false", "zh-hans_any_changed": "false"}'
+    local temp_file=$(mktemp)
+    echo "$core_changes_json" > "$temp_file"
     if run_test "Auto trigger (core changes)" \
-               "$SCRIPT_DIR/generate-locale-matrix.sh auto '' '$core_changes_json'" \
+               "$SCRIPT_DIR/generate-locale-matrix.sh auto '' '$temp_file'" \
                "has-changes=true"; then
         ((passed_count++))
     fi
+    rm -f "$temp_file"
     ((test_count++))
     
     print_header "Test 6: Auto Trigger - Locale Changes"
     local locale_changes_json='{"core_any_changed": "false", "en_any_changed": "true", "zh-hans_any_changed": "false"}'
+    local temp_file=$(mktemp)
+    echo "$locale_changes_json" > "$temp_file"
     if run_test "Auto trigger (locale changes)" \
-               "$SCRIPT_DIR/generate-locale-matrix.sh auto '' '$locale_changes_json'" \
+               "$SCRIPT_DIR/generate-locale-matrix.sh auto '' '$temp_file'" \
                "has-changes=true"; then
         ((passed_count++))
     fi
+    rm -f "$temp_file"
     ((test_count++))
     
     print_header "Test 7: Docs PR Trigger"
+    local temp_file=$(mktemp)
+    echo "$core_changes_json" > "$temp_file"
     if run_test "Docs PR trigger" \
-               "$SCRIPT_DIR/generate-locale-matrix.sh docs-pr '' '$core_changes_json'" \
+               "$SCRIPT_DIR/generate-locale-matrix.sh docs-pr '' '$temp_file'" \
                "has-changes=true"; then
         ((passed_count++))
     fi
+    rm -f "$temp_file"
     ((test_count++))
     
     print_header "Test 8: Error Handling - Invalid Trigger Type"
