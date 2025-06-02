@@ -7,6 +7,7 @@ import Image from 'next/image';
 export const useBaseOptions = () => {
   const t = useTranslations('baseOptions');
   return {
+    i18n: true,
     nav: {
       title: (
         <>

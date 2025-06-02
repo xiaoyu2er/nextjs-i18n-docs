@@ -1,80 +1,10 @@
-import { GITHUB_URL, PENDING_SITES, SITES } from '@next-i18n/const';
+import { GITHUB_URL, LOCALES } from '@next-i18n/const';
 import Image from 'next/image';
 
-// Language metadata with display names and descriptions
-const LANGUAGE_INFO = {
-  en: {
-    name: 'English',
-    nativeName: 'English',
-    flag: '🇺🇸',
-    description: 'Official Next.js documentation in English',
-    color: 'from-blue-500 to-blue-600',
-  },
-  'zh-hans': {
-    name: 'Simplified Chinese',
-    nativeName: '简体中文',
-    flag: '🇨🇳',
-    description: 'Next.js 简体中文文档',
-    color: 'from-red-500 to-red-600',
-  },
-  'zh-hant': {
-    name: 'Traditional Chinese',
-    nativeName: '繁體中文',
-    flag: '🇭🇰',
-    description: 'Next.js 繁體中文文檔',
-    color: 'from-purple-500 to-purple-600',
-  },
-  // Pending languages
-  ja: {
-    name: 'Japanese',
-    nativeName: '日本語',
-    flag: '🇯🇵',
-    description: 'Next.js 日本語ドキュメント',
-    color: 'from-pink-500 to-pink-600',
-  },
-  es: {
-    name: 'Spanish',
-    nativeName: 'Español',
-    flag: '🇪🇸',
-    description: 'Documentación de Next.js en español',
-    color: 'from-amber-500 to-amber-600',
-  },
-  de: {
-    name: 'German',
-    nativeName: 'Deutsch',
-    flag: '🇩🇪',
-    description: 'Next.js Dokumentation auf Deutsch',
-    color: 'from-gray-500 to-gray-600',
-  },
-  fr: {
-    name: 'French',
-    nativeName: 'Français',
-    flag: '🇫🇷',
-    description: 'Documentation Next.js en français',
-    color: 'from-indigo-500 to-indigo-600',
-  },
-  ru: {
-    name: 'Russian',
-    nativeName: 'Русский',
-    flag: '🇷🇺',
-    description: 'Документация Next.js на русском языке',
-    color: 'from-emerald-500 to-emerald-600',
-  },
-  ar: {
-    name: 'Arabic',
-    nativeName: 'العربية',
-    flag: '🇸🇦',
-    description: 'وثائق Next.js باللغة العربية',
-    color: 'from-green-500 to-green-600',
-  },
-} as const;
-
 export default function Home() {
-  const siteEntries = Object.entries(SITES).filter(
-    ([locale]) => locale !== 'en',
-  );
-  const pendingSiteEntries = Object.entries(PENDING_SITES);
-  const totalTranslations = siteEntries.length;
+  const sites = LOCALES.filter((l) => l.locale !== 'en' && l.enabled);
+  const pedingSites = LOCALES.filter((l) => !l.enabled);
+  const finishedLength = sites.length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -110,12 +40,12 @@ export default function Home() {
             <div className="flex items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0" />
-                <span>{totalTranslations} Languages Available</span>
+                <span>{finishedLength} Languages Available</span>
               </div>
-              {pendingSiteEntries.length > 0 && (
+              {pedingSites.length > 0 && (
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse shrink-0" />
-                  <span>{pendingSiteEntries.length} More Coming Soon</span>
+                  <span>{pedingSites.length} More Coming Soon</span>
                 </div>
               )}
               <div className="flex items-center gap-2">
@@ -134,81 +64,80 @@ export default function Home() {
       </div>
 
       {/* Language Cards Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-4 md:pt-8">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {siteEntries.map(([locale, url]) => {
-            const info = LANGUAGE_INFO[locale as keyof typeof LANGUAGE_INFO];
-            if (!info) return null;
+          {sites.map(
+            ({ locale, url, color, flag, name, nativeName, description }) => {
+              return (
+                <a
+                  key={locale}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-200 dark:border-gray-700"
+                >
+                  {/* Gradient Background */}
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br ${color} opacity-6 group-hover:opacity-10 transition-opacity duration-300`}
+                  />
 
-            return (
-              <a
-                key={locale}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-200 dark:border-gray-700"
-              >
-                {/* Gradient Background */}
-                <div
-                  className={`absolute inset-0 bg-gradient-to-br ${info.color} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}
-                />
-
-                {/* Card Content */}
-                <div className="relative p-8">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="text-4xl mb-4">{info.flag}</div>
-                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                      <span>Live</span>
-                    </div>
-                  </div>
-
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
-                    {info.nativeName}
-                  </h3>
-
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                    {info.name}
-                  </p>
-
-                  <p className="text-gray-600 dark:text-gray-300 mb-6 line-clamp-2">
-                    {info.description}
-                  </p>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                      <Image
-                        src="/file.svg"
-                        alt="Documentation icon"
-                        width={14}
-                        height={14}
-                        className="dark:invert"
-                      />
-                      <span>Docs • Blog • Learn</span>
+                  {/* Card Content */}
+                  <div className="relative p-8">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="text-4xl mb-4">{flag}</div>
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                        <span>Live</span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-300">
-                      <span className="text-sm font-medium">Visit Site</span>
-                      <svg
-                        className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <title>Arrow Right Icon</title>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
+                      {nativeName}
+                    </h3>
+
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                      {name}
+                    </p>
+
+                    <p className="text-gray-600 dark:text-gray-300 mb-6 line-clamp-2">
+                      {description}
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <Image
+                          src="/file.svg"
+                          alt="Documentation icon"
+                          width={14}
+                          height={14}
+                          className="dark:invert"
                         />
-                      </svg>
+                        <span>Docs • Blog • Learn</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-300">
+                        <span className="text-sm font-medium">Visit Site</span>
+                        <svg
+                          className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <title>Arrow Right Icon</title>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </a>
-            );
-          })}
+                </a>
+              );
+            },
+          )}
         </div>
       </div>
 
@@ -313,11 +242,9 @@ export default function Home() {
               <div className="mt-8 p-4 bg-white/10 backdrop-blur-sm rounded-xl">
                 <p className="text-white/80 text-sm">
                   <strong>Most requested so far:</strong>{' '}
-                  {pendingSiteEntries
-                    .map(([locale]) => {
-                      const info =
-                        LANGUAGE_INFO[locale as keyof typeof LANGUAGE_INFO];
-                      return info ? info.name : locale;
+                  {pedingSites
+                    .map(({ name }) => {
+                      return name;
                     })
                     .join(', ')}
                 </p>
@@ -328,7 +255,7 @@ export default function Home() {
       </div>
 
       {/* Pending Sites Section */}
-      {pendingSiteEntries.length > 0 && (
+      {pedingSites.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
@@ -341,64 +268,61 @@ export default function Home() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {pendingSiteEntries.map(([locale, url]) => {
-              const info = LANGUAGE_INFO[locale as keyof typeof LANGUAGE_INFO];
-              if (!info) return null;
-
-              return (
-                <div
-                  key={locale}
-                  className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-700 opacity-75"
-                >
-                  {/* Gradient Background */}
+            {pedingSites.map(
+              ({ locale, color, name, nativeName, description, flag }) => {
+                return (
                   <div
-                    className={`absolute inset-0 bg-gradient-to-br ${info.color} opacity-3`}
-                  />
+                    key={locale}
+                    className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-700 opacity-75"
+                  >
+                    {/* Gradient Background */}
+                    <div
+                      className={`absolute inset-0 bg-gradient-to-br ${color} opacity-3`}
+                    />
 
-                  {/* Card Content */}
-                  <div className="relative p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="text-3xl mb-3 opacity-60">
-                        {info.flag}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded-full">
-                        <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
-                        <span>In Progress</span>
-                      </div>
-                    </div>
-
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      {info.nativeName}
-                    </h3>
-
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                      {info.name}
-                    </p>
-
-                    <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2 text-sm">
-                      {info.description}
-                    </p>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                        <Image
-                          src="/globe.svg"
-                          alt="Coming soon icon"
-                          width={12}
-                          height={12}
-                          className="dark:invert opacity-60"
-                        />
-                        <span>Docs • Blog • Learn</span>
+                    {/* Card Content */}
+                    <div className="relative p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="text-3xl mb-3 opacity-60">{flag}</div>
+                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded-full">
+                          <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
+                          <span>In Progress</span>
+                        </div>
                       </div>
 
-                      <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                        Coming Soon
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        {nativeName}
+                      </h3>
+
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                        {name}
+                      </p>
+
+                      <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2 text-sm">
+                        {description}
+                      </p>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                          <Image
+                            src="/globe.svg"
+                            alt="Coming soon icon"
+                            width={12}
+                            height={12}
+                            className="dark:invert opacity-60"
+                          />
+                          <span>Docs • Blog • Learn</span>
+                        </div>
+
+                        <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                          Coming Soon
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              },
+            )}
           </div>
 
           <div className="text-center mt-8">
@@ -440,9 +364,9 @@ export default function Home() {
                 v13), blog posts, and learn tutorials in multiple languages.
               </p>
               <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                <span>{totalTranslations} Languages</span>
+                <span>{finishedLength} Languages</span>
                 <span>•</span>
-                <span>{pendingSiteEntries.length} In Progress</span>
+                <span>{pedingSites.length} In Progress</span>
                 <span>•</span>
                 <span>Open Source</span>
                 <span>•</span>

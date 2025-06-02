@@ -1,3 +1,3 @@
-export * from './language';
-export * from './sites';
+export * from './mdx';
+export * from './locale';
 export * from './github';
