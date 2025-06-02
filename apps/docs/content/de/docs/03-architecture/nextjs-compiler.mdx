@@ -1,0 +1,361 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T19:59:26.675Z
+title: Next.js Compiler
+description: Der Next.js Compiler, geschrieben in Rust, transformiert und minimiert Ihre Next.js-Anwendung.
+---
+
+Der Next.js Compiler, geschrieben in Rust mit [SWC](https://swc.rs/), ermöglicht es Next.js, Ihren JavaScript-Code für die Produktion zu transformieren und zu minimieren. Dies ersetzt Babel für einzelne Dateien und Terser für die Minimierung von Ausgabebündeln.
+
+Die Kompilierung mit dem Next.js Compiler ist 17x schneller als mit Babel und seit Next.js Version 12 standardmäßig aktiviert. Wenn Sie eine bestehende Babel-Konfiguration haben oder [nicht unterstützte Funktionen](#unsupported-features) verwenden, wird Ihre Anwendung den Next.js Compiler nicht nutzen und weiterhin Babel verwenden.
+
+## Warum SWC?
+
+[SWC](https://swc.rs/) ist eine erweiterbare, Rust-basierte Plattform für die nächste Generation schneller Entwicklertools.
+
+SWC kann für Kompilierung, Minimierung, Bundling und mehr verwendet werden – und ist für Erweiterungen konzipiert. Es ist etwas, das Sie aufrufen können, um Code-Transformationen durchzuführen (entweder eingebaut oder benutzerdefiniert). Die Ausführung dieser Transformationen erfolgt über höhere Tools wie Next.js.
+
+Wir haben uns aus mehreren Gründen für SWC entschieden:
+
+- **Erweiterbarkeit:** SWC kann als Crate innerhalb von Next.js verwendet werden, ohne die Bibliothek forken oder Designbeschränkungen umgehen zu müssen.
+- **Leistung:** Durch den Wechsel zu SWC konnten wir ~3x schnelleres Fast Refresh und ~5x schnellere Builds in Next.js erreichen, wobei noch weiteres Optimierungspotenzial besteht.
+- **WebAssembly:** Rusts Unterstützung für WASM ist entscheidend, um alle möglichen Plattformen zu unterstützen und Next.js-Entwicklung überall hin zu bringen.
+- **Community:** Die Rust-Community und das Ökosystem sind großartig und wachsen weiter.
+
+## Unterstützte Funktionen
+
+### Styled Components
+
+Wir arbeiten daran, `babel-plugin-styled-components` auf den Next.js Compiler zu portieren.
+
+Aktualisieren Sie zunächst auf die neueste Version von Next.js: `npm install next@latest`. Aktualisieren Sie dann Ihre `next.config.js`-Datei:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    styledComponents: true,
+  },
+}
+```
+
+Für erweiterte Anwendungsfälle können Sie einzelne Eigenschaften für die styled-components-Kompilierung konfigurieren.
+
+> Hinweis: Die `ssr`- und `displayName`-Transformationen sind die Hauptvoraussetzung für die Verwendung von `styled-components` in Next.js.
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // Weitere Informationen zu den Optionen finden Sie unter https://styled-components.com/docs/tooling#babel-plugin.
+    styledComponents: {
+      // Standardmäßig in der Entwicklung aktiviert, in der Produktion deaktiviert, um die Dateigröße zu reduzieren.
+      // Die Festlegung dieser Option überschreibt die Standardeinstellung für alle Umgebungen.
+      displayName?: boolean,
+      // Standardmäßig aktiviert.
+      ssr?: boolean,
+      // Standardmäßig aktiviert.
+      fileName?: boolean,
+      // Standardmäßig leer.
+      topLevelImportPaths?: string[],
+      // Standardmäßig ["index"].
+      meaninglessFileNames?: string[],
+      // Standardmäßig aktiviert.
+      minify?: boolean,
+      // Standardmäßig aktiviert.
+      transpileTemplateLiterals?: boolean,
+      // Standardmäßig leer.
+      namespace?: string,
+      // Standardmäßig deaktiviert.
+      pure?: boolean,
+      // Standardmäßig aktiviert.
+      cssProp?: boolean,
+    },
+  },
+}
+```
+
+### Jest
+
+Der Next.js Compiler transpiliert Ihre Tests und vereinfacht die Konfiguration von Jest mit Next.js, einschließlich:
+
+- Automatisches Mocking von `.css`, `.module.css` (und ihren `.scss`-Varianten) sowie Bildimporten
+- Automatische Einrichtung von `transform` mit SWC
+- Laden von `.env` (und allen Varianten) in `process.env`
+- Ignorieren von `node_modules` bei der Testauflösung und Transformation
+- Ignorieren von `.next` bei der Testauflösung
+- Laden von `next.config.js` für Flags, die experimentelle SWC-Transformationen ermöglichen
+
+Aktualisieren Sie zunächst auf die neueste Version von Next.js: `npm install next@latest`. Aktualisieren Sie dann Ihre `jest.config.js`-Datei:
+
+```js filename="jest.config.js"
+const nextJest = require('next/jest')
+
+// Bereitstellung des Pfads zu Ihrer Next.js-App, wodurch das Laden von next.config.js und .env-Dateien ermöglicht wird
+const createJestConfig = nextJest({ dir: './' })
+
+// Jede benutzerdefinierte Konfiguration, die Sie an Jest übergeben möchten
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+}
+
+// createJestConfig wird auf diese Weise exportiert, um sicherzustellen, dass next/jest die Next.js-Konfiguration laden kann, die asynchron ist
+module.exports = createJestConfig(customJestConfig)
+```
+
+### Relay
+
+Um [Relay](https://relay.dev/)-Unterstützung zu aktivieren:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    relay: {
+      // Dies sollte mit relay.config.js übereinstimmen
+      src: './',
+      artifactDirectory: './__generated__',
+      language: 'typescript',
+      eagerEsModules: false,
+    },
+  },
+}
+```
+
+> **Gut zu wissen:** In Next.js werden alle JavaScript-Dateien im Verzeichnis `pages` als Routen betrachtet. Für `relay-compiler` müssen Sie daher die `artifactDirectory`-Konfiguration außerhalb von `pages` angeben, da `relay-compiler` sonst Dateien neben der Quelldatei im Verzeichnis `__generated__` generiert, und diese Datei als Route betrachtet wird, was Produktionsbuilds unterbricht.
+
+### React Properties entfernen
+
+Ermöglicht das Entfernen von JSX-Properties. Dies wird oft für Tests verwendet. Ähnlich wie `babel-plugin-react-remove-properties`.
+
+Um Properties zu entfernen, die auf den Standard-Regex `^data-test` passen:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    reactRemoveProperties: true,
+  },
+}
+```
+
+Um benutzerdefinierte Properties zu entfernen:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // Die hier definierten Regexes werden in Rust verarbeitet, daher unterscheidet sich die Syntax von
+    // JavaScript `RegExp`s. Siehe https://docs.rs/regex.
+    reactRemoveProperties: { properties: ['^data-custom$'] },
+  },
+}
+```
+
+### Console entfernen
+
+Diese Transformation ermöglicht das Entfernen aller `console.*`-Aufrufe im Anwendungscode (nicht in `node_modules`). Ähnlich wie `babel-plugin-transform-remove-console`.
+
+Entfernen Sie alle `console.*`-Aufrufe:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: true,
+  },
+}
+```
+
+Entfernen Sie `console.*`-Ausgaben außer `console.error`:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: {
+      exclude: ['error'],
+    },
+  },
+}
+```
+
+### Legacy Decorators
+
+Next.js erkennt automatisch `experimentalDecorators` in `jsconfig.json` oder `tsconfig.json`. Legacy Decorators werden häufig mit älteren Versionen von Bibliotheken wie `mobx` verwendet.
+
+Dieses Flag wird nur für die Kompatibilität mit bestehenden Anwendungen unterstützt. Wir empfehlen nicht, Legacy Decorators in neuen Anwendungen zu verwenden.
+
+Aktualisieren Sie zunächst auf die neueste Version von Next.js: `npm install next@latest`. Aktualisieren Sie dann Ihre `jsconfig.json` oder `tsconfig.json`-Datei:
+
+```js
+{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}
+```
+
+### importSource
+
+Next.js erkennt automatisch `jsxImportSource` in `jsconfig.json` oder `tsconfig.json` und wendet dies an. Dies wird häufig mit Bibliotheken wie [Theme UI](https://theme-ui.com) verwendet.
+
+Aktualisieren Sie zunächst auf die neueste Version von Next.js: `npm install next@latest`. Aktualisieren Sie dann Ihre `jsconfig.json` oder `tsconfig.json`-Datei:
+
+```js
+{
+  "compilerOptions": {
+    "jsxImportSource": "theme-ui"
+  }
+}
+```
+
+### Emotion
+
+Wir arbeiten daran, `@emotion/babel-plugin` auf den Next.js Compiler zu portieren.
+
+Aktualisieren Sie zunächst auf die neueste Version von Next.js: `npm install next@latest`. Aktualisieren Sie dann Ihre `next.config.js`-Datei:
+
+```js filename="next.config.js"
+
+module.exports = {
+  compiler: {
+    emotion: boolean | {
+      // Standard ist true. Wird deaktiviert, wenn der Build-Typ production ist.
+      sourceMap?: boolean,
+      // Standard ist 'dev-only'.
+      autoLabel?: 'never' | 'dev-only' | 'always',
+      // Standard ist '[local]'.
+      // Zulässige Werte: `[local]` `[filename]` und `[dirname]`
+      // Diese Option funktioniert nur, wenn autoLabel auf 'dev-only' oder 'always' gesetzt ist.
+      // Sie ermöglicht es Ihnen, das Format des resultierenden Labels zu definieren.
+      // Das Format wird über eine Zeichenkette definiert, bei der variable Teile in eckige Klammern [] eingeschlossen sind.
+      // Beispiel: labelFormat: "my-classname--[local]", wobei [local] durch den Namen der Variable ersetzt wird, der das Ergebnis zugewiesen ist.
+      labelFormat?: string,
+      // Standard ist undefined.
+      // Diese Option ermöglicht es Ihnen, dem Compiler mitzuteilen, welche Importe er
+      // betrachten soll, um zu bestimmen, was transformiert werden soll, sodass Sie bei erneuten Exporten
+      // von Emotions Exporten weiterhin Transformationen verwenden können.
+      importMap?: {
+        [packageName: string]: {
+          [exportName: string]: {
+            canonicalImport?: [string, string],
+            styledBaseImport?: [string, string],
+          }
+        }
+      },
+    },
+  },
+}
+```
+
+### Minimierung
+
+Der SWC-Compiler von Next.js wird seit v13 standardmäßig für die Minimierung verwendet. Dies ist 7x schneller als Terser.
+
+> **Gut zu wissen:** Ab v15 kann die Minimierung nicht mehr über `next.config.js` angepasst werden. Die Unterstützung für das `swcMinify`-Flag wurde entfernt.
+
+### Modultranspilierung
+
+Next.js kann Abhängigkeiten aus lokalen Paketen (wie Monorepos) oder externen Abhängigkeiten (`node_modules`) automatisch transpilieren und bündeln. Dies ersetzt das Paket `next-transpile-modules`.
+
+```js filename="next.config.js"
+module.exports = {
+  transpilePackages: ['@acme/ui', 'lodash-es'],
+}
+```
+
+### Modularisierte Imports
+
+Diese Option wurde durch [`optimizePackageImports`](/docs/app/api-reference/config/next-config-js/optimizePackageImports) in Next.js 13.5 ersetzt. Wir empfehlen ein Upgrade, um die neue Option zu verwenden, die keine manuelle Konfiguration von Importpfaden erfordert.
+
+### Define (Variablen während des Builds ersetzen)
+
+Die `define`-Option ermöglicht es Ihnen, Variablen in Ihrem Code statisch zur Build-Zeit zu ersetzen.
+Die Option nimmt ein Objekt als Schlüssel-Wert-Paare entgegen, wobei die Schlüssel die Variablen sind, die durch die entsprechenden Werte ersetzt werden sollen.
+
+Verwenden Sie das Feld `compiler.define` in `next.config.js`, um Variablen für alle Umgebungen (Server, Edge und Client) zu definieren. Oder verwenden Sie `compiler.defineServer`, um Variablen nur für serverseitigen Code (Server und Edge) zu definieren:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    define: {
+      MY_VARIABLE: 'my-string',
+      'process.env.MY_ENV_VAR': 'my-env-var',
+    },
+    defineServer: {
+      MY_SERVER_VARIABLE: 'my-server-var',
+    },
+  },
+}
+```
+
+### Build-Lifecycle-Hooks
+
+Der Next.js Compiler unterstützt Lifecycle-Hooks, die es Ihnen ermöglichen, benutzerdefinierten Code an bestimmten Punkten während des Build-Prozesses auszuführen. Derzeit wird der folgende Hook unterstützt:
+
+#### runAfterProductionCompile
+
+Eine Hook-Funktion, die nach Abschluss der Produktionsbuild-Kompilierung, aber vor der Ausführung von Post-Kompilierungsaufgaben wie Typüberprüfung und statischer Seitengenerierung, ausgeführt wird. Dieser Hook bietet Zugriff auf Projektmetadaten, einschließlich des Projektverzeichnisses und des Build-Ausgabeverzeichnisses, was ihn für Drittanbietertools nützlich macht, um Build-Ausgaben wie Sourcemaps zu sammeln.
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    runAfterProductionCompile: async ({ distDir, projectDir }) => {
+      // Ihr benutzerdefinierter Code hier
+    },
+  },
+}
+```
+
+Der Hook empfängt ein Objekt mit den folgenden Eigenschaften:
+
+- `distDir`: Das Build-Ausgabeverzeichnis (standardmäßig `.next`)
+- `projectDir`: Das Stammverzeichnis des Projekts
+
+## Experimentelle Funktionen
+
+### SWC-Trace-Profiling
+
+Sie können SWCs interne Transform-Traces im [Trace-Event-Format](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview?mode=html#%21=) von Chromium generieren.
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcTraceProfiling: true,
+  },
+}
+```
+
+Einmal aktiviert, generiert SWC eine Trace-Datei namens `swc-trace-profile-${timestamp}.json` unter `.next/`. Chromiums Trace-Viewer (chrome://tracing/, https://ui.perfetto.dev/) oder kompatible Flamegraph-Viewer (https://www.speedscope.app/) können die generierten Traces laden und visualisieren.
+
+### SWC-Plugins (experimentell)
+
+Sie können die SWC-Transformation konfigurieren, um die experimentelle Plugin-Unterstützung von SWC, die in wasm geschrieben ist, zu verwenden und das Transformationsverhalten anzupassen.
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcPlugins: [
+      [
+        'plugin',
+        {
+          ...pluginOptions,
+        },
+      ],
+    ],
+  },
+}
+```
+
+`swcPlugins` akzeptiert ein Array von Tupeln zur Konfiguration von Plugins. Ein Tupel für das Plugin enthält den Pfad zum Plugin und ein Objekt für die Plugin-Konfiguration. Der Pfad zum Plugin kann ein npm-Modul-Paketname oder ein absoluter Pfad zur `.wasm`-Binärdatei selbst sein.
+
+## Nicht unterstützte Funktionen
+
+Wenn Ihre Anwendung eine `.babelrc`-Datei enthält, wird Next.js automatisch auf die Verwendung von Babel für die Transformation einzelner Dateien zurückfallen. Dies gewährleistet Abwärtskompatibilität mit bestehenden Anwendungen, die benutzerdefinierte Babel-Plugins nutzen.
+
+Wenn Sie ein benutzerdefiniertes Babel-Setup verwenden, [teilen Sie uns bitte Ihre Konfiguration mit](https://github.com/vercel/next.js/discussions/30174). Wir arbeiten daran, so viele häufig verwendete Babel-Transformationen wie möglich zu portieren sowie zukünftig Plugins zu unterstützen.
+
+## Versionsverlauf
+
+| Version   | Änderungen                                                                                                                                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.1.0` | [Modultranspilierung](https://nextjs.org/blog/next-13-1#built-in-module-transpilation-stable) und [Modularisierte Imports](https://nextjs.org/blog/next-13-1#import-resolution-for-smaller-bundles) stabil. |
+| `v13.0.0` | SWC-Minimierung standardmäßig aktiviert.                                                                                                                                                                         |
+| `v12.3.0` | SWC-Minimierung [stabil](https://nextjs.org/blog/next-12-3#swc-minifier-stable).                                                                                                                            |
+| `v12.2.0` | [SWC-Plugins](#swc-plugins-experimental) experimentelle Unterstützung hinzugefügt.                                                                                                                                     |
+| `v12.1.0` | Unterstützung für Styled Components, Jest, Relay, React Properties entfernen, Legacy Decorators, Console entfernen und jsxImportSource hinzugefügt.                                                                       |
+| `v12.0.0` | Next.js Compiler [eingeführt](https://nextjs.org/blog/next-12).                                                                                                                                          |

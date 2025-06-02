@@ -1,0 +1,587 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-06-02T20:18:21.155Z
+title: HTTP-Header
+description: Fügen Sie Ihren Next.js-Apps benutzerdefinierte HTTP-Header hinzu.
+---
+
+{/* Der Inhalt dieses Dokuments wird sowohl vom App- als auch vom Pages-Router gemeinsam genutzt. Sie können die Komponente `<PagesOnly>Inhalt</PagesOnly>` verwenden, um Inhalte hinzuzufügen, die spezifisch für den Pages-Router sind. Gemeinsam genutzte Inhalte sollten nicht in eine Komponente eingeschlossen werden. */}
+
+Header ermöglichen es Ihnen, benutzerdefinierte HTTP-Header in der Antwort auf eine eingehende Anfrage für einen bestimmten Pfad festzulegen.
+
+Um benutzerdefinierte HTTP-Header zu setzen, können Sie den Schlüssel `headers` in `next.config.js` verwenden:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/about',
+        headers: [
+          {
+            key: 'x-custom-header',
+            value: 'mein benutzerdefinierter Header-Wert',
+          },
+          {
+            key: 'x-another-custom-header',
+            value: 'mein anderer benutzerdefinierter Header-Wert',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+`headers` ist eine asynchrone Funktion, die ein Array zurückgibt, das Objekte mit den Eigenschaften `source` und `headers` enthält:
+
+- `source` ist das Muster des eingehenden Anfragepfads.
+- `headers` ist ein Array von Antwort-Header-Objekten mit den Eigenschaften `key` und `value`.
+- `basePath`: `false` oder `undefined` - wenn false, wird das basePath beim Abgleich nicht berücksichtigt, kann nur für externe Rewrites verwendet werden.
+- `locale`: `false` oder `undefined` - gibt an, ob die Locale beim Abgleich nicht berücksichtigt werden soll.
+- `has` ist ein Array von [has-Objekten](#header-cookie-und-query-matching) mit den Eigenschaften `type`, `key` und `value`.
+- `missing` ist ein Array von [missing-Objekten](#header-cookie-und-query-matching) mit den Eigenschaften `type`, `key` und `value`.
+
+Header werden vor dem Dateisystem überprüft, das Seiten und Dateien in `/public` enthält.
+
+## Verhalten bei Header-Überschreibung
+
+Wenn zwei Header denselben Pfad abgleichen und denselben Header-Schlüssel setzen, überschreibt der letzte Header-Schlüssel den ersten. Mit den folgenden Headern führt der Pfad `/hello` dazu, dass der Header `x-hello` auf `world` gesetzt wird, da der letzte gesetzte Header-Wert `world` ist.
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'there',
+          },
+        ],
+      },
+      {
+        source: '/hello',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Pfadabgleich
+
+Pfadabgleiche sind möglich, z.B. wird `/blog/:slug` mit `/blog/hello-world` abgeglichen (keine verschachtelten Pfade):
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug', // Abgeglichene Parameter können im Wert verwendet werden
+          },
+          {
+            key: 'x-slug-:slug', // Abgeglichene Parameter können im Schlüssel verwendet werden
+            value: 'mein anderer benutzerdefinierter Header-Wert',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Wildcard-Pfadabgleich
+
+Um einen Wildcard-Pfad abzugleichen, können Sie `*` nach einem Parameter verwenden, z.B. wird `/blog/:slug*` mit `/blog/a/b/c/d/hello-world` abgeglichen:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug*',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug*', // Abgeglichene Parameter können im Wert verwendet werden
+          },
+          {
+            key: 'x-slug-:slug*', // Abgeglichene Parameter können im Schlüssel verwendet werden
+            value: 'mein anderer benutzerdefinierter Header-Wert',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Regex-Pfadabgleich
+
+Um einen Regex-Pfad abzugleichen, können Sie den Regex in Klammern nach einem Parameter einschließen, z.B. wird `/blog/:slug(\\d{1,})` mit `/blog/123` abgeglichen, aber nicht mit `/blog/abc`:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:post(\\d{1,})',
+        headers: [
+          {
+            key: 'x-post',
+            value: ':post',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+Die folgenden Zeichen `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` werden für den Regex-Pfadabgleich verwendet. Wenn sie in der `source` als nicht-spezielle Werte verwendet werden, müssen sie durch Hinzufügen von `\\` davor maskiert werden:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        // dies gleicht `/english(default)/something` ab, wenn es angefordert wird
+        source: '/english\\(default\\)/:slug',
+        headers: [
+          {
+            key: 'x-header',
+            value: 'value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Header-, Cookie- und Query-Abgleich
+
+Um einen Header nur anzuwenden, wenn Header-, Cookie- oder Query-Werte ebenfalls mit dem `has`-Feld übereinstimmen oder nicht mit dem `missing`-Feld übereinstimmen, können diese Felder verwendet werden. Sowohl die `source` als auch alle `has`-Elemente müssen übereinstimmen und alle `missing`-Elemente dürfen nicht übereinstimmen, damit der Header angewendet wird.
+
+`has`- und `missing`-Elemente können die folgenden Felder haben:
+
+- `type`: `String` - muss entweder `header`, `cookie`, `host` oder `query` sein.
+- `key`: `String` - der Schlüssel des ausgewählten Typs, gegen den abgeglichen werden soll.
+- `value`: `String` oder `undefined` - der zu überprüfende Wert. Wenn undefined, wird jeder Wert abgeglichen. Ein regex-ähnlicher String kann verwendet werden, um einen bestimmten Teil des Werts zu erfassen, z.B. wenn der Wert `first-(?<paramName>.*)` für `first-second` verwendet wird, dann kann `second` im Ziel mit `:paramName` verwendet werden.
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      // wenn der Header `x-add-header` vorhanden ist,
+      // wird der Header `x-another-header` angewendet
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-add-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // wenn der Header `x-no-header` nicht vorhanden ist,
+      // wird der Header `x-another-header` angewendet
+      {
+        source: '/:path*',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-no-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // wenn die Quelle, die Query und der Cookie übereinstimmen,
+      // wird der Header `x-authorized` angewendet
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // der Seitenwert wird nicht in den Header-Schlüssel/Werten verfügbar sein,
+            // da der Wert bereitgestellt wird und keine benannte Erfassungsgruppe verwendet wird, z.B. (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-authorized',
+            value: ':authorized',
+          },
+        ],
+      },
+      // wenn der Header `x-authorized` vorhanden ist und
+      // einen übereinstimmenden Wert enthält, wird `x-another-header` angewendet
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+      // wenn der Host `example.com` ist,
+      // wird dieser Header angewendet
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Header mit basePath-Unterstützung
+
+Wenn Sie die [`basePath`-Unterstützung](/docs/app/api-reference/config/next-config-js/basePath) mit Headern nutzen, wird jede `source` automatisch mit dem `basePath` präfixiert, es sei denn, Sie fügen `basePath: false` zum Header hinzu:
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async headers() {
+    return [
+      {
+        source: '/with-basePath', // wird zu /docs/with-basePath
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        source: '/without-basePath', // wird nicht modifiziert, da basePath: false gesetzt ist
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+        basePath: false,
+      },
+    ]
+  },
+}
+```
+
+## Header mit i18n-Unterstützung
+
+<AppOnly>
+
+Wenn Sie die [`i18n`-Unterstützung](/docs/app/guides/internationalization) mit Headern nutzen, wird jede `source` automatisch präfixiert, um die konfigurierten `locales` zu handhaben, es sei denn, Sie fügen `locale: false` zum Header hinzu. Wenn `locale: false` verwendet wird, müssen Sie die `source` mit einer Locale präfixieren, damit sie korrekt abgeglichen werden kann.
+
+</AppOnly>
+
+<PagesOnly>
+
+Wenn Sie die [`i18n`-Unterstützung](/docs/pages/guides/internationalization) mit Headern nutzen, wird jede `source` automatisch präfixiert, um die konfigurierten `locales` zu handhaben, es sei denn, Sie fügen `locale: false` zum Header hinzu. Wenn `locale: false` verwendet wird, müssen Sie die `source` mit einer Locale präfixieren, damit sie korrekt abgeglichen werden kann.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async headers() {
+    return [
+      {
+        source: '/with-locale', // handhabt automatisch alle Locales
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // handhabt Locales nicht automatisch, da locale: false gesetzt ist
+        source: '/nl/with-locale-manual',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // gleicht '/' ab, da `en` die defaultLocale ist
+        source: '/en',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // wird in /(en|fr|de)/(.*) umgewandelt, so dass es nicht die obersten
+        // `/` oder `/fr` Routen wie /:path* abgleicht
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Cache-Control
+
+Next.js setzt den `Cache-Control`-Header auf `public, max-age=31536000, immutable` für wirklich unveränderliche Assets. Dies kann nicht überschrieben werden. Diese unveränderlichen Dateien enthalten einen SHA-Hash im Dateinamen und können daher sicher unbegrenzt zwischengespeichert werden. Zum Beispiel [Statische Bildimporte](/docs/app/getting-started/images#local-images). Sie können `Cache-Control`-Header in `next.config.js` nicht für diese Assets setzen.
+
+Sie können jedoch `Cache-Control`-Header für andere Antworten oder Daten setzen.
+
+<AppOnly>
+
+Erfahren Sie mehr über [Caching](/docs/app/deep-dive/caching) mit dem App-Router.
+
+</AppOnly>
+
+<PagesOnly>
+
+Wenn Sie den Cache einer Seite, die [statisch generiert](/docs/pages/building-your-application/rendering/static-site-generation) wurde, neu validieren müssen, können Sie dies tun, indem Sie die `revalidate`-Prop in der [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)-Funktion der Seite setzen.
+
+Um die Antwort einer [API-Route](/docs/pages/building-your-application/routing/api-routes) zwischenzuspeichern, können Sie `res.setHeader` verwenden:
+
+```ts filename="pages/api/hello.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+type ResponseData = {
+  message: string
+}
+
+export default function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ResponseData>
+) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+```js filename="pages/api/hello.js" switcher
+export default function handler(req, res) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+Sie können auch Caching-Header (`Cache-Control`) innerhalb von `getServerSideProps` verwenden, um dynamische Antworten zwischenzuspeichern. Zum Beispiel mit [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/).
+
+```ts filename="pages/index.tsx" switcher
+import { GetStaticProps, GetStaticPaths, GetServerSideProps } from 'next'
+
+// Dieser Wert gilt für zehn Sekunden als frisch (s-maxage=10).
+// Wenn eine Anfrage innerhalb der nächsten 10 Sekunden wiederholt wird, bleibt der zuvor
+// zwischengespeicherte Wert frisch. Wenn die Anfrage vor 59 Sekunden wiederholt wird,
+// ist der zwischengespeicherte Wert veraltet, wird aber trotzdem gerendert (stale-while-revalidate=59).
+//
+// Im Hintergrund wird eine Revalidierungsanfrage gestellt, um den Cache
+// mit einem frischen Wert zu füllen. Wenn Sie die Seite aktualisieren, sehen Sie den neuen Wert.
+export const getServerSideProps = (async (context) => {
+  context.res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}) satisfies GetServerSideProps
+```
+
+```js filename="pages/index.js" switcher
+// Dieser Wert gilt für zehn Sekunden als frisch (s-maxage=10).
+// Wenn eine Anfrage innerhalb der nächsten 10 Sekunden wiederholt wird, bleibt der zuvor
+// zwischengespeicherte Wert frisch. Wenn die Anfrage vor 59 Sekunden wiederholt wird,
+// ist der zwischengespeicherte Wert veraltet, wird aber trotzdem gerendert (stale-while-revalidate=59).
+//
+// Im Hintergrund wird eine Revalidierungsanfrage gestellt, um den Cache
+// mit einem frischen Wert zu füllen. Wenn Sie die Seite aktualisieren, sehen Sie den neuen Wert.
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+</PagesOnly>
+
+## Optionen
+
+### CORS
+
+[Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/docs/Web/HTTP/CORS) ist eine Sicherheitsfunktion, die steuert, welche Websites auf Ihre Ressourcen zugreifen können. Sie können den `Access-Control-Allow-Origin`-Header setzen, um einer bestimmten Origin den Zugriff auf Ihre <PagesOnly>API-Endpunkte</PagesOnly><AppOnly>Route-Handler</AppOnly> zu erlauben.
+
+```js
+async headers() {
+    return [
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*", // Setzen Sie Ihre Origin
+          },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET, POST, PUT, DELETE, OPTIONS",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value: "Content-Type, Authorization",
+          },
+        ],
+      },
+    ];
+  },
+```
+
+### X-DNS-Prefetch-Control
+
+[Dieser Header](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-DNS-Prefetch-Control) steuert das DNS-Prefetching, das es Browsern ermöglicht, Domänennamenauflösungen für externe Links, Bilder, CSS, JavaScript und mehr proaktiv durchzuführen. Dieses Prefetching erfolgt im Hintergrund, so dass die [DNS](https://developer.mozilla.org/docs/Glossary/DNS)-Auflösung wahrscheinlich abgeschlossen ist, wenn die referenzierten Elemente benötigt werden. Dies reduziert die Latenz, wenn der Benutzer auf einen Link klickt.
+
+```js
+{
+  key: 'X-DNS-Prefetch-Control',
+  value: 'on'
+}
+```
+
+### Strict-Transport-Security
+
+[Dieser Header](https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security) informiert Browser, dass sie nur über HTTPS und nicht über HTTP aufgerufen werden sollten. Mit der folgenden Konfiguration verwenden alle aktuellen und zukünftigen Subdomains HTTPS für einen `max-age` von 2 Jahren. Dies blockiert den Zugriff auf Seiten oder Subdomains, die nur über HTTP bereitgestellt werden können.
+
+```js
+{
+  key: 'Strict-Transport-Security',
+  value: 'max-age=63072000; includeSubDomains; preload'
+}
+```
+
+### X-Frame-Options
+
+[Dieser Header](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Frame-Options) gibt an, ob die Site innerhalb eines `iframe` angezeigt werden darf. Dies kann Clickjacking-Angriffe verhindern.
+
+**Dieser Header wurde durch die CSP-Option `frame-ancestors` ersetzt**, die in modernen Browsern besser unterstützt wird (siehe [Content Security Policy](/docs/app/guides/content-security-policy) für Konfigurationsdetails).
+
+```js
+{
+  key: 'X-Frame-Options',
+  value: 'SAMEORIGIN'
+}
+```
+
+### Permissions-Policy
+
+[Dieser Header](https://developer.mozilla.org/docs/Web/HTTP/Headers/Permissions-Policy) ermöglicht die Kontrolle darüber, welche Funktionen und APIs im Browser genutzt werden können. Er wurde früher als `Feature-Policy` bezeichnet.
+
+```js
+{
+  key: 'Permissions-Policy',
+  value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()'
+}
+```
+
+### X-Content-Type-Options
+
+[Dieser Header](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Content-Type-Options) verhindert, dass der Browser den Inhaltstyp erraten kann, wenn der `Content-Type`-Header nicht explizit gesetzt ist. Dies kann XSS-Angriffe verhindern, insbesondere auf Websites, die Nutzern das Hochladen und Teilen von Dateien erlauben.
+
+Beispielsweise könnte ein Nutzer versuchen, ein Bild herunterzuladen, das jedoch als ausführbare Datei mit einem anderen `Content-Type` behandelt wird, was bösartig sein könnte. Dieser Header gilt auch für das Herunterladen von Browser-Erweiterungen. Der einzige gültige Wert für diesen Header ist `nosniff`.
+
+```js
+{
+  key: 'X-Content-Type-Options',
+  value: 'nosniff'
+}
+```
+
+### Referrer-Policy
+
+[Dieser Header](https://developer.mozilla.org/docs/Web/HTTP/Headers/Referrer-Policy) steuert, wie viele Informationen der Browser beim Navigieren von der aktuellen Website (Ursprung) zu einer anderen Website mitliefert.
+
+```js
+{
+  key: 'Referrer-Policy',
+  value: 'origin-when-cross-origin'
+}
+```
+
+### Content-Security-Policy
+
+Erfahren Sie mehr über das Hinzufügen einer [Content Security Policy](/docs/app/guides/content-security-policy) zu Ihrer Anwendung.
+
+## Versionsverlauf
+
+| Version   | Änderungen          |
+| --------- | ------------------- |
+| `v13.3.0` | `missing` hinzugefügt. |
+| `v10.2.0` | `has` hinzugefügt.     |
+| `v9.5.0`  | Header hinzugefügt.    |

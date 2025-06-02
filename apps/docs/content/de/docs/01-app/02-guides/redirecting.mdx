@@ -1,0 +1,649 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:02:11.062Z
+title: Umgang mit Weiterleitungen in Next.js
+nav_title: Weiterleitungen
+description: Erfahren Sie mehr über die verschiedenen Möglichkeiten, Weiterleitungen in Next.js zu handhaben.
+related:
+  links:
+    - app/api-reference/functions/redirect
+    - app/api-reference/functions/permanentRedirect
+    - app/building-your-application/routing/middleware
+    - app/api-reference/config/next-config-js/redirects
+---
+
+Es gibt mehrere Möglichkeiten, Weiterleitungen in Next.js zu handhaben. Diese Seite stellt jede verfügbare Option vor, zeigt Anwendungsfälle und erklärt den Umgang mit einer großen Anzahl von Weiterleitungen.
+
+<AppOnly>
+
+| API                                                            | Zweck                                            | Ort                                                | Statuscode                             |
+| -------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------- | -------------------------------------- |
+| [`redirect`](#redirect-function)                               | Benutzer nach einer Mutation oder einem Ereignis weiterleiten | Server Components, Server Actions, Route Handlers  | 307 (Temporär) oder 303 (Server Action) |
+| [`permanentRedirect`](#permanentredirect-function)             | Benutzer nach einer Mutation oder einem Ereignis dauerhaft weiterleiten | Server Components, Server Actions, Route Handlers  | 308 (Permanent)                        |
+| [`useRouter`](#userouter-hook)                                 | Client-seitige Navigation durchführen            | Event-Handler in Client Components                 | N/A                                    |
+| [`redirects` in `next.config.js`](#redirects-in-nextconfigjs)  | Eingehende Anfrage basierend auf einem Pfad weiterleiten | `next.config.js` Datei                             | 307 (Temporär) oder 308 (Permanent)    |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | Eingehende Anfrage basierend auf einer Bedingung weiterleiten | Middleware                                         | Beliebig                               |
+
+</AppOnly>
+
+<PagesOnly>
+
+| API                                                            | Zweck                                            | Ort                 | Statuscode                         |
+| -------------------------------------------------------------- | ------------------------------------------------ | ------------------- | ---------------------------------- |
+| [`useRouter`](#userouter-hook)                                 | Client-seitige Navigation durchführen            | Components          | N/A                                |
+| [`redirects` in `next.config.js`](#redirects-in-nextconfigjs)  | Eingehende Anfrage basierend auf einem Pfad weiterleiten | `next.config.js` Datei | 307 (Temporär) oder 308 (Permanent) |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | Eingehende Anfrage basierend auf einer Bedingung weiterleiten | Middleware         | Beliebig                           |
+
+</PagesOnly>
+
+<AppOnly>
+
+## `redirect` Funktion
+
+Die `redirect` Funktion ermöglicht es, Benutzer zu einer anderen URL weiterzuleiten. Sie können `redirect` in [Server Components](/docs/app/getting-started/server-and-client-components), [Route Handlers](/docs/app/building-your-application/routing/route-handlers) und [Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) aufrufen.
+
+`redirect` wird oft nach einer Mutation oder einem Ereignis verwendet. Zum Beispiel beim Erstellen eines Posts:
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id: string) {
+  try {
+    // Datenbank aufrufen
+  } catch (error) {
+    // Fehler behandeln
+  }
+
+  revalidatePath('/posts') // Gecachte Posts aktualisieren
+  redirect(`/post/${id}`) // Zur neuen Post-Seite navigieren
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id) {
+  try {
+    // Datenbank aufrufen
+  } catch (error) {
+    // Fehler behandeln
+  }
+
+  revalidatePath('/posts') // Gecachte Posts aktualisieren
+  redirect(`/post/${id}`) // Zur neuen Post-Seite navigieren
+}
+```
+
+> **Wissenswertes**:
+>
+> - `redirect` gibt standardmäßig einen 307 (Temporäre Weiterleitung) Statuscode zurück. Bei Verwendung in einer Server Action wird ein 303 (See Other) zurückgegeben, der häufig für die Weiterleitung zu einer Erfolgsseite nach einer POST-Anfrage verwendet wird.
+> - `redirect` wirft intern einen Fehler und sollte daher außerhalb von `try/catch` Blöcken aufgerufen werden.
+> - `redirect` kann in Client Components während des Rendering-Prozesses aufgerufen werden, aber nicht in Event-Handlern. Verwenden Sie stattdessen den [`useRouter` Hook](#userouter-hook).
+> - `redirect` akzeptiert auch absolute URLs und kann für Weiterleitungen zu externen Links verwendet werden.
+> - Wenn Sie vor dem Rendering-Prozess weiterleiten möchten, verwenden Sie [`next.config.js`](#redirects-in-nextconfigjs) oder [Middleware](#nextresponseredirect-in-middleware).
+
+Weitere Informationen finden Sie in der [`redirect` API-Referenz](/docs/app/api-reference/functions/redirect).
+
+## `permanentRedirect` Funktion
+
+Die `permanentRedirect` Funktion ermöglicht es, Benutzer **dauerhaft** zu einer anderen URL weiterzuleiten. Sie können `permanentRedirect` in [Server Components](/docs/app/getting-started/server-and-client-components), [Route Handlers](/docs/app/building-your-application/routing/route-handlers) und [Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) aufrufen.
+
+`permanentRedirect` wird oft nach einer Mutation oder einem Ereignis verwendet, das die kanonische URL einer Entität ändert, wie z.B. die Aktualisierung der Profil-URL eines Benutzers nach einer Namensänderung:
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username: string, formData: FormData) {
+  try {
+    // Datenbank aufrufen
+  } catch (error) {
+    // Fehler behandeln
+  }
+
+  revalidateTag('username') // Alle Referenzen zum Benutzernamen aktualisieren
+  permanentRedirect(`/profile/${username}`) // Zum neuen Benutzerprofil navigieren
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username, formData) {
+  try {
+    // Datenbank aufrufen
+  } catch (error) {
+    // Fehler behandeln
+  }
+
+  revalidateTag('username') // Alle Referenzen zum Benutzernamen aktualisieren
+  permanentRedirect(`/profile/${username}`) // Zum neuen Benutzerprofil navigieren
+}
+```
+
+> **Wissenswertes**:
+>
+> - `permanentRedirect` gibt standardmäßig einen 308 (Permanente Weiterleitung) Statuscode zurück.
+> - `permanentRedirect` akzeptiert auch absolute URLs und kann für Weiterleitungen zu externen Links verwendet werden.
+> - Wenn Sie vor dem Rendering-Prozess weiterleiten möchten, verwenden Sie [`next.config.js`](#redirects-in-nextconfigjs) oder [Middleware](#nextresponseredirect-in-middleware).
+
+Weitere Informationen finden Sie in der [`permanentRedirect` API-Referenz](/docs/app/api-reference/functions/permanentRedirect).
+
+</AppOnly>
+
+## `useRouter()` Hook
+
+<AppOnly>
+
+Wenn Sie in einem Event-Handler einer Client Component eine Weiterleitung durchführen müssen, können Sie die `push` Methode des `useRouter` Hooks verwenden. Beispiel:
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+Wenn Sie in einer Komponente eine Weiterleitung durchführen müssen, können Sie die `push` Methode des `useRouter` Hooks verwenden. Beispiel:
+
+```tsx filename="app/page.tsx" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+</PagesOnly>
+
+> **Wissenswertes**:
+>
+> - Wenn Sie keine programmatische Navigation benötigen, sollten Sie eine [`<Link>`](/docs/app/api-reference/components/link) Komponente verwenden.
+
+<AppOnly>
+
+Weitere Informationen finden Sie in der [`useRouter` API-Referenz](/docs/app/api-reference/functions/use-router).
+
+</AppOnly>
+
+<PagesOnly>
+
+Weitere Informationen finden Sie in der [`useRouter` API-Referenz](/docs/pages/api-reference/functions/use-router).
+
+</PagesOnly>
+
+## `redirects` in `next.config.js`
+
+Die `redirects` Option in der `next.config.js` Datei ermöglicht es, eine eingehende Anfrage basierend auf einem Pfad zu einem anderen Zielpfad weiterzuleiten. Dies ist nützlich, wenn Sie die URL-Struktur von Seiten ändern oder eine Liste von Weiterleitungen im Voraus kennen.
+
+`redirects` unterstützt [Pfad](/docs/app/api-reference/config/next-config-js/redirects#path-matching), [Header-, Cookie- und Query-Matching](/docs/app/api-reference/config/next-config-js/redirects#header-cookie-and-query-matching), was Ihnen die Flexibilität gibt, Benutzer basierend auf einer eingehenden Anfrage weiterzuleiten.
+
+Um `redirects` zu verwenden, fügen Sie die Option zu Ihrer `next.config.js` Datei hinzu:
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      // Einfache Weiterleitung
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // Wildcard-Pfad-Matching
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  async redirects() {
+    return [
+      // Einfache Weiterleitung
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // Wildcard-Pfad-Matching
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+Weitere Informationen finden Sie in der [`redirects` API-Referenz](/docs/app/api-reference/config/next-config-js/redirects).
+
+> **Wissenswertes**:
+>
+> - `redirects` kann einen 307 (Temporäre Weiterleitung) oder 308 (Permanente Weiterleitung) Statuscode mit der `permanent` Option zurückgeben.
+> - `redirects` kann auf Plattformen ein Limit haben. Auf Vercel gibt es beispielsweise ein Limit von 1.024 Weiterleitungen. Um eine große Anzahl von Weiterleitungen (1000+) zu verwalten, sollten Sie eine benutzerdefinierte Lösung mit [Middleware](/docs/app/building-your-application/routing/middleware) erstellen. Siehe [Verwaltung von Weiterleitungen im großen Maßstab](#managing-redirects-at-scale-advanced) für mehr Informationen.
+> - `redirects` wird **vor** Middleware ausgeführt.
+
+## `NextResponse.redirect` in Middleware
+
+Middleware ermöglicht es Ihnen, Code auszuführen, bevor eine Anfrage abgeschlossen ist. Basierend auf der eingehenden Anfrage können Sie dann mit `NextResponse.redirect` zu einer anderen URL weiterleiten. Dies ist nützlich, wenn Sie Benutzer basierend auf einer Bedingung (z.B. Authentifizierung, Session-Management, etc.) weiterleiten möchten oder [eine große Anzahl von Weiterleitungen](#managing-redirects-at-scale-advanced) haben.
+
+Um beispielsweise einen Benutzer zur `/login` Seite weiterzuleiten, wenn er nicht authentifiziert ist:
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request: NextRequest) {
+  const isAuthenticated = authenticate(request)
+
+  // Wenn der Benutzer authentifiziert ist, normal fortfahren
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // Zur Login-Seite weiterleiten, wenn nicht authentifiziert
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request) {
+  const isAuthenticated = authenticate(request)
+
+  // Wenn der Benutzer authentifiziert ist, normal fortfahren
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // Zur Login-Seite weiterleiten, wenn nicht authentifiziert
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+> **Wissenswertes**:
+>
+> - Middleware wird **nach** `redirects` in `next.config.js` und **vor** dem Rendering ausgeführt.
+
+Weitere Informationen finden Sie in der [Middleware](/docs/app/building-your-application/routing/middleware) Dokumentation.
+
+## Verwaltung von Weiterleitungen im großen Maßstab (fortgeschritten)
+
+Um eine große Anzahl von Weiterleitungen (1000+) zu verwalten, können Sie eine benutzerdefinierte Lösung mit Middleware erstellen. Dies ermöglicht es Ihnen, Weiterleitungen programmatisch zu handhaben, ohne Ihre Anwendung neu bereitstellen zu müssen.
+
+Dafür müssen Sie folgende Punkte beachten:
+
+1. Erstellung und Speicherung einer Weiterleitungs-Map.
+2. Optimierung der Datenabfrage-Performance.
+
+> **Next.js Beispiel**: Sehen Sie sich unser [Middleware mit Bloom-Filter](https://redirects-bloom-filter.vercel.app/) Beispiel an, das die untenstehenden Empfehlungen umsetzt.
+
+### 1. Erstellung und Speicherung einer Weiterleitungs-Map
+
+Eine Weiterleitungs-Map ist eine Liste von Weiterleitungen, die Sie in einer Datenbank (normalerweise einem Key-Value-Store) oder einer JSON-Datei speichern können.
+
+Betrachten Sie die folgende Datenstruktur:
+
+```json
+{
+  "/old": {
+    "destination": "/new",
+    "permanent": true
+  },
+  "/blog/post-old": {
+    "destination": "/blog/post-new",
+    "permanent": true
+  }
+}
+```
+
+In [Middleware](/docs/app/building-your-application/routing/middleware) können Sie aus einer Datenbank wie Vercels [Edge Config](https://vercel.com/docs/edge-config/get-started) oder [Redis](https://vercel.com/docs/redis) lesen und den Benutzer basierend auf der eingehenden Anfrage weiterleiten:
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData && typeof redirectData === 'string') {
+    const redirectEntry: RedirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // Keine Weiterleitung gefunden, ohne Weiterleitung fortfahren
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+export async function middleware(request) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData) {
+    const redirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // Keine Weiterleitung gefunden, ohne Weiterleitung fortfahren
+  return NextResponse.next()
+}
+```
+
+### 2. Optimierung der Datenabfrageleistung
+
+Das Lesen eines großen Datensatzes für jede eingehende Anfrage kann langsam und ressourcenintensiv sein. Es gibt zwei Möglichkeiten, die Leistung bei der Datenabfrage zu optimieren:
+
+- Verwenden Sie eine Datenbank, die für schnelle Lesezugriffe optimiert ist
+- Verwenden Sie eine Datenabfragestrategie wie einen [Bloom-Filter](https://de.wikipedia.org/wiki/Bloom-Filter), um effizient zu prüfen, ob eine Weiterleitung existiert, **bevor** die größere Weiterleitungsdatei oder Datenbank gelesen wird.
+
+Basierend auf dem vorherigen Beispiel können Sie eine generierte Bloom-Filter-Datei in die Middleware importieren und dann prüfen, ob der Pfadname der eingehenden Anfrage im Bloom-Filter vorhanden ist.
+
+Falls ja, leiten Sie die Anfrage an einen <AppOnly>[Route Handler](/docs/app/building-your-application/routing/route-handlers)</AppOnly> <PagesOnly>[API-Route](/docs/pages/building-your-application/routing/api-routes)</PagesOnly> weiter, der die tatsächliche Datei überprüft und den Benutzer zur entsprechenden URL weiterleitet. Dadurch wird vermieden, dass eine große Weiterleitungsdatei in die Middleware importiert wird, was jede eingehende Anfrage verlangsamen könnte.
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+// Bloom-Filter aus einer generierten JSON-Datei initialisieren
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter as any)
+
+export async function middleware(request: NextRequest) {
+  // Pfad für die eingehende Anfrage abrufen
+  const pathname = request.nextUrl.pathname
+
+  // Prüfen, ob der Pfad im Bloom-Filter vorhanden ist
+  if (bloomFilter.has(pathname)) {
+    // Pfadnamen an den Route Handler weiterleiten
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // Weiterleitungsdaten vom Route Handler abfragen
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry: RedirectEntry | undefined =
+          await redirectData.json()
+
+        if (redirectEntry) {
+          // Statuscode bestimmen
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // Zur Ziel-URL weiterleiten
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // Keine Weiterleitung gefunden, Anfrage ohne Weiterleitung fortsetzen
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+// Bloom-Filter aus einer generierten JSON-Datei initialisieren
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter)
+
+export async function middleware(request) {
+  // Pfad für die eingehende Anfrage abrufen
+  const pathname = request.nextUrl.pathname
+
+  // Prüfen, ob der Pfad im Bloom-Filter vorhanden ist
+  if (bloomFilter.has(pathname)) {
+    // Pfadnamen an den Route Handler weiterleiten
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // Weiterleitungsdaten vom Route Handler abfragen
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry = await redirectData.json()
+
+        if (redirectEntry) {
+          // Statuscode bestimmen
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // Zur Ziel-URL weiterleiten
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // Keine Weiterleitung gefunden, Anfrage ohne Weiterleitung fortsetzen
+  return NextResponse.next()
+}
+```
+
+<AppOnly>
+
+Dann im Route Handler:
+
+```ts filename="app/api/redirects/route.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export function GET(request: NextRequest) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // Weiterleitungseintrag aus der redirects.json-Datei abrufen
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // Falschpositive des Bloom-Filters berücksichtigen
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // Weiterleitungseintrag zurückgeben
+  return NextResponse.json(redirect)
+}
+```
+
+```js filename="app/api/redirects/route.js" switcher
+import { NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+export function GET(request) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // Weiterleitungseintrag aus der redirects.json-Datei abrufen
+  const redirect = redirects[pathname]
+
+  // Falschpositive des Bloom-Filters berücksichtigen
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // Weiterleitungseintrag zurückgeben
+  return NextResponse.json(redirect)
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+Dann in der API-Route:
+
+```ts filename="pages/api/redirects.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // Weiterleitungseintrag aus der redirects.json-Datei abrufen
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // Falschpositive des Bloom-Filters berücksichtigen
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // Weiterleitungseintrag zurückgeben
+  return res.json(redirect)
+}
+```
+
+```js filename="pages/api/redirects.js" switcher
+import redirects from '@/app/redirects/redirects.json'
+
+export default function handler(req, res) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // Weiterleitungseintrag aus der redirects.json-Datei abrufen
+  const redirect = redirects[pathname]
+
+  // Falschpositive des Bloom-Filters berücksichtigen
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // Weiterleitungseintrag zurückgeben
+  return res.json(redirect)
+}
+```
+
+</PagesOnly>
+
+> **Gut zu wissen:**
+>
+> - Um einen Bloom-Filter zu generieren, können Sie eine Bibliothek wie [`bloom-filters`](https://www.npmjs.com/package/bloom-filters) verwenden.
+> - Sie sollten Anfragen an Ihren Route Handler validieren, um böswillige Anfragen zu verhindern.

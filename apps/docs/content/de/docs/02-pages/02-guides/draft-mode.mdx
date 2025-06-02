@@ -1,0 +1,183 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-06-02T19:58:48.311Z
+title: Vorschau von Inhalten mit dem Draft Mode in Next.js
+nav_title: Draft Mode
+description: Next.js bietet einen Draft Mode zum Wechseln zwischen statischen und dynamischen Seiten. Erfahren Sie, wie er mit dem Pages Router funktioniert.
+---
+
+In der [Pages-Dokumentation](/docs/pages/building-your-application/routing/pages-and-layouts) und der [Dokumentation zur Datenabfrage](/docs/pages/building-your-application/data-fetching) haben wir besprochen, wie Sie eine Seite zur Build-Zeit (**Statische Generierung**) mit `getStaticProps` und `getStaticPaths` vorrendern können.
+
+Statische Generierung ist nützlich, wenn Ihre Seiten Daten von einem Headless CMS abrufen. Allerdings ist sie nicht ideal, wenn Sie einen Entwurf in Ihrem Headless CMS schreiben und diesen sofort auf Ihrer Seite anzeigen möchten. In diesem Fall möchten Sie, dass Next.js diese Seiten zur **Anfragezeit** statt zur Build-Zeit rendert und den Entwurfsinhalt statt des veröffentlichten Inhalts abruft. Sie möchten, dass Next.js die Statische Generierung nur für diesen speziellen Fall umgeht.
+
+Next.js bietet eine Funktion namens **Draft Mode**, die dieses Problem löst. Hier sind die Anweisungen zur Verwendung.
+
+## Schritt 1: API-Route erstellen und aufrufen
+
+> Werfen Sie zunächst einen Blick in die [API-Routes-Dokumentation](/docs/pages/building-your-application/routing/api-routes), wenn Sie mit Next.js API-Routen nicht vertraut sind.
+
+Erstellen Sie zunächst die **API-Route**. Sie kann beliebig benannt werden, z.B. `pages/api/draft.ts`.
+
+In dieser API-Route müssen Sie `setDraftMode` auf dem Response-Objekt aufrufen.
+
+```js
+export default function handler(req, res) {
+  // ...
+  res.setDraftMode({ enable: true })
+  // ...
+}
+```
+
+Dadurch wird ein **Cookie** gesetzt, um den Draft Mode zu aktivieren. Nachfolgende Anfragen, die diesen Cookie enthalten, lösen den **Draft Mode** aus und ändern das Verhalten für statisch generierte Seiten (mehr dazu später).
+
+Sie können dies manuell testen, indem Sie eine API-Route wie unten erstellen und manuell über Ihren Browser aufrufen:
+
+```ts filename="pages/api/draft.ts"
+// Einfaches Beispiel zum manuellen Testen im Browser.
+export default function handler(req, res) {
+  res.setDraftMode({ enable: true })
+  res.end('Draft Mode ist aktiviert')
+}
+```
+
+Wenn Sie die Entwicklertools Ihres Browsers öffnen und `/api/draft` aufrufen, werden Sie einen `Set-Cookie`-Response-Header mit einem Cookie namens `__prerender_bypass` bemerken.
+
+### Sicherer Aufruf aus Ihrem Headless CMS
+
+In der Praxis möchten Sie diese API-Route _sicher_ aus Ihrem Headless CMS aufrufen. Die genauen Schritte hängen von Ihrem Headless CMS ab, aber hier sind einige allgemeine Schritte.
+
+Diese Schritte setzen voraus, dass Ihr Headless CMS das Setzen von **benutzerdefinierten Entwurfs-URLs** unterstützt. Falls nicht, können Sie diese Methode trotzdem verwenden, um Ihre Entwurfs-URLs zu sichern, müssen die URL jedoch manuell erstellen und aufrufen.
+
+**Zuerst** sollten Sie einen **geheimen Token-String** mit einem Token-Generator Ihrer Wahl erstellen. Dieser Token sollte nur Ihrer Next.js-App und Ihrem Headless CMS bekannt sein. Dadurch wird verhindert, dass Personen ohne Zugriff auf Ihr CMS auf Entwurfs-URLs zugreifen können.
+
+**Zweitens**, wenn Ihr Headless CMS benutzerdefinierte Entwurfs-URLs unterstützt, geben Sie Folgendes als Entwurfs-URL an. Dabei wird angenommen, dass Ihre Entwurfs-API-Route unter `pages/api/draft.ts` liegt.
+
+```bash filename="Terminal"
+https://<ihre-domain>/api/draft?secret=<token>&slug=<pfad>
+```
+
+- `<ihre-domain>` sollte Ihre Bereitstellungsdomäne sein.
+- `<token>` sollte durch den generierten geheimen Token ersetzt werden.
+- `<pfad>` sollte der Pfad der Seite sein, die Sie anzeigen möchten. Wenn Sie `/posts/foo` anzeigen möchten, verwenden Sie `&slug=/posts/foo`.
+
+Ihr Headless CMS könnte es ermöglichen, eine Variable in die Entwurfs-URL einzubinden, sodass `<pfad>` dynamisch basierend auf den CMS-Daten gesetzt werden kann, z.B.: `&slug=/posts/{entry.fields.slug}`
+
+**Schließlich** in der Entwurfs-API-Route:
+
+- Überprüfen Sie, ob der Token übereinstimmt und der `slug`-Parameter vorhanden ist (falls nicht, sollte die Anfrage fehlschlagen).
+- Rufen Sie `res.setDraftMode` auf.
+- Leiten Sie dann den Browser zu dem durch `slug` angegebenen Pfad um (im folgenden Beispiel wird eine [307-Umleitung](https://developer.mozilla.org/docs/Web/HTTP/Status/307) verwendet).
+
+```js
+export default async (req, res) => {
+  // Token und Parameter überprüfen
+  // Dieser Token sollte nur dieser API-Route und dem CMS bekannt sein
+  if (req.query.secret !== 'MEIN_GEHEIMER_TOKEN' || !req.query.slug) {
+    return res.status(401).json({ message: 'Ungültiger Token' })
+  }
+
+  // Headless CMS abfragen, um zu prüfen, ob der angegebene `slug` existiert
+  // getPostBySlug würde die erforderliche Abfragelogik für das Headless CMS implementieren
+  const post = await getPostBySlug(req.query.slug)
+
+  // Falls der slug nicht existiert, wird der Draft Mode nicht aktiviert
+  if (!post) {
+    return res.status(401).json({ message: 'Ungültiger slug' })
+  }
+
+  // Draft Mode durch Setzen des Cookies aktivieren
+  res.setDraftMode({ enable: true })
+
+  // Zum Pfad des abgerufenen Beitrags umleiten
+  // Wir leiten nicht zu req.query.slug um, da dies zu Open-Redirect-Schwachstellen führen könnte
+  res.redirect(post.slug)
+}
+```
+
+Wenn dies erfolgreich ist, wird der Browser zu dem gewünschten Pfad mit dem Draft-Mode-Cookie umgeleitet.
+
+## Schritt 2: `getStaticProps` aktualisieren
+
+Der nächste Schritt besteht darin, `getStaticProps` für den Draft Mode anzupassen.
+
+Wenn Sie eine Seite anfordern, die `getStaticProps` enthält, und der Cookie gesetzt ist (über `res.setDraftMode`), wird `getStaticProps` zur **Anfragezeit** (statt zur Build-Zeit) aufgerufen.
+
+Darüber hinaus wird es mit einem `context`-Objekt aufgerufen, bei dem `context.draftMode` `true` ist.
+
+```js
+export async function getStaticProps(context) {
+  if (context.draftMode) {
+    // dynamische Daten
+  }
+}
+```
+
+Wir haben `res.setDraftMode` in der Entwurfs-API-Route verwendet, daher wird `context.draftMode` `true` sein.
+
+Wenn Sie auch `getStaticPaths` verwenden, ist `context.params` ebenfalls verfügbar.
+
+### Entwurfsdaten abrufen
+
+Sie können `getStaticProps` anpassen, um basierend auf `context.draftMode` unterschiedliche Daten abzurufen.
+
+Ihr Headless CMS könnte beispielsweise einen anderen API-Endpunkt für Entwurfsbeiträge haben. In diesem Fall können Sie den API-Endpunkt-URL wie folgt anpassen:
+
+```js
+export async function getStaticProps(context) {
+  const url = context.draftMode
+    ? 'https://draft.beispiel.com'
+    : 'https://produktion.beispiel.com'
+  const res = await fetch(url)
+  // ...
+}
+```
+
+Das war's! Wenn Sie die Entwurfs-API-Route (mit `secret` und `slug`) aus Ihrem Headless CMS oder manuell aufrufen, sollten Sie nun den Entwurfsinhalt sehen können. Und wenn Sie Ihren Entwurf ohne Veröffentlichung aktualisieren, sollten Sie den Entwurf anzeigen können.
+
+Setzen Sie dies als Entwurfs-URL in Ihrem Headless CMS oder rufen Sie sie manuell auf, und Sie sollten den Entwurf sehen können.
+
+```bash filename="Terminal"
+https://<ihre-domain>/api/draft?secret=<token>&slug=<pfad>
+```
+
+## Weitere Details
+
+### Draft-Mode-Cookie löschen
+
+Standardmäßig endet die Draft-Mode-Sitzung, wenn der Browser geschlossen wird.
+
+Um den Draft-Mode-Cookie manuell zu löschen, erstellen Sie eine API-Route, die `setDraftMode({ enable: false })` aufruft:
+
+```ts filename="pages/api/disable-draft.ts"
+export default function handler(req, res) {
+  res.setDraftMode({ enable: false })
+}
+```
+
+Senden Sie dann eine Anfrage an `/api/disable-draft`, um die API-Route aufzurufen. Wenn Sie diese Route mit [`next/link`](/docs/pages/api-reference/components/link) aufrufen, müssen Sie `prefetch={false}` übergeben, um ein versehentliches Löschen des Cookies beim Prefetch zu verhindern.
+
+### Funktioniert mit `getServerSideProps`
+
+Draft Mode funktioniert mit `getServerSideProps` und ist als `draftMode`-Schlüssel im [`context`](/docs/pages/api-reference/functions/get-server-side-props#context-parameter)-Objekt verfügbar.
+
+> **Gut zu wissen**: Sie sollten den `Cache-Control`-Header nicht setzen, wenn Sie Draft Mode verwenden, da er nicht umgangen werden kann. Stattdessen empfehlen wir die Verwendung von [ISR](/docs/pages/guides/incremental-static-regeneration).
+
+### Funktioniert mit API-Routen
+
+API-Routen haben Zugriff auf `draftMode` im Request-Objekt. Zum Beispiel:
+
+```js
+export default function myApiRoute(req, res) {
+  if (req.draftMode) {
+    // Entwurfsdaten abrufen
+  }
+}
+```
+
+### Einzigartig pro `next build`
+
+Bei jedem Aufruf von `next build` wird ein neuer Bypass-Cookie-Wert generiert.
+
+Dadurch wird sichergestellt, dass der Bypass-Cookie nicht erraten werden kann.
+
+> **Gut zu wissen**: Um Draft Mode lokal über HTTP zu testen, muss Ihr Browser Cookies von Drittanbietern und Zugriff auf den lokalen Speicher erlauben.

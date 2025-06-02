@@ -1,0 +1,140 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:00:27.705Z
+title: Optimierung des Speicherverbrauchs
+nav_title: Speicherverbrauch
+description: Optimieren Sie den Speicherverbrauch Ihrer Anwendung in Entwicklung und Produktion.
+---
+
+Wenn Anwendungen wachsen und funktionsreicher werden, können sie mehr Ressourcen bei der lokalen Entwicklung oder der Erstellung von Produktions-Builds benötigen.
+
+Lassen Sie uns einige Strategien und Techniken zur Optimierung des Speichers und zur Behebung häufiger Speicherprobleme in Next.js untersuchen.
+
+## Anzahl der Abhängigkeiten reduzieren
+
+Anwendungen mit einer großen Anzahl von Abhängigkeiten verbrauchen mehr Speicher.
+
+Der [Bundle Analyzer](/docs/app/guides/package-bundling) kann Ihnen helfen, große Abhängigkeiten in Ihrer Anwendung zu identifizieren, die möglicherweise entfernt werden können, um die Leistung und den Speicherverbrauch zu verbessern.
+
+## `experimental.webpackMemoryOptimizations` ausprobieren
+
+Ab Version `v15.0.0` können Sie `experimental.webpackMemoryOptimizations: true` in Ihrer `next.config.js`-Datei hinzufügen, um das Verhalten von Webpack zu ändern, das den maximalen Speicherverbrauch reduziert, aber die Kompilierungszeiten geringfügig erhöhen kann.
+
+> **Gut zu wissen**: Diese Funktion ist derzeit experimentell, um sie zunächst in mehr Projekten zu testen, gilt aber als risikoarm.
+
+## `next build` mit `--experimental-debug-memory-usage` ausführen
+
+Ab Version `14.2.0` können Sie `next build --experimental-debug-memory-usage` ausführen, um den Build in einem Modus zu starten, in dem Next.js kontinuierlich Informationen über den Speicherverbrauch während des Builds ausgibt, wie z.B. Heap-Nutzung und Garbage-Collection-Statistiken. Heap-Snapshots werden auch automatisch erstellt, wenn der Speicherverbrauch nahe an das konfigurierte Limit kommt.
+
+> **Gut zu wissen**: Diese Funktion ist nicht kompatibel mit der Webpack-Build-Worker-Option, die automatisch aktiviert wird, sofern keine benutzerdefinierte Webpack-Konfiguration vorhanden ist.
+
+## Heap-Profil aufzeichnen
+
+Um Speicherprobleme zu untersuchen, können Sie ein Heap-Profil von Node.js aufzeichnen und es in Chrome DevTools laden, um potenzielle Quellen von Speicherlecks zu identifizieren.
+
+Übergeben Sie in Ihrem Terminal das Flag `--heap-prof` an Node.js, wenn Sie Ihren Next.js-Build starten:
+
+```sh
+node --heap-prof node_modules/next/dist/bin/next build
+```
+
+Am Ende des Builds wird eine `.heapprofile`-Datei von Node.js erstellt.
+
+In Chrome DevTools können Sie den Memory-Tab öffnen und auf den "Load Profile"-Button klicken, um die Datei zu visualisieren.
+
+## Heap-Snapshot analysieren
+
+Sie können ein Inspector-Tool verwenden, um den Speicherverbrauch der Anwendung zu analysieren.
+
+Wenn Sie den Befehl `next build` oder `next dev` ausführen, fügen Sie `NODE_OPTIONS=--inspect` am Anfang des Befehls hinzu. Dadurch wird der Inspector-Agent auf dem Standardport verfügbar gemacht.
+Wenn Sie vor dem Start von Benutzercode anhalten möchten, können Sie stattdessen `--inspect-brk` übergeben. Während der Prozess läuft, können Sie ein Tool wie Chrome DevTools verwenden, um sich mit dem Debugging-Port zu verbinden und einen Snapshot des Heaps aufzuzeichnen und zu analysieren, um zu sehen, welcher Speicher belegt wird.
+
+Ab Version `14.2.0` können Sie auch `next build` mit dem Flag `--experimental-debug-memory-usage` ausführen, um das Erstellen von Heap-Snapshots zu vereinfachen.
+
+Während Sie in diesem Modus laufen, können Sie jederzeit ein `SIGUSR2`-Signal an den Prozess senden, und der Prozess wird einen Heap-Snapshot erstellen.
+
+Der Heap-Snapshot wird im Projektstammverzeichnis der Next.js-Anwendung gespeichert und kann in jedem Heap-Analyzer, wie z.B. Chrome DevTools, geladen werden, um zu sehen, welcher Speicher belegt wird. Dieser Modus ist noch nicht mit Webpack-Build-Workern kompatibel.
+
+Weitere Informationen finden Sie unter [Aufzeichnen und Analysieren von Heap-Snapshots](https://developer.chrome.com/docs/devtools/memory-problems/heap-snapshots).
+
+## Webpack-Build-Worker
+
+Der Webpack-Build-Worker ermöglicht es Ihnen, Webpack-Kompilierungen in einem separaten Node.js-Worker auszuführen, was den Speicherverbrauch Ihrer Anwendung während der Builds reduziert.
+
+Diese Option ist standardmäßig aktiviert, wenn Ihre Anwendung ab Version `v14.1.0` keine benutzerdefinierte Webpack-Konfiguration hat.
+
+Wenn Sie eine ältere Version von Next.js verwenden oder eine benutzerdefinierte Webpack-Konfiguration haben, können Sie diese Option aktivieren, indem Sie `experimental.webpackBuildWorker: true` in Ihrer `next.config.js` setzen.
+
+> **Gut zu wissen**: Diese Funktion ist möglicherweise nicht mit allen benutzerdefinierten Webpack-Plugins kompatibel.
+
+## Webpack-Cache deaktivieren
+
+Der [Webpack-Cache](https://webpack.js.org/configuration/cache/) speichert generierte Webpack-Module im Speicher und/oder auf der Festplatte, um die Geschwindigkeit von Builds zu verbessern. Dies kann
+die Leistung verbessern, erhöht aber auch den Speicherverbrauch Ihrer Anwendung, um die zwischengespeicherten Daten zu speichern.
+
+Sie können dieses Verhalten deaktivieren, indem Sie Ihrer Anwendung eine [benutzerdefinierte Webpack-Konfiguration](/docs/app/api-reference/config/next-config-js/webpack) hinzufügen:
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  webpack: (
+    config,
+    { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack }
+  ) => {
+    if (config.cache && !dev) {
+      config.cache = Object.freeze({
+        type: 'memory',
+      })
+    }
+    // Wichtig: die modifizierte Konfiguration zurückgeben
+    return config
+  },
+}
+
+export default nextConfig
+```
+
+## Statische Analyse deaktivieren
+
+Typechecking und Linting können viel Speicher benötigen, insbesondere in großen Projekten.
+Die meisten Projekte haben jedoch einen dedizierten CI-Runner, der diese Aufgaben bereits übernimmt.
+Wenn der Build während des Schritts "Linting und Überprüfung der Typenvalidität" Speicherprobleme verursacht, können Sie diese Aufgaben während der Builds deaktivieren:
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  eslint: {
+    // Warnung: Dies ermöglicht die erfolgreiche Fertigstellung von Produktions-Builds, auch wenn
+    // Ihr Projekt ESLint-Fehler aufweist.
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // !! WARNUNG !!
+    // Erlaubt gefährlicherweise die erfolgreiche Fertigstellung von Produktions-Builds, auch wenn
+    // Ihr Projekt Typfehler aufweist.
+    // !! WARNUNG !!
+    ignoreBuildErrors: true,
+  },
+}
+
+export default nextConfig
+```
+
+- [Ignorieren von TypeScript-Fehlern](/docs/app/api-reference/config/typescript#disabling-typescript-errors-in-production)
+- [ESLint in der Next.js-Konfiguration](/docs/pages/api-reference/config/next-config-js/eslint)
+
+Beachten Sie, dass dies aufgrund von Typfehlern oder Linting-Problemen fehlerhafte Deployments produzieren kann.
+Wir empfehlen dringend, Builds erst in die Produktion zu überführen, nachdem die statische Analyse abgeschlossen ist.
+Wenn Sie auf Vercel deployen, können Sie die [Anleitung für Staging-Deployments](https://vercel.com/docs/deployments/managing-deployments#staging-and-promoting-a-production-deployment) lesen, um zu erfahren, wie Sie Builds nach erfolgreichem Abschluss benutzerdefinierter Aufgaben in die Produktion überführen können.
+
+## Source Maps deaktivieren
+
+Die Generierung von Source Maps verbraucht zusätzlichen Speicher während des Build-Prozesses.
+
+Sie können die Generierung von Source Maps deaktivieren, indem Sie `productionBrowserSourceMaps: false` und `experimental.serverSourceMaps: false` zu Ihrer Next.js-Konfiguration hinzufügen.
+
+> **Gut zu wissen**: Einige Plugins können Source Maps aktivieren und erfordern möglicherweise eine benutzerdefinierte Konfiguration, um sie zu deaktivieren.
+
+## Speicherprobleme im Edge-Runtime
+
+Next.js `v14.1.3` hat ein Speicherproblem bei der Verwendung des Edge-Runtimes behoben. Bitte aktualisieren Sie auf diese Version (oder höher), um zu sehen, ob es Ihr Problem löst.
