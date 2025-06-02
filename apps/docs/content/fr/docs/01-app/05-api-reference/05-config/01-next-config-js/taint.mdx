@@ -1,0 +1,228 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:13:24.462Z
+title: Taint (marquage)
+description: Active le marquage des objets et des valeurs.
+version: experimental
+---
+
+## Utilisation
+
+L'option `taint` active le support des API expérimentales de React pour le marquage des objets et des valeurs. Cette fonctionnalité aide à empêcher que des données sensibles ne soient accidentellement transmises au client. Lorsqu'elle est activée, vous pouvez utiliser :
+
+- [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) pour marquer les références d'objets.
+- [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) pour marquer des valeurs uniques.
+
+> **Bon à savoir** : L'activation de ce drapeau active également le canal `experimental` de React pour le répertoire `app`.
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **Avertissement :** Ne comptez pas sur l'API de marquage comme seul mécanisme pour empêcher l'exposition de données sensibles au client. Consultez nos [recommandations de sécurité](/blog/security-nextjs-server-components-actions).
+
+Les API de marquage vous permettent d'être défensif, en marquant de manière déclarative et explicite les données qui ne sont pas autorisées à traverser la limite Serveur-Client. Lorsqu'un objet ou une valeur est transmis à travers cette limite, React lance une erreur.
+
+Ceci est utile dans les cas où :
+
+- Les méthodes pour lire les données échappent à votre contrôle
+- Vous devez travailler avec des structures de données sensibles que vous n'avez pas définies
+- Des données sensibles sont accédées lors du rendu d'un composant serveur
+
+Il est recommandé de modéliser vos données et API afin que les données sensibles ne soient pas retournées dans des contextes où elles ne sont pas nécessaires.
+
+## Mises en garde
+
+- Le marquage ne peut suivre les objets que par référence. Copier un objet crée une version non marquée, ce qui annule toutes les garanties fournies par l'API. Vous devrez marquer la copie.
+- Le marquage ne peut pas suivre les données dérivées d'une valeur marquée. Vous devez également marquer la valeur dérivée.
+- Les valeurs restent marquées tant que leur référence est dans la portée. Voir la [référence des paramètres de `experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue#parameters) pour plus d'informations.
+
+## Exemples
+
+### Marquage d'une référence d'objet
+
+Dans ce cas, la fonction `getUserDetails` retourne des données sur un utilisateur donné. Nous marquons la référence de l'objet utilisateur pour qu'elle ne puisse pas traverser la limite Serveur-Client. Par exemple, en supposant que `UserCard` est un composant client.
+
+```ts switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id: string): UserDetails {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'N\'utilisez pas l\'intégralité de l\'objet utilisateur. Sélectionnez uniquement les champs nécessaires.',
+    user
+  )
+
+  return user
+}
+```
+
+```js switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id) {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'N\'utilisez pas l\'intégralité de l\'objet utilisateur. Sélectionnez uniquement les champs nécessaires.',
+    user
+  )
+
+  return user
+}
+```
+
+Nous pouvons toujours accéder aux champs individuels de l'objet marqué `userDetails`.
+
+```tsx filename="app/contact/page.tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+```jsx filename="app/contact/page.js switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+Maintenant, passer l'objet entier au composant client lancera une erreur.
+
+```tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const userDetails = await getUserDetails(id)
+
+  // Lance une erreur
+  return <UserCard user={userDetails} />
+}
+```
+
+```jsx switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  // Lance une erreur
+  return <UserCard user={userDetails} />
+}
+```
+
+### Marquage d'une valeur unique
+
+Dans ce cas, nous pouvons accéder à la configuration du serveur en attendant les appels à `config.getConfigDetails`. Cependant, la configuration système contient `SERVICE_API_KEY` que nous ne voulons pas exposer aux clients.
+
+Nous pouvons marquer la valeur `config.SERVICE_API_KEY`.
+
+```ts switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig(): SystemConfig {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'Ne passez pas les jetons de configuration au client',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+```js switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig() {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'Ne passez pas les jetons de configuration au client',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+Nous pouvons toujours accéder aux autres propriétés de l'objet `systemConfig`.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+
+  return <ClientDashboard version={systemConfig.SERVICE_API_VERSION} />
+}
+```
+
+Cependant, passer `SERVICE_API_KEY` à `ClientDashboard` lance une erreur.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // Quelqu'un fait une erreur dans une PR
+  const version = systemConfig.SERVICE_API_KEY
+
+  return <ClientDashboard version={version} />
+}
+```
+
+Notez que, même si `systemConfig.SERVICE_API_KEY` est réaffecté à une nouvelle variable, le passer à un composant client lance toujours une erreur.
+
+Alors qu'une valeur dérivée d'une valeur unique marquée sera exposée au client.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // Quelqu'un fait une erreur dans une PR
+  const version = `version::${systemConfig.SERVICE_API_KEY}`
+
+  return <ClientDashboard version={version} />
+}
+```
+
+Une meilleure approche est de supprimer `SERVICE_API_KEY` des données retournées par `getSystemConfig`.

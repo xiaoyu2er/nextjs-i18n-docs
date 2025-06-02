@@ -1,0 +1,136 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:14:12.702Z
+title: output
+description: Next.js trace automatiquement les fichiers nécessaires à chaque page pour faciliter le déploiement de votre application. Découvrez ici comment cela fonctionne.
+---
+
+{/* Le contenu de ce document est partagé entre le routeur d'application et le routeur de pages. Vous pouvez utiliser le composant `<PagesOnly>Content</PagesOnly>` pour ajouter du contenu spécifique au routeur de pages. Tout contenu partagé ne doit pas être encapsulé dans un composant. */}
+
+Lors d'une compilation, Next.js trace automatiquement chaque page et ses dépendances pour déterminer tous les fichiers nécessaires au déploiement d'une version de production de votre application.
+
+Cette fonctionnalité permet de réduire considérablement la taille des déploiements. Auparavant, lors d'un déploiement avec Docker, vous deviez avoir tous les fichiers des `dependencies` de votre package installés pour exécuter `next start`. À partir de Next.js 12, vous pouvez utiliser le traçage des fichiers de sortie dans le répertoire `.next/` pour n'inclure que les fichiers nécessaires.
+
+De plus, cela élimine le besoin de la cible `serverless` dépréciée, qui peut causer divers problèmes et crée également des duplications inutiles.
+
+## Fonctionnement
+
+Pendant `next build`, Next.js utilise [`@vercel/nft`](https://github.com/vercel/nft) pour analyser statiquement les utilisations de `import`, `require` et `fs` afin de déterminer tous les fichiers qu'une page pourrait charger.
+
+Le serveur de production de Next.js est également tracé pour ses fichiers nécessaires et sorti dans `.next/next-server.js.nft.json`, qui peut être utilisé en production.
+
+Pour exploiter les fichiers `.nft.json` émis dans le répertoire de sortie `.next`, vous pouvez lire la liste des fichiers dans chaque trace qui sont relatifs au fichier `.nft.json` et les copier vers votre emplacement de déploiement.
+
+## Copie automatique des fichiers tracés
+
+Next.js peut automatiquement créer un dossier `standalone` qui copie uniquement les fichiers nécessaires pour un déploiement en production, y compris certains fichiers dans `node_modules`.
+
+Pour utiliser cette copie automatique, vous pouvez l'activer dans votre `next.config.js` :
+
+```js filename="next.config.js"
+module.exports = {
+  output: 'standalone',
+}
+```
+
+Cela créera un dossier à `.next/standalone` qui peut ensuite être déployé seul sans installer `node_modules`.
+
+De plus, un fichier minimal `server.js` est également généré et peut être utilisé à la place de `next start`. Ce serveur minimal ne copie pas les dossiers `public` ou `.next/static` par défaut, car ceux-ci devraient idéalement être gérés par un CDN, bien que ces dossiers puissent être copiés manuellement dans les dossiers `standalone/public` et `standalone/.next/static`, après quoi le fichier `server.js` les servira automatiquement.
+
+Pour copier ces fichiers manuellement, vous pouvez utiliser l'outil en ligne de commande `cp` après avoir exécuté `next build` :
+
+```bash filename="Terminal"
+cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+```
+
+Pour démarrer votre fichier minimal `server.js` localement, exécutez la commande suivante :
+
+```bash filename="Terminal"
+node .next/standalone/server.js
+```
+
+<AppOnly>
+
+> **Bon à savoir** :
+>
+> - Si votre projet a besoin d'écouter un port ou un nom d'hôte spécifique, vous pouvez définir les variables d'environnement `PORT` ou `HOSTNAME` avant d'exécuter `server.js`. Par exemple, exécutez `PORT=8080 HOSTNAME=0.0.0.0 node server.js` pour démarrer le serveur sur `http://0.0.0.0:8080`.
+
+</AppOnly>
+
+<PagesOnly>
+
+> **Bon à savoir** :
+>
+> - `next.config.js` est lu pendant `next build` et sérialisé dans le fichier de sortie `server.js`. Si les options obsolètes [`serverRuntimeConfig` ou `publicRuntimeConfig`](/docs/pages/api-reference/config/next-config-js/runtime-configuration) sont utilisées, les valeurs seront spécifiques aux valeurs au moment de la compilation.
+> - Si votre projet a besoin d'écouter un port ou un nom d'hôte spécifique, vous pouvez définir les variables d'environnement `PORT` ou `HOSTNAME` avant d'exécuter `server.js`. Par exemple, exécutez `PORT=8080 HOSTNAME=0.0.0.0 node server.js` pour démarrer le serveur sur `http://0.0.0.0:8080`.
+
+</PagesOnly>
+
+## Mises en garde
+
+- Lors du traçage dans des configurations de monorepo, le répertoire du projet est utilisé par défaut pour le traçage. Pour `next build packages/web-app`, `packages/web-app` serait la racine de traçage et aucun fichier en dehors de ce dossier ne sera inclus. Pour inclure des fichiers en dehors de ce dossier, vous pouvez définir `outputFileTracingRoot` dans votre `next.config.js`.
+
+```js filename="packages/web-app/next.config.js"
+module.exports = {
+  // cela inclut les fichiers depuis la base du monorepo deux répertoires au-dessus
+  outputFileTracingRoot: path.join(__dirname, '../../'),
+}
+```
+
+- Il existe certains cas où Next.js peut échouer à inclure les fichiers nécessaires, ou peut inclure incorrectement des fichiers inutilisés. Dans ces cas, vous pouvez utiliser respectivement `outputFileTracingExcludes` et `outputFileTracingIncludes` dans `next.config.js`. Chaque configuration accepte un objet avec des [globs minimatch](https://www.npmjs.com/package/minimatch) pour la clé correspondant à des pages spécifiques et une valeur de tableau avec des globs relatifs à la racine du projet pour inclure ou exclure dans la trace.
+
+```js filename="next.config.js"
+module.exports = {
+  outputFileTracingExcludes: {
+    '/api/hello': ['./un-necessary-folder/**/*'],
+  },
+  outputFileTracingIncludes: {
+    '/api/another': ['./necessary-folder/**/*'],
+    '/api/login/\\[\\[\\.\\.\\.slug\\]\\]': [
+      './node_modules/aws-crt/dist/bin/**/*',
+    ],
+  },
+}
+```
+
+**Remarque :** La clé de `outputFileTracingIncludes`/`outputFileTracingExcludes` est un [glob](https://www.npmjs.com/package/picomatch#basic-globbing), donc les caractères spéciaux doivent être échappés.
+
+## `turbotrace` expérimental
+
+Le traçage des dépendances peut être lent car il nécessite des calculs et des analyses très complexes. Nous avons créé `turbotrace` en Rust comme une alternative plus rapide et plus intelligente à l'implémentation JavaScript.
+
+Pour l'activer, vous pouvez ajouter la configuration suivante à votre `next.config.js` :
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    turbotrace: {
+      // contrôle le niveau de log de turbotrace, par défaut est `error`
+      logLevel?:
+      | 'bug'
+      | 'fatal'
+      | 'error'
+      | 'warning'
+      | 'hint'
+      | 'note'
+      | 'suggestions'
+      | 'info',
+      // contrôle si le log de turbotrace doit contenir les détails de l'analyse, par défaut est `false`
+      logDetail?: boolean
+      // affiche tous les messages de log sans limite
+      // turbotrace n'affiche qu'un seul message de log par catégorie par défaut
+      logAll?: boolean
+      // contrôle le répertoire de contexte de turbotrace
+      // les fichiers en dehors du répertoire de contexte ne seront pas tracés
+      // définir `outputFileTracingRoot` a le même effet
+      // si `outputFileTracingRoot` et cette option sont tous deux définis, `experimental.turbotrace.contextDirectory` sera utilisé
+      contextDirectory?: string
+      // s'il y a une expression `process.cwd()` dans votre code, vous pouvez définir cette option pour indiquer à `turbotrace` la valeur de `process.cwd()` pendant le traçage.
+      // par exemple, require(process.cwd() + '/package.json') sera tracé comme require('/path/to/cwd/package.json')
+      processCwd?: string
+      // contrôle l'utilisation maximale de mémoire de `turbotrace`, en `MB`, par défaut est `6000`.
+      memoryLimit?: number
+    },
+  },
+}
+```
