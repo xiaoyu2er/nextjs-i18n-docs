@@ -1,0 +1,219 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:33:26.473Z
+title: Notre parcours avec la mise en cache
+description: Découvrez notre parcours avec la mise en cache dans le routeur d'application Next.js.
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2024-10-24T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/our-journey-with-caching/twitter-card.png
+---
+
+Les performances frontend peuvent être difficiles à optimiser. Même dans les applications hautement optimisées, le principal responsable reste souvent les cascades client-serveur. En introduisant le routeur d'application Next.js, nous savions que nous voulions résoudre ce problème. Pour y parvenir, nous devions déplacer les requêtes REST client-serveur vers le serveur en utilisant les composants serveur React en un seul aller-retour. Cela signifiait que le serveur devait parfois être dynamique, sacrifiant ainsi les excellentes performances de chargement initial du Jamstack. Nous avons construit le pré-rendu partiel pour résoudre ce compromis et obtenir le meilleur des deux mondes.
+
+Cependant, en cours de route, l'expérience développeur a souffert à cause des valeurs par défaut et des contrôles de mise en cache que nous avons fournis. La valeur par défaut pour `fetch()` a changé pour favoriser les performances en mettant en cache par défaut, mais le prototypage rapide et les applications hautement dynamiques en ont pâti. Nous n'avons pas fourni suffisamment de contrôle sur l'accès aux bases de données locales qui n'utilisaient pas `fetch()`. Nous avions `unstable_cache()`, mais ce n'était pas ergonomique. Cela a conduit à la nécessité de configurations au niveau des segments, telles que `export const dynamic, runtime, fetchCache, dynamicParams, revalidate = ...`, comme échappatoire.
+
+Nous continuerons bien sûr à les supporter pour la rétrocompatibilité. Mais pour un instant, j'aimerais que vous oubliiez tout cela. Nous pensons avoir une idée pour quelque chose de plus simple.
+
+Nous avons travaillé sur un nouveau mode expérimental qui se base sur seulement deux concepts : `<Suspense>` et `use cache`.
+
+[Choisissez votre aventure](#choose-your-adventure)
+-----------------------------------------------
+
+La première chose que vous remarquerez est que lorsque vous ajoutez des données à vos composants, vous obtiendrez maintenant une erreur.
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // erreur
+}
+ 
+export default async function Page() {
+  return <Component />
+}
+```
+
+Pour utiliser des données, cookies, en-têtes, l'heure actuelle ou des valeurs aléatoires, vous avez maintenant un choix : voulez-vous que les données soient mises en cache (côté serveur ou client) ou exécutées à chaque requête ? J'utilise `fetch()` comme exemple, mais cela s'applique à toute API Node asynchrone, comme les bases de données ou les minuteries.
+
+[Dynamique](#dynamic)
+-------------------
+
+Si vous êtes encore en phase d'itération ou que vous construisez un tableau de bord hautement dynamique, vous pouvez encapsuler le composant dans une limite `<Suspense>`. `<Suspense>` opte pour la récupération dynamique de données et le streaming.
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // pas d'erreur
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+Vous pouvez aussi faire cela dans votre layout racine ou utiliser `loading.tsx`.
+
+Cela garantit que l'enveloppe de votre application reste instantanée. Vous pouvez continuer à ajouter plus de données dans votre Page, sachant que tout sera dynamique par défaut. Rien n'est mis en cache par défaut. Plus de caches cachés.
+
+[Statique](#static)
+-----------------
+
+Si vous construisez quelque chose de statique et ne voulez pas utiliser de fonctionnalités dynamiques, vous pouvez utiliser la nouvelle directive `use cache`.
+
+```tsx filename="app/page.tsx"
+"use cache"
+ 
+export default async function Page() {
+  return fetch(...) // pas d'erreur
+}
+```
+
+En marquant la Page avec `use cache`, vous indiquez que tout le segment doit être mis en cache. Cela signifie que toutes les données que vous récupérez peuvent maintenant être mises en cache, permettant à la page d'être rendue statiquement. Aucune limite `<Suspense>` n'est utilisée pour le contenu statique. Vous pouvez ajouter plus de données à la page, et tout sera mis en cache.
+
+[Mixte](#partial)
+-------------------
+
+Vous pouvez aussi mixer les approches. Par exemple, vous pouvez mettre `use cache` dans votre layout racine pour vous assurer qu'il est mis en cache. Chaque layout ou page peut être mis en cache indépendamment.
+
+```tsx filename="app/layout.tsx"
+"use cache"
+ 
+export default async function Layout({ children }) {
+  const response = await fetch(...)
+  const data = await response.json()
+  return <html>
+    <body>
+      <div>{data.notice}</div>
+      {children}
+    </body>
+  </html>
+}
+```
+
+Tout en utilisant des données dynamiques dans une Page spécifique :
+
+```tsx filename="app/page.tsx"
+import { Suspense } from 'react'
+async function Component() {
+  return fetch(...) // pas d'erreur
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+[Fonctions mises en cache](#cached-functions)
+-------------------------------------
+
+Lorsque vous utilisez une approche hybride comme celle-ci, il peut être plus pratique d'ajouter la mise en cache plus près des appels API.
+
+Vous pouvez ajouter `use cache` à n'importe quelle fonction asynchrone, tout comme `use server`. Voyez cela comme une Action Serveur mais au lieu d'appeler un Serveur, vous appelez un Cache. Elle supporte les mêmes types riches d'arguments et de valeurs de retour au-delà du simple JSON. La clé de cache inclut automatiquement tous les arguments et fermetures, donc vous n'avez pas besoin de spécifier une clé de cache manuellement.
+
+```tsx filename="app/layout.tsx"
+async function getNotice() {
+  "use cache"
+  const response = await fetch(...)
+  const data = await response.json()
+  return data.notice;
+}
+ 
+export default async function Layout({ children }) {
+  return <html>
+    <body>
+      <h1>{await getNotice()}</h1>
+      {children}
+    </body>
+  </html>
+}
+```
+
+Comme aucune autre donnée n'a été utilisée dans ce layout, il peut rester statique. Un avantage de cette approche est que si vous ajoutez accidentellement de nouvelles données dynamiques au layout, cela déclenchera une erreur pendant la construction, vous forçant à faire un nouveau choix. Si vous ajoutez `use cache` à tout le layout, il sera mis en cache sans erreur. L'approche que vous choisissez dépend de votre cas d'utilisation.
+
+[Étiquetage d'un cache](#tagging-a-cache)
+-----------------------------------
+
+Si vous voulez explicitement effacer une entrée de cache par étiquette, vous pouvez utiliser la nouvelle API `cacheTag()` à l'intérieur de la fonction `use cache`.
+
+```ts filename="app/utils.ts"
+import { cacheTag } from 'next/cache';
+ 
+async function getNotice() {
+  'use cache';
+  cacheTag('my-tag');
+}
+```
+
+Ensuite, il suffit d'appeler `revalidateTag('my-tag')` depuis une Action Serveur comme avant.
+
+Comme cette API peut être appelée après le chargement des données, vous pouvez maintenant utiliser des données pour étiqueter vos entrées de cache.
+
+```ts filename="app/actions.ts"
+import { unstable_cacheTag as cacheTag } from 'next/cache';
+ 
+async function getBlogPosts(page) {
+  'use cache';
+  const posts = await fetchPosts(page);
+  for (let post of posts) {
+    cacheTag('blog-post-' + post.id);
+  }
+  return posts;
+}
+```
+
+[Définition de la durée de vie d'un cache](#defining-the-lifetime-of-a-cache)
+---------------------------------------------------------------------
+
+Si vous voulez contrôler combien de temps une entrée ou une page particulière doit rester dans le cache, vous pouvez utiliser l'API `cacheLife()` :
+
+```tsx filename="app/page.tsx"
+"use cache"
+import { unstable_cacheLife as cacheLife } from 'next/cache'
+ 
+export default async function Page() {
+  cacheLife("minutes")
+  return ...
+}
+```
+
+Par défaut, elle accepte les valeurs suivantes :
+
+*   `"seconds"`
+*   `"minutes"`
+*   `"hours"`
+*   `"days"`
+*   `"weeks"`
+*   `"max"`
+
+Choisissez une plage approximative qui correspond le mieux à votre cas d'utilisation. Pas besoin de spécifier un nombre exact et de calculer combien de secondes (ou était-ce des millisecondes ?) il y a dans une semaine. Cependant, vous pouvez aussi spécifier des valeurs précises ou configurer vos propres profils de cache nommés.
+
+En plus de `revalidate`, cette API peut contrôler le temps `stale` du cache client ainsi que `expire`, qui dicte quand une Page doit expirer si elle n'a pas eu beaucoup de trafic depuis un moment.
+
+[Expérimental](#experimental)
+-----------------------------
+
+C'est encore un projet très expérimental. Il n'est pas encore prêt pour la production et il manque encore des fonctionnalités et contient des bugs. En particulier, nous savons que nous devons améliorer les piles d'erreurs pour ce nouveau type d'erreur. Cependant, si vous vous sentez aventureux, nous adorerions avoir vos retours précoces.
+
+Nous publierons un chemin de mise à jour plus détaillé. À part les erreurs précoces, le principal changement cassant ici est l'annulation de la mise en cache par défaut de `fetch()`. Cela dit, nous recommandons d'expérimenter uniquement sur des projets nouveaux à ce stade expérimental précoce. Si cela fonctionne bien, nous espérons livrer une version opt-in dans une version mineure et la rendre par défaut dans une future version majeure.
+
+Pour l'essayer, vous devez être sur la version `canary` de Next.js :
+
+```
+npx create-next-app@canary
+```
+
+Vous devez aussi activer le flag expérimental dynamicIO dans `next.config.ts` :
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  experimental: {
+    dynamicIO: true,
+  }
+};
+ 
+export default nextConfig;
+```
+
+En savoir plus sur [`use cache`](/docs/canary/app/api-reference/directives/use-cache), [`cacheLife`](/docs/canary/app/api-reference/next-config-js/cacheLife), et [`cacheTag`](/docs/canary/app/api-reference/functions/cacheTag) dans notre documentation.

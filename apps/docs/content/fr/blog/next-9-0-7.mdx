@@ -1,0 +1,255 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:35:31.218Z
+title: Next.js 9.0.7
+description: >-
+  Next.js 9.0 a été publié il y a environ deux mois. Depuis, nous avons travaillé sur 7 versions mineures mais importantes. Plongeons dans ce que ces versions ont apporté à vos sites et applications, sans aucun changement cassant.
+author:
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Joe Haddad
+    image: /static/team/timer.jpg
+  - name: Luis Alvarez
+    image: /static/team/lfades.jpg
+  - name: Lukáš Huvar
+    image: /static/team/huvik.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-09-30T14:47:09.956Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-0-7/twitter-card.png
+---
+
+Next.js 9.0 a été publié il y a environ deux mois. Depuis, nous avons travaillé sur 7 versions mineures mais importantes : [9.0.1](https://github.com/vercel/next.js/releases/tag/v9.0.1), [9.0.2](https://github.com/vercel/next.js/releases/tag/v9.0.2), [9.0.3](https://github.com/vercel/next.js/releases/tag/v9.0.3), [9.0.4](https://github.com/vercel/next.js/releases/tag/v9.0.4), [9.0.5](https://github.com/vercel/next.js/releases/tag/v9.0.5), [9.0.6](https://github.com/vercel/next.js/releases/tag/v9.0.6), et [9.0.7](https://github.com/vercel/next.js/releases/tag/v9.0.7).
+
+Plongeons dans ce que ces versions ont apporté à vos sites et applications, sans aucun changement cassant.
+
+*   **[Amélioration de la concurrence dans les environnements Windows](#improved-concurrency-in-windows-environments)** : Le processus `next build` est désormais plus fiable sous Windows et peut mieux paralléliser le travail.
+*   **[Compression Gzip par défaut](#gzip-compression-by-default)** : La compression Gzip est maintenant activée par défaut pour réduire les étapes d'optimisation nécessaires.
+*   **[Rapport TypeScript uniquement sur les pages actives](#typescript-report-on-active-pages-only)** : Le support intégré de TypeScript a été étendu pour ne surveiller que les changements sur les pages actives, le rendant plus rapide et plus fiable.
+*   **[Télémétrie](#telemetry)** : Cela nous aidera à nous concentrer sur les parties de Next.js à optimiser et à valider l'effet des optimisations.
+*   **[Amélioration du suivi des éléments `next/head`](#improved-nexthead-element-tracking)** : La classe `next-head` a été supprimée, ce qui facilite l'implémentation d'outils de vérification.
+*   **[Prévention des fichiers non-pages dans le répertoire Pages](#preventing-non-pages-in-the-pages-directory)** : Optimisation de la sécurité de votre application et du temps de `next build` en empêchant la publication accidentelle de non-pages.
+*   **[Améliorations du runtime](#runtime-improvements)** : Lorsque certaines parties de Next.js ne sont pas utilisées, comme `next/dynamic`, elles ne seront plus requises au runtime, réduisant ainsi la taille des bundles.
+
+### [Amélioration de la concurrence dans les environnements Windows](#improved-concurrency-in-windows-environments)
+
+Next.js effectue un travail concurrentiel à plusieurs endroits pendant le processus `next build`. L'utilisation principale est la minification de la sortie de build avec Terser en parallèle.
+
+Auparavant, ce travail était géré sur plusieurs CPU à l'aide d'un package appelé `worker-farm`. Cependant, nous avons remarqué que de nombreux utilisateurs Windows avaient désactivé la minification avec une configuration webpack personnalisée. Après inspection, nous avons constaté que `worker-farm` ne fonctionnait pas de manière cohérente sur les machines Windows.
+
+Pour résoudre ce problème, nous sommes passés de `worker-farm` à `jest-worker`. Cela garantit que les builds sont fiables et cohérents sur macOS, Linux et Windows.
+
+`jest-worker`, comme son nom l'indique, fait partie du lanceur de tests Jest. C'est le package que Jest utilise pour paralléliser les cas de test. Cela signifie que ce package est très éprouvé, fiable et maintenu.
+
+`jest-worker` prend également en charge [`worker_threads`](https://github.com/facebook/jest/tree/master/packages/jest-worker#experimental-worker), une nouvelle fonctionnalité de Node 12. Contrairement à `child_process`, `worker_threads` peut partager la mémoire - ce qui signifie des temps de build plus rapides sur les nouvelles versions de Node.
+
+En passant à `jest-worker`, nous avons pu réactiver la concurrence de build pour les utilisateurs Windows.
+
+### [Compression Gzip par défaut](#gzip-compression-by-default)
+
+En étudiant pourquoi les entreprises utilisent un serveur personnalisé, nous avons constaté que c'était le plus souvent pour la compression. Les entreprises ajoutaient un middleware Express appelé `compression`, qui gère la compression Gzip des réponses HTTP.
+
+Ce middleware compresse les réponses pour que moins d'octets soient envoyés aux utilisateurs. Normalement, cela devrait être géré par un proxy inverse comme Nginx. Les proxies inverses retirent le travail intensif en CPU du processus Node monothread.
+
+Cependant, en inspectant l'utilisation de Next.js sur le web, nous avons constaté qu'un grand pourcentage d'entreprises n'avait aucune compression configurée.
+
+Sur des plateformes comme [Vercel](https://vercel.com), `gzip` et `brotli` sont gérés automatiquement au niveau du proxy.
+
+Lors de l'auto-hébergement, les entreprises doivent ajouter elles-mêmes gzip (via `compression` ou un proxy inverse).
+
+À partir de Next.js 9.0.4, la compression `gzip` est incluse par défaut lors de l'utilisation de `next start` ou d'un `server.js` personnalisé.
+
+Le support de `brotli` [arrive bientôt](https://github.com/expressjs/compression/pull/150) car Node.js prend désormais en charge nativement Brotli.
+
+Si la compression est déjà activée dans votre application via un serveur personnalisé, Next.js n'ajoutera pas son propre compresseur.
+
+Next.js n'inclut pas la compression pour la cible serverless par défaut car avec cette cible, les assets sont uploadés séparément et ne sont pas servis via Node.js.
+
+Si vous déployez sur une plateforme qui gère la compression comme [Vercel](https://vercel.com), aucune modification n'est nécessaire.
+
+### [Rapport TypeScript uniquement sur les pages actives](#typescript-report-on-active-pages-only)
+
+Next.js 9 incluait un support intégré pour TypeScript. Tout ce qui est nécessaire est de renommer une seule page de `.js` à `.tsx`. Next.js gérera automatiquement ou vous guidera pour le reste de la configuration.
+
+Next.js gère également la vérification des types en exécutant `tsc --watch` en parallèle du processus de développement. Pendant le développement, Next.js a un concept appelé [entrées à la demande](https://nextjs.org/blog/next-8#improved-on-demand-entries). Cette fonctionnalité ne compile que les pages sur lesquelles vous travaillez activement.
+
+![Le flux des entrées à la demande](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/flow.jpg)
+
+Le flux des entrées à la demande
+
+Depuis la version 9.0.4, Next.js ne signale désormais que les erreurs de type pour les pages qui sont activement compilées par les entrées à la demande. Cela réduit considérablement le bruit de vérification des types tout en se concentrant sur un ensemble spécifique de pages.
+
+La vérification des types complète de l'application est toujours exécutée pendant `next build` ou peut être gérée dans/votre éditeur.
+
+### [Télémétrie](#telemetry)
+
+Next.js a été publié il y a presque 3 ans, et le framework a considérablement évolué pendant ces 3 ans, avec de nouvelles fonctionnalités et de meilleures valeurs par défaut pour tous les utilisateurs.
+
+La façon dont nous avons abordé ce processus d'amélioration a été très manuelle.
+
+Vercel a quelques grandes applications Next.js. Par exemple, [vercel.com](https://vercel.com), [vercel.com/docs](https://vercel.com/docs), et [https://nextjs.org](https://nextjs.org). Nous avons utilisé Next.js en interne chez Vercel et l'avons amélioré en fonction de nos expériences.
+
+En plus de cela, nous engageons activement la communauté pour recueillir des commentaires. Il est probable que vous ayez déjà parlé à Tim pour donner votre avis sur la façon dont vous utilisez Next.js dans votre entreprise.
+
+Par exemple, si vous utilisez un serveur personnalisé, si vous avez une configuration webpack personnalisée, et plus encore. Ces retours sont extrêmement précieux pour orienter le développement des fonctionnalités de Next.js.
+
+Cependant, il y a un problème avec cette approche, c'est que nous ne pouvons recueillir des commentaires que d'un sous-ensemble d'utilisateurs. Ce sous-ensemble peut avoir des besoins et des cas d'utilisation différents des vôtres / de votre entreprise.
+
+Un exemple serait l'importation de fichiers CSS, qui est non standard, mais qu'un bon nombre d'utilisateurs semblent utiliser, soit via `next-css` (ou Sass/Less), soit via une configuration personnalisée. Si nous savons quel pourcentage d'utilisateurs utilise cette approche spécifique, nous pouvons prioriser son amélioration.
+
+Pour cette raison, nous avons introduit une approche anonyme et plus automatisée pour collecter ces points de feedback afin que nous puissions améliorer Next.js encore plus dans un avenir proche.
+
+Cela nous permettra également de vérifier si les améliorations apportées au framework améliorent la base de toutes les applications.
+
+Vous pouvez en savoir plus sur la télémétrie sur [nextjs.org/telemetry](https://nextjs.org/telemetry). Vous y trouverez également comment vous désinscrire si vous ne souhaitez pas participer.
+
+### [Feedback de build avec des points indiquant l'activité](#build-feedback-with-dots-indicating-activity)
+
+En parlant avec les utilisateurs de Next.js, un petit retour était que parfois, il semblait que `next build` ne faisait rien, surtout visuellement.
+
+Pour résoudre ce problème, nous avons ajouté un indicateur de chargement à la sortie console pendant l'exécution de `next build`. Cette sortie donne une indication visuelle que la commande est toujours en cours d'exécution et que le processus n'est pas gelé.
+
+Nous prévoyons d'étendre cette sortie de build pour montrer plus d'étapes du build lorsque cela est possible.
+
+Les nouveaux points d'indication de build
+
+### [Amélioration du suivi des éléments `next/head`](#improved-nexthead-element-tracking)
+
+Next.js fournit un moyen intégré de gérer les éléments `<head>` car il est responsable du rendu HTML de votre application. Cette API est exposée via le module `next/head`.
+
+Par exemple, pour ajouter un titre à la page :
+
+```js filename="pages/index.js"
+import Head from 'next/head';
+ 
+export default function MyPage() {
+  return (
+    <>
+      <Head>
+        <title>Mon Titre</title>
+      </Head>
+      <h1>Bonjour le monde</h1>
+    </>
+  );
+}
+```
+
+Lors du rendu en HTML, Next.js collectera tous les composants rendus dans `<Head>` et rendra les balises dans le `<head>` de votre page.
+
+Cependant, Next.js permet des transitions de route de type application monopage (SPA) en utilisant le composant `<Link>`.
+
+Lorsque vous cliquez sur un `<Link>`, Next.js récupérera le fichier JavaScript nécessaire pour rendre la page côté client. Ensuite, il rendra le composant React associé au fichier.
+
+Comme cette transition se produit côté client, nous devons nettoyer les éléments `<head>` injectés depuis la page précédente, sinon des éléments obsolètes pourraient être présents sur une autre page.
+
+Auparavant, Next.js suivait ces éléments en ajoutant un nom de classe à chaque élément fourni par `<Head>`.
+
+En reprenant l'exemple ci-dessus, le `<head>` ressemblerait à :
+
+```
+<head>
+  <title class="next-head">Mon Titre</title>
+</head>
+```
+
+Cette solution fonctionne bien car chaque élément injecté via `next/head` était clairement marqué et facile à nettoyer.
+
+Cependant, un petit sous-ensemble d'utilisateurs a signalé des problèmes que l'attribut `class` supplémentaire sur les éléments rendait parfois les scripts ajoutés depuis des services externes non valides.
+
+[Gerald Monaco](https://github.com/devknoll), de l'équipe Google Chrome, [a trouvé un moyen](https://github.com/vercel/next.js/pull/8020) de préserver le comportement de nettoyage sans avoir besoin d'un nom de classe sur les éléments.
+
+Le nouveau comportement est que Next.js insérera une balise `<meta>` supplémentaire contenant le nombre d'éléments qu'il (`next/head`) a rendus. Avec cela, Next.js peut utiliser le compte pour nettoyer les éléments existants.
+
+En conséquence, cette approche réduit la taille de la charge utile HTML initiale lorsque plusieurs éléments sont injectés dans le `<head>` d'une page.
+
+### [Prévention des fichiers non-pages dans le répertoire Pages](#preventing-non-pages-in-the-pages-directory)
+
+Lorsque vous commencez avec Next.js, la première chose que vous faites est de créer un répertoire `pages`.
+
+La convention est que chaque fichier dans le répertoire `pages` devient une route dans l'application. Un exemple simple est que `pages/about.js` devient `/about`.
+
+Au fil du temps, nous avons reçu des rapports occasionnels selon lesquels les applications des utilisateurs, grandes et petites, avaient de mauvaises performances de build.
+
+Après enquête, il a été révélé que ces utilisateurs avaient créé toute leur structure de composants dans le répertoire `pages`.
+
+Comme chaque fichier dans le répertoire `pages` est traité comme une page, chaque composant était compilé comme une page dans l'application. Cela entraîne une surcharge importante au moment du build, générant 2+ fichiers JavaScript pour des pages invalides.
+
+De plus, cela affecterait partiellement la façon dont Next.js décide de générer des morceaux de code-splitting. En effet, Next.js utilise des heuristiques sur l'utilisation des bibliothèques à travers les pages.
+
+Pour cette raison, nous devons nous assurer que les utilisateurs n'introduisent pas ce piège dans leur application Next.js.
+
+Next.js 9 valide désormais que les fichiers dans le répertoire `pages` exportent un composant React.
+
+En action, cela signifie que Next.js vous montrera un message vous alertant qu'un potentiel non-page a été trouvé dans le répertoire `pages`.
+
+Cela encourage l'utilisateur à déplacer le fichier qui n'est pas une page dans un autre répertoire. En retour, le développement, la production et le code-splitting sont plus rapides et plus précis.
+
+### [Améliorations du runtime](#runtime-improvements)
+
+Le framework Next.js se compose de nombreuses parties. L'une d'elles est le runtime côté client. Ce runtime gère l'hydratation, le routage côté client, et plus encore.
+
+L'hydratation, sur laquelle cette amélioration s'est concentrée, est ce qui est nécessaire pour rendre le HTML rendu par le serveur ou prérendu interactif. L'hydratation ajoute des gestionnaires d'événements et appelle des méthodes de cycle de vie comme `useEffect()` ou `componentDidMount` - rendant votre application prête pour l'utilisateur final.
+
+De plus, Next.js gère plus que l'hydratation de base - par exemple, la configuration d'un routeur côté client, la configuration de `next/head`, et le chargement de logiques d'application supplémentaires via `next/dynamic`.
+
+Chacune de ces responsabilités a également sa propre partie de runtime spécifique.
+
+Dans le cas de `next/dynamic`, Next.js doit s'assurer que les composants chargés paresseusement qui ont été rendus sur le serveur sont prêts côté client. Chaque utilisation de `next/dynamic` génère un bundle JavaScript supplémentaire, et ces fichiers doivent être chargés avant l'hydratation pour éviter une incohérence d'hydratation.
+
+Auparavant, ce runtime était toujours inclus dans le bundle runtime de Next.js. Maintenant, il n'est inclus que lorsque vous utilisez `next/dynamic` dans votre application. Cela signifie que moins de JavaScript est téléchargé, analysé et exécuté pour les applications n'utilisant pas `next/dynamic`.
+
+### [Support AppTree](#apptree-support)
+
+Certaines bibliothèques de l'écosystème React implémentent le rendu côté serveur d'une manière très spécifique. Plus notablement, la solution de rendu côté serveur d'Apollo, appelée `getDataFromTree`, fonctionne en rendant l'arbre React et pour chaque `Query` trouvée, elle attend le résultat puis rerend l'arbre React à nouveau.
+
+Par défaut, Next.js ajoute certaines valeurs de contexte dans l'arbre React, par exemple, le routeur qui peut être lu en utilisant `useRouter`.
+
+La façon dont l'exemple `with-apollo` rendait l'arbre React était en rendant `<App>` et en essayant de remplir manuellement les propriétés manquantes. Avec l'ajout de React Context, cela n'était plus possible car le fournisseur de contexte est un élément séparé.
+
+À partir de Next.js 9.0.4, une nouvelle propriété appelée `AppTree` a été ajoutée à l'objet contexte dans `getInitialProps`. Elle a été spécifiquement ajoutée pour les cas où des bibliothèques externes doivent parcourir tout l'arbre React comme avec `getDataFromTree` d'Apollo.
+
+L'exemple `with-apollo` a été [mis à jour pour refléter les changements](https://github.com/vercel/next.js/blob/v9.0.4/examples/with-apollo/lib/with-apollo-client.js#L20-L34). Si vous avez déjà Apollo implémenté dans votre application, il est recommandé de passer à l'approche `AppTree` afin que `useRouter` et d'autres API ajoutées à l'avenir fonctionnent correctement dans votre application Next.js.
+
+Si vous n'utilisez pas Apollo ou une bibliothèque similaire, nous vous recommandons d'essayer d'éviter d'utiliser AppTree, car l'équipe Next.js ne recommande pas de parcourir l'arbre React en général. Cela ajoute une surcharge de performance importante car l'arbre React est rendu plusieurs fois au lieu d'une seule.
+
+### [Suppression du package `next-server`](#removal-of-the-next-server-package)
+
+Lorsque nous avons commencé à optimiser Next.js pour les déploiements serverless il y a plus d'un an, nous avons créé un package appelé `next-server`. Ce package était expérimental et publié parallèlement au package `next`. Il n'a jamais été documenté publiquement mais constituait une expérience visant à créer le runtime serveur Next.js le plus léger possible.
+
+Finalement, le package a été un succès et a effectivement réduit la taille du runtime serveur en production. Cependant, nous avons trouvé une nouvelle méthode innovante pour rendre le runtime encore plus léger grâce au compilateur Next.js et à [l'analyse statique](https://github.com/vercel/node-file-trace).
+
+Ce faisant, `next-server` est devenu obsolète et a été remplacé par la [cible serverless](/docs#serverless-deployment). Cette cible produit un résultat bien plus optimisé que l'utilisation du package `next-server` comme remplacement de `next`.
+
+Bien que ce package soit obsolète et ne puisse pas être utilisé directement, nous l'avons conservé. Cela s'expliquait par le fait qu'il contenait des éléments internes partagés entre plusieurs packages et que déplacer le code aurait nécessité un effort non négligeable.
+
+Nous avons récemment fait cet effort et avons réintégré le code de `next-server` dans le package `next`. Cela signifie que tout le code du framework Next.js réside désormais dans le package `next`.
+
+Cette modification facilite la contribution à Next.js, que vous soyez débutant ou contributeur expérimenté. Il existe désormais un seul processus de compilation et une configuration de build unifiée. Auparavant, il y avait des paramètres distincts pour `next` et `next-server`, ainsi que des contraintes arbitraires sur le code appartenant à chaque package.
+
+### [Mise à niveau de Next.js](#upgrading-nextjs)
+
+Si votre projet utilise une ancienne version de Next.js, nous recommandons de passer à Next.js 9.
+
+Dans la plupart des cas, aucune modification n'est nécessaire pour effectuer la mise à niveau. Vous pouvez suivre le [guide de mise à niveau](https://github.com/vercel/next.js/blob/canary/UPGRADING.md#migrating-from-v8-to-v9) pour garantir une expérience de mise à niveau fluide.
+
+Nous tenons à remercier tous les contributeurs de la communauté qui ont mis à jour le guide depuis sa publication.
+
+### [Quelles sont les nouveautés à venir ?](#whats-coming-in-the-future)
+
+Les nouvelles optimisations présentées dans cet article de blog ne sont que le début des optimisations et fonctionnalités plus larges sur lesquelles nous travaillons.
+
+Nous partagerons très bientôt une mise à jour sur les RFC en cours. D'ici là, vous pouvez avoir un petit aperçu via [l'étiquette RFC sur GitHub](https://github.com/vercel/next.js/labels/RFC).
+
+Cela montre certaines des fonctionnalités que nous avons étudiées, comme [le support natif du CSS](https://github.com/vercel/next.js/issues/8626), [le support du répertoire public](https://github.com/vercel/next.js/issues/7177) et [le support du répertoire src](https://github.com/vercel/next.js/issues/8451).
+
+### [Communauté](#community)
+
+Nous sommes ravis de voir la croissance continue de la communauté Next.js.
+
+*   Nous avons eu plus de **800** contributeurs ayant soumis au moins 1 commit.
+*   Sur GitHub, le projet a été mis en favori plus de **41 100** fois.
+
+La communauté Next.js a doublé depuis la dernière version majeure, avec plus de 10 900 membres. [Rejoignez-nous !](https://github.com/vercel/next.js/discussions)
+
+Nous sommes enthousiastes face aux contributions continues de la communauté et aux retours externes des entreprises et utilisateurs qui aident à façonner les versions.

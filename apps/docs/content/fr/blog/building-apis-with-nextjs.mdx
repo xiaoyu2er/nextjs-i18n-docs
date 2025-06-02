@@ -1,0 +1,396 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:42:55.409Z
+title: Construire des API avec Next.js
+description: Apprenez à construire des API avec Next.js.
+author:
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+date: 2025-02-28T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/building-apis-with-nextjs/twitter-card.png
+---
+
+Ce guide couvrira comment construire des API avec Next.js, incluant la configuration de votre projet, la compréhension du routeur d'application (App Router) et des gestionnaires de route (Route Handlers), la gestion de multiples méthodes HTTP, l'implémentation de routage dynamique, la création de logique middleware réutilisable, et la décision de quand créer une couche API dédiée.
+
+*   [1\. Premiers pas](#1-premiers-pas)
+    *   [1.1 Créer une application Next.js](#11-créer-une-application-nextjs)
+    *   [1.2 App Router vs. Pages Router](#12-app-router-vs-pages-router)
+*   [2\. Pourquoi (et quand) construire des API avec Next.js](#2-pourquoi-et-quand-construire-des-api-avec-nextjs)
+*   [3\. Créer une API avec les Route Handlers](#3-créer-une-api-avec-les-route-handlers)
+    *   [3.1 Configuration de base des fichiers](#31-configuration-de-base-des-fichiers)
+    *   [3.2 Méthodes HTTP multiples dans un seul fichier](#32-méthodes-http-multiples-dans-un-seul-fichier)
+*   [4\. Travailler avec les API Web](#4-travailler-avec-les-api-web)
+    *   [4.1 Utilisation directe de Request & Response](#41-utilisation-directe-de-request--response)
+    *   [4.2 Paramètres de requête](#42-paramètres-de-requête)
+    *   [4.3 En-têtes et cookies](#43-en-têtes-et-cookies)
+*   [5\. Routes dynamiques](#5-routes-dynamiques)
+*   [6\. Utiliser Next.js comme proxy ou couche de transfert](#6-utiliser-nextjs-comme-proxy-ou-couche-de-transfert)
+*   [7\. Construire une logique "middleware" partagée](#7-construire-une-logique-middleware-partagée)
+*   [8\. Déploiement et considérations sur le "Mode SPA"](#8-déploiement-et-considérations-sur-le-mode-spa)
+    *   [8.1 Déploiement Node.js standard](#81-déploiement-nodejs-standard)
+    *   [8.2 Export statique/SPA](#82-export-statiquespa)
+    *   [8.3 Déployer des API sur Vercel](#83-déployer-des-api-sur-vercel)
+*   [9\. Quand éviter de créer un point de terminaison API](#9-quand-éviter-de-créer-un-point-de-terminaison-api)
+*   [10\. Mettre tout ensemble](#10-mettre-tout-ensemble)
+*   [Conclusion](#conclusion)
+*   [Foire aux questions](#foire-aux-questions)
+    *   [Qu'en est-il des Server Actions ?](#quen-est-il-des-server-actions)
+    *   [Puis-je utiliser TypeScript avec les Route Handlers ?](#puis-je-utiliser-typescript-avec-les-route-handlers)
+    *   [Quelles sont les meilleures pratiques pour l'authentification ?](#quelles-sont-les-meilleures-pratiques-pour-lauthentification)
+
+[1\. Premiers pas](#1-premiers-pas)
+-----------------------------------------
+
+### [1.1 Créer une application Next.js](#11-créer-une-application-nextjs)
+
+Si vous partez de zéro, vous pouvez créer un nouveau projet Next.js en utilisant :
+
+```bash filename="Terminal"
+npx create-next-app@latest --api
+```
+
+> **Note :** Le flag `--api` inclut automatiquement un exemple de `route.ts` dans le dossier `app/` de votre nouveau projet, démontrant comment créer un point de terminaison API.
+
+### [1.2 App Router vs. Pages Router](#12-app-router-vs-pages-router)
+
+*   **Pages Router** : Historiquement, Next.js utilisait `pages/api/*` pour les API. Cette approche s'appuyait sur les objets requête/réponse de Node.js et une API de type Express.
+*   **App Router (Par défaut)** : Introduit dans Next.js 13, l'App Router adopte pleinement les API Web standard Request/Response. Au lieu de `pages/api/*`, vous pouvez maintenant placer des fichiers `route.ts` ou `route.js` n'importe où dans le répertoire `app/`.
+
+> **Pourquoi changer ?** Les "Route Handlers" de l'App Router s'appuient sur les [API Web Platform Request/Response](https://developer.mozilla.org/en-US/docs/Web/API) plutôt que sur des API spécifiques à Node.js. Cela simplifie l'apprentissage, réduit les frictions et vous aide à réutiliser vos connaissances à travers différents outils.
+
+[2\. Pourquoi (et quand) construire des API avec Next.js](#2-pourquoi-et-quand-construire-des-api-avec-nextjs)
+------------------------------------------------------------------------------------------
+
+1.  **API publique pour plusieurs clients**
+    
+    *   Vous pouvez construire une API publique consommée par votre application web Next.js, une application mobile séparée, ou tout service tiers. Par exemple, vous pourriez récupérer des données depuis `/api/users` à la fois dans votre site React et une application mobile React Native.
+2.  **Proxy vers un backend existant**
+    
+    *   Parfois, vous souhaitez masquer ou consolider des [microservices](https://vercel.com/blog/how-vercel-adopted-microfrontends) externes derrière un seul point de terminaison. Les Route Handlers de Next.js peuvent agir comme un proxy ou une couche intermédiaire vers un backend existant. Par exemple, vous pourriez intercepter des requêtes, gérer l'authentification, transformer des données, puis transmettre la requête à une API en amont.
+3.  **Webhooks et intégrations**
+    
+    *   Si vous recevez des rappels externes ou des webhooks (par exemple depuis Stripe, GitHub, Twilio), vous pouvez les gérer avec les Route Handlers.
+4.  **Authentification personnalisée**
+    
+    *   Si vous avez besoin de sessions, de tokens ou d'autres logiques d'authentification, vous pouvez stocker des cookies, lire des en-têtes et répondre avec les données appropriées dans votre couche API Next.js.
+
+> **Note :** Si vous avez seulement besoin de récupération de données côté serveur pour votre propre application Next.js (et que vous n'avez pas besoin de partager ces données à l'extérieur), les Server Components pourraient suffire à récupérer les données directement pendant le rendu—aucune couche API séparée n'est nécessaire.
+
+[3\. Créer une API avec les Route Handlers](#3-créer-une-api-avec-les-route-handlers)
+---------------------------------------------------------------------------------
+
+### [3.1 Configuration de base des fichiers](#31-configuration-de-base-des-fichiers)
+
+Dans l'App Router (`app/`), créez un dossier qui représente votre route, et à l'intérieur, un fichier `route.ts`.
+
+Par exemple, pour créer un point de terminaison à `/api/users` :
+
+```
+app
+└── api
+    └── users
+        └── route.ts
+```
+
+### [3.2 Méthodes HTTP multiples dans un seul fichier](#32-méthodes-http-multiples-dans-un-seul-fichier)
+
+Contrairement aux routes API du Pages Router (qui avaient une seule exportation par défaut), vous pouvez exporter plusieurs fonctions représentant différentes méthodes HTTP depuis le même fichier.
+
+```ts filename="app/api/users/route.ts"
+export async function GET(request: Request) {
+  // Par exemple, récupérez des données depuis votre base de données ici
+  const users = [
+    { id: 1, name: 'Alice' },
+    { id: 2, name: 'Bob' }
+  ];
+  return new Response(JSON.stringify(users), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+ 
+export async function POST(request: Request) {
+  // Analysez le corps de la requête
+  const body = await request.json();
+  const { name } = body;
+ 
+  // Par exemple, insérez un nouvel utilisateur dans votre base de données
+  const newUser = { id: Date.now(), name };
+ 
+  return new Response(JSON.stringify(newUser), {
+    status: 201,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+```
+
+Maintenant, envoyer une requête GET à `/api/users` retourne votre liste d'utilisateurs, tandis qu'une requête `POST` à la même URL en insérera un nouveau.
+
+[4\. Travailler avec les API Web](#4-travailler-avec-les-api-web)
+-----------------------------------------------------
+
+### [4.1 Utilisation directe de Request & Response](#41-utilisation-directe-de-request--response)
+
+Par défaut, vos méthodes Route Handler (`GET`, `POST`, etc.) reçoivent un objet [Request](https://developer.mozilla.org/docs/Web/API/Request) standard, et vous devez retourner un objet [Response](https://developer.mozilla.org/docs/Web/API/Response) standard.
+
+### [4.2 Paramètres de requête](#42-paramètres-de-requête)
+
+```ts filename="app/api/search/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const query = searchParams.get('query'); // Par exemple, `/api/search?query=hello`
+ 
+  return new Response(
+    JSON.stringify({ result: `Vous avez recherché : ${query}` }),
+    {
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+}
+```
+
+### [4.3 En-têtes et cookies](#43-en-têtes-et-cookies)
+
+```ts filename="app/api/auth/route.ts"
+import { NextRequest } from 'next/server';
+import { cookies, headers } from 'next/headers';
+ 
+export async function GET(request: NextRequest) {
+  // 1. Utilisation des helpers 'next/headers'
+  const cookieStore = await cookies();
+  const token = cookieStore.get('token');
+ 
+  const headersList = await headers();
+  const referer = headersList.get('referer');
+ 
+  // 2. Utilisation des API Web standard
+  const userAgent = request.headers.get('user-agent');
+ 
+  return new Response(JSON.stringify({ token, referer, userAgent }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+```
+
+Les fonctions `cookies()` et `headers()` peuvent être utiles si vous prévoyez de réutiliser une logique partagée dans d'autres codes côté serveur dans Next.js. Vous remarquerez que Next.js fournit également `NextRequest` et `NextResponse` qui étendent les API Web de base.
+
+[5\. Routes dynamiques](#5-routes-dynamiques)
+---------------------------------------
+
+Pour créer des chemins dynamiques (par exemple `/api/users/:id`), utilisez des **segments dynamiques** dans votre structure de dossier :
+
+```
+app
+└── api
+    └── users
+        └── [id]
+            └── route.ts
+```
+
+Ce fichier correspond à une URL comme `/api/users/123`, avec le `123` capturé comme paramètre.
+
+```ts filename="app/api/users/[id]/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const id = (await params).id;
+  // Par exemple, interrogez une base de données pour l'utilisateur avec l'ID `id`
+  return new Response(JSON.stringify({ id, name: `Utilisateur ${id}` }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const id = (await params).id;
+  // Par exemple, supprimez l'utilisateur avec l'ID `id` dans la base de données
+  return new Response(null, { status: 204 });
+}
+```
+
+Ici, `params.id` vous donne le segment dynamique.
+
+[6\. Utiliser Next.js comme proxy ou couche de transfert](#6-utiliser-nextjs-comme-proxy-ou-couche-de-transfert)
+--------------------------------------------------------------------------------------------------
+
+Un scénario courant est le **proxying** d'un service backend existant. Vous pouvez authentifier les requêtes, gérer les logs, ou transformer les données avant de les envoyer à un serveur distant ou backend :
+
+```ts filename="app/api/external/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export async function GET(request: NextRequest) {
+  const response = await fetch('https://example.com/api/data', {
+    // Optionnel : transférez certains en-têtes, ajoutez des tokens d'authentification, etc.
+    headers: { Authorization: `Bearer ${process.env.API_TOKEN}` },
+  });
+ 
+  // Transformez ou transférez la réponse
+  const data = await response.json();
+  const transformed = { ...data, source: 'proxifié-via-nextjs' };
+ 
+  return new Response(JSON.stringify(transformed), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+```
+
+Maintenant, vos clients n'ont qu'à appeler `/api/external`, et Next.js gérera le reste. Ceci est aussi parfois appelé un "Backend for Frontend" ou BFF.
+
+[7\. Construire une logique "middleware" partagée](#7-construire-une-logique-middleware-partagée)
+-----------------------------------------------------------------------------
+
+Si vous souhaitez appliquer la même logique (par exemple des vérifications d'authentification, des logs) à travers plusieurs Route Handlers, vous pouvez créer des fonctions réutilisables qui englobent vos gestionnaires :
+
+```ts filename="lib/with-auth.ts"
+import { NextRequest } from 'next/server';
+ 
+type Handler = (req: NextRequest, context?: any) => Promise<Response>;
+ 
+export function withAuth(handler: Handler): Handler {
+  return async (req, context) => {
+    const token = req.cookies.get('token')?.value;
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+ 
+    // Si authentifié, appelez le gestionnaire original
+    return handler(req, context);
+  };
+}
+```
+
+Puis dans votre Route Handler :
+
+```ts filename="app/api/secret/route.ts"
+import { NextRequest } from 'next/server';
+import { withAuth } from '@/lib/with-auth';
+ 
+async function secretGET(request: NextRequest) {
+  return new Response(JSON.stringify({ secret: 'Ici se trouvent des dragons' }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export const GET = withAuth(secretGET);
+```
+
+[8\. Déploiement et considérations sur le "Mode SPA"](#8-déploiement-et-considérations-sur-le-mode-spa)
+-----------------------------------------------------------------------------------------
+
+### [8.1 Déploiement Node.js standard](#81-déploiement-nodejs-standard)
+
+Le déploiement standard du serveur Next.js utilisant `next start` vous permet d'utiliser des fonctionnalités comme les Route Handlers, les Server Components, le Middleware et plus—tout en profitant des informations dynamiques au moment de la requête.
+
+Aucune configuration supplémentaire n'est requise. Voir [Déploiement](/docs/app/building-your-application/deploying) pour plus de détails.
+
+### [8.2 Export statique/SPA](#82-export-statiquespa)
+
+Next.js supporte également la génération de votre site entier comme une [Single-Page Application (SPA) statique](/docs/app/building-your-application/upgrading/single-page-applications).
+
+Vous pouvez activer ceci en configurant :
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  output: 'export',
+};
+ 
+export default nextConfig;
+```
+
+En **mode export statique**, Next.js générera du HTML, CSS et JS purement statiques. **Vous ne pouvez pas exécuter de code côté serveur** (comme des points de terminaison API). Si vous avez toujours besoin d'une API, vous devrez l'héberger séparément (par exemple, un serveur Node.js autonome).
+
+> **Note :**
+> 
+> *   **Les Route Handlers GET** [peuvent être exportés statiquement](/docs/app/building-your-application/deploying/static-exports#route-handlers) s'ils ne dépendent pas de données de requête dynamiques. Ils deviennent des fichiers statiques dans votre dossier `out`.
+> *   **Toutes les autres fonctionnalités serveur** (requêtes dynamiques, réécriture de cookies, etc.) ne sont **pas** supportées dans un export SPA pur.
+
+### [8.3 Déploiement d'APIs sur Vercel](#83-deploying-apis-on-vercel)
+
+Si vous déployez votre application Next.js sur Vercel, nous avons un [guide sur le déploiement d'APIs](https://vercel.com/guides/hosting-backend-apis). Cela inclut d'autres fonctionnalités de Vercel comme la [limitation de débit programmatique](https://vercel.com/docs/security/vercel-waf/rate-limiting-sdk) via le Vercel Firewall. Vercel propose également des [Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs), souvent nécessaires avec les approches API.
+
+[9\. Quand éviter de créer un point de terminaison API](#9-when-to-skip-creating-an-api-endpoint)
+-------------------------------------------------------------------------------------
+
+Avec les **Composants Serveur React** du Routeur d'application, vous pouvez récupérer des données directement sur le serveur sans exposer de point de terminaison public :
+
+```tsx filename="app/users/page.tsx"
+// (Composant Serveur)
+export default async function UsersPage() {
+  // Cette requête s'exécute sur le serveur (aucun code côté client nécessaire ici)
+  const res = await fetch('https://api.example.com/users');
+  const data = await res.json();
+ 
+  return (
+    <main>
+      <h1>Utilisateurs</h1>
+      <ul>
+        {data.map((user: any) => (
+          <li key={user.id}>{user.name}</li>
+        ))}
+      </ul>
+    </main>
+  );
+}
+```
+
+Si vos données ne sont utilisées que dans votre application Next.js, vous n'avez peut-être pas besoin d'une API publique du tout.
+
+[10\. Tout mettre ensemble](#10-putting-it-all-together)
+-----------------------------------------------------------
+
+1.  **Créez un nouveau projet Next.js** : `npx create-next-app@latest --api`.
+2.  **Ajoutez des gestionnaires de route** dans le répertoire `app/` (par exemple, `app/api/users/route.ts`).
+3.  **Exportez les méthodes HTTP** (`GET`, `POST`, `PUT`, `DELETE`, etc.) dans le même fichier.
+4.  **Utilisez les APIs Web standard** pour interagir avec l'objet `Request` et renvoyer une `Response`.
+5.  **Construisez une API publique** si vous avez besoin que d'autres clients consomment vos données, ou pour proxyfier un service backend.
+6.  **Récupérez** vos nouvelles routes API depuis le client (par exemple, dans un Composant Client ou avec `fetch('/api/...')`).
+7.  Ou **évitez complètement de créer une API** si un Composant Serveur peut simplement récupérer les données.
+8.  **Ajoutez un "middleware" partagé** (par exemple, `withAuth()`) pour l'authentification ou d'autres logiques répétées.
+9.  **Déployez** dans un environnement compatible Node.js pour les fonctionnalités serveur, ou **exportez** statiquement si vous n'avez besoin que d'une SPA statique.
+
+[Conclusion](#conclusion)
+-------------------------
+
+L'utilisation du **Routeur d'application** et des **Gestionnaires de route** de Next.js vous offre une manière flexible et moderne de construire des APIs qui exploitent directement la **Plateforme Web**. Vous pouvez :
+
+*   **Créer une API publique complète** à partager avec des clients web, mobiles ou tiers.
+*   **Proxyfier** et personnaliser les appels vers des services externes existants.
+*   **Implémenter** une couche "middleware" réutilisable pour l'authentification, la journalisation ou toute logique répétée.
+*   **Router dynamiquement** les requêtes en utilisant la structure de dossiers avec segment `[id]`.
+
+[Questions fréquemment posées](#frequently-asked-questions)
+---------------------------------------------------------
+
+### [Qu'en est-il des Actions Serveur ?](#what-about-server-actions)
+
+Vous pouvez considérer les [Actions Serveur](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) comme des routes API `POST` générées automatiquement qui peuvent être appelées depuis le client.
+
+Elles sont conçues pour les opérations de mutation, comme la création, la mise à jour ou la suppression de données. Vous appelez une Action Serveur comme une fonction JavaScript normale, plutôt que de faire un `fetch` explicite vers une route API définie.
+
+Bien qu'il y ait toujours une requête réseau en cours, vous n'avez pas besoin de la gérer explicitement. Le chemin URL est généré automatiquement et [chiffré](/docs/app/building-your-application/data-fetching/server-actions-and-mutations#security), donc vous ne pouvez pas accéder manuellement à une route comme `/api/users` dans le navigateur.
+
+Si vous prévoyez d'utiliser des Actions Serveur _et_ d'exposer une API publique, nous recommandons de déplacer la logique principale vers une [Couche d'Accès aux Données](/blog/security-nextjs-server-components-actions) et d'appeler la même logique depuis l'Action Serveur et la route API.
+
+### [Puis-je utiliser TypeScript avec les Gestionnaires de route ?](#can-i-use-typescript-with-route-handlers)
+
+Oui, vous pouvez utiliser TypeScript avec les Gestionnaires de route. Par exemple, en définissant les types `Request` et `Response` dans votre fichier `route`.
+
+Apprenez-en plus sur [TypeScript avec Next.js](/docs/app/api-reference/config/typescript).
+
+### [Quelles sont les meilleures pratiques pour l'authentification ?](#what-are-the-best-practices-for-authentication)
+
+Apprenez-en plus dans notre [documentation sur l'authentification](/docs/app/building-your-application/authentication).

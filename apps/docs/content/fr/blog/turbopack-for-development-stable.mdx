@@ -1,0 +1,295 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:38:28.208Z
+title: Turbopack Dev est désormais stable
+description: >-
+  Le chemin a été long, mais nous sommes heureux d'annoncer que `next dev
+  --turbo` est maintenant stable et prêt à accélérer votre expérience de développement.
+author:
+  - name: Maia Teegarden
+    image: /static/team/maia.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2024-10-21T16:50:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-for-development-stable/twitter-card.png
+---
+
+Le chemin a été long, mais nous sommes heureux d'annoncer que `next dev --turbo` est maintenant stable et prêt à accélérer votre expérience de développement. Nous l'utilisons pour itérer sur [vercel.com](http://vercel.com), [nextjs.org](http://nextjs.org), [v0](https://v0.dev) et toutes nos autres applications avec d'excellents résultats.
+
+Depuis sa sortie il y a 8 ans, Next.js a été utilisé pour construire tout type de projet, des projets de week-end aux applications d'entreprise sophistiquées. Lorsque Next.js a été lancé pour la première fois, webpack était clairement le meilleur choix comme fondation pour le bundling du framework, mais avec le temps, il a eu du mal à suivre les besoins des développeurs web modernes. Notre communauté a commencé à trouver l'itération douloureusement lente en attendant le chargement des routes, la prise en compte des modifications de code et le déploiement des builds de production.
+
+Nous avons investi beaucoup de [temps](/blog/next-12#faster-builds-and-fast-refresh-with-rust-compiler) et [d'efforts](/blog/next-13-5#improving-startup-and-fast-refresh-time) pour optimiser webpack, mais à un certain moment, nous avons senti que les améliorations ne justifiaient plus l'effort. Nous avions besoin d'une nouvelle fondation qui pourrait supporter les nombreuses applications Next.js déjà en production aujourd'hui, ainsi que les futures innovations que nous avions prévues, comme les React Server Components.
+
+Voici nos exigences pour ce nouveau bundler :
+
+*   Un minimum de breaking changes
+*   Support à la fois pour App Router et Pages Router
+*   Des temps de compilation plus rapides pour des codebases de toutes tailles
+*   Des builds de développement proches de la production
+*   Des optimisations avancées pour la production (par exemple, le tree shaking dans les modules)
+*   Un graphe de modules supportant plusieurs environnements comme Node.js et le navigateur
+*   Une observabilité complète pour les mainteneurs et utilisateurs avancés
+
+Nous avons évalué toutes les solutions existantes à l'époque et avons constaté que chacune avait des compromis qui ne correspondaient pas à nos exigences et objectifs. Il était logique pour nous de concevoir quelque chose à partir de zéro qui pourrait accomplir exactement ce dont Next.js a besoin aujourd'hui et de maîtriser la feuille de route pour pouvoir construire et expérimenter avec ce dont il aura besoin demain. C'était notre motivation pour créer Turbopack.
+
+Nous avons commencé par optimiser l'expérience de développement, et c'est ce que nous publions comme stable aujourd'hui. Nous avons largement testé Turbopack avec les applications de Vercel, et avons notablement amélioré la vélocité d'itération de nos développeurs. Par exemple, avec `vercel.com`, une grande application Next.js, nous avons observé :
+
+*   Jusqu'à **76,7 % plus rapide** au démarrage du serveur local.
+*   Jusqu'à **96,3 % plus rapide** pour les mises à jour de code avec Fast Refresh.
+*   Jusqu'à **45,8 % plus rapide** pour la compilation initiale d'une route sans cache (Turbopack n'a pas encore de cache disque).
+
+Dans cet article, nous allons discuter de la façon dont nous avons obtenu ces résultats, ainsi que d'autres points forts. Nous clarifierons également ce que vous pouvez attendre de cette version et fournirons une feuille de route pour la suite.
+
+[Points forts](#highlights)
+-------------------------
+
+### [Compilation initiale plus rapide d'une route](#faster-initial-compile-of-a-route)
+
+L'un des plus gros problèmes que nous entendions de notre communauté était que les routes prenaient trop de temps à charger en développement, ce qui était dû à la vitesse de compilation de webpack. Next.js compile les routes à la demande pour éviter d'avoir à compiler toutes les routes possibles avant qu'elles ne soient nécessaires, ce qui maintient le démarrage initial rapide et l'utilisation de la mémoire plus faible, mais même dans ce cas, vous pouviez encore vous retrouver à attendre qu'une seule page se charge.
+
+Pour être juste, les bundlers comme webpack font beaucoup de choses sous le capot. Lors de la compilation d'une route pour la première fois, le bundler commence par un "point d'entrée". Dans le cas de Next.js, c'est une combinaison de `page.tsx` et de tous les fichiers associés à cette route, comme `layout.tsx` et `loading.tsx`, etc. Ces points d'entrée sont analysés pour trouver les déclarations `import` qui sont résolues en fichiers, qui sont ensuite traités de la même manière que les points d'entrée, et ce cycle continue jusqu'à ce qu'il n'y ait plus d'imports. Ce processus construit un graphe de modules, qui peut être composé non seulement de modules TypeScript/JavaScript (y compris `node_modules`), mais aussi de fichiers CSS (globaux et modules CSS), et de fichiers statiques comme les images importées pour `next/image`.
+
+Une fois tous les modules collectés, le graphe de modules est utilisé pour créer des bundles JavaScript, souvent appelés "chunks". Ces chunks sont les sorties du compilateur qui s'exécutent sur le serveur (au moment du build ou du runtime) ou dans le navigateur.
+
+webpack ne supporte pas la création de graphes qui produisent des sorties pour plusieurs environnements, donc nous devons exécuter au moins deux compilateurs séparés dans Next.js avec webpack aujourd'hui, un pour le serveur et un pour le navigateur. Nous devons d'abord compiler le graphe de modules du serveur pour que toutes les références à `"use client"` puissent être trouvées. Une fois le serveur construit, nous parcourons son graphe pour créer les points d'entrée pertinents pour le compilateur du navigateur. Comme il s'agit d'un compilateur webpack séparé, il y a une certaine surcharge dans ce processus, comme l'analyse du même code deux fois entre le client et le serveur.
+
+Avec Turbopack, nous avons cherché à éliminer la surcharge liée à l'exécution de plusieurs compilateurs et à la coordination entre eux. La solution a été de rendre le compilateur conscient de plusieurs cibles de sortie différentes. En interne, celles-ci sont appelées "transitions" de cible. Nous pouvons marquer une importation comme une transition du serveur vers le navigateur ou du navigateur vers le serveur. C'est ce qui permet à Turbopack de bundler efficacement les Server Components et les Client Components, ainsi que les Server Functions importées depuis les Client Components.
+
+En plus d'améliorer les performances, avoir un seul compilateur capable de gérer plusieurs environnements en une seule passe présente des avantages en termes de fiabilité et de débogage, car nous n'avons plus à coordonner entre deux processus de compilation séparés dans Next.js.
+
+Une autre grande différence entre webpack et Turbopack est que Turbopack peut paralléliser le travail sur plusieurs CPUs, alors qu'avec webpack, seule l'étape de transformation TypeScript/JavaScript utilisant SWC est parallélisée.
+
+webpack ne supporte pas la parallélisation sur plusieurs CPUs car, pour paralléliser efficacement, les données doivent être facilement accessibles entre les threads. webpack a été construit d'une manière qui utilise massivement de gros objets JavaScript, qui ne peuvent pas être partagés facilement entre les threads sans une sérialisation et désérialisation coûteuses. Cette surcharge annule souvent l'amélioration des performances obtenue en utilisant plusieurs CPUs. Turbopack est écrit en Rust, qui n'a pas les mêmes limitations, et a été conçu dès le départ avec la parallélisation à l'esprit.
+
+Nous avons également pu obtenir des gains de performance avec des lectures et écritures plus rapides sur le système de fichiers, une résolution de modules plus rapide et en [sautant plus de travail sur les modules sans effets de bord](https://gist.github.com/timneutkens/63f95e096a7a060627ca53056720022e).
+
+Lorsque nous utilisons Turbopack sur [`vercel.com`](http://vercel.com), une grande application Next.js, nous avons constaté jusqu'à **45,8 % plus rapide** pour la compilation initiale par rapport à Next.js avec webpack.
+
+### [Fast Refresh plus rapide](#faster-fast-refresh)
+
+Fast Refresh est le système que les bundlers utilisent pour propager les modifications vers la route que vous regardez actuellement dans le navigateur, parfois appelé Hot Module Replacement (HMR).
+
+Next.js a une intégration plus profonde qui connecte Fast Refresh à React, en s'assurant que React ne perd pas l'état lorsque vous modifiez un composant.
+
+Avec webpack, nous avons constaté qu'il y a une limite à la performance de Fast Refresh lorsque vous atteignez un certain nombre de modules JavaScript. Webpack doit effectuer une traversée de graphe et générer des sorties même pour les modules qui n'ont pas changé, ce qui évolue linéairement avec le nombre de modules JavaScript.
+
+Nous avons constaté qu'à partir d'environ 30 000 modules, les modifications de code ont systématiquement au moins 1 seconde de surcharge pour traiter une mise à jour, que le changement soit petit ou non. Par exemple, changer une couleur dans un fichier CSS pouvait prendre 1 seconde pour apparaître à l'écran.
+
+Cette performance n'était pas acceptable pour nous. Nous pensons que les builds incrémentaux ne devraient évoluer qu'avec la taille des modifications locales, et non avec la taille de la route ou de l'application. Lorsque `button.tsx` change, le compilateur ne devrait avoir à exécuter que le travail lié à ce changement de fichier au lieu de devoir recalculer d'autres modules et fichiers de sortie qui ne sont pas affectés par le changement. Pour lutter contre cela, nous avons priorisé une fondation dans Turbopack qui permet un recalcul très granulaire du travail.
+
+Cet effort s'est transformé en la bibliothèque sous-jacente, [Turbo Engine](https://nextjs.org/docs/app/api-reference/turbopack), qui utilise une architecture de calcul incrémental automatique pilotée par la demande pour fournir un hot-reloading interactif des applications Next.js et React massives en quelques dizaines de millisecondes. Cette architecture est basée sur plus d'une décennie de recherche et d'antécédents, notamment [webpack](https://webpack.js.org/), [Salsa](https://github.com/salsa-rs/salsa), [Parcel](https://parceljs.org/), [Adapton](http://adapton.org/) et le [système de requêtes du compilateur Rust](https://rustc-dev-guide.rust-lang.org/query.html).
+
+Maintenant avec Turbopack, la vitesse de Fast Refresh évolue avec la taille de vos modifications, c'est ainsi que nous avons pu obtenir des mises à jour de code **96,3 % plus rapides** avec Fast Refresh sur de grandes applications Next.js comme [vercel.com](http://vercel.com).
+
+### [Tracing avancé](#advanced-tracing)
+
+Alors que Next.js a gagné en adoption au fil des années, nous avons trouvé de plus en plus difficile de reproduire les problèmes signalés sur GitHub, en particulier ceux liés aux performances du compilateur et à l'utilisation de la mémoire. C'est parce que la plupart des gens ne peuvent pas partager leur code d'application, ou lorsque le code est partagé, l'application ne peut pas s'exécuter car elle nécessite une base de données ou une autre configuration.
+
+Pour commencer à résoudre ce problème, nous avons ajouté du tracing aux internes de Next.js. Ces traces sont écrites dans un fichier dans le dossier `.next` et n'incluent pas le code de l'application - seulement le chemin du fichier, le temps que le compilateur y a passé, et d'autres timings comme les transformations individuelles. Cependant, avec webpack, nous n'avons jamais eu de bonne façon de distinguer clairement l'utilisation de la mémoire du compilateur de celle du framework ou du code de l'application, car ils s'exécutent tous dans la même instance Node.js.
+
+Avec Turbopack, nous avons pu concevoir avec l'instrumentation dès le début. Nous avons implémenté une couche d'instrumentation dans [Turbo Engine](https://nextjs.org/docs/app/api-reference/turbopack) qui permet de collecter les timings de chaque fonction individuelle. Nous avons pu étendre ces traces pour également suivre l'allocation de mémoire, la désallocation et la mémoire persistante pour chaque fonction.
+
+Ce nouveau tracing avancé nous donne toutes les informations nécessaires pour enquêter en profondeur sur les ralentissements et l'utilisation de la mémoire ; il ne nécessite qu'une trace au lieu d'une codebase complète.
+
+Afin de traiter ces nouvelles traces, nous avons implémenté un visualiseur de traces personnalisé qui reste performant quelle que soit la taille de l'application et de la trace. C'est un visualiseur de traces spécialement conçu pour enquêter sur les ralentissements et l'utilisation de la mémoire pour Turbopack et nous a permis d'optimiser les performances sur de nombreuses applications d'early adopters car il raccourcit la boucle de feedback.
+
+Bien que le visualiseur de traces ait été initialement conçu pour un usage interne (et il est destiné aux situations où une plongée technique profonde est nécessaire), nous avons intégré les éléments nécessaires pour l'exécuter vous-même dans Next.js. Vous pouvez générer une trace Turbopack en utilisant [ces instructions](/docs/canary/architecture/turbopack#generating-trace-files). Ensuite, lorsque la trace est générée, vous pouvez utiliser `next internal turbo-trace-server .next/trace-turbopack` pour démarrer le serveur qui permet d'inspecter la trace. Il y a une vidéo rapide de présentation du visualiseur de traces [disponible ici](https://www.youtube.com/watch?v=PGO2szAye7A&t=1s).
+
+### [Moins d'inconstance dans les temps de compilation](#less-flakiness-in-compile-times)
+
+Lorsque vous utilisez Next.js avec webpack, les temps de compilation ne sont souvent pas assez transparents. Dans un cas, cela peut prendre 10 secondes pour ouvrir une page, et dans un autre, cela peut prendre 20 secondes. Bien qu'un cache puisse être présent, il n'a parfois pas assez d'impact pour produire des résultats cohérents. Même sur les compilations sans caches, nous avons constaté certaines variations.
+
+L'architecture sous-jacente de Turbopack garantit que la variance dans les temps de compilation est beaucoup plus cohérente. Les temps de compilation pour les routes ne varient que de quelques pourcents, ce qui nous permet d'optimiser constamment les performances du compilateur.
+
+### [Des builds de développement proches de la production](#development-builds-that-closely-match-production)
+
+Afin d'optimiser pour la vitesse de compilation avec webpack, nous avons dû accepter certains compromis qui ont entraîné des divergences entre les environnements de développement et de production. Quelques exemples de ces compromis sont que nous utilisons `style-loader`, qui injecte le style dans la page et permet de les Fast Refresher sans recharger la page. Cependant, cela signifie que les styles sont injectés par JavaScript en développement, ce qui provoque un flash de contenu non stylisé. Nous contournons ce flash de contenu non stylisé pour que vous ne le voyiez pas. Un autre exemple est que Next.js avec webpack utilise `eval-source-map`, ce qui signifie que tout le code est encapsulé dans `eval` et les sourcemaps sont incluses dedans, ce qui garantit que les sourcemaps sont disponibles en développement au détriment du code bundle qui est plus difficile à inspecter et à déboguer. Bien que webpack supporte la génération de sourcemaps complètes en utilisant l'option `source-map`, cela a un impact disproportionné sur le temps de compilation et l'utilisation de la mémoire.
+
+Pour Turbopack, nous avons cherché à résoudre ces problèmes par défaut, en générant des fichiers CSS et des sourcemaps sans utiliser `eval`. Turbopack exploite les sourcemaps [`sections`](https://tc39.es/source-map/#index-map), une partie relativement nouvelle de la spécification source-map qui permet une fusion plus efficace des sorties de sourcemaps. Là où nous devions auparavant générer tous les mappings en un seul endroit, nous sommes maintenant capables de les générer et de les cacher beaucoup plus finement.
+
+La gestion des CSS dans Turbopack génère toujours des fichiers CSS, et similairement à la gestion JavaScript, elle peut mettre à jour le fichier CSS sans rafraîchir le navigateur grâce à un mécanisme qui fait partie du runtime de développement de Turbopack.
+
+Nous pouvons maintenant dire avec confiance que lorsque quelque chose fonctionne en développement avec Turbopack, cela fonctionne et se comporte de la même manière en production.
+
+[Notre première version stable](#our-first-stable-release)
+-----------------------------------------------------
+
+Il y a deux ans, nous avons introduit Turbopack en alpha avec Next.js 13, offrant un aperçu de son potentiel de performance. Bien que les résultats initiaux étaient prometteurs, il ne supportait qu'une utilisation basique - de nombreuses fonctionnalités de Next.js, comme `basePath`, n'étaient pas encore implémentées.
+
+L'année suivante, nous nous sommes concentrés sur l'ajout des fonctionnalités manquantes de Next.js et de bundling. Sur la base des retours de la communauté, nous avons décidé de nous concentrer entièrement sur l'expérience `next dev` afin de pouvoir répondre aux plaintes les plus courantes sur la vélocité d'itération. Lors du Next.js Conf de l'année dernière, 90 % des tests de développement passaient, et les développeurs de Vercel utilisaient déjà Turbopack au quotidien.
+
+En avril, nous avons annoncé Next.js 14.2 avec 99,8 % des tests réussis, atteignant 100 % peu après. Depuis, nous avons traité les problèmes signalés sur GitHub, en particulier autour des packages npm, Fast Refresh et la précision des emplacements d'erreur.
+
+Certes, le chemin vers la stabilité a pris beaucoup de temps, mais cela est principalement dû à la suite de tests étendue de Next.js, qui fixe une barre élevée pour la stabilité. Nous avons eu 8 ans pour découvrir des cas limites et ajouter 6 599 tests de développement qui devaient également passer avec Turbopack. Un facteur supplémentaire est que nous avons conçu Turbopack avec une architecture complètement différente de webpack. Simplement porter webpack en Rust aurait été plus facile mais n'aurait pas permis d'obtenir les gains de performance que nous voulions atteindre.
+
+Maintenant que Turbopack passe tous les tests, a été validé avec les principaux packages npm et que les retours des early adopters ont été pris en compte, nous sommes prêts à le qualifier de stable.
+
+### [Qu'est-ce qui est exactement stable ?](#what-exactly-is-stable)
+
+Ce point a été source de confusion par le passé, nous allons donc clarifier dans cette section ce que cette version apporte à la communauté Next.js.
+
+Cette version marque spécifiquement la commande `next dev --turbo` comme stable. Les builds de production (`next build --turbo`) ne sont pas encore pris en charge, mais nous vous donnerons des nouvelles à ce sujet car ils sont en cours de développement. Nous prévoyons à terme de publier une version autonome de Turbopack en dehors de Next.js, mais nous voulons d'abord prouver son utilité en améliorant l'expérience de la communauté Next.js.
+
+À part les fonctionnalités non prises en charge que nous aborderons dans la section suivante, Turbopack devrait fonctionner avec toutes les fonctionnalités stables de Next.js. Pour plus de clarté, Turbopack prend en charge à la fois le routeur App et le routeur Pages. Les fonctionnalités expérimentales peuvent ou non fonctionner avec Turbopack, mais elles le seront certainement une fois marquées comme stables.
+
+Si votre application a des personnalisations webpack mais n'ajoute que des loaders webpack, vous pourriez déjà utiliser Turbopack en configurant les loaders pour Turbopack. Vous pouvez [consulter la documentation](/docs/canary/app/api-reference/next-config-js/turbo#webpack-loaders) pour la prise en charge des loaders webpack dans Turbopack.
+
+Voici une liste de loaders webpack vérifiés comme fonctionnant avec Turbopack :
+
+*   `@svgr/webpack`
+*   `babel-loader`
+*   `url-loader`
+*   `file-loader`
+*   `raw-loader`
+*   `tsconfig-paths-webpack-plugin` — pris en charge nativement, aucun plugin nécessaire.
+*   La plupart des autres loaders fonctionnent également, car nous prenons en charge un sous-ensemble de l'API des loaders webpack.
+
+La plupart des bibliothèques CSS et CSS-in-JS sont prises en charge :
+
+*   Pris en charge
+    *   Tailwind CSS
+    *   @emotion/react
+    *   Sass
+    *   styled-components
+    *   Bootstrap
+    *   Antd
+    *   node-sass
+    *   JSS
+    *   Emotion
+    *   theme-ui (utilise Emotion)
+    *   @chakra-ui/core (avec Emotion)
+    *   aphrodite
+*   Non pris en charge actuellement
+    *   Less — Vous pouvez ajouter less-loader. Next.js avec webpack ne prend pas en charge Less nativement non plus.
+    *   @vanilla-extract/css — Utilise un plugin webpack personnalisé — Nous allons étudier ce qu'il faut pour prendre en charge les hooks nécessaires à l'avenir.
+    *   StyleX — Nécessite une transformation Babel et la prise en charge des attributs `data:` — Nous allons étudier la prise en charge de StyleX une fois que `next build --turbo` sera stable.
+
+### [Performances](#performance)
+
+Nous tenons à souligner que les performances de la version publiée aujourd'hui sont nettement meilleures que celles de webpack, mais ce n'est pas le chiffre final. Nous avons suivi la célèbre formule de Kent Beck : "Faites-le fonctionner. Faites-le bien. Faites-le vite." Jusqu'à présent, une grande partie de nos efforts a été consacrée à l'étape "Faites-le fonctionner", car nous devons rattraper la portée de Next.js et webpack, qui ont mûri pendant près d'une décennie.
+
+Turbopack mise beaucoup sur son infrastructure de cache, mais comme vous le savez peut-être, le cache est l'une des deux seules choses difficiles dans le développement logiciel. D'après notre expérience, nous savions qu'ajouter du cache à une architecture qui n'a pas été explicitement conçue pour cela peut conduire à des résultats indésirables, nous avons donc activé le cache pour les fonctions les plus granulaires. Cela signifie que les reconstructions sont extrêmement rapides au détriment des builds froids et de l'utilisation de la mémoire, et nous travaillons à un meilleur équilibre. La bonne nouvelle est que nous pouvons utiliser notre traçage avancé mentionné précédemment dans l'article pour identifier les inefficacités et profiler quelles fonctions méritent le plus d'être mises en cache.
+
+Au cours des 3 derniers mois, nous avons déjà apporté des améliorations significatives. La comparaison entre Turbopack dans [Next.js 15 RC 2](/blog/next-15-rc2) et Turbopack dans [15 RC 1](/blog/next-15-rc) montre les résultats de ces optimisations :
+
+*   Une réduction moyenne de 25 à 35 % de l'utilisation de la **mémoire**.
+*   Une **compilation initiale** 30 à 50 % plus rapide pour les grandes pages avec des milliers de modules.
+
+La version stable de Turbopack contient un cache en mémoire qui doit être reconstruit à chaque redémarrage du serveur de développement, ce qui peut prendre dix secondes ou plus pour les grandes applications. Ce qui nous enthousiasme particulièrement, ce sont les gains significatifs que nous observons lors des tests avec le cache persistant sur disque, que nous aborderons plus loin dans cet article.
+
+### [Changements cassants](#breaking-changes)
+
+Une grande motivation pour construire notre propre bundler était la nécessité de correspondre autant que possible aux comportements existants de webpack, ce que nous ne pouvions garantir avec aucune solution existante à l'époque. Cela inclut la façon dont les fichiers sont résolus et les fonctionnalités plus petites de webpack, comme [le commentaire `webpackIgnore`](https://webpack.js.org/api/module-methods/#magic-comments) que certains packages npm utilisent.
+
+Malheureusement, nous avons dû supprimer certaines fonctionnalités pour préparer Turbopack et l'implémentation Next.js associée à l'avenir. Ces fonctionnalités seront toujours prises en charge lorsque vous utilisez webpack.
+
+Voici quelques points clés, explorons les raisons pour lesquelles nous avons dû les modifier :
+
+**La configuration `webpack()` n'est pas prise en charge.** Turbopack n'est pas webpack, il n'a pas la même structure d'options de configuration, bien qu'il prenne en charge de nombreuses fonctionnalités similaires. Nous avons notamment implémenté la prise en charge des [loaders webpack](/docs/app/api-reference/next-config-js/turbo#webpack-loaders) et des [alias de résolution](/docs/app/api-reference/next-config-js/turbo#resolve-aliases). La plupart des loaders webpack qui transforment du code sont pris en charge nativement. Certains loaders webpack qui font des choses exotiques, comme un compilateur enfant webpack et l'émission de fichiers, ne sont pas pris en charge.
+
+**`.babelrc` ne transformera pas automatiquement le code.** Turbopack utilise par défaut [SWC](/docs/architecture/nextjs-compiler#why-swc). Vous pouvez toujours ajouter `babel-loader` si nécessaire, mais nous veillons à ce que les valeurs par défaut soient toujours rapides et qu'elles aient également du sens en termes d'architecture. Nous devons toujours exécuter SWC, même si vous configurez `.babelrc`, pour traiter d'autres optimisations. C'est similaire à la façon dont webpack doit toujours exécuter le parseur `acorn` pour effectuer d'autres optimisations. Si vous utilisez SWC au lieu de Babel avec Turbopack, nous pouvons parser une fois et utiliser le même arbre de syntaxe abstraite (AST) de bout en bout dans Turbopack.
+
+**Certaines fonctionnalités moins utilisées des CSS Modules.** Nous avons remplacé le traitement des CSS de PostCSS par [Lightning CSS](https://lightningcss.dev/). Lightning CSS est un compilateur CSS nettement plus rapide qui prend en charge les transformations CSS, la minification et les CSS Modules nativement. Le compromis est que certaines fonctionnalités moins utilisées ne sont pas prises en charge. Plus précisément, les pseudo-sélecteurs `:global` et `:local` (leurs variantes fonctionnelles `:global()` et `:local()` fonctionnent toujours), `@value`, et les règles ICSS `:import / :export`. Il est également un peu plus strict que les autres parseurs CSS et signalera les erreurs dans le code plutôt que de les ignorer.
+
+Dans le processus d'ajout de Lightning CSS, nous avons contribué au projet. Par exemple, nous avons implémenté des options granulaires pour les CSS Modules afin de désactiver le préfixage des grilles CSS et le mode `pure` pour les CSS Modules. Cela facilite l'adoption de Lightning CSS pour les CSS Modules lorsqu'on vient de css-loader dans webpack. Nous avons également amélioré les erreurs pour les fonctionnalités non prises en charge des CSS Modules.
+
+Nous remercions [Devon Govett](https://x.com/devongovett), l'auteur et mainteneur de Lightning CSS, pour la collaboration continue sur le projet.
+
+**Fonctionnalités expérimentales.** Comme nous nous concentrons sur la stabilité de Turbopack dans Next.js, nous avons décidé de nous concentrer d'abord sur les fonctionnalités stables disponibles dans Next.js.
+
+Pour la liste complète, consultez la [page de documentation](/docs/canary/architecture/turbopack#unsupported-features).
+
+[Feuille de route](#roadmap)
+-------------------
+
+Turbopack a parcouru un long chemin, mais il reste encore beaucoup de travail à faire. Les deux fonctionnalités passionnantes à venir sont le cache persistant et les builds de production. Nous prévoyons que le déploiement suivra à peu près cet ordre :
+
+*   Cache persistant — Future version mineure
+*   Bêta des builds — Future version mineure
+*   Candidate de release des builds — Future version mineure
+*   Builds stables — Future version mineure
+*   Recommandé dans create-next-app pour les nouvelles applications — Future version mineure
+*   Par défaut dans Next.js lorsque vous n'avez pas de configuration webpack personnalisée — Future version majeure
+
+Bien que webpack restera dans Next.js, nous nous attendons à ce que, en raison des avantages de Turbopack, la majorité des applications Next.js souhaitent l'utiliser. Une fois que Turbopack pour les builds de production sera terminé, nous commencerons à travailler pour prendre en charge les plugins webpack couramment utilisés.
+
+Nous avons des plans approximatifs pour Turbopack au-delà de cela, mais nous souhaitons limiter cet article à ce que nous pouvons livrer avec confiance dans un avenir prévisible. Nous ne parlons peut-être que de deux fonctionnalités, mais il y a beaucoup de choses qui entrent en jeu, donc cela vaut la peine de les explorer.
+
+### [Cache persistant (Fast Refresh entre les redémarrages)](#persistent-caching-fast-refresh-across-restarts)
+
+Le cache persistant signifie stocker le travail effectué par le compilateur d'une manière qui permet de le réutiliser entre les redémarrages du serveur de développement ou entre plusieurs builds de production.
+
+En bref, Turbopack évite de refaire le même travail, même si vous redémarrez.
+
+Comme mentionné dans la section Faster Fast Refresh, nous avons construit [Turbo Engine](https://nextjs.org/docs/app/api-reference/turbopack) pour nous assurer que le travail peut être parallélisé et mis en cache, de sorte que chaque fois que vous modifiez un fichier, nous n'avons qu'à exécuter le travail lié à cette modification. Et si nous pouvions vous offrir cette expérience entre les redémarrages et lors de l'ouverture d'une route ? Nous n'aurions pas à refaire le travail de compilation déjà effectué dans une session de développement précédente. Et si nous pouvions obtenir les avantages de Fast Refresh mais pour l'ouverture de routes compilées dans des sessions de développement précédentes et entre plusieurs builds avec `next build` ?
+
+C'est exactement ce sur quoi nous avons travaillé : une nouvelle couche de stockage pour [Turbo Engine](https://nextjs.org/docs/app/api-reference/turbopack) qui prend en charge la persistance du travail de compilation sur disque et sa restauration lors du démarrage du serveur de développement ou d'un nouveau build.
+
+Bien que webpack ait un cache disque activé par défaut dans Next.js, il présente plusieurs limites. Il est notable qu'une grande partie du cache doit être restaurée depuis le disque et lue en mémoire pour fonctionner. On n'a jamais vraiment l'impression qu'il y a un cache suffisamment granulaire. Par exemple, sur les grandes applications chez Vercel, nous avons constaté que le cache disque de webpack pouvait même être plus lent que de tout faire à partir de zéro lorsque le cache avait atteint une taille suffisamment importante.
+
+Contrairement au cache disque existant avec webpack, le cache persistant avec Turbopack donne vraiment l'impression d'un Fast Refresh entre les redémarrages. Les routes qui prennent plus de 10 secondes à compiler la première fois prennent moins de 500 ms à restaurer depuis le cache une fois qu'elles ont été compilées une fois.
+
+Nous avons observé des résultats similaires pour `next build` avec Turbopack, où seuls les fichiers modifiés sont recompilés, et tout le reste reste tel quel. Dans les multiples étapes que prend `next build`, cela déplace la majorité du temps passé de la compilation et du bundling vers la vérification des types TypeScript.
+
+Le cache persistant est actuellement en cours de développement, car nous voulons d'abord le vérifier en utilisant nos applications Next.js internes. Les résultats initiaux sont très prometteurs, et les performances s'amélioreront encore avec le temps à mesure que nous continuerons à optimiser ces chemins critiques.
+
+Une fois que le cache persistant sera stable, il sera activé par défaut. L'activation du cache persistant ne nécessitera aucune modification de votre codebase.
+
+Si vous êtes intéressé par le test du cache persistant, n'hésitez pas à nous contacter !
+
+### [Builds de production](#production-builds)
+
+Nous sommes ravis de partager que nous progressons considérablement vers des builds de production stables avec Turbopack. Actuellement, 96 % de nos tests de production passent, ce qui est une grande avancée. Cependant, il reste encore des domaines qui nécessitent plus de travail avant que nous puissions recommander Turbopack pour la production à grande échelle en toute confiance.
+
+Les builds de production présentent leurs propres défis uniques par rapport au développement, et nous travaillons activement à les résoudre. Ci-dessous, nous allons passer en revue ce qui a déjà été optimisé et ce qui est encore en cours.
+
+### [Optimisations de production](#production-optimizations)
+
+### [Exactitude](#correctness)
+
+Garantir l'exactitude est essentiel pour des builds de production fiables. Voici l'état actuel :
+
+*   **Découpage CSS** : En cours. Cette fonctionnalité est cruciale pour diviser le CSS en morceaux plus petits, permettant de ne charger que le CSS nécessaire pour chaque partie de l'application, ce qui aide à réduire les temps de chargement et garantit un ordre correct des règles CSS.
+*   **Runtime JS en production** : Terminé. Cela garantit que le runtime JavaScript se comporte comme prévu dans un environnement de production, offrant fiabilité et stabilité.
+*   **Hachage des noms de fichiers basé sur le contenu** : Pas encore implémenté. Le hachage basé sur le contenu nous permettra de générer des noms de fichiers basés sur le contenu, permettant un cache navigateur plus efficace à long terme.
+
+### [Optimisations de performance UX](#ux-performance-optimizations)
+
+La performance UX est essentielle pour garantir des temps de chargement rapides et une utilisation efficace des ressources. Voici ce sur quoi nous travaillons :
+
+*   **Minification JS** : Terminé. Nous avons implémenté SWC Minify, que Next.js utilise déjà avec webpack depuis Next.js 13.
+*   **Minification CSS** : Terminé. Minification CSS avec Lightning CSS, ce qui est important pour réduire la taille des feuilles de style.
+*   **Informations globales (Optimisations de l'application entière)** : Terminé. Turbopack peut appliquer des optimisations nécessitant des données sur toutes les routes de l'application, par exemple le hachage des identifiants de module.
+*   **Élagage d'arbre (Tree Shaking)** : Partiellement terminé. En cours. Nous avons un support partiel pour l'élagage d'arbre, qui aide à éliminer le code inutilisé et réduire la taille des bundles. Cependant, il existe des scénarios où l'élagage d'arbre n'est pas encore pleinement efficace :
+    *   **Imports dynamiques** : L'élagage est limité pour les imports dynamiques comme ceux utilisant `next/dynamic`.
+    *   **Exports complexes** : Certains types d'exports, comme `export { foo as "string name" }`.
+    *   **Modules non-ES** : Les modules CommonJS ne peuvent pas être élagués.
+    *   **Fichiers barils (Barrel Files)** : Les ré-exports depuis des fichiers barils sont inefficaces, avec des limitations pour ignorer les modules sans effets secondaires.
+    *   **Fragmentation** : Dans certains cas, l'élagage d'arbre peut créer trop de fragments, menant à des bundles inefficaces.
+*   **Hachage des identifiants de module (Partiel)** : En cours. Le hachage des identifiants de module est partiellement implémenté, mais nous travaillons à améliorer les performances. Une fois pleinement activé, cela aidera à réduire la taille finale du bundle.
+*   **Mangling des noms d'export (Export Name Mangling)** : En cours. Cela implique de réduire la taille des noms exportés pour diminuer la taille finale du bundle.
+*   **Remontée de portée (Scope Hoisting)** : Pas encore implémenté. La remontée de portée aidera à réduire la taille des bundles en fusionnant des petits modules JavaScript dans une seule portée, ce qui réduit la surcharge et améliore les performances.
+*   **Découpage optimisé des chunks JS pour la production** : Pas encore implémenté. Le découpage du JavaScript pour minimiser la duplication est essentiel pour améliorer les performances de chargement, surtout pour les applications plus grandes.
+
+[Restez à l'écoute](#stay-tuned)
+-------------------------
+
+Nous sommes ravis de recommander en toute confiance la commande `next dev --turbo`, et nous avons hâte de savoir comment cela améliore votre expérience de développement. Essayez-la dès aujourd'hui et constatez par vous-même les gains de performance.
+
+Ce n'est que le début — la mise en cache persistante et les builds de production sont à l'horizon, ce qui apportera encore plus de vitesse et de fiabilité à votre flux de travail.
+
+Nous partagerons plus de mises à jour au fur et à mesure que nous progressons vers l'assurance de la correction et l'optimisation des performances pour gérer même les plus grandes applications sans heurts. Restez à l'écoute pour les prochaines versions et améliorations alors que nous travaillons à faire de Turbopack la meilleure solution pour les builds de développement et de production.
+
+[Contributeurs](#contributors)
+-----------------------------
+
+Nous remercions les milliers de développeurs qui ont participé aux tests, signalé des problèmes et vérifié les correctifs tout au long des phases bêta et candidate à la sortie de Turbopack.
+
+Cette version a été rendue possible grâce à :
+
+*   L'équipe **Turbopack** : [Alex](https://github.com/arlyon), [Benjamin](https://github.com/bgw), [Donny](https://github.com/kdy1), [Justin](https://github.com/jridgewell), [Leah](https://github.com/forsakenharmony), [Maia](https://github.com/padmaia), [Niklas](https://github.com/mischnic), [OJ](https://github.com/kwonoj), [Tim](https://github.com/timneutkens), [Tobias](https://github.com/sokra), et [Will](https://github.com/wbinnssmith).
+*   L'équipe **Next.js** : [Andrew](https://github.com/acdlite), [Hendrik](https://github.com/unstubbable), [Janka](https://github.com/lubieowoce), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [Jiwon](https://github.com/devjiwonchoi), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sam](https://github.com/samcx), [Sebastian](https://github.com/sebmarkbage), [Sebbie](https://github.com/eps1lon), [Shu](https://github.com/shuding), [Wyatt](https://github.com/wyattjoh), et [Zack](https://github.com/ztanner).
+*   L'équipe **Documentation Next.js** : [Delba](https://github.com/delbaoliveira), [Rich](https://github.com/molebox), [Ismael](https://github.com/ismaelrumzan), et [Lee](https://github.com/leerob).

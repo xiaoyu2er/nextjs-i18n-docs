@@ -1,0 +1,184 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:35:05.105Z
+title: 'Next.js 5.1 : Résolution de pages plus rapide, configuration d’environnement et plus encore'
+description: >-
+  Next.js 5.1 introduit le support de la configuration d'environnement, des phases, des
+  source maps et de nouveaux plugins Next.js.
+author:
+  - name: Arunoda Susiripala
+    image: /static/team/arunoda.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2018-03-26T17:29:45.995Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/twitter-card.png
+---
+
+Nous sommes heureux de vous présenter Next.js 5.1, qui introduit le support de la configuration d'environnement, des phases, des source maps et de nouveaux plugins Next.js.
+
+D'importantes améliorations de performance sont apportées : la résolution des pages est **102 fois** plus rapide, et les pages d'erreur se chargent plus efficacement.
+
+Pour mettre à jour ou installer, exécutez :
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest
+```
+
+> En plus de mettre à jour Next.js, nous mettons à jour les dépendances peer `react` et `react-dom`
+
+Assurez-vous également de mettre à jour les [next-plugins](https://github.com/vercel/next-plugins) comme `@zeit/next-css`, `@zeit/next-sass`, `@zeit/next-less` ou `@zeit/next-typescript`.
+
+[Résolution de pages plus rapide](#faster-page-resolution)
+-------------------------------------------------
+
+Grâce aux changements architecturaux de Next.js 5.0, nous avons pu [simplifier la logique](https://github.com/vercel/next.js/pull/3776) qui résout les pages en fonction du chemin URL. Ces changements étaient basés sur les [recherches](https://github.com/vercel/next.js/issues/3682) de [@oliviertassinari](https://github.com/oliviertassinari). Auparavant, la résolution d'une page prenait en moyenne **2,347 ms**. Avec la nouvelle logique, la résolution de la même page prend en moyenne **0,023 ms**. C'est une accélération de **102x** pour l'une des méthodes les plus fréquemment invoquées dans les applications Next.js.
+
+![Résolution de page affichée par requête. À gauche Next.js 5.0, à droite Next.js 5.1](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/faster-resolution.png)
+
+Résolution de page affichée par requête. À gauche Next.js 5.0, à droite Next.js 5.1
+
+[Configuration d'environnement](#environment-configuration)
+-------------------------------------------------------
+
+Les environnements Node.js typiques dépendent souvent du passage de variables d'environnement à l'application, par exemple : `API_URL=https://api.vercel.com node index.js` puis vous pouvez utiliser `API_URL` n'importe où dans votre application via `process.env.API_URL`.
+
+Avec le rendu universel, `process.env` n'est pas disponible côté client. Avec Next 5.1, nous introduisons donc une nouvelle fonctionnalité : `publicRuntimeConfig` et `serverRuntimeConfig`. Celles-ci peuvent être définies dans `next.config.js` et seront ensuite disponibles via le module `next/config`.
+
+```js filename="next.config.js"
+module.exports = {
+  serverRuntimeConfig: {
+    // Ne sera disponible que côté serveur
+    mySecret: 'secret',
+  },
+  publicRuntimeConfig: {
+    // Sera disponible à la fois côté serveur et client
+    staticFolder: '/static',
+  },
+};
+```
+
+> `serverRuntimeConfig` et `publicRuntimeConfig` sont définis dans `next.config.js`
+
+```js filename="pages/index.js"
+import getConfig from 'next/config';
+const { serverRuntimeConfig, publicRuntimeConfig } = getConfig();
+ 
+console.log(serverRuntimeConfig.mySecret); // Ne sera disponible que côté serveur
+console.log(publicRuntimeConfig.staticFolder); // Sera disponible à la fois côté serveur et client
+ 
+export default function Index() {
+  return (
+    <div>
+      <img src={`${publicRuntimeConfig.staticFolder}/logo.png`} />
+    </div>
+  );
+}
+```
+
+> La méthode `getConfig` du module `next/config` est utilisée pour obtenir les valeurs de configuration
+
+[Gestion améliorée des erreurs](#improved-error-handling)
+---------------------------------------------------
+
+Auparavant, Next.js avait un mécanisme spécial de gestion des erreurs pour détecter les erreurs serveur lors du chargement des bundles de page. Un bundle de page est le fichier JavaScript chargé côté client pour afficher la page, par exemple `/_next/-/page/index.js`.
+
+S'il y avait une erreur, comme une incompatibilité d'ID de build, le bundle de page était toujours servi avec un statut HTTP 200, mais le contenu était une représentation JSON d'une erreur générée par le serveur Next.js. La raison était qu'il y avait une gestion d'erreur côté client qui dépendait de plus que simplement le fait que la page soit un 404. Cette solution fonctionnait très bien, jusqu'à ce que vous essayiez de télécharger des assets sur un hébergeur de fichiers statiques ou un CDN qui ne supporte pas de fallback.
+
+Avec Next.js 5.1, nous avons [complètement refondu](https://github.com/vercel/next.js/pull/3849) la logique de gestion des erreurs. Lorsqu'un bundle de page retourne un statut HTTP 404, le routeur le détecte automatiquement et recharge la page, pour assurer que la navigation entre [multi-zones](https://github.com/vercel/next.js#multi-zones) soit possible.
+
+En réécrivant cette logique, nous avons [supprimé le hook `Router.onAppUpdated`](https://github.com/vercel/next.js/blob/canary/errors/no-on-app-updated-hook.md) ; qui était principalement utilisé pour déclencher un rechargement de page. Maintenant, la page sera automatiquement rechargée.
+
+En plus de cela, nous avons ajouté un nouvel ensemble de [tests d'intégration](https://github.com/vercel/next.js/pull/3895) sur la récupération d'erreurs en mode développement, pour éviter les régressions dans les futures versions.
+
+[Phases / fonction de configuration](#phases--config-function)
+----------------------------------------------------
+
+Certains [next-plugins](https://github.com/vercel/next-plugins) comme [`@zeit/next-css`](https://github.com/vercel/next-plugins/tree/master/packages/next-css) ne sont nécessaires que lorsque Next.js est en mode développement ou lors de l'exécution de `next build`.
+
+Vous pouvez maintenant exporter une fonction qui retourne l'objet de configuration au lieu d'exporter immédiatement l'objet.
+
+```
+module.exports = (phase, { defaultConfig }) => config;
+```
+
+> `next.config.js` exportant une fonction qui retourne la configuration utilisateur
+
+Exporter une fonction vous donnera accès à la `phase` dans laquelle Next.js s'exécute, par exemple développement, production, build, export. Cela permet aux plugins d'être chargés uniquement quand nécessaire, mais donne aussi accès à la configuration par défaut.
+
+Nous avons introduit un nouveau module appelé [`next/constants`](https://github.com/vercel/next.js/blob/canary/lib/constants.js) contenant des constantes couramment utilisées, y compris les phases.
+
+```
+const {PHASE_DEVELOPMENT_SERVER} = require('next/constants')
+module.exports = (phase, {defaultConfig}){
+  if(phase === PHASE_DEVELOPMENT_SERVER) {
+    return { /* options de configuration uniquement pour le développement ici */ }
+  }
+ 
+  return { /* options de configuration pour toutes les phases sauf le développement ici */ }
+}
+```
+
+> Un `next.config.js` qui vérifie la phase de développement
+
+[Génération améliorée des source maps en production](#improved-production-source-map-generation)
+---------------------------------------------------------------------------------------
+
+Avec l'introduction du webpack universel dans [Next.js 5](/blog/next-5), l'ajout de source maps à votre environnement de production est devenu aussi simple que d'ajouter quelques lignes à `next.config.js` :
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    if (!dev) {
+      config.devtool = 'source-map';
+      for (const plugin of config.plugins) {
+        if (plugin['constructor']['name'] === 'UglifyJsPlugin') {
+          plugin.options.sourceMap = true;
+          break;
+        }
+      }
+    }
+    return config;
+  },
+};
+```
+
+> Activation manuelle des source maps dans `next.config.js`
+
+[@zeit/next-source-maps](https://github.com/vercel/next-plugins/tree/master/packages/next-source-maps) peut être ajouté à un projet pour activer automatiquement les source maps en production, ajoutez ceci à `next.config.js` :
+
+```
+const withSourceMaps = require('@zeit/next-source-maps');
+module.exports = withSourceMaps();
+```
+
+> Utilisation de `@zeit/next-source-maps` pour activer les source maps dans `next.config.js`
+
+Cela permettait la génération de source maps pour tous les fichiers sauf un, `app.js`, car `app.js` était composé de plusieurs fichiers (`manifest.js` et `commons.js`) combinés avec un plugin webpack. Un effet secondaire était que webpack ne pouvait pas générer de source maps pour le fichier combiné.
+
+Grâce à une [pull request](https://github.com/vercel/next.js/pull/3793) de [@ptomasroos], le fichier `app.js` a été remplacé par `main.js`. Ce fichier contiendra le code précédemment compilé dans `manifest.js` et `commons.js` et webpack générera une source map pour `main.js`. Les source maps seront automatiquement servies, permettant aux outils de suivi d'erreurs externes d'afficher le fichier et la ligne exacts lorsque des erreurs sont détectées.
+
+![Le code source est affiché dans le panneau des sources](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/sourcemap.png)
+
+Le code source est affiché dans le panneau des sources
+
+[Nouveaux plugins / améliorations des existants](#new-plugins--improvements-to-existing-ones)
+------------------------------------------------------------------------------------------
+
+Nous avons introduit deux nouveaux plugins officiels. [@zeit/next-bundle-analyzer](https://github.com/vercel/next-plugins/tree/master/packages/next-bundle-analyzer) permet de configurer facilement `webpack-bundle-analyzer` pour analyser séparément les bundles côté serveur et côté client.
+
+De plus, de nombreuses améliorations ont été apportées aux plugins officiels [`css`](https://github.com/vercel/next-plugins/tree/master/packages/next-css), [`less`](https://github.com/vercel/next-plugins/tree/master/packages/next-less), et [`sass`](https://github.com/vercel/next-plugins/tree/master/packages/next-sass) concernant le rechargement à chaud et le bundling. Par exemple, il n'y a plus de flash de contenu non stylisé en mode développement. Et les styles dans les sous-composants sont également pris en compte.
+
+[Communauté](#community)
+-----------------------
+
+Vous pouvez maintenant trouver la communauté Next.js sur [GitHub](https://github.com/vercel/next.js/discussions). Récemment, une liste d'[entreprises notables utilisant Next.js](https://github.com/vercel/next.js/discussions/10640) y a été postée. N'hésitez pas à partager vos projets dans ce fil.
+
+[Remerciements](#thank-you)
+-----------------------
+
+Nous tenons à remercier tous ceux qui ont contribué à Next.js pour cette version. Qu'il s'agisse de contributions au cœur du projet ou d'expansion et d'amélioration de notre [répertoire d'exemples](https://github.com/vercel/next.js/tree/canary/examples) toujours croissant.
+
+Si vous souhaitez commencer à contribuer à Next.js, vous pouvez trouver des issues avec les labels [good first issue](https://github.com/vercel/next.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22) ou [help wanted](https://github.com/vercel/next.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22).
+
+Un remerciement spécial à Trulia pour leurs précieux retours concernant la configuration d'environnement et la nouvelle gestion des pages d'erreur.
