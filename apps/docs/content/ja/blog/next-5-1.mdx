@@ -1,0 +1,183 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:13:47.005Z
+title: 'Next.js 5.1: 高速なページ解決、環境設定など'
+description: >-
+  Next.js 5.1では、環境設定、フェーズ、ソースマップ、新しいNext.jsプラグインのサポートが追加されました。
+author:
+  - name: Arunoda Susiripala
+    image: /static/team/arunoda.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2018-03-26T17:29:45.995Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/twitter-card.png
+---
+
+Next.js 5.1のリリースを発表します。このバージョンでは環境設定、フェーズ、ソースマップ、新しいNext.jsプラグインのサポートが追加されました。
+
+主要なパフォーマンス改善として、ページ解決が**102倍**高速化され、エラーページの読み込みがより効率的になりました。
+
+アップグレードまたはインストールするには、以下を実行してください:
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest
+```
+
+> Next.jsのアップグレードに加えて、peer dependenciesである`react`と`react-dom`もアップグレードされます
+
+`@zeit/next-css`、`@zeit/next-sass`、`@zeit/next-less`、`@zeit/next-typescript`などの[next-plugins](https://github.com/vercel/next-plugins)も忘れずにアップグレードしてください。
+
+[高速なページ解決](#faster-page-resolution)
+----------------------------------------
+
+Next.js 5.0のアーキテクチャ変更により、URLパスに基づいてページを解決するロジックを[簡素化](https://github.com/vercel/next.js/pull/3776)することができました。これらの変更は[@oliviertassinari](https://github.com/oliviertassinari)の[調査](https://github.com/vercel/next.js/issues/3682)に基づいています。以前はページ解決に平均**2.347ms**かかっていましたが、新しいロジックでは同じページの解決に平均**0.023ms**しかかかりません。これはNext.jsアプリケーションで最も頻繁に呼び出されるメソッドの1つが**102倍**高速化されたことを意味します。
+
+![リクエストごとのページ解決時間。左がNext.js 5.0、右がNext.js 5.1](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/faster-resolution.png)
+
+リクエストごとのページ解決時間。左がNext.js 5.0、右がNext.js 5.1
+
+[環境設定](#environment-configuration)
+------------------------------------
+
+一般的なNode.js環境では、アプリケーションに環境変数を渡すことがよくあります。例: `API_URL=https://api.vercel.com node index.js` そして `process.env.API_URL` を使ってアプリケーション内で `API_URL` を使用できます。
+
+ユニバーサルレンダリングでは `process.env` はクライアントサイドで利用できません。そこでNext 5.1では新しい機能として `publicRuntimeConfig` と `serverRuntimeConfig` を導入しました。これらは `next.config.js` で設定でき、`next/config` モジュールを使って利用できます。
+
+```js filename="next.config.js"
+module.exports = {
+  serverRuntimeConfig: {
+    // サーバーサイドでのみ利用可能
+    mySecret: 'secret',
+  },
+  publicRuntimeConfig: {
+    // サーバーとクライアントの両方で利用可能
+    staticFolder: '/static',
+  },
+};
+```
+
+> `serverRuntimeConfig` と `publicRuntimeConfig` は `next.config.js` で定義されます
+
+```js filename="pages/index.js"
+import getConfig from 'next/config';
+const { serverRuntimeConfig, publicRuntimeConfig } = getConfig();
+ 
+console.log(serverRuntimeConfig.mySecret); // サーバーサイドでのみ利用可能
+console.log(publicRuntimeConfig.staticFolder); // サーバーとクライアントの両方で利用可能
+ 
+export default function Index() {
+  return (
+    <div>
+      <img src={`${publicRuntimeConfig.staticFolder}/logo.png`} />
+    </div>
+  );
+}
+```
+
+> `next/config` モジュールの `getConfig` メソッドを使って設定値を取得します
+
+[改善されたエラーハハンドリング](#improved-error-handling)
+--------------------------------------------------------
+
+以前のNext.jsには、ページバンドルを読み込む際のサーバーエラーを検出する特別なエラーハンドリングメカニズムがありました。ページバンドルとは、クライアントサイドでページを読み込むために読み込まれるJavaScriptファイルです（例: `/_next/-/page/index.js`）。
+
+ビルドIDの不一致などのエラーがあった場合、ページバンドルは200 HTTPステータスで配信されますが、内容はNext.jsサーバーによって生成されたエラーのJSON表現になります。この理由は、ページが404であること以上のクライアントサイドのエラーハンドリングに依存していたためです。このソリューションは、フォールバックをサポートしていない静的ファイルホストやCDNにアセットをアップロードしようとするまで非常にうまく機能していました。
+
+Next.js 5.1では、エラーハンドリングロジックを[完全に再構築](https://github.com/vercel/next.js/pull/3849)しました。ページバンドルが404 HTTPステータスを返すと、ルーターが自動的にそれを検出してページをリロードし、[マルチゾーン](https://github.com/vercel/next.js#multi-zones)間のナビゲーションが可能になるようにします。
+
+このロジックの書き換えにより、[`Router.onAppUpdated`フック](https://github.com/vercel/next.js/blob/canary/errors/no-on-app-updated-hook.md)が削除されました。このフックは主にページリロードをトリガーするために使用されていました。現在はページが自動的にリロードされます。
+
+これに加えて、開発モードでのエラー回復に関する新しい[統合テスト](https://github.com/vercel/next.js/pull/3895)を追加し、将来のリリースでエラー回復に関するリグレッションを防ぎます。
+
+[フェーズ/設定関数](#phases--config-function)
+------------------------------------------
+
+[`@zeit/next-css`](https://github.com/vercel/next-plugins/tree/master/packages/next-css)のような[next-plugins](https://github.com/vercel/next-plugins)の中には、Next.jsが開発モードにあるときや`next build`を実行しているときにのみ必要なものがあります。
+
+これからは、設定オブジェクトを即座にエクスポートする代わりに、設定オブジェクトを返す関数をエクスポートできます。
+
+```
+module.exports = (phase, { defaultConfig }) => config;
+```
+
+> ユーザー設定を返す関数をエクスポートする`next.config.js`
+
+関数をエクスポートすると、Next.jsが実行されている`phase`（開発、本番、ビルド、エクスポートなど）にアクセスできます。これにより、プラグインが必要なときにのみロードできるだけでなく、デフォルト設定にもアクセスできます。
+
+一般的に使用される定数（フェーズを含む）を保持する[`next/constants`](https://github.com/vercel/next.js/blob/canary/lib/constants.js)という新しいモジュールを導入しました。
+
+```
+const {PHASE_DEVELOPMENT_SERVER} = require('next/constants')
+module.exports = (phase, {defaultConfig}){
+  if(phase === PHASE_DEVELOPMENT_SERVER) {
+    return { /* 開発専用の設定オプションをここに記述 */ }
+  }
+ 
+  return { /* 開発以外のすべてのフェーズの設定オプションをここに記述 */ }
+}
+```
+
+> 開発フェーズをチェックする`next.config.js`
+
+[改善された本番用ソースマップ生成](#improved-production-source-map-generation)
+----------------------------------------------------------------------------
+
+[Next.js 5](/blog/next-5)でユニバーサルwebpackが導入されたことで、本番環境にソースマップを追加することが`next.config.js`に数行追加するだけで簡単になりました:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    if (!dev) {
+      config.devtool = 'source-map';
+      for (const plugin of config.plugins) {
+        if (plugin['constructor']['name'] === 'UglifyJsPlugin') {
+          plugin.options.sourceMap = true;
+          break;
+        }
+      }
+    }
+    return config;
+  },
+};
+```
+
+> `next.config.js`で手動でソースマップを有効化
+
+[@zeit/next-source-maps](https://github.com/vercel/next-plugins/tree/master/packages/next-source-maps)をプロジェクトに追加すると、本番用ソースマップを自動的に有効にできます。`next.config.js`に以下を追加してください:
+
+```
+const withSourceMaps = require('@zeit/next-source-maps');
+module.exports = withSourceMaps();
+```
+
+> `@zeit/next-source-maps`を使って`next.config.js`でソースマップを有効化
+
+これにより、1つのファイル`app.js`を除くすべてのファイルのソースマップが出力されるようになりました。その理由は、`app.js`が複数のファイル（`manifest.js`と`commons.js`）とwebpackプラグインで構成されていたためです。この副作用として、webpackは結合されたファイルのソースマップを生成できませんでした。
+
+[@ptomasroos](https://github.com/ptomasroos)による[プルリクエスト](https://github.com/vercel/next.js/pull/3793)のおかげで、`app.js`ファイルが`main.js`に置き換えられました。このファイルには以前`manifest.js`と`commons.js`にコンパイルされていたコードが保持され、webpackは`main.js`のソースマップを生成します。ソースマップは自動的に提供され、外部エラートラッキングツールがエラーを検出したときに実際のファイルと行番号を表示できるようになります。
+
+![ソースパネルに表示されたソースコード](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5-1/sourcemap.png)
+
+ソースパネルに表示されたソースコード
+
+[新しいプラグイン/既存プラグインの改善](#new-plugins--improvements-to-existing-ones)
+--------------------------------------------------------------------------------
+
+2つの新しい公式プラグインを導入しました。[@zeit/next-bundle-analyzer](https://github.com/vercel/next-plugins/tree/master/packages/next-bundle-analyzer)を使うと、`webpack-bundle-analyzer`を簡単に設定して、サーバーサイドとクライアントサイドのバンドルを別々に分析できます。
+
+さらに、公式の[`css`](https://github.com/vercel/next-plugins/tree/master/packages/next-css)、[`less`](https://github.com/vercel/next-plugins/tree/master/packages/next-less)、[`sass`](https://github.com/vercel/next-plugins/tree/master/packages/next-sass)プラグインに関して、ホットリロードとバンドリングに関する多くの改善がありました。例えば、開発モードでのスタイル未適用コンテンツのちらつきがなくなりました。また、サブコンポーネントのスタイルも認識されるようになりました。
+
+[コミュニティ](#community)
+-------------------------
+
+現在、Next.jsコミュニティは[GitHub](https://github.com/vercel/next.js/discussions)で見つけることができます。最近、[Next.jsを使用している注目すべき企業のリスト](https://github.com/vercel/next.js/discussions/10640)が投稿されました。スレッドにプロジェクトを自由に投稿してください。
+
+[謝辞](#thank-you)
+-----------------
+
+このリリースに貢献してくれたすべての方々に感謝します。コアへの貢献であろうと、ますます成長している[examplesディレクトリ](https://github.com/vercel/next.js/tree/canary/examples)の拡張と改善であろうと、すべての貢献に感謝します。
+
+Next.jsへの貢献を始めたい場合は、[good first issue](https://github.com/vercel/next.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22)または[help wanted](https://github.com/vercel/next.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22)ラベルの付いたissueを見つけることができます。
+
+環境設定と新しいエラーページ処理に関する貴重なフィードバックを提供してくれたTruliaに特に感謝します。

@@ -1,0 +1,361 @@
+---
+source-updated-at: 2025-05-30T16:38:07.000Z
+translation-updated-at: 2025-06-02T19:14:03.428Z
+title: 'Next.js 5: ユニバーサルWebpack、CSSインポート、プラグインとゾーン'
+description: >-
+  Next.js 5では、大規模アプリケーション向けの拡張性と構成可能性、そしてパフォーマンスに焦点を当てています
+author:
+  - name: Arunoda Susiripala
+    image: /static/team/arunoda.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2018-02-05T19:10:43.056Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/twitter-card.png
+---
+
+Next.js 5.0のリリースを世界中に発表できることを大変嬉しく思います。npmですぐに利用可能です。アップグレードするには、次のコマンドを実行してください:
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest
+```
+
+> Next.jsのバージョンアップに加えて、peer dependenciesである `react` と `react-dom` もアップグレードします
+
+Next.jsは、ユニバーサルなサーバーサイドレンダリング（または静的プリレンダリング）React.jsアプリケーションを構築するためのツールキットです。どんなサイズのアプリケーションでも、`next` を実行するだけで開発を始められます。（[詳細はこちら](https://vercel.com/blog/next)）
+
+各リリースにおいて、私たちは後方互換性を保ち、シンプルなアップグレードパスを提供し、絶対に必要な場合にのみAPIを変更することを約束しています。Next.js 5.0も例外ではありません。
+
+しかし内部では、Next.jsは強力な新機能と拡張性を実現するために根本的な変革を遂げました。まず、Next.jsがサーバーとクライアントのコード両方で共通のWebpackパイプラインを共有するようにしました。
+
+[ユニバーサルWebpackとNextプラグイン](#universal-webpack-and-next-plugins)
+-------------------------------------------------------------------------
+
+Next.jsはWebpack、Babel、Uglifyといった強力なツールを活用し、エンドユーザーには驚くほどシンプルなインターフェースとして提供されます: `next`（開発用）、`next build`（本番用ビルド）、`next start`（サーバー起動）、または `next export`（静的ファイルへのプリレンダリング）。
+
+初期の決定の一つとして、これらのツールの設定方法に対して非常に強力な拡張ポイントを提供することにしました。単に使いやすさだけでなく、ツールキットを自由に拡張できる柔軟性を実現したかったのです。
+
+例えば、`next.config.js` に `webpack` プロパティを設定することで[Next.jsのwebpack設定を拡張](https://github.com/vercel/next.js#customizing-webpack-config)できます。
+
+webpackは本番と開発で異なる動作をするため、当時はデフォルトのwebpack設定を装飾する**関数**として実装することを決めました:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    // 設定を変更！
+    return config;
+  },
+};
+```
+
+> オプションの `next.config.js` ファイルの例
+
+しかし、Webpackはクライアント（ブラウザ）バンドルに対してのみ実行され、サーバーサイドレンダリングでこの素晴らしいツールチェーンを利用する機会を逃していました。
+
+私たちは、コードベースを大幅にリファクタリングして**Webpackをユニバーサルに動作させる**ことを発表できることを嬉しく思います。
+
+ユーザー視点では、上記の装飾関数に追加の `isServer` プロパティが渡されるようになっただけです。しかし、この新しいセマンティクスにより、Webpackローダーの広範なエコシステムを利用できるようになりました。
+
+### [CSS、LESS、SASS、SCSSとCSSモジュール](#css-less-sass-scss-and-css-modules)
+
+最も要望の多かった機能の一つが、CSSファイルをインポートしWebpackローダーを活用する機能です:
+
+```
+import './index.css';
+ 
+export default function Index() {
+  return (
+    <div>
+      <p>CSS最高！</p>
+    </div>
+  );
+}
+```
+
+> ユニバーサルWebpackのおかげでCSSインポートを使用するページ例（`pages/index.js`）
+
+これを動作させるには、必要なローダーをpeer dependenciesとしてインストールします:
+
+```bash filename="Terminal"
+npm i --save css-loader style-loader postcss-loader
+```
+
+> Next.jsでは、必要なローダーを自由に選択し、任意のバージョンにアップグレードできます
+
+そして設定を拡張してローダーを構成します。`next.config.js` で:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, options) {
+    const { dev, isServer } = options;
+    const extractCSSPlugin = new ExtractTextPlugin({
+      filename: 'static/style.css',
+      disable: dev,
+    });
+    config.module.rules.push({
+      test: /\\.css$/,
+      use: cssLoaderConfig(extractCSSPlugin, {
+        cssModules,
+        dev,
+        isServer,
+      }),
+    });
+    return config;
+  },
+};
+```
+
+> 生のwebpack設定を拡張することで、優れた柔軟性と制御が可能に
+
+一般的には、[組み込みの `styled-jsx` babelプラグイン](https://github.com/vercel/next.js#built-in-css-support)のようなコンポーネントローカルなスタイリングソリューションを使用することを推奨していますが、CSSローダーには既存のCSSコードベースを再利用しやすくしたり、古いコードベースをNext.jsに移行するのを大幅に簡素化するなど、多くの重要な利点があります。
+
+考えられるすべての機能とローダーをデフォルトで有効にする代わりに、[**Next.jsプラグイン**](https://github.com/vercel/next-plugins)を導入します。これは_設定を装飾するシンプルな関数_です。上記のように手動で設定を拡張する代わりに、次のようにするだけです:
+
+```
+const withCss = require('next-css');
+module.exports = withCss({
+  /* 追加のオプション設定 */
+});
+```
+
+> `.css` ファイルのインポートを有効にするには `next-css` を追加するだけ
+
+Next.JSでの[CSSローダー](https://github.com/vercel/next-plugins/tree/master/packages/next-css)の使用法について詳しく読むか、私たちが既に作成したパッケージを参照してください:
+
+| ローダー | パッケージ |
+| --- | --- |
+| CSS | [next-css](https://github.com/vercel/next-plugins/tree/master/packages/next-css) |
+| LESS | [next-less](https://github.com/vercel/next-plugins/tree/master/packages/next-less) |
+| SASS | [next-sass](https://github.com/vercel/next-plugins/tree/master/packages/next-sass) |
+
+私たちの目標は、実用的でシンプルな拡張機能のエコシステムをコミュニティが開発し成長させることを可能にすることです。そのため、Next.jsコミュニティが維持する[next-plugins](https://github.com/vercel/next-plugins)モノレポをオープンにします。すべてのPRを歓迎します！
+
+### [TypeScriptサポート](#typescript-support)
+
+JavaScriptエコシステムで[最も急速に成長している技術](https://stateofjs.com/2017/flavors/results)の一つがTypeScriptです。その勢いは、Babel 7で[公式にサポートされる](https://github.com/babel/babel/tree/master/packages/babel-preset-typescript)ほどで、つまり[.babelrcをカスタマイズする](https://github.com/vercel/next.js#customizing-babel-config)だけでNext.jsでも自然にサポートされます。
+
+それまでの間、新しいユニバーサルWebpackサポートのおかげで、**今日から**完全なTypeScriptサポートを利用できます！
+
+webpack設定を次のように拡張できます:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, options) {
+    const { dir, defaultLoaders } = options;
+    config.resolve.extensions.push('.ts', '.tsx');
+    config.module.rules.push({
+      test: /\\.+(ts|tsx)$/,
+      include: [dir],
+      exclude: /node_modules/,
+      use: [
+        defaultLoaders.babel,
+        { loader: 'ts-loader', options: { transpileOnly: true } },
+      ],
+    });
+    return config;
+  },
+};
+```
+
+> `ts-loader` を有効にするだけ
+
+CSSローダーやプリプロセッサーと同様に、TypeScriptは最も要望の多かった機能の一つでした。他のローダーと同様に簡単にプロジェクトに組み込めるように、`next.config.js` ファイルに含めることができる[`next-typescript` プラグイン](/)を用意しました:
+
+```js filename="next.config.js"
+const withTs = require('next-typescript');
+module.exports = withTs({
+  /* 追加設定 */
+});
+```
+
+> プラグインは簡単に合成できます: 単なる関数です
+
+### [React代替ライブラリとモジュールオーバーロードのより良いサポート](#better-support-for-react-altlibs--module-overloading)
+
+時間の経過とともに、Reactのドロップイン代替実装が数多く登場しました。その中でも注目すべきは \[`preact`\]([https://preactjs.com/](https://preactjs.com/))、[`nervjs`](https://github.com/NervJS/nerv)、[`inferno`](https://github.com/infernojs/inferno) などです。
+
+他のライブラリは、[`react-dom-lite`](https://github.com/jquense/react-dom-lite)のようにDOMレンダラーを置き換えることに焦点を当てており、ブラウザ互換性に若干のトレードオフを導入することでより小さなReactビルドを作成することを目指しています。
+
+ユニバーサルWebpackサポートにより、**これらのライブラリをドロップイン代替として組み込むプロセスがさらに簡単になりました**。他のプラグインと同様に、Next.jsでpreactを使用するには次のようにするだけです:
+
+```bash filename="Terminal"
+npm i @zeit/next-preact preact preact-compat
+```
+
+> preactプラグインと必要なpeer dependenciesをインストール
+
+```
+const withPreact = require('@zeit/next-preact');
+module.exports = withPreact();
+```
+
+> preact用に準備された新しい `next.config.js`
+
+非常にシンプルな[@zeit/next-preact](https://github.com/vercel/next-plugins/tree/master/packages/next-preact)モジュールをチェックするか、自分で作成してください！
+
+### [本番環境でのオプション外部ソースマップ](#optional-external-sourcemaps-in-production)
+
+Next.jsでクライアントとサーバーコードの両方にwebpackが使用されるようになったため、本番ビルドでソースマップを有効にするのは設定のわずかな調整だけで済みます。
+
+開発時にはソースマップが自動的に有効になるため、本番環境では次のように異なる設定を行います:
+
+```js filename="next.config.js"
+module.exports = {
+  webpack(config, { dev }) {
+    if (!dev) {
+      config.devtool = 'source-map';
+    }
+    return config;
+  },
+};
+```
+
+> 開発モードでない場合に単に`devtool`オプションを異なる方法で設定しています
+
+[ゾーン機能](#zones)
+---------------
+
+Next.jsの[当初からの目標](https://deck.vercel.app)の1つは、Webのシンプルさを取り戻し維持することでした。
+
+サーバーサイドレンダリング (SSR)、データ取得に対するシンプルでフレームワークに依存しないアプローチ、ファイルシステム構造に基づく宣言的なページなどは、この考え方に沿って導入した機能の一部です。
+
+WebサービスやWebサイトで頻繁に見落とされがちな側面は、それらが_自然に構成可能でスケーラブル_であることです。
+
+例えば、`mydomain.com/settings`と`mydomain.com/`は、完全に別々のアプリケーションであり、独立してデプロイされ、独立してスケーリングされ、同じソフトウェアの異なるバージョンが実行されている可能性さえあります。
+
+エンドユーザーにとって統一された体験として「それらを接着する」ために必要なのは、それらを公開するバックエンドのルーティング層やロードバランサーの[簡単な設定](/docs/pages/building-your-application/configuring/absolute-imports-and-module-aliases)だけです。私たちは、通常の`<Link>`コンポーネントを使用して接続された**Next.jsで構築された複数のアプリケーションを構成する**機能を提供できることを非常に嬉しく思います。この機能を**ゾーン**と呼びます。
+
+例として、[Vercel](https://vercel.com)にデプロイされた次の2つの独立したNext.jsアプリケーションを考えてみてください:
+
+*   [https://front.vercel.app](https://front.vercel.app)
+*   [https://zeit-docs-zbqbsrucga.vercel.app/docs](https://zeit-docs-zbqbsrucga.vercel.app/docs) [https://zeit-docs-zbqbsrucga.vercel.app/api](https://zeit-docs-zbqbsrucga.vercel.app/api)
+
+![両方のページはシームレスな体験を提供しますが、別々のアプリに属しています](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/zones.png)
+
+両方のページはシームレスな体験を提供しますが、別々のアプリに属しています
+
+ドキュメントを刷新する際、コミュニティの貢献を受け入れることを可能な限り簡単にしたいと考えました。
+
+ドキュメント「ミニウェブサイト」を[独自のリポジトリ](https://github.com/vercel/docs)に分割することに決定しました。さらに、プルリクエストが提出され変更が提案されるたびに、それを自動的に隔離してデプロイします:
+
+![PR内で変更が発生するたびに、ボットが自動的にデプロイします](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/github.png)
+
+PR内で変更が発生するたびに、ボットが自動的にデプロイします
+
+結果として得られたのは、[パスエイリアス機能](/docs/pages/building-your-application/configuring/absolute-imports-and-module-aliases)を使用して親ドメイン`https://vercel.com`にまとめられた_2つのゾーン_です。次のようになります:
+
+```
+{
+  "rules": [
+    { "pathname": "/docs", "dest": "our-docs.vercel.app" },
+    { "pathname": "/api", "dest": "our-docs.vercel.app" },
+    { "dest": "my-main-website.vercel.app" }
+  ]
+}
+```
+
+> これらのシンプルなルールにより、マイクロサービスとゾーンを一緒に構成できます
+
+あとは`now alias`コマンドを実行するだけです:
+
+```bash filename="Terminal"
+now alias -r rules.json my-domain.com
+```
+
+私たちの使命は、デプロイメントを可能な限り普遍的かつオープンにすることです。ローカル開発を支援するために、最近`micro-proxy`をオープンソース化しました。これは上記と同じ設定形式で動作するツールです。
+
+同様に、Nginx、HAProxy、API Gatewayなどの他のソリューションでゾーンを結合することもできます。
+
+[より高速な本番ビルド時間](#faster-production-build-times)
+---------------------------------------------------------------
+
+開発者体験とユーザー体験は密接に関連していると考えています。変更をより効率的に記述、テスト、デプロイできれば、新機能の追加、バグの修正、全体的なユーザー体験の改善が速くなります。
+
+その結果、システムの最も基本的な構成要素のパフォーマンスプロファイルを継続的に反復することに注力しています。
+
+Next.js 5.0では、[静的サイトとして](/docs/pages/building-your-application/deploying/static-exports)Next.jsアプリケーションをエクスポートする前や本番環境にデプロイする前に実行する`next build`コマンドを再度見直す機会がありました。
+
+数千のコンポーネントで構成されるReactアプリであるvercel.comで、Next.js 5.0により**23.6%高速化された本番ビルド時間**という非常に劇的な改善が見られたことを嬉しく思います:
+
+![メインアプリケーションの本番ビルドが完了するまでの時間が38秒短縮されました](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/build.png)
+
+メインアプリケーションの本番ビルドが完了するまでの時間が38秒短縮されました
+
+[動的インポートの改善されたキャッシュ](#improved-caching-for-dynamic-imports)
+-----------------------------------------------------------------------------
+
+動的`import()`を使用するたびに、WebPackに新しいコード分割エントリポイントが存在することを通知します。
+
+ビルド時には、これは対応するモジュールのサブツリー用の特定のバンドルを生成することを意味します。
+
+Next.js 5.0以前では、動的バンドルは次のようなURLを受け取りました:
+
+```
+/_next/1517592683901/webpack/chunks/components_hello1_1345d10fc951cd6717c5676c467579a6.js
+```
+
+現在では、動的インポートをサブツリーの内容のコンテンツアドレス可能なハッシュに変換しました:
+
+```
+/_next/webpack/chunks/components_hello1_1345d10fc951cd6717c5676c467579a6-b7874680a9e21fb6eb89.js
+```
+
+これにより、デプロイメントをまたいで、ユーザーや顧客が既に使用したコードを不必要に再ダウンロードする必要がなくなります。
+
+[フラグメント](#fragments)
+-----------------------
+
+Next.jsは、各ページでサーバーサイドレンダリングされる最上位の`<Document>`コンポーネントを構築します。[このコンポーネントをオーバーライドする](/)ことで、マークアップを完全に制御でき、多くの[高度なユースケース](https://github.com/vercel/next.js/tree/canary/examples)が可能になります。
+
+その初期マークアップの一部は、Next.jsがクライアント側で評価する必要があるスクリプトのリストです。カスタム`_document`は次のようになります:
+
+```js filename="pages/_document.js"
+import Document, { Head, Main, NextScript } from 'next/document';
+export default class extends Document {
+  render() {
+    return (
+      <html>
+        <Head />
+        <body>
+          <Main />
+          <NextScript />
+        </body>
+      </html>
+    );
+  }
+}
+```
+
+> `Document`を使用すると、ページのサーバーサイドレンダリング出力全体をカスタマイズできます
+
+最近まで、スクリプトを`<div>`でラップする必要がありました。
+
+Next.js 5.0では、新しい`Fragment`サポートを利用するようになり、**より軽量なページ**と、余分なマークアップなしでページのスタイリングを完全に制御できるようになりました。
+
+[より正確なエラー](#more-accurate-errors)
+---------------------------------------------
+
+Node.jsはソースマップをサポートしていないため、サーバー側で発生するエラーには、コンパイルされたコードを指すスタックトレースが伴います。
+
+Next 5では、サーバー側のソースマップサポートが改善されました。サーバーサイドレンダリング中に発生するエラーは、正しい関数と行番号を指すようになりました。
+
+![エラーが正しい行、ファイル、関数名を表示するようになりました](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-5/errors.png)
+
+エラーが正しい行、ファイル、関数名を表示するようになりました
+
+[結論](#conclusion)
+-------------------------
+
+ユニバーサルWebpackはNext.jsの基盤を強化し、さらに将来性のあるものにします。概して、Next.jsに適用可能なプラグインやローダーとそうでないものとの人為的な分離はなくなりました。
+
+_ゼロ設定_の精神に則り、[Nextプラグイン](https://github.com/vercel/next-plugins)を導入することに興奮しています。これは、特定のノブを調整することなくNext.jsの機能を自動的に拡張するレシピのコミュニティリポジトリです。
+
+これにより、追加のモジュールを持ち込み、`next.config.js`での包含を明示するだけで、CSSソリューション全体、TypeScriptなどのコンパイル済みJS言語、[Nerve](https://github.com/NervJS/nerv)などのReact代替品をサポートできるようになりました。不透明さのないシンプルさです。
+
+ゾーン機能により、同じリポジトリやサーバーにルートされていないNext.jsアプリを相互接続できます。これは「チームのスケーラビリティ」という改善カテゴリーにおいて非常に重要なマイルストーンと考えています。
+
+Next.jsは、複数のチームによって維持される大規模なアプリケーションの優れた候補となります。これらは現在、エラー表面を減らし、反復速度を上げ、コアに加えて[さまざまなアプローチ](https://github.com/vercel/next.js/tree/canary/examples)の状態管理やデータ取得など、さまざまな技術を試すために並行して改善をデプロイできます。
+
+この機能の設計につながった重要な洞察、コード、テストを提供してくれたDeep Varmaと[Trulia](https://trulia.com)エンジニアリングチームに感謝の機会を得たいと思います。
+
+いつものように、このリリースは多くのオープンソース貢献者と素晴らしいコミュニティなしでは実現できませんでした。

@@ -1,0 +1,95 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:11:35.982Z
+title: Next.js 8 における Webpack メモリ改善
+description: >-
+  最近リリースされた Next.js 8 では、ビルド時のメモリ使用量を大幅に削減しました。このブログ記事では、コミュニティのために webpack を最適化した方法を探ります。
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-02-19T14:00:00.000Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/twitter-card.png
+---
+
+最近 [Next.js 8](/blog/next-8) がリリースされました。このリリースではビルド時のメモリ使用量を大幅に削減しました。このブログ記事では、webpack をコミュニティのために最適化した方法を探ります。
+
+Next.js はゼロコンフィギュレーションで、[webpack](https://webpack.js.org/) や [Babel](https://babeljs.io) などのツールの上に構築されています。その目的は、重要なこと（アプリケーションコード）に集中できるようにすることです。
+
+現代のウェブアプリケーションは、1つ以上のページで構成されています。例えば、ホームページ、ブログ、ダッシュボード、商品一覧などです。
+
+Next.js では、これらのページはプロジェクトルートの特別な `pages` ディレクトリ内のファイルになります。
+
+例えば、`pages/about.js` ファイルは `/about` URL にマッピングされます。
+
+このフレームワークの主要な設計制約の1つは、1ページでも数千ページでもうまく動作しなければならないことです。
+
+[サーバーレス Next.js](/blog/next-8#serverless-nextjs) を実装している際、数百ページあるプロジェクトで `next build` を実行するとメモリ使用量が高くなり、Node.js の約1.4 GB のメモリヒープ制限を超えることがあることがすぐに明らかになりました。
+
+Chrome デベロッパーツールを使用して、ビルドプロセスのメモリ使用量をプロファイリングし始めました。
+
+その結果のプロファイルで、webpack が一度に **548 MB** のメモリを割り当てるポイントを発見しました。
+
+割り当てられるメモリ量はページ数に直接比例し、ページ数が多いほどメモリ使用量が増加しました。
+
+![Chrome デベロッパーツールのメモリプロファイラーで、一度に548 MBが割り当てられている様子](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/allocation-before.png)
+
+Chrome デベロッパーツールのメモリプロファイラーで、一度に548 MBが割り当てられている様子
+
+メモリプロファイルのスタックトレースを調べることで、メモリ割り当ての急増を引き起こした関数を特定できました。
+
+割り当て自体は [`source.source()` メソッドの呼び出し](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L334) から発生しており、結果ファイルを生成してメモリに保存していました。
+
+しかし、`source()` メソッドを呼び出す関数をさらに調べると、[`compilation.assets`](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L316) が `asyncLib.forEach` を使用して反復処理されていることがわかります。つまり、[提供された関数](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L317) が `compilation.assets` 配列内のすべてのファイルに対して同時に呼び出されることになります。
+
+つまり、例えば100ページある場合、各ページをディスクに書き込む必要があると、上記のコードは100ファイルすべてを同時に書き込もうとし、100ファイルすべてを同時に生成しようとします。
+
+この問題の解決策は、[セマフォ](https://en.wikipedia.org/wiki/Semaphore_\(programming\)) を使用して同時書き込み数を制限することです。通常はこの目的で [async-sema](https://github.com/vercel/async-sema) を使用しますが、この場合 webpack には既に [neo-async](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L8) に適切なメソッドがありました:
+
+```
+asyncLib.forEach(compilation.assets, (source, file, callback) => {
+  // etc
+});
+```
+
+> すべてのアセットに対して関数を同時に実行する以前のコード
+
+```
+asyncLib.forEachLimit(compilation.assets, 15, (source, file, callback) => {
+  // etc
+});
+```
+
+> 最大15個まで同時実行する新しいコード
+
+この並行性制限を実装し、再度ビルドメモリ使用量をプロファイリングしたところ、メモリ割り当てが **34 MB** の小さな塊に分割されていることが確認できました。
+
+![プロファイラーには、時間をかけて34 MBの塊が割り当てられている様子が表示されました](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/after-limiting.png)
+
+プロファイラーには、時間をかけて34 MBの塊が割り当てられている様子が表示されました
+
+この変更は非常に有望な結果を示しましたが、実際にはビルドがまだメモリ不足になるため、プロファイリングと問題の調査を続けました。
+
+メモリプロファイルをさらに調査すると、[`source.source()` メソッドが呼び出された](https://github.com/webpack/webpack/blob/v4.28.4/lib/Compiler.js#L334) 後、メモリが後で（ガベージコレクションによって）クリーンアップされていないことに気づきました。
+
+webpack では、アセットは一般的に [Source クラス](https://github.com/webpack/webpack-sources) のインスタンスです。これらのクラスはすべて、ファイルソースを生成する `source()` メソッドを実装しています。
+
+プロファイルによると、多くのアセットが [`CachedSource`](https://github.com/webpack/webpack-sources#cachedsource) のインスタンスでした。`CachedSource` の動作方法は、`source()` が呼び出されると結果がメモリにキャッシュされ、アセットが破棄されるまで保持されるというものです。
+
+Next.js が使用する webpack プラグインを調査したところ、webpack がファイルを書き込んだ後に `source()` を呼び出すプラグインがなかったため、書き込まれた値をキャッシュすることに利点がないことがわかりました。
+
+[Tobias Koppers](https://twitter.com/wSokra) と [協力](https://github.com/webpack/webpack/pull/8609) した結果、[`output.futureEmitAssets` という新しいオプション](https://github.com/webpack/webpack/pull/8642) が実装され、新しいアセット書き込み動作を選択できるようになりました。
+
+この新しい動作により、割り当てられるチャンクは時間をかけて **_182 KB_** に減少しました。
+
+![すべての最適化後、プロファイラーには184 KBの塊が時間をかけて割り当てられている様子が表示されました](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/webpack-memory/allocation-after.png)
+
+すべての最適化後、プロファイラーには184 KBの塊が時間をかけて割り当てられている様子が表示されました
+
+[Next.js 8](/blog/next-8) には既にこれらの最適化がすべて組み込まれています。Next.js を使用する際に何かを変更する必要はありません。
+
+この最適化は webpack に導入されたため、Next.js ユーザーだけでなく、すべての webpack ユーザーがこれらの最適化の恩恵を受けることができます。
+
+私たちは、Next.js と webpack のメモリ使用量とパフォーマンスを積極的に改善し続けます。

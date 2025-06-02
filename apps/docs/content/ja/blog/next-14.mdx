@@ -1,0 +1,297 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:17:51.729Z
+title: Next.js 14
+description: >-
+  Next.js 14 には、Server Actions のパフォーマンスと安定性の向上、App Router を教える新しいコースなどが含まれています。
+author:
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2023-10-26T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14/twitter-card.png
+---
+
+[Next.js Conf](https://nextjs.org/conf) で発表したように、Next.js 14 はこれまでで最も焦点を絞ったリリースです:
+
+*   [**Turbopack**](#nextjs-compiler-turbocharged): App & Pages Router で5,000テストを通過
+    *   ローカルサーバー起動が **53% 高速化**
+    *   Fast Refresh によるコード更新が **94% 高速化**
+*   [**Server Actions (安定版)**](#forms-and-mutations): プログレッシブエンハンスメントなミューテーション
+    *   キャッシュ & 再検証と統合
+    *   シンプルな関数呼び出し、またはフォームとネイティブに連携
+*   [**Partial Prerendering (プレビュー)**](#partial-prerendering-preview): 高速な初期静的レスポンス + 動的コンテンツのストリーミング
+*   [**Next.js Learn (新規)**](#nextjs-learn-course): App Router、認証、データベースなどを教える無料コース
+
+今すぐアップグレード、または以下で開始:
+
+```bash filename="Terminal"
+npx create-next-app@latest
+```
+
+[Next.js コンパイラ: 強化版](#nextjs-compiler-turbocharged)
+---------------------------------------------------------------
+
+Next.js 13 以降、私たちは Pages と App Router の両方でローカル開発パフォーマンスを向上させるために取り組んできました。
+
+以前は、この取り組みをサポートするために `next dev` や Next.js の他の部分を書き換えていました。その後、私たちはより漸進的なアプローチに変更しました。これは、Rust ベースのコンパイラがまずすべての Next.js 機能をサポートすることに焦点を当て直したため、すぐに安定版に達することを意味します。
+
+`next dev` の5,000の統合テストが、基盤となる Rust エンジンである [Turbopack](https://nextjs.org/docs/app/api-reference/turbopack) で通過しました。これらのテストには7年間のバグ修正と再現が含まれています。
+
+大規模な Next.js アプリケーションである `vercel.com` でテストした結果:
+
+*   ローカルサーバー起動が最大 **53.3% 高速化**
+*   Fast Refresh によるコード更新が最大 **94.7% 高速化**
+
+このベンチマークは、大規模なアプリケーション（および大規模なモジュールグラフ）で期待できるパフォーマンス改善の実際の結果です。`next dev` のテストの90%が通過した現在、`next dev --turbo` を使用すると一貫して高速で信頼性の高いパフォーマンスが得られるはずです。
+
+テストの100%通過を達成したら、次のマイナーリリースで Turbopack を安定版に移行します。また、カスタム設定やエコシステムプラグインのために webpack の使用も引き続きサポートします。
+
+テストの通過率は [areweturboyet.com](https://areweturboyet.com) で確認できます。
+
+[フォームとミューテーション](#forms-and-mutations)
+-------------------------------------------
+
+Next.js 9 では API Routes が導入されました - フロントエンドコードと一緒にバックエンドエンドポイントを迅速に構築する方法です。
+
+例えば、`api/` ディレクトリに新しいファイルを作成します:
+
+```ts filename="pages/api/submit.ts"
+import type { NextApiRequest, NextApiResponse } from 'next';
+ 
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
+  const data = req.body;
+  const id = await createItem(data);
+  res.status(200).json({ id });
+}
+```
+
+次に、クライアント側では、React と `onSubmit` のようなイベントハンドラを使用して API Route に `fetch` を実行できます。
+
+```tsx filename="pages/index.tsx"
+import { FormEvent } from 'react';
+ 
+export default function Page() {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+ 
+    const formData = new FormData(event.currentTarget);
+    const response = await fetch('/api/submit', {
+      method: 'POST',
+      body: formData,
+    });
+ 
+    // 必要に応じてレスポンスを処理
+    const data = await response.json();
+    // ...
+  }
+ 
+  return (
+    <form onSubmit={onSubmit}>
+      <input type="text" name="name" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+Next.js 14 では、データミューテーションの開発者体験を簡素化したいと考えています。さらに、ユーザーのネットワーク接続が遅い場合や、低電力デバイスからフォームを送信する場合のユーザー体験を改善したいと考えています。
+
+### [Server Actions (安定版)](#server-actions-stable)
+
+API Route を手動で作成する必要がなかったらどうでしょうか？代わりに、React コンポーネントから直接呼び出される、サーバー上で安全に実行される関数を定義できます。
+
+App Router は React の `canary` チャンネル上に構築されており、これは [フレームワークにとって安定](https://react.dev/blog/2023/05/03/react-canaries) しています。v14 時点で、Next.js は最新の React `canary` にアップグレードされ、安定版の Server Actions が含まれています。
+
+Pages Router の前の例は1つのファイルに簡素化できます:
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  async function create(formData: FormData) {
+    'use server';
+    const id = await createItem(formData);
+  }
+ 
+  return (
+    <form action={create}>
+      <input type="text" name="name" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+Server Actions は、以前にサーバー中心のフレームワークを使用したことがある開発者には馴染みがあるはずです。これはフォームや [FormData Web API](https://developer.mozilla.org/ja/docs/Web/API/FormData) のようなウェブの基本機能に基づいています。
+
+フォームを通じて Server Actions を使用することはプログレッシブエンハンスメントに役立ちますが、必須ではありません。フォームなしで直接関数として呼び出すこともできます。TypeScript を使用する場合、これによりクライアントとサーバー間の完全なエンドツーエンドの型安全性が得られます。
+
+データの変更、ページの再レンダリング、リダイレクトは **1回のネットワーク往復** で行うことができ、上流プロバイダが遅くてもクライアントに正しいデータが表示されることが保証されます。さらに、さまざまなアクションを構成して再利用したり、同じルートに多くの異なるアクションを含めたりできます。
+
+### [キャッシュ、再検証、リダイレクトなど](#caching-revalidating-redirecting-and-more)
+
+Server Actions は App Router モデル全体に深く統合されています。次のことが可能です:
+
+*   `revalidatePath()` または `revalidateTag()` でキャッシュデータを再検証
+*   `redirect()` で異なるルートにリダイレクト
+*   `cookies()` でクッキーの設定と読み取り
+*   `useOptimistic()` で楽観的UI更新を処理
+*   `useFormState()` でサーバーからのエラーをキャッチして表示
+*   `useFormStatus()` でクライアントのローディング状態を表示
+
+[Server Actions によるフォームとミューテーション](https://nextjs.org/docs/app/building-your-application/data-fetching/forms-and-mutations) または [セキュリティモデル](https://nextjs.org/blog/security-nextjs-server-components-actions) と Server Components および Server Actions のベストプラクティスについて詳しく学べます。
+
+[Partial Prerendering (プレビュー)](#partial-prerendering-preview)
+---------------------------------------------------------------
+
+私たちは、Next.js 向けに取り組んでいる Partial Prerendering - 高速な初期静的レスポンスを持つ動的コンテンツのためのコンパイラ最適化 - のプレビューを共有したいと思います。
+
+Partial Prerendering は、サーバーサイドレンダリング (SSR)、静的サイト生成 (SSG)、および増分的静的再検証 (ISR) に関する10年間の研究開発に基づいています。
+
+### [動機](#motivation)
+
+私たちは皆さんのフィードバックを聞いています。現在、考慮すべきランタイム、設定オプション、レンダリング方法が多すぎます。静的の速度と信頼性を維持しながら、完全に動的でパーソナライズされたレスポンスもサポートしたいと考えています。
+
+グローバルに優れたパフォーマンスとパーソナライゼーションを実現することは、複雑さの代償を払うべきではありません。
+
+私たちの課題は、開発者が学ぶべき新しいAPIを導入することなく、既存のモデルを簡素化するより良い開発者体験を作成することでした。サーバーサイドコンテンツの部分的なキャッシュは存在していましたが、これらのアプローチは私たちが目指す開発者体験と構成可能性の目標をまだ満たしていませんでした。
+
+**Partial Prerendering は学ぶべき新しいAPIを必要としません。**
+
+### [React Suspense に基づく](#built-on-react-suspense)
+
+Partial Prerendering は Suspense 境界によって定義されます。仕組みは次のとおりです。以下のeコマースページを考えてみましょう:
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  return (
+    <main>
+      <header>
+        <h1>My Store</h1>
+        <Suspense fallback={<CartSkeleton />}>
+          <ShoppingCart />
+        </Suspense>
+      </header>
+      <Banner />
+      <Suspense fallback={<ProductListSkeleton />}>
+        <Recommendations />
+      </Suspense>
+      <NewProducts />
+    </main>
+  );
+}
+```
+
+Partial Prerendering が有効になっている場合、このページは `<Suspense />` 境界に基づいて静的シェルを生成します。React Suspense の `fallback` は事前レンダリングされます。
+
+シェル内の Suspense fallbacks は、その後、カートを決定するためにクッキーを読み取ったり、ユーザーに基づいてバナーを表示したりするような動的コンポーネントに置き換えられます。
+
+リクエストが行われると、静的HTMLシェルがすぐに提供されます:
+
+```
+<main>
+  <header>
+    <h1>My Store</h1>
+    <div class="cart-skeleton">
+      <!-- 穴 -->
+    </div>
+  </header>
+  <div class="banner" />
+  <div class="product-list-skeleton">
+    <!-- 穴 -->
+  </div>
+  <section class="new-products" />
+</main>
+```
+
+`<ShoppingCart />` はユーザーセッションを確認するために `cookies` から読み取るため、このコンポーネントは静的シェルと同じHTTPリクエストの一部としてストリーミングされます。追加のネットワーク往復は必要ありません。
+
+```tsx filename="app/cart.tsx"
+import { cookies } from 'next/headers'
+ 
+export default function ShoppingCart() {
+  const cookieStore = cookies()
+  const session = cookieStore.get('session')
+  return ...
+}
+```
+
+最も細かい静的シェルを持つためには、追加の Suspense 境界が必要になる場合があります。ただし、現在 `loading.js` を使用している場合、これは暗黙的な Suspense 境界であるため、静的シェルを生成するために変更は必要ありません。
+
+### [近日公開予定](#coming-soon)
+
+パーシャルプリレンダリング (Partial Prerendering) は現在開発中です。今後のマイナーリリースでさらにアップデートを共有する予定です。
+
+[メタデータの改善](#metadata-improvements)
+-----------------------------------------------
+
+ページコンテンツがサーバーからストリーミングされる前に、ビューポート、カラースキーム、テーマに関する重要なメタデータがブラウザに最初に送信される必要があります。
+
+これらの `meta` タグが初期ページコンテンツとともに送信されるようにすることで、テーマカラーの変更によるページのちらつきや、ビューポート変更によるレイアウトのシフトを防ぎ、スムーズなユーザー体験を実現できます。
+
+Next.js 14では、ブロッキングと非ブロッキングのメタデータを分離しました。ブロッキングとなるメタデータオプションはごく一部のみで、非ブロッキングメタデータがパーシャルプリレンダリングされたページの静的シェルの提供を妨げないようにしています。
+
+以下のメタデータオプションは非推奨となり、今後のメジャーバージョンで `metadata` から削除されます:
+
+*   `viewport`: ビューポートの初期ズームやその他のプロパティを設定
+*   `colorScheme`: ビューポートのサポートモード（ライト/ダーク）を設定
+*   `themeColor`: ビューポート周辺のクロームが表示する色を設定
+
+Next.js 14からは、これらのオプションを置き換える新しい [`viewport` と `generateViewport`](https://nextjs.org/docs/app/api-reference/functions/generate-viewport) オプションが利用可能です。他のすべての `metadata` オプションは変更ありません。
+
+これらの新しいAPIを今すぐ採用できます。既存の `metadata` オプションも引き続き動作します。
+
+[Next.js Learnコース](#nextjs-learn-course)
+--------------------------------------------
+
+本日、[Next.js Learn](https://nextjs.org/learn) で新しい無料コースをリリースしました。このコースでは以下を学べます:
+
+*   Next.js App Router
+*   スタイリングとTailwind CSS
+*   フォントと画像の最適化
+*   レイアウトとページの作成
+*   ページ間のナビゲーション
+*   Postgresデータベースのセットアップ
+*   サーバーコンポーネントでのデータ取得
+*   静的および動的レンダリング
+*   ストリーミング
+*   パーシャルプリレンダリング（オプション）
+*   検索とページネーションの追加
+*   データの変更
+*   エラーハンドリング
+*   アクセシビリティの向上
+*   認証の追加
+*   メタデータの追加
+
+Next.js Learnはこれまでに数百万人の開発者にフレームワークの基礎を教えてきました。この新しい追加コースについてのフィードバックをお待ちしています。[nextjs.org/learn](https://nextjs.org/learn) でコースを受講してください。
+
+[その他の変更点](#other-changes)
+-------------------------------
+
+*   **【破壊的変更】** Node.jsの最低バージョンが `18.17` に変更
+*   **【破壊的変更】** `next-swc` ビルドのWASMターゲットを削除 ([PR](https://github.com/vercel/next.js/pull/57437))
+*   **【破壊的変更】** `@next/font` のサポートを終了し `next/font` に統一 ([Codemod](https://nextjs.org/docs/app/building-your-application/upgrading/codemods#built-in-next-font))
+*   **【破壊的変更】** `ImageResponse` のインポートを `next/server` から `next/og` に変更 ([Codemod](https://nextjs.org/docs/app/building-your-application/upgrading/codemods#next-og-import))
+*   **【破壊的変更】** `next export` コマンドを削除し `output: 'export'` 設定に統一 ([Docs](https://nextjs.org/docs/app/building-your-application/deploying/static-exports))
+*   **【非推奨】** `next/image` の `onLoadingComplete` を非推奨化し [`onLoad`](https://nextjs.org/docs/app/api-reference/components/image#onload) に置換
+*   **【非推奨】** `next/image` の `domains` を非推奨化し [`remotePatterns`](https://nextjs.org/docs/app/api-reference/components/image#remotepatterns) に置換
+*   **【新機能】** `fetch` キャッシュに関する詳細なログを有効化可能に ([Docs](https://nextjs.org/docs/app/api-reference/next-config-js/logging))
+*   **【改善】** 基本的な `create-next-app` アプリケーションの関数サイズを80%削減
+*   **【改善】** 開発時の `edge` ランタイム使用時のメモリ管理を強化
+
+[コントリビューター](#contributors)
+-----------------------------
+
+Next.jsは2,900人以上の個人開発者、GoogleやMetaなどの業界パートナー、そしてVercelのコアチームの共同作業の成果です。[GitHub Discussions](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/)、[Discord](/discord) でコミュニティに参加してください。
+
+このリリースは以下の方々によってもたらされました:
+
+*   **Next.js** チーム: [Andrew](https://github.com/acdlite), [Balazs](https://github.com/balazsorban44), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sebastian](https://github.com/sebmarkbage), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens), [Wyatt](https://github.com/wyattjoh), [Zack](https://github.com/ztanner).
+*   **Turbopack** チーム: [Donny](https://github.com/kdy1), [Justin](https://github.com/jridgewell), [Leah](https://github.com/forsakenharmony), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra), [Will](https://github.com/wbinnssmith).
+*   **Next.js Learn**: [Delba](https://github.com/delbaoliveira), [Steph](https://github.com/StephDietz), [Emil](https://github.com/emilkowalski), [Balazs](https://github.com/balazsorban44), [Hector](https://github.com/dizzyup), [Amy](https://github.com/timeyoutakeit).
+
+そして以下のコントリビューターの方々: @05lazy, @0xadada, @2-NOW, @aarnadlr, @aaronbrown-vercel, @aaronjy, @abayomi185, @abe1272001, @abhiyandhakal, @abstractvector, @acdlite, @adamjmcgrath, @AdamKatzDev, @adamrhunter, @ademilter, @adictonator, @adilansari, @adtc, @afonsojramos, @agadzik, @agrattan0820, @akd-io, @AkifumiSato, @akshaynox, @alainkaiser, @alantoa, @albertothedev, @AldeonMoriak, @aleksa-codes, @alexanderbluhm, @alexkirsz, @alfred-mountfield, @alpha-xek, @andarist, @Andarist, @andrii-bodnar, @andykenward, @angel1254mc, @anonrig, @anthonyshew, @AntoineBourin, @anujssstw, @apeltop, @aralroca, @aretrace, @artdevgame, @artechventure, @arturbien, @Aryan9592, @AviAvinav, @aziyatali, @BaffinLee, @Banbarashik, @bencmbrook, @benjie, @bennettdams, @bertho-zero, @bigyanse, @Bitbbot, @blue-devil1134, @bot08, @bottxiang, @Bowens20832, @bre30kra69cs, @BrennanColberg, @brkalow, @BrodaNoel, @Brooooooklyn, @brunoeduardodev, @brvnonascimento, @carlos-menezes, @cassidoo, @cattmote, @cesarkohl, @chanceaclark, @charkour, @charlesbdudley, @chibicode, @chrisipanaque, @ChristianIvicevic, @chriswdmr, @chunsch, @ciruz, @cjmling, @clive-h-townsend, @colinhacks, @colinking, @coreyleelarson, @Cow258, @cprussin, @craigwheeler, @cramforce, @cravend, @cristobaldominguez95, @ctjlewis, @cvolant, @cxa, @danger-ahead, @daniel-web-developer, @danmindru, @dante-robinson, @darshanjain-entrepreneur, @darshkpatel, @davecarlson, @David0z, @davidnx, @dciug, @delbaoliveira, @denchance, @DerTimonius, @devagrawal09, @DevEsteves, @devjiwonchoi, @devknoll, @DevLab2425, @devvspaces, @didemkkaslan, @dijonmusters, @dirheimerb, @djreillo, @dlehmhus, @doinki, @dpnolte, @Drblessing, @dtinth, @ducanhgh, @DuCanhGH, @ductnn, @duncanogle, @dunklesToast, @DustinsCode, @dvakatsiienko, @dvoytenko, @dylanjha, @ecklf, @EndangeredMassa, @eps1lon, @ericfennis, @escwxyz, @Ethan-Arrowood, @ethanmick, @ethomson, @fantaasm, @feikerwu, @ferdingler, @FernandVEYRIER, @feugy, @fgiuliani, @fomichroman, @Fonger, @ForsakenHarmony, @franktronics, @FSaldanha, @fsansalvadore, @furkanmavili, @g12i, @gabschne, @gaojude, @gdborton, @gergelyke, @gfgabrielfranca, @gidgudgod, @Gladowar, @Gnadhi, @gnoff, @goguda, @greatSumini, @gruz0, @Guilleo03, @gustavostz, @hanneslund, @HarshaVardhanReddyDuvvuru, @haschikeks, @Heidar-An, @heyitsuzair, @hiddenest, @hiro0218, @hotters, @hsrvms, @hu0p, @hughlilly, @HurSungYun, @hustLer2k, @iamarpitpatidar, @ianldgs, @ianmacartney, @iaurg, @ibash, @ibrahemid, @idoob, @iiegor, @ikryvorotenko, @imranbarbhuiya, @ingovals, @inokawa, @insik-han, @isaackatayev, @ishaqibrahimbot, @ismaelrumzan, @itsmingjie, @ivanhofer, @IvanKiral, @jacobsfletch, @jakemstar, @jamespearson, @JanCizmar, @janicklas-ralph, @jankaifer, @JanKaifer, @jantimon, @jaredpalmer, @javivelasco, @jayair, @jaykch, @Jeffrey-Zutt, @jenewland1999, @jeremydouglas, @JesseKoldewijn, @jessewarren-aa, @jimcresswell, @jiwooIncludeJeong, @jocarrd, @joefreeman, @JohnAdib, @JohnAlbin, @JohnDaly, @johnnyomair, @johnta0, @joliss, @jomeswang, @joostdecock, @Josehower, @josephcsoti, @josh, @joshuabaker, @JoshuaKGoldberg, @joshuaslate, @joulev, @jsteele-stripe, @JTaylor0196, @JuanM04, @jueungrace, @juliusmarminge, @Juneezee, @Just-Moh-it, @juzhiyuan, @jyunhanlin, @kaguya3222, @karlhorky, @kevinmitch14, @keyz, @kijikunnn, @kikobeats, @Kikobeats, @kleintorres, @koba04, @koenpunt, @koltong, @konomae, @kosai106, @krmeda, @kvnang, @kwonoj, @ky1ejs, @kylemcd, @labyrinthitis, @lachlanjc, @lacymorrow, @laityned, @Lantianyou, @leerob, @leodr, @leoortizz, @li-jia-nan, @loettz, @lorenzobloedow, @lubakravche, @lucasassisrosa, @lucasconstantino, @lucgagan, @LukeSchlangen, @LuudJanssen, @lycuid, @M3kH, @m7yue, @manovotny, @maranomynet, @marcus-rise, @MarDi66, @MarkAtOmniux, @martin-wahlberg, @masnormen, @matepapp, @matthew-heath, @mattpr, @maxleiter, @MaxLeiter, @maxproske, @meenie, @meesvandongen, @mhmdrioaf, @michaeloliverx, @mike-plummer, @MiLk, @milovangudelj, @Mingyu-Song, @mirismaili, @mkcy3, @mknichel, @mltsy, @mmaaaaz, @mnajdova, @moetazaneta, @mohanraj-r, @molebox, @morganfeeney, @motopods, @mPaella, @mrkldshv, @mrxbox98, @nabsul, @nathanhammond, @nbouvrette, @nekochantaiwan, @nfinished, @Nick-Mazuk, @nickmccurdy, @niedziolkamichal, @niko20, @nikolovlazar, @nivak-monarch, @nk980113, @nnnnoel, @nocell, @notrab, @nroland013, @nuta, @nutlope, @obusk, @okcoker, @oliviertassinari, @omarhoumz, @opnay, @orionmiz, @ossan-engineer, @patrick91, @pauek, @peraltafederico, @Phiction, @pn-code, @pyjun01, @pythagoras-yamamoto, @qrohlf, @raisedadead, @reconbot, @reshmi-sriram, @reyrodrigez, @ricardofiorani, @rightones, @riqwan, @rishabhpoddar, @rjsdnql123, @rodrigofeijao, @runjuu, @Ryan-Dia, @ryo-manba, @s0h311, @sagarpreet-xflowpay, @sairajchouhan, @samdenty, @samsisle, @sanjaiyan-dev, @saseungmin, @SCG82, @schehata, @Schniz, @sepiropht, @serkanbektas, @sferadev, @ShaunFerris, @shivanshubisht, @shozibabbas, @silvioprog, @simonswiss, @simPod, @sivtu, @SleeplessOne1917, @smaeda-ks, @sonam-serchan, @SonMooSans, @soonoo, @sophiebits, @souporserious, @sp00ls, @sqve, @sreetamdas, @stafyniaksacha, @starunaway, @steebchen, @stefanprobst, @steppefox, @steven-tey, @suhaotian, @sukkaw, @SukkaW, @superbahbi, @SuttonJack, @svarunid, @swaminator, @swarnava, @syedtaqi95, @taep96, @taylorbryant, @teobler, @Terro216, @theevilhead, @thepatrick00, @therealrinku, @thomasballinger, @thorwebdev, @tibi1220, @tim-hanssen, @timeyoutakeit, @tka5, @tknickman, @tomryanx, @trigaten, @tristndev, @tunamagur0, @tvthatsme, @tyhopp, @tyler-lutz, @UnknownMonk, @v1k1, @valentincostam, @valentinh, @valentinpolitov, @vamcs, @vasucp1207, @vicsantizo, @vinaykulk621, @vincenthongzy, @visshaljagtap, @vladikoff, @wherehows, @WhoAmIRUS, @WilderDev, @Willem-Jaap, @williamli, @wiredacorn, @wiscaksono, @wojtekolek, @ws-jm, @wxh06, @wyattfry, @wyattjoh, @xiaolou86, @y-tsubuku, @yagogmaisp, @yangshun, @yasath, @Yash-Singh1, @yigithanyucedag, @ykzts, @Yovach, @yutsuten, @yyuemii, @zek, @zekicaneksi, @zignis, @zlrlyy

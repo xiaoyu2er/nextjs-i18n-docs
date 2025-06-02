@@ -1,0 +1,182 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:18:45.541Z
+title: Next.js 11.1
+description: >-
+  Next.js 11.1では、重要なセキュリティパッチ、ES Modulesサポート、パフォーマンス改善、Rustベースのツーリング、
+  プリレンダリング時のデータ取得が2倍高速化などが導入されました！
+author:
+  - name: DongYoon Kang
+    image: /static/team/kdy.jpg
+  - name: Jiachi Liu
+    image: /static/team/jiachi.png
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Maia Teegarden
+    image: /static/team/maia.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Steven
+    image: /static/team/styfle.png
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2021-08-11T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-11-1/twitter-card.png
+---
+
+Next.js 11.1では、スタック全体のビルドパフォーマンスを改善しています。主な機能は以下の通りです：
+
+*   [**セキュリティパッチ**](#security-patch): オープンリダイレクトを防ぐ重要な更新
+*   [**ES Modulesサポート**](#es-modules-support): 実験的フラグで今すぐ利用可能
+*   [**Rustベースのツーリング**](#adopting-rust-based-swc): JSツーリング（BabelとTerser）を置き換えるSWC統合
+*   [**高速なデータ取得**](#builds--data-fetching): プリレンダリング時のHTTP `keep-alive`による2倍高速なデータ取得
+*   [**高速なソースマップ**](#source-maps): ソースマップ使用時にビルドが70%高速化、メモリ使用量が67%削減
+*   [**ESLint統合の改善**](#eslint-improvements): よりアクセシブルなデフォルトとタイポのリンティング
+*   [**`next/image`の改善**](#nextimage-improvements): Sharpのオプショナル使用、`next export`のサポート強化
+
+今すぐアップデートするには `npm i next@latest` を実行してください。
+
+[セキュリティパッチ](#security-patch)
+---------------------------------
+
+Next.jsチームはセキュリティ研究者や監査人と協力して脆弱性を防いでいます。RobinhoodのGabriel Benmergui氏による`pages/_error.js`のオープンリダイレクト調査と責任ある開示に感謝します。
+
+報告された問題はユーザーに直接的な害はありませんでしたが、信頼できるドメインから攻撃者のドメインにリダイレクトするフィッシング攻撃を可能にする可能性がありました。Next.js 11.1ではこのオープンリダイレクトを防ぐパッチと[セキュリティ回帰テスト](https://github.com/vercel/next.js/blob/canary/test/integration/repeated-slashes/test/index.test.js)を実装しました。
+
+詳細は[公開されたCVE](https://github.com/vercel/next.js/security/advisories/GHSA-vxf5-wxwp-m7g9)をご覧ください。アプリケーションのセキュリティを向上させるため、最新バージョンのNext.jsにアップグレードすることを推奨します。今後の責任ある開示報告は`security@vercel.com`までメールでお願いします。
+
+**注記:** [Vercel](https://vercel.com)でホストされているNext.jsアプリケーションはこの脆弱性の**影響を受けません**（したがって、Vercelで実行されているNext.jsアプリでは**何もする必要はありません**）。
+
+[ES Modulesサポート](#es-modules-support)
+-----------------------------------------
+
+Next.jsでは、入力モジュールと出力ターゲットの両方として[ES Modules](https://nodejs.org/docs/latest/api/esm.html)の広範なサポートに取り組んでいます。Next.js 11.1から、実験的フラグを使用してES Modules（例：`package.json`で`"type": "module"`）を使用するnpmパッケージをインポートできるようになりました。
+
+```js filename="next.config.js"
+module.exports = {
+  // CommonJSよりもES Modulesのロードを優先
+  experimental: { esmExternals: true },
+};
+```
+
+ES Modulesサポートには、[CommonJS](https://nodejs.org/docs/latest/api/modules.html)の以前のインポート動作をサポートするための後方互換性が含まれています。Next.js 12では`esmExternals: true`がデフォルトになります。新しいオプションを試して、改善の提案がある場合は[GitHub Discussionsでフィードバック](https://github.com/vercel/next.js/discussions/27876)を残してください。
+
+[RustベースのSWC採用](#adopting-rust-based-swc)
+---------------------------------------------------
+
+Next.jsで使用されている2つのツールチェーン（個々のファイル用のBabelと出力バンドルの最小化用のTerser）を置き換えるため、Rustで書かれた超高速なJavaScriptおよびTypeScriptコンパイラ[SWC](https://swc.rs/)の統合に取り組んでいます。
+
+BabelをSWCに置き換える一環として、Next.jsが使用するすべてのカスタムコード変換をRustで書かれたSWC変換に移植し、パフォーマンスを最大化しています。例えば、`getStaticProps`、`getStaticPaths`、`getServerSideProps`内の未使用コードのツリーシェイキングなどです。
+
+Terserを置き換える一環として、SWCミニファイアがTerserと同様の出力を保ちながら、パフォーマンスとミニフィケーションの並列化を大幅に改善するように取り組んでいます。
+
+初期テストでは、Babelを使用した以前のコード変換は**約500msから約10ms**に、Terserによるコード最小化は**約250msから約30ms**に短縮されました。全体として、これにより**ビルドが2倍高速化**されました。
+
+[SWC](https://swc.rs/)の作成者[DongYoon Kang](https://twitter.com/kdy1dev)と[Parcel](https://parceljs.org/)の貢献者[Maia Teegarden](https://twitter.com/padmaia)がVercelのNext.jsチームに加わり、`next dev`と`next build`のパフォーマンス改善に取り組むことを発表できることを嬉しく思います。SWC採用のさらなる結果は、次回の安定版リリースで共有する予定です。
+
+[パフォーマンス改善](#improved-performance)
+---------------------------------------------
+
+### [ビルド＆データ取得](#builds--data-fetching)
+
+`next build`を使用して多数のHTTPリクエストを行う場合、平均して**約2倍のパフォーマンス改善**がありました。例えば、Headless CMSからコンテンツを取得するために`getStaticProps`と`getStaticPaths`を使用している場合、ビルドが明らかに高速化するはずです。
+
+Next.jsは自動的に[node-fetch](/docs/architecture/supported-browsers#polyfills)をポリフィルし、デフォルトで[HTTP Keep-Alive](https://en.wikipedia.org/wiki/HTTP_persistent_connection)を有効にします。[外部ベンチマーク](https://github.com/Ethan-Arrowood/undici-fetch/blob/main/benchmarks.md#fetch)によると、これによりプリレンダリングが**約2倍高速化**します。
+
+特定の`fetch()`呼び出しでHTTP Keep-Aliveを無効にするには、agentオプションを追加できます：
+
+```
+import { Agent } from 'https';
+const url = '<https://example.com>';
+const agent = new Agent({ keepAlive: false });
+fetch(url, { agent });
+```
+
+すべての`fetch()`呼び出しをグローバルにオーバーライドするには、`next.config.js`を使用できます：
+
+```js filename="next.config.js"
+module.exports = {
+  httpAgentOptions: {
+    keepAlive: false,
+  },
+};
+```
+
+### [ソースマップ](#source-maps)
+
+Next.jsアプリケーションにブラウザソースマップを含める場合、webpackアセットとソースマップ処理の最適化により、パフォーマンスコストが約70％、メモリコストが約67％削減されました。
+
+これは、`next.config.js`ファイルで`productionBrowserSourceMaps: true`を設定しているNext.jsアプリケーションにのみ影響します。Next.js 11.1では、ソースマップが有効な場合、ビルド時間は11％しか増加しません。
+
+また、Sentryと協力して[Sentry Next.jsプラグイン](https://docs.sentry.io/platforms/javascript/guides/nextjs/)を使用したソースマップのアップロード[パフォーマンスを向上](https://github.com/vercel/next.js/issues/26588#issuecomment-894329188)させました。
+
+[ESLintの改善](#eslint-improvements)
+-------------------------------------------
+
+Next.js 11では、`next lint`を通じて組み込みの[ESLintサポート](/docs/pages/building-your-application/configuring/eslint)を導入しました。初期リリース以来、アプリケーションで一般的なミスを修正するのに役立つルールを追加し続けています。
+
+### [デフォルトのアクセシビリティルール](#default-accessibility-rules)
+
+デフォルトでより良いアクセシビリティルールが含まれるようになり、互いに一致しないARIAプロパティや存在しないARIA属性の使用に関する問題を防ぎます。これらのルールはデフォルトで警告を出します。
+
+*   [aria-props](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-props.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+*   [aria-proptypes](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-proptypes.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+*   [aria-unsupported-elements](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/aria-unsupported-elements.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+*   [role-has-required-aria-props](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/role-has-required-aria-props.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+*   [role-supports-aria-props](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/role-supports-aria-props.md?rgh-link-date=2021-06-04T02%3A10%3A36Z)
+
+コミュニティ貢献者の[JeffersonBledsoe](https://github.com/JeffersonBledsoe)氏がこれらのルールを追加してくれたことに感謝します。
+
+### [一般的なタイポ](#common-typos)
+
+`getStaticProps`、`getStaticPaths`、`getServerSideProps`の一般的なタイポについて、デフォルトで警告を出すようになりました。これにより、小さなタイポが原因でデータ取得が呼び出されないケースを防ぎます。例えば、`getstaticprops`や`getStaticprops`は警告を表示します。
+
+コミュニティ貢献者の[kaykdm](https://github.com/kaykdm)氏がこのルールを作成してくれたことに感謝します。
+
+[`next/image`の改善](#nextimage-improvements)
+----------------------------------------------------
+
+`next/image`と組み込みの[画像最適化](/docs/pages/building-your-application/optimizing/images)についてコミュニティからのフィードバックを収集し、パフォーマンス、開発者体験、ユーザー体験の複数の改善を共有できることを嬉しく思います。
+
+### [画像最適化](#image-optimization)
+
+デフォルトでは、Next.jsはWebAssemblyを使用して画像最適化を実行します。これにより、Next.jsパッケージのインストール時間が大幅に短縮され、ポストインストールステップが不要になります。Next.js 11.1では、`sharp`をオプションでインストールでき、インストール時間が遅くなる代わりに、キャッシュされていない画像生成時間を最適化します。
+
+WebAssemblyベースの画像オプティマイザは、Node.js 16でApple M1のようなARMチップをサポートするように更新されました。
+
+組み込みの画像オプティマイザは、レスポンスボディの内容に基づいて外部画像のコンテンツタイプを自動的に検出するようになりました。これにより、レスポンスヘッダーが`Content-Type: application/octet-stream`の場合でも、AWS S3でホストされている画像をNext.jsが最適化できるようになります。
+
+### [開発時のBlur Upプレースホルダーの遅延生成](#lazy-generation-of-blur-up-placeholders-in-development)
+
+`next dev`中に`placeholder="blur"`を含む[静的画像インポート](/docs/pages/building-your-application/optimizing/images#image-imports)は、遅延生成されるようになり、多くの静的画像インポートがあるアプリケーションの開発サーバー起動時間が改善されます：
+
+```js filename="pages/index.js"
+import Image from 'next/image';
+import author from '../public/me.png';
+ 
+export default function Home() {
+  return (
+    // この画像のプレースホルダーは開発中に遅延生成されます
+    <Image src={author} alt="著者の写真" placeholder="blur" />
+  );
+}
+```
+
+### [その他の画像改善](#other-image-improvements)
+
+*   **以前に読み込まれた画像は遅延読み込みされなくなりました**: ページで以前に読み込まれた画像（クライアントナビゲーションまたはページの別の場所で読み込まれた場合）は、Next.jsが自動的に遅延読み込みをスキップし、画像を表示する前のちらつきを防ぎます。
+*   **`next export`でのカスタム画像ローダーのサポート**: `next/image`は`next export`と任意の[サードパーティ画像最適化サービス](/docs/pages/building-your-application/optimizing/images#loader)の使用をサポートするようになりました。[カスタム`loader`プロップ](/docs/pages/api-reference/components/image#loader)を`next/image`に提供する場合は、`next.config.js`で`images.loader: "custom"`を設定できます。
+*   **画像読み込み完了時の新しいイベント**: ユーザーフィードバックに基づき、`next/image`に新しいプロパティ[`onLoadingComplete`](/docs/pages/api-reference/components/image#onloadingcomplete)を追加しました。これにより、画像が完全に読み込まれた時に呼び出されるコールバックを登録できます。
+*   **デフォルトの画像キャッシュTTL（Time to Live）の設定**: `next.config.js`で[`images.minimumCacheTTL`](/docs/pages/building-your-application/optimizing/images#minimumcachettl)を設定し、最適化された画像のデフォルトキャッシュTTLを変更できるようになりました。可能であれば、URLに画像コンテンツハッシュが含まれるため、最大TTLを使用する[静的画像`import`](/docs/pages/building-your-application/optimizing/images#image-imports)を使用することを推奨します。
+
+[コミュニティ](#community)
+-----------------------
+
+Next.jsは、1,700人以上の個人開発者、GoogleやFacebookなどの業界パートナー、そして私たちのコアチームの共同作業の結果です。
+
+コミュニティが成長し続けていることを誇りに思います。過去6か月間だけで、NPMでのNext.jsのダウンロード数は410万から620万へと50％増加し、Alexaトップ10,000のホームページでNext.jsを使用している数も50％増加しました。
+
+このリリースは以下の貢献者によってもたらされました： @abotsi, @adam-cowley, @afbarbaro, @akellbl4, @AndreVarandas, @andys-github, @angeloashmore, @apuyou, @arturmuller, @AryanBeezadhur, @atcastle, @borekb, @brandonchinn178, @breyed, @brijendravarma, @ctbarna, @ctjlewis, @darshkpatel, @delbaoliveira, @destruc7i0n, @devknoll, @enesakar, @enzoferey, @euess, @fabb, @gnbaron, @hiro0218, @housseindjirdeh, @huozhi, @ijjk, @JacobLey, @jameshoward, @jamsinclair, @janicklas-ralph, @jarvelov, @javivelasco, @jaybekster, @JeffersonBledsoe, @jflayhart, @johnrackles, @jviide, @karlsander, @kasipavankumar, @kaykdm, @kdy1, @kylemh, @leerob, @LetItRock, @lsndr, @lucleray, @m-abdelwahab, @mandarons, @markkaylor, @mastoj, @michalbundyra, @michielvangendt, @Munawwar, @mvasilkov, @NickCrews, @NickKelly1, @noahweingand, @noreiller, @nyedidikeke, @omasher, @orta, @pa-rang, @padmaia, @papaponmx, @PaulvdDool, @petermekhaeil, @phocks, @pranavp10, @qwertyforce, @raon0211, @reod, @rishabhpoddar, @roim, @Ryz0nd, @sa3dany, @sachinraja, @samrobbins85, @schoenwaldnils, @schultzp2020, @sedlukha, @sergioalvz, @shibe23, @smitssjors, @sohamsshah, @sokra, @stefanprobst, @stovmascript, @stuymedova, @styfle, @tanys123, @ThangHuuVu, @theostrahlen, @thomasmarshall, @tigger9flow, @timneutkens, @Timvdv, @tmcgann, @tomchen, @UniqueNL, @Vadorequest, @vitalybaev, @yunger7, @zackdotcomputer, @zeekrey

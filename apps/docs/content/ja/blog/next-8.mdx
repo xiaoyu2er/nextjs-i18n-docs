@@ -1,0 +1,349 @@
+---
+source-updated-at: 2025-05-30T16:38:07.000Z
+translation-updated-at: 2025-06-02T19:13:56.090Z
+title: Next.js 8
+description: >-
+  Next.js 8ではサーバーレスモード、バンドルサイズの縮小、パフォーマンス改善などが導入されました。
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-02-11T08:00:35.009Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/twitter-card.png
+---
+
+本日、Next.js 8の正式リリースを発表できることを誇りに思います。主な新機能は以下の通りです:
+
+*   [サーバーレスNext.js](#serverless-nextjs)
+*   [ビルド時のメモリ使用量大幅削減](#massive-build-time-memory-usage-reduction)
+*   [ビルド時環境設定](#build-time-environment-configuration)
+*   [プリフェッチ性能の改善](#prefetch-performance-improvements)
+*   [初期HTMLサイズの縮小](#smaller-initial-html-size)
+*   [オンデマンドエントリの改善](#improved-on-demand-entries)
+*   [開発時のポート待機高速化](#faster-port-listening-in-development)
+*   [静的エクスポートの高速化](#faster-static-export)
+*   [Head要素の重複排除](#head-element-deduplication)
+*   [新しいcrossOrigin設定オプション](#new-crossorigin-config-option)
+*   [インラインJavaScriptの削除](#removed-inline-javascript)
+*   [API認証の例](#example-of-api-authentication)
+
+これまでと同様、これらの改善はすべて**完全な後方互換性**を保っています。ほとんどのNext.jsアプリケーションでは、次のコマンドを実行するだけでアップグレードできます:
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest
+```
+
+私たちのコミュニティと成功を信じてくれたすべての方々に感謝します。前回のブログ投稿以降、[AT&T](https://att.com)、[Starbucks](https://www.starbucksreserve.com/en-us)、[Twitch](https://m.twitch.tv/)などの企業がNext.jsを使用して公開向けウェブサイトやアプリをリニューアルしました。
+
+[サーバーレスNext.js](#serverless-nextjs)
+----------------------------------------
+
+Next.jsのサーバーレスターゲットは、ページからサーバーレス関数を出力します
+
+サーバーレスデプロイはアプリケーションを小さな部分（**ラムダ**とも呼ばれます）に分割することで、信頼性とスケーラビリティを大幅に向上させます。Next.jsの場合、`pages`ディレクトリ内の各ページがサーバーレスラムダになります。
+
+サーバーレスには[多くの利点](https://vercel.com/docs/serverless-functions/conceptual-model)があります。参照リンクではExpressの文脈で説明されていますが、その原則は普遍的です: サーバーレスは障害ポイントの分散、無限のスケーラビリティを可能にし、「使用した分だけ支払う」モデルで非常にコスト効率が良いです。
+
+Next.jsで**サーバーレスモード**を有効にするには、`next.config.js`に`serverless`ビルド`target`を追加します:
+
+```js filename="next.config.js"
+module.exports = {
+  target: 'serverless',
+};
+```
+
+`serverless`ターゲットはページごとに単一のラムダを出力します。このファイルは完全にスタンドアロンで、実行に依存関係を必要としません:
+
+*   `pages/index.js` => `.next/serverless/pages/index.js`
+*   `pages/about.js` => `.next/serverless/pages/about.js`
+
+Next.jsサーバーレス関数のシグネチャはNode.js HTTPサーバーコールバックと似ています:
+
+```
+type Function = (req: http.IncomingMessage, res: http.ServerResponse) => void;
+```
+
+*   [http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage)
+*   [http.ServerResponse](https://nodejs.org/api/http.html#http_class_http_serverresponse)
+*   `void`は関数が戻り値を持たず、JavaScriptの`undefined`と同等です。関数を呼び出すとリクエストが完了します。
+
+Next.jsはサーバーレスデプロイのための低レベルAPIを提供します。ホスティングプラットフォームごとに異なる関数シグネチャがあるためです。一般的には、Next.jsサーバーレスビルドの出力を互換性レイヤーでラップする必要があります。
+
+例えば、プラットフォームがNode.js [http.Server](https://nodejs.org/api/http.html#http_class_http_server)クラスをサポートしている場合:
+
+```js filename="server.js"
+const http = require('http');
+const page = require('./.next/serverless/about.js');
+const server = new http.Server((req, res) => page.render(req, res));
+server.listen(3000, () => console.log('Listening on http://localhost:3000'));
+```
+
+### [**まとめ**](#summary)
+
+*   サーバーレスデプロイ実装のための低レベルAPI
+*   `pages`ディレクトリ内の各ページがサーバーレス関数（ラムダ）になります
+*   可能な限り最小のサーバーレス関数を作成（**50 KB**ベースのzipサイズ）
+*   関数の[コールドスタート](https://vercel.com/docs/serverless-functions/conceptual-model)高速化に最適化
+*   サーバーレス関数には依存関係がありません（関数バンドルに含まれています）
+*   Node.jsの[http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage)と[http.ServerResponse](https://nodejs.org/api/http.html#http_class_http_serverresponse)を使用
+*   `next.config.js`で`target: 'serverless'`を設定してオプトイン
+*   `server`ターゲットも完全にサポートされ、メンテナンスされます
+*   `serverless`モードでは`publicRuntimeConfig`と`serverRuntimeConfig`はサポートされていません。代わりにビルド時設定を使用してください。
+
+[ビルド時のメモリ使用量大幅削減](#massive-build-time-memory-usage-reduction)
+---------------------------------------------------------------------------------------
+
+私たちはwebpackに貢献し、Next.js（およびwebpackエコシステム全体）のビルドパフォーマンスとリソース利用を改善しました。
+
+この取り組みにより、**最大16倍のメモリ使用効率向上**を達成し、パフォーマンスの低下はありませんでした。
+
+メモリがより速く解放され、多くのページがある場合でもプロセスがクラッシュしなくなりました。
+
+この最適化の詳細については、近日中に[Next.jsブログ](/blog)で詳しく説明する予定です。
+
+[ビルド時環境設定](#build-time-environment-configuration)
+-----------------------------------------------------------------------------
+
+Next.jsアプリケーションをレビューする中で、`babel-plugin-transform-define`や`webpack.DefinePlugin`を追加してアプリケーションに設定値を提供するというパターンが頻繁に見られました。
+
+Next.js 8では、`next.config.js`に`env`という新しいキーを導入し、同じ機能を後方互換性のある方法で提供します:
+
+```js filename="next.config.js"
+module.exports = {
+  env: {
+    customKey: 'MyValue',
+  },
+};
+```
+
+これにより、コード内で`process.env.customKey`を使用できるようになります。例:
+
+```js filename="pages/index.js"
+export default function IndexPage() {
+  return <h1>The value of customKey is: {process.env.customKey}</h1>;
+}
+```
+
+`process.env.customKey`はビルド時に`'MyValue'`に置き換えられます。
+
+[プリフェッチ性能の改善](#prefetch-performance-improvements)
+-----------------------------------------------------------------------
+
+Next.jsルーターでは、ページをプリフェッチしてナビゲーションを高速化できます:
+
+```js filename="pages/index.js"
+import Link from 'next/link';
+ 
+export default function IndexPage() {
+  return (
+    <>
+      <Link href="/about" prefetch>
+        <a>To About Page</a>
+      </Link>
+    </>
+  );
+}
+```
+
+これは、`prefetch`属性を持つすべてのリンクのJavaScriptバンドルをプリフェッチすることで機能します。
+
+Next.js 8以前のバージョンでは、これはドキュメント`<body>`に`<script>`タグを挿入することを意味していました。
+
+しかし、これによりページを開く際にいくつかのオーバーヘッドが生じ、特にブラウザの「読み込み中」表示が、ページが既に操作可能になっているにもかかわらず、予想以上に長く表示されることがありました。
+
+Next.js 8では、`prefetch`は`<script>`タグの代わりに`<link rel="preload">`を使用します。また、`onload`の後にのみプリフェッチを開始し、ブラウザがリソースを管理できるようにします。
+
+さらに、Next.jsは2Gインターネット接続と`navigator.connection.saveData`モードを検出し、遅いネットワーク接続ではプリフェッチを無効にします。
+
+[初期HTMLサイズの縮小](#smaller-initial-html-size)
+-------------------------------------------------------
+
+Next.jsはHTMLをプリレンダリングするため、ページを`<html>`、`<head>`、`<body>`と、ページをレンダリングするために必要なJavaScriptファイルで囲むデフォルト構造にラップします。
+
+[Next.js 7では初期ペイロードを1.50KBに最適化](https://nextjs.org/blog/next-7/#smaller-initial-html-payload)し、前バージョンから7.4%削減しました。
+
+さらに初期ペイロードサイズを1.16KBに削減し、23%のさらなる削減を達成しました:
+
+|  | 7.0 | 8.0 | 差分 |
+| --- | --- | --- | --- |
+| ドキュメントサイズ（サーバーレンダリング） | 1.50KB | 1.16KB | **23%** _縮小_ |
+
+主なサイズ削減方法:
+
+*   ページ初期化インラインスクリプトが削除されました
+*   `/_error`ページが毎回のページロードに含まれなくなりました
+
+### [/_errorのオンデマンドロード](#on-demand-loading-of-_error)
+
+本番環境でエラーが発生すると、`/_error`ページがレンダリングされ、エラーが発生したことが表示されます。
+
+Next.jsの最初のリリース以来、`/_error`ページのスクリプトタグは初期HTMLの一部であり、ランタイムエラーが発生しなくてもロードされていました。
+
+Next.js 8から、`/_error`ページはエラー発生時にオンデマンドでロードされます。
+
+つまり、デフォルトでロード、解析、実行されるコードが少なくなります。
+
+[開発者体験の改善](#dx-improvements)
+-----------------------------------
+
+Next.jsの主要な目標の1つは、**最高の開発者体験**で最高の本番パフォーマンスを提供することです。このリリースには、ユーザーフィードバックに基づいた多くの細かな改善が含まれています。
+
+### [オンデマンドエントリの改善](#improved-on-demand-entries)
+
+Next.jsはデフォルトで、開発中に_アクティブに_使用されているページのみを自動的にコンパイルします。`next dev`を実行するたびにpagesディレクトリ内のすべてのページをコンパイルするのではなく、アクセスしたページをオンデマンドでコンパイルします。
+
+例えば、`http://localhost:3000/my-page`にアクセスすると、`pages/my-page.js`ファイルがオンデマンドでコンパイルされた後、ページがレンダリングされます。
+
+これにより、開発者は開発サーバーを起動する際にすべてのページのコンパイルを待つ必要がなく、大規模なアプリではかなりの時間がかかる場合があります。コンパイラはバンドリング時にすべてのページを考慮する必要がないため、メモリ使用量を低く保ち、コンパイラを高速に保ちます。
+
+![オンデマンドエントリのフロー](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/flow.jpg)
+
+オンデマンドエントリのフロー
+
+ページが25秒間アクセスされないと、コンパイラのビルドキャッシュから破棄され、コンパイラを高速に保ち、メモリ使用量を削減します。
+
+Next.jsがページのアクセスを追跡する方法は、ポーリングメカニズムを使用しています。5秒ごとに「on-demand-entries-ping」が送信され、Next.js開発サーバーに特定のページがアクセスされていることを通知します。
+
+この機能の初期リリース以来、pingは`window.fetch`呼び出しを使用して行われていました。つまり、pingがトリガーされるたびに、ブラウザの開発ツールの`console`と`network`タブに表示されます。
+
+最も要望の多かった機能の1つは、これらのリクエストをブラウザの開発ツールから隠す機能です。これらのリクエストは不要なノイズを追加する可能性があります。
+
+Next.js 8では、`fetch`ベースのpingがWebSocketベースのアプローチに置き換えられました。つまり、pingは依然として行われますが、WebSocket接続を検査する場合にのみ表示されます。
+
+WebSocketへの変換に協力してくれた[JJ Kasper](https://github.com/ijjk)に特に感謝します。
+
+### [開発時のポート待機高速化](#faster-port-listening-in-development)
+
+Next.js開発サーバーを起動する際、リクエストを処理できるようにするために初期コンパイルを実行する必要があります。デフォルトでは、Next.jsはこのコンパイルステップが完了するまでHTTPサーバーを開始しませんでした。つまり、`next dev`を実行してからブラウザに移動すると、HTTPサーバーがまだ接続を待機していないため、「このサイトにアクセスできません」というメッセージが表示されることがありました。
+
+Next.js 8では、HTTPサーバーはコンパイルが開始される前に接続を待機するようになります。つまり、コンパイルが完了する前に`http://localhost:3000/`にアクセスしても、リクエストは初期コンパイルが完了するのを待ってから処理され、利用可能になるまでページを更新する必要がなくなります。
+
+この機能を実装してくれた[Brian Beck](https://github.com/exogen)に特に感謝します。
+
+[静的エクスポートの高速化](#faster-static-export)
+---------------------------------------------
+
+Next.jsは、高性能を実現する手段として**プリレンダリング**のアイデアに焦点を当てています。プリレンダリングには2つの形式があります:
+
+*   **サーバーサイドレンダリング (SSR)** - 各リクエストがレンダリングをトリガーします。その結果、エンドユーザーはデータの利用を開始するためにJSのダウンロードを待つ必要がありません
+*   **静的レンダリング** - サーバー上でコードを実行する必要なく直接提供できる静的ファイルを出力します
+
+Next.js 8から、`next export`による静的レンダリングは、マシンに複数のCPUがある場合に速度が向上します。
+
+4コアCPUのMacBookでのテストでは、すべてのコアを利用してページをプリレンダリングすることで、エクスポート速度が約1秒あたり25ページから75ページに向上しました。
+
+Next.jsは自動的にCPUコア数を検出し、それに応じてページを分散します。コード変更は必要ありません。
+
+この機能を実装してくれた[Benjamin Kniffler](https://github.com/bkniffler)に特に感謝します。
+
+[Head要素の重複排除](#head-element-deduplication)
+---------------------------------------------------------
+
+アプリケーションを構築する際の一般的なニーズは、ページの`<head>`要素を更新することです。例えば、`<title>`を設定したり、レスポンシブデザインのために`<meta name="viewport">`を設定したりします。
+
+Next.jsは`<head>`に変更を加えるための組み込みコンポーネントを公開しています:
+
+```js filename="pages/index.js"
+import Head from 'next/head';
+ 
+export default function IndexPage() {
+  return (
+    <>
+      <Head>
+        <title>My page title</title>
+      </Head>
+    </>
+  );
+}
+```
+
+`<Head>`コンポーネントは、異なるコンポーネントで複数回使用することもできます。例えば、レイアウトコンポーネントでいくつかのデフォルトのheadタグを設定できます。
+
+ただし、デフォルトのheadタグを異なる値で上書きしたい場合があります。Next.jsの以前のバージョンでは、タグの重複排除方法がなかったため、出力でタグが重複していました。
+
+このため、`<Head>`コンポーネント内のすべての要素に`key`プロパティを提供できるようになり、同じ`key`値を持つタグを自動的に重複排除します。
+
+2つのタグに`key="viewport"`を設定すると、最後のタグのみがレンダリングされます。
+
+```js filename="pages/index.js"
+import Head from 'next/head';
+export default function IndexPage() {
+  return (
+    <>
+      <Head>
+        <title>My page title</title>
+        <meta
+          name="viewport"
+          content="initial-scale=1.0, width=device-width"
+          key="viewport"
+        />
+      </Head>
+      <Head>
+        <meta
+          name="viewport"
+          content="initial-scale=1.2, width=device-width"
+          key="viewport"
+        />
+      </Head>
+    </>
+  );
+}
+```
+
+[セキュリティの改善](#security-improvements)
+-----------------------------------------------
+
+### [新しい`crossOrigin`設定オプション](#new-crossorigin-config-option)
+
+Next.js 6では、`pages/_document.js`の`<Head>`と`<NextScript>`に`crossOrigin`属性を追加するオプションを導入しましたが、これは`cross-origin`を設定するためのすべてのユースケースをカバーしていませんでした。
+
+Next.jsには動的に`<script>`タグを注入するクライアントサイドルーターがあり、これらのタグには注入時に`cross-origin`属性が欠落していました。
+
+すべての`<script>`タグに`cross-origin`が設定されていることを保証するために、`next.config.js`に新しい設定オプションを導入しました
+
+```js filename="next.config.js"
+module.exports = {
+  crossOrigin: 'anonymous',
+};
+```
+
+このオプションを導入するもう1つの利点は、アプリケーションで`cross-origin`を設定するためにカスタム`pages/_document.js`が不要になったことです。
+
+以前の動作も引き続きサポートされていますが、開発者が新しく導入されたオプションに移行するのを助けるために、開発時に警告が表示されます。
+
+### [インラインJavaScriptの削除](#removed-inline-javascript)
+
+Next.js 7以前を使用する場合、[コンテンツセキュリティポリシー (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP)を有効にするためには、ユーザーはポリシーに`script-src 'unsafe-inline'`を含める必要がありました。これは、Next.jsがデータをクライアントサイドに渡すために（例えば`getInitialProps`の結果を渡すために）インラインの`<script>`タグを生成していたためです。
+
+Next.js 8では、このインラインスクリプトタグを安全にクライアントに転送するためのJSONタグに変更しました。これにより、Next.jsが含めるインラインスクリプトはなくなりました。
+
+慎重に検討した上で、`script-src 'self'`を使用できるようになりました。
+
+### [API認証の例](#example-of-api-authentication)
+
+[これまで最もリクエストの多かった例](https://github.com/vercel/next.js/issues/153)の1つは、Next.jsで外部API（どのようなAPIでも、どのプログラミング言語でも）に対して認証を行う方法でした。
+
+Next.js 8のリリースに伴い、新しく作成したサンプルも紹介します: [with-cookie-auth](https://github.com/vercel/next.js/tree/canary/examples/with-cookie-auth)
+
+この例では、外部のNode.js APIに対して認証を行う方法を示していますが、適用されているコンセプトはどのようなステートレスAPIでも機能します。
+
+この例では、サーバーサイドとクライアントサイドのレンダリング間でトークンを共有するためにクッキーを使用しています。
+
+この方法により、アプリがサーバーでレンダリングされた場合でも、ユーザーに代わって認証済みデータを取得できます。
+
+このサンプルを提供してくれた[Juan Olvera](https://github.com/j0lv3r4)に特別な感謝を捧げます。
+
+[コミュニティ](#community)
+-----------------------
+
+最初のリリース以来、Next.jsはフォーチュン500企業から個人ブログまであらゆる場面で使用されてきました。Next.jsの採用が継続的に成長していることを非常に嬉しく思っています。
+
+*   **600人以上のコントリビューター**が少なくとも1つのコミットをしています。
+*   GitHubでは、このプロジェクトは**34,400回以上**スターされています。
+*   最初のリリース以来、**2600以上のプルリクエスト**が提出されました。
+
+Next.jsコミュニティには**4,570人以上のメンバー**がいます。[ぜひ参加してください！](https://github.com/vercel/next.js/discussions)

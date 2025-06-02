@@ -1,0 +1,219 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:12:04.639Z
+title: Next.js App Routerにおけるキャッシュの進化
+description: Next.js App Routerでのキャッシュに関する私たちの取り組みについて学びましょう。
+author:
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+date: 2024-10-24T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/our-journey-with-caching/twitter-card.png
+---
+
+フロントエンドのパフォーマンス最適化は難しい課題です。高度に最適化されたアプリケーションであっても、最も一般的な問題はクライアント-サーバー間のウォーターフォール現象です。Next.js App Routerを導入する際、私たちはこの問題を解決したいと考えていました。そのためには、クライアント-サーバー間のRESTフェッチをサーバーサイドに移行し、React Server Componentsを使って単一の往復で処理する必要がありました。これは、サーバーが時として動的であることを意味し、Jamstackの優れた初期読み込みパフォーマンスを犠牲にすることになりました。私たちはこのトレードオフを解決し、両方の利点を得るために部分的なプリレンダリングを構築しました。
+
+しかし、その過程で、私たちが提供したキャッシュのデフォルト設定と制御により、開発者体験が損なわれることになりました。`fetch()`のデフォルト設定はパフォーマンスを重視してキャッシュを有効にしましたが、迅速なプロトタイピングや高度に動的なアプリケーションには不向きでした。また、`fetch()`を使用しないローカルデータベースアクセスに対する十分な制御を提供していませんでした。`unstable_cache()`はありましたが、使い勝手が良くありませんでした。これにより、`export const dynamic, runtime, fetchCache, dynamicParams, revalidate = ...`といったセグメントレベルの設定が必要となり、緊急避難的な解決策として使われるようになりました。
+
+もちろん、後方互換性のためにこれらを引き続きサポートします。しかし、ここで一旦それらを忘れてください。私たちはもっとシンプルな解決策を考えています。
+
+私たちは、`<Suspense>`と`use cache`という2つの概念に基づいた新しい実験的なモードを開発中です。
+
+[冒険を選ぼう](#choose-your-adventure)
+-----------------------------------------------
+
+最初に気づくのは、コンポーネントにデータを追加するとエラーが発生するようになったことです。
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // エラー
+}
+ 
+export default async function Page() {
+  return <Component />
+}
+```
+
+データ、クッキー、ヘッダー、現在時刻、またはランダムな値を使用する場合、今や選択肢があります：データをキャッシュ（サーバーサイドまたはクライアントサイド）したいのか、それとも毎リクエストごとに実行したいのか？ここでは`fetch()`を例にしていますが、これはデータベースやタイマーなどの非同期Node APIにも適用されます。
+
+[動的（Dynamic）](#dynamic)
+-------------------
+
+まだ開発中だったり、高度に動的なダッシュボードを構築している場合、コンポーネントを`<Suspense>`境界でラップできます。`<Suspense>`は動的なデータ取得とストリーミングを選択します。
+
+```tsx filename="app/page.tsx"
+async function Component() {
+  return fetch(...) // エラーなし
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+これはルートレイアウトで行うことも、`loading.tsx`を使用することもできます。
+
+これにより、アプリのシェルは即座に表示されることが保証されます。ページ内にさらにデータを追加しても、デフォルトで全てが動的になります。デフォルトでは何もキャッシュされません。隠れたキャッシュはもうありません。
+
+[静的（Static）](#static)
+-----------------
+
+静的なものを構築していて動的機能を使用したくない場合、新しい`use cache`ディレクティブを使用できます。
+
+```tsx filename="app/page.tsx"
+"use cache"
+ 
+export default async function Page() {
+  return fetch(...) // エラーなし
+}
+```
+
+`use cache`でページをマークすることで、そのセグメント全体をキャッシュすることを示します。これにより、フェッチしたデータはキャッシュ可能になり、ページを静的にレンダリングできます。静的コンテンツには`<Suspense>`境界は使用されません。ページにさらにデータを追加しても、すべてキャッシュされます。
+
+[部分的（Partial）](#partial)
+-------------------
+
+両方を組み合わせることもできます。例えば、ルートレイアウトに`use cache`を追加してキャッシュされるようにできます。各レイアウトやページは独立してキャッシュできます。
+
+```tsx filename="app/layout.tsx"
+"use cache"
+ 
+export default async function Layout({ children }) {
+  const response = await fetch(...)
+  const data = await response.json()
+  return <html>
+    <body>
+      <div>{data.notice}</div>
+      {children}
+    </body>
+  </html>
+}
+```
+
+一方、特定のページ内で動的データを使用する場合：
+
+```tsx filename="app/page.tsx"
+import { Suspense } from 'react'
+async function Component() {
+  return fetch(...) // エラーなし
+}
+ 
+export default async function Page() {
+  return <Suspense fallback="..."><Component /></Suspense>
+}
+```
+
+[キャッシュ関数（Cached functions）](#cached-functions)
+-------------------------------------
+
+このようなハイブリッドアプローチを使用する場合、API呼び出しの近くにキャッシュを追加する方が便利かもしれません。
+
+`use server`と同様に、任意の非同期関数に`use cache`を追加できます。サーバーを呼び出すのではなく、キャッシュを呼び出すサーバーアクションと考えてください。JSON以外の豊富な引数と戻り値の型をサポートしています。キャッシュキーには自動的に引数とクロージャが含まれるため、手動でキャッシュキーを指定する必要はありません。
+
+```tsx filename="app/layout.tsx"
+async function getNotice() {
+  "use cache"
+  const response = await fetch(...)
+  const data = await response.json()
+  return data.notice;
+}
+ 
+export default async function Layout({ children }) {
+  return <html>
+    <body>
+      <h1>{await getNotice()}</h1>
+      {children}
+    </body>
+  </html>
+}
+```
+
+このレイアウトで他のデータが使用されていないため、静的のままにできます。このアプローチの利点は、誤ってレイアウトに新しい動的データを追加すると、ビルド時にエラーが発生し、新しい選択を強制されることです。レイアウト全体に`use cache`を追加すると、エラーなくキャッシュされます。どちらのアプローチを選ぶかはユースケースによります。
+
+[キャッシュのタグ付け（Tagging a cache）](#tagging-a-cache)
+-----------------------------------
+
+タグで明示的にキャッシュエントリをクリアしたい場合、`use cache`関数内で新しい`cacheTag()` APIを使用できます。
+
+```ts filename="app/utils.ts"
+import { cacheTag } from 'next/cache';
+ 
+async function getNotice() {
+  'use cache';
+  cacheTag('my-tag');
+}
+```
+
+その後、以前と同様にサーバーアクションから`revalidateTag('my-tag')`を呼び出します。
+
+このAPIはデータ読み込み後に呼び出せるため、データを使用してキャッシュエントリにタグを付けられるようになりました。
+
+```ts filename="app/actions.ts"
+import { unstable_cacheTag as cacheTag } from 'next/cache';
+ 
+async function getBlogPosts(page) {
+  'use cache';
+  const posts = await fetchPosts(page);
+  for (let post of posts) {
+    cacheTag('blog-post-' + post.id);
+  }
+  return posts;
+}
+```
+
+[キャッシュの寿命定義（Defining the lifetime of a cache）](#defining-the-lifetime-of-a-cache)
+---------------------------------------------------------------------
+
+特定のエントリやページがキャッシュに保持される期間を制御したい場合、`cacheLife()` APIを使用できます：
+
+```tsx filename="app/page.tsx"
+"use cache"
+import { unstable_cacheLife as cacheLife } from 'next/cache'
+ 
+export default async function Page() {
+  cacheLife("minutes")
+  return ...
+}
+```
+
+デフォルトで以下の値を受け入れます：
+
+*   `"seconds"`（秒）
+*   `"minutes"`（分）
+*   `"hours"`（時間）
+*   `"days"`（日）
+*   `"weeks"`（週）
+*   `"max"`（最大）
+
+ユースケースに最適な大まかな範囲を選択してください。1週間が何秒（またはミリ秒？）か正確な数を指定して計算する必要はありません。ただし、特定の値を指定したり、独自の名前付きキャッシュプロファイルを設定することもできます。
+
+`revalidate`に加えて、このAPIはクライアントキャッシュの`stale`時間と、トラフィックが少ない場合にページがいつ期限切れになるかを決定する`expire`を制御できます。
+
+[実験的（Experimental）](#experimental)
+-----------------------------
+
+これはまだ非常に実験的なプロジェクトです。まだ本番環境での使用に耐えるものではなく、不足している機能やバグがあります。特に、この新しいタイプのエラーに対するエラースタックの改善が必要であることを認識しています。しかし、冒険心がある方には、早期のフィードバックをお待ちしています。
+
+より詳細なアップグレードパスを公開する予定です。早期のエラーを除けば、ここでの主な破壊的変更は`fetch()`のデフォルトキャッシュを元に戻すことです。とはいえ、この初期実験段階では新規プロジェクトでのみ試すことをお勧めします。うまくいけば、マイナーリリースでオプトイン版をリリースし、将来のメジャーリリースでデフォルトにしたいと考えています。
+
+試すには、Next.jsの`canary`バージョンを使用する必要があります：
+
+```
+npx create-next-app@canary
+```
+
+また、`next.config.ts`で実験的なdynamicIOフラグを有効にする必要があります：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  experimental: {
+    dynamicIO: true,
+  }
+};
+ 
+export default nextConfig;
+```
+
+[`use cache`](/docs/canary/app/api-reference/directives/use-cache)、[`cacheLife`](/docs/canary/app/api-reference/next-config-js/cacheLife)、[`cacheTag`](/docs/canary/app/api-reference/functions/cacheTag)についての詳細はドキュメントをご覧ください。

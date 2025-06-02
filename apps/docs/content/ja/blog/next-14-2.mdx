@@ -1,0 +1,218 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:16:32.910Z
+title: Next.js 14.2
+description: >-
+  Next.js 14.2には、開発環境、本番環境、およびキャッシュの改善が含まれています。
+  新しい設定オプション、Turbopackテストの99%通過率などが追加されました。
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2024-04-11T17:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/twitter-card.png
+---
+
+Next.js 14.2には、開発環境、本番環境、およびキャッシュの改善が含まれています。
+
+*   [**開発用Turbopack（リリース候補版）:**](#turbopack-for-development-release-candidate) `next dev --turbo` で99.8%のテストを通過
+*   [**ビルドと本番環境の改善:**](#build-and-production-improvements) ビルド時のメモリ使用量削減とCSS最適化
+*   [**キャッシュの改善:**](#caching-improvements) `staleTimes`による設定可能な無効化期間
+*   [**エラーDXの改善:**](#errors-dx-improvements) ハイドレーションミスマッチエラーの改善とデザイン更新
+
+今すぐアップグレードするか、以下で新規プロジェクトを作成できます:
+
+```bash filename="Terminal"
+npx create-next-app@latest
+```
+
+[開発用Turbopack（リリース候補版）](#turbopack-for-development-release-candidate)
+---------------------------------------------------------------------------------------------
+
+過去数ヶ月間、私たちはTurbopackを使用したローカル開発環境のパフォーマンス改善に取り組んできました。バージョン14.2では、ローカル開発用のTurbopack**リリース候補版**が利用可能になりました:
+
+*   [統合テスト](https://areweturboyet.com/)の**99.8%**を通過
+*   Next.jsアプリケーションで使用される上位300の`npm`パッケージがTurbopackでコンパイル可能であることを確認
+*   すべての[Next.jsサンプル](https://github.com/vercel/next.js/tree/canary/examples)がTurbopackで動作
+*   Rustで書かれた高速なCSSバンドラー/ミニファイアである[Lightning CSS](https://lightningcss.dev/)を統合
+
+私たちはVercelのアプリケーションでTurbopackを広範囲にテストしてきました。例えば大規模なNext.jsアプリケーションである`vercel.com`では以下の結果が得られました:
+
+*   ローカルサーバー起動時間が最大**76.7%高速化**
+*   Fast Refreshによるコード更新が最大**96.3%高速化**
+*   キャッシュなしの初期ルートコンパイルが最大**45.8%高速化**（Turbopackにはまだディスクキャッシュ機能がありません）
+
+Turbopackは引き続きオプトイン機能であり、以下のコマンドで試すことができます:
+
+```bash filename="Terminal"
+next dev --turbo
+```
+
+今後はメモリ使用量の改善、永続キャッシュの実装、`next build --turbo`に注力していきます。
+
+*   **メモリ使用量** - メモリ使用量を調査するための低レベルツールを開発しました。パフォーマンスメトリクスと広範なメモリ使用情報を含む[トレースファイル生成](/docs/architecture/turbopack#generating-trace-files)が可能になりました
+*   **永続キャッシュ** - 最適なアーキテクチャオプションを検討中で、今後のリリースで詳細を共有予定
+*   **`next build`** - Turbopackはまだビルドには利用できませんが、**74.7%**のテストを通過しています。進捗は[areweturboyet.com/build](https://areweturboyet.com/build)で確認可能
+
+Turbopackの[サポート機能](/docs/architecture/turbopack#supported-features)と[未サポート機能](/docs/architecture/turbopack#unsupported-features)の一覧については、[ドキュメント](/docs/architecture/turbopack)を参照してください。
+
+[ビルドと本番環境の改善](#build-and-production-improvements)
+-----------------------------------------------------------------------
+
+Turbopackによるバンドリング改善に加え、すべてのNext.jsアプリケーション（Pages RouterとApp Routerの両方）のビルドおよび本番環境パフォーマンスを向上させました。
+
+### [ツリーシェイキング](#tree-shaking)
+
+サーバーコンポーネントとクライアントコンポーネントの境界における最適化を実装し、未使用のエクスポートをツリーシェイクできるようになりました。例えば`"use client"`を含むファイルから単一の`Icon`コンポーネントをインポートする場合、そのパッケージの他のアイコンが含まれなくなりました。これにより本番JavaScriptバンドルサイズを大幅に削減できます。
+
+この最適化を`react-aria-components`のような人気ライブラリでテストしたところ、最終バンドルサイズが**-51.3%**減少しました。
+
+> **注:** この最適化は現在バレルファイルでは動作しません。当面は[`optimizePackageImports`](/docs/app/api-reference/next-config-js/optimizePackageImports)設定オプションを使用できます:
+> 
+> ```ts filename="next.config.ts"
+> module.exports = {
+>   experimental: {
+>     optimizePackageImports: ['package-name'],
+>   },
+> };
+> ```
+
+### [ビルド時のメモリ使用量](#build-memory-usage)
+
+超大規模なNext.jsアプリケーションでは、本番ビルド中にメモリ不足（OOM）クラッシュが発生するケースがありました。ユーザー報告と再現調査の結果、過剰なバンドリングとミニフィケーション（重複を含むより少ない大きなJavaScriptファイルの生成）が根本原因であることを特定しました。この問題に対処するため、バンドリングロジックをリファクタリングし、コンパイラを最適化しました。
+
+最小限のNext.jsアプリでの初期テストでは、メモリ使用量とキャッシュファイルサイズが平均**2.2GBから190MB未満**に減少しました。
+
+メモリパフォーマンスのデバッグを容易にするため、`next build`に`--experimental-debug-memory-usage`フラグを追加しました。詳細は[ドキュメント](/docs/app/building-your-application/optimizing/memory-usage)をご覧ください。
+
+### [CSS](#css)
+
+本番ビルド時のCSS最適化方法を更新し、ページ間遷移時のスタイル競合を防ぐためCSSをチャンク分割するようにしました。
+
+CSSチャンクの順序とマージはインポート順で定義されるようになりました。例えば`base-button.module.css`は`page.module.css`より前に順序付けられます:
+
+```tsx filename="base-button.tsx"
+import styles from './base-button.module.css';
+ 
+export function BaseButton() {
+  return <button className={styles.primary} />;
+}
+```
+
+```tsx filename="page.tsx"
+import { BaseButton } from './base-button';
+import styles from './page.module.css';
+ 
+export function Page() {
+  return <BaseButton className={styles.primary} />;
+}
+```
+
+正しいCSS順序を維持するため、以下をお勧めします:
+
+*   [グローバルスタイル](/docs/app/building-your-application/styling/css-modules#global-styles)よりも[CSS Modules](/docs/app/building-your-application/styling/css-modules)を使用する
+*   CSSモジュールは単一のJS/TSファイルでのみインポートする
+*   グローバルクラス名を使用する場合、グローバルスタイルも同じJS/TSファイルでインポートする
+
+この変更がほとんどのアプリケーションに悪影響を与えることはないと考えていますが、アップグレード後に予期しないスタイルが発生した場合は、[ドキュメント](/docs/app/building-your-application/styling/css#ordering-and-merging)の推奨事項に従ってCSSインポート順序を確認してください。
+
+[キャッシュの改善](#caching-improvements)
+---------------------------------------------
+
+キャッシュは高速で信頼性の高いWebアプリケーション構築の重要な要素です。変更を行う際、ユーザーも開発者もキャッシュが最新の変更を反映することを期待します。私たちはApp RouterでのNext.jsキャッシュ体験を改善する方法を模索してきました。
+
+### [`staleTimes`（実験的機能）](#staletimes-experimental)
+
+[クライアントサイドルーターキャッシュ](/docs/app/building-your-application/caching#data-cache-and-client-side-router-cache)は、訪問済みおよびプリフェッチされたルートをクライアント側にキャッシュすることで高速なナビゲーション体験を提供するキャッシュレイヤーです。
+
+コミュニティからのフィードバックに基づき、[クライアントサイドルーターキャッシュ](/docs/app/building-your-application/caching#router-cache)の無効化期間を設定可能にする実験的`staleTimes`オプションを追加しました。
+
+デフォルトでは、プリフェッチされたルート（`prefetch`プロップなしの`<Link>`コンポーネント使用）は30秒間キャッシュされ、`prefetch`プロップが`true`に設定されている場合は5分間キャッシュされます。`next.config.js`でカスタム[再検証時間](/docs/app/building-your-application/caching#duration-3)を定義することでこれらのデフォルト値を上書きできます:
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+`staleTimes`はキャッシュヒューリスティックをより制御したいユーザーの現在の体験を改善することを目的としていますが、完全な解決策ではありません。今後のリリースでは、全体的なキャッシュセマンティクスの改善とより柔軟なソリューションの提供に注力します。
+
+`staleTimes`の詳細については[ドキュメント](/docs/app/api-reference/next-config-js/staleTimes)をご覧ください。
+
+### [並列ルート (Parallel Routes) とインターセプトルート (Intercepting Routes)](#parallel-and-intercepting-routes)
+
+現在、[並列ルート (Parallel Routes)](/docs/app/building-your-application/routing/parallel-routes) と [インターセプトルート (Intercepting Routes)](/docs/app/building-your-application/routing/intercepting-routes) の改善を継続しており、クライアントサイドルーターキャッシュ (Client-side Router Cache) との統合を強化しています。
+
+* [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) または [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) を使用してサーバーアクション (Server Actions) を呼び出す並列ルートとインターセプトルートは、キャッシュを再検証し、ユーザーの現在のビューを維持しながら表示スロットを更新します。
+* 同様に、[`router.refresh`](/docs/app/building-your-application/caching#routerrefresh) を呼び出すと、現在のビューを維持しながら表示スロットが正しく更新されます。
+
+[エラーDXの改善 (Errors DX Improvements)](#errors-dx-improvements)
+-------------------------------------------------
+
+バージョン14.1では、`next dev` 実行時の [エラーメッセージとスタックトレースの可読性向上](/blog/next-14-1#improved-error-messages-and-fast-refresh) に取り組み始めました。この取り組みは14.2でも継続され、より優れたエラーメッセージ、App RouterとPages Routerの両方に対するオーバーレイデザインの改善、ライト/ダークモードのサポート、より明確な `dev` および `build` ログが含まれるようになりました。
+
+例えば、Reactハイドレーションエラー (React Hydration errors) はコミュニティで混乱を招きやすい問題です。ハイドレーションの不一致の原因を特定するための改善（下記参照）を行いつつ、Reactチームと協力して基礎となるエラーメッセージを改善し、エラーが発生したファイル名を表示するようにしています。
+
+**改善前:**
+
+![バージョン14.2以前のNext.jsエラーオーバーレイの例](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/error-overlay-before.png)
+
+バージョン14.2以前のNext.jsエラーオーバーレイの例
+
+**改善後:**
+
+![バージョン14.2以降のNext.jsエラーオーバーレイの例](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/error-overlay-after.png)
+
+バージョン14.2以降のNext.jsエラーオーバーレイの例
+
+[React 19](#react-19)
+---------------------
+
+2月にReactチームは [React 19](https://react.dev/blog/2024/02/15/react-labs-what-we-have-been-working-on-february-2024#the-next-major-version-of-react) のリリースを発表しました。React 19に備えて、Next.jsに最新の機能と改善を統合する作業を行っており、これらの変更を調整するメジャーバージョンのリリースを計画しています。
+
+[Reactカナリーチャンネル (React canary channel)](https://react.dev/blog/2023/05/03/react-canaries) からNext.jsで利用可能だったアクション (Actions) と関連するフックなどの新機能は、すべてのReactアプリケーション（クライアントのみのアプリケーションを含む）で利用可能になります。Reactエコシステムでこれらの機能が広く採用されることを楽しみにしています。
+
+[その他の改善点 (Other Improvements)](#other-improvements)
+-----------------------------------------
+
+* **\[ドキュメント\]** 動画最適化 (Video Optimization) に関する新しいドキュメント ([PR](https://github.com/vercel/next.js/pull/60574))
+* **\[ドキュメント\]** `instrumentation.ts` に関する新しいドキュメント ([PR](https://github.com/vercel/next.js/pull/61403))
+* **\[機能\]** `next/image` に新しい `overrideSrc` プロパティを追加 ([PR](https://github.com/vercel/next.js/pull/64221))
+* **\[機能\]** `getStaticProps` に新しい `revalidateReason` 引数を追加 ([PR](https://github.com/vercel/next.js/pull/64258))
+* **\[改善\]** ストリーミングロジックをリファクタリングし、本番環境でのページストリーミング時間を短縮 ([PR](https://github.com/vercel/next.js/pull/63427))
+* **\[改善\]** ネストされたサーバーアクション (Server Actions) のサポート ([PR](https://github.com/vercel/next.js/pull/61001))
+* **\[改善\]** 生成されたサイトマップ (Sitemaps) でのローカライゼーションサポート ([PR](https://github.com/vercel/next.js/pull/53765))
+* **\[改善\]** devおよびbuildログの視覚的改善 ([PR](https://github.com/vercel/next.js/pull/62946))
+* **\[改善\]** Vercelでのスキュー保護 (Skew protection) が安定版に ([Docs](https://vercel.com/docs/skew-protection))
+* **\[改善\]** `useSelectedLayoutSegment` をPages Routerと互換性を持たせる ([PR](https://github.com/vercel/next.js/pull/62584))
+* **\[改善\]** 絶対URLを解決する必要がない場合の `metadataBase` 警告をスキップ ([PR](https://github.com/vercel/next.js/pull/61898))
+* **\[改善\]** Vercelにデプロイ時にJavaScriptが無効な状態でもサーバーアクションが送信されない問題を修正 ([PR](https://github.com/vercel/next.js/pull/63978))
+* **\[改善\]** 参照ページから離れた後や非アクティブな並列ルートセグメント内で使用された場合にサーバーアクションが見つからないというエラーを修正 ([PR](https://github.com/vercel/next.js/pull/64227))
+* **\[改善\]** `next/dynamic` で読み込まれるコンポーネント内のCSSインポートを修正 ([PR](https://github.com/vercel/next.js/pull/64294))
+* **\[改善\]** アニメーション画像に `unoptimized` プロパティがない場合に警告を表示 ([PR](https://github.com/vercel/next.js/pull/61045))
+* **\[改善\]** `images.loaderFile` がデフォルト関数をエクスポートしていない場合にエラーメッセージを表示 ([PR](https://github.com/vercel/next.js/pull/64036))
+
+[コミュニティ (Community)](#community)
+-----------------------
+
+Next.jsは現在、月間100万人以上のアクティブ開発者を擁しています。コミュニティのサポートと貢献に感謝しています。[GitHub Discussions](https://github.com/vercel/next.js/discussions)、[Reddit](https://www.reddit.com/r/nextjs/)、[Discord](/discord) で会話に参加してください。
+
+[貢献者 (Contributors)](#contributors)
+-----------------------------
+
+Next.jsは、3,000人以上の個人開発者、GoogleやMetaなどの業界パートナー、そしてVercelのコアチームの共同作業の結果です。このリリースは以下の方々によってもたらされました:
+
+* **Next.jsチーム**: [Andrew](https://github.com/acdlite), [Balazs](https://github.com/balazsorban44), [Ethan](https://github.com/Ethan-Arrowood), [Janka](https://github.com/lubieowoce), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sam](https://github.com/samcx), [Sebastian](https://github.com/sebmarkbage), [Sebbie](https://github.com/eps1lon), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens), [Wyatt](https://github.com/wyattjoh), [Zack](https://github.com/ztanner)
+* **Turbopackチーム**: [Donny](https://github.com/kdy1), [Leah](https://github.com/forsakenharmony), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra), [Will](https://github.com/wbinnssmith)
+* **Next.jsドキュメントチーム**: [Delba](https://github.com/delbaoliveira), [Steph](https://github.com/StephDietz), [Michael](https://github.com/manovotny), [Anthony](https://github.com/anthonyshew), [Lee](https://github.com/leerob)
+
+@taishikato、@JesseKoldewijn、@Evavic44、@feugy、@liamlaverty、@dvoytenko、@SukkaW、@wbinnssmith、@rishabhpoddar、@better-salmon、@ziyafenn、@A7med3bdulBaset、@jasonuc、@yossydev、@Prachi-meon、@InfiniteCodeMonkeys、@ForsakenHarmony、@miketimmerman、@kwonoj、@williamli、@gnoff、@jsteele-stripe、@chungweileong94、@WITS、@sogoagain、@junioryono、@eisafaqiri、@yannbolliger、@aramikuto、@rocketman-21、@kenji-webdev、@michaelpeterswa、@Dannymx、@vpaflah、@zeevo、@chrisweb、@stefangeneralao、@tknickman、@Kikobeats、@ubinatus、@code-haseeb、@hmmChase、@byhow、@DanielRivers、@wojtekmaj、@paramoshkinandrew、@OMikkel、@theitaliandev、@oliviertassinari、@Ishaan2053、@Sandeep-Mani、@alyahmedaly、@Lezzio、@devjiwonchoi、@juliusmarminge、@szmazhr、@eddiejaoude、@itz-Me-Pj、@AndersDJohnson、@gentamura、@tills13、@dijonmusters、@SaiGanesh21、@vordgi、@ryota-murakami、@tszhong0411、@officialrajdeepsingh、@alexpuertasr、@AkifumiSato、@Jonas-PFX、@icyJoseph、@florian-lp、@pbzona、@erfanium、@remcohaszing、@bernardobelchior、@willashe、@kevinmitch14、@smakosh、@mnjongerius、@asobirov、@theoholl、@suu3、@ArianHamdi、@adrianha、@Sina-Abf、@kuzeykose、@meenie、@nphmuller、@javivelasco、@belgattitude、@Svetoslav99、@johnslemmer、@colbyfayock、@mehranmf31、@m-nakamura145、@ryo8000、@aryaemami59、@bestlyg、@jinsoul75、@petrovmiroslav、@nattui、@zhuyedev、@dongwonnn、@nhducit、@flotwig、@Schmavery、@abhinaypandey02、@rvetere、@coffeecupjapan、@cjimmy、@Soheiljafarnejad、@jantimon、@zengspr、@wesbos、@neomad1337、@MaxLeiter、@devr77 の皆さん、ご協力ありがとうございました！

@@ -1,0 +1,271 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:18:53.955Z
+title: Next.js 12.2
+description: >-
+  Next.js 12.2では、安定版のMiddlewareとオンデマンドISR、実験的なEdge SSRとAPI Routesなどが導入されました！
+author:
+  - name: Balázs Orbán
+    image: /static/team/balazs.jpg
+  - name: DongYoon Kang
+    image: /static/team/kdy.jpg
+  - name: Javi Velasco
+    image: /static/team/javi.jpg
+  - name: Jiachi Liu
+    image: /static/team/jiachi.png
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Joe Haddad
+    image: /static/team/timer.jpg
+  - name: Maia Teegarden
+    image: /static/team/maia.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Steven
+    image: /static/team/styfle.png
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2022-06-28T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-12-2/twitter-card.png
+---
+
+Next.js 12.2で、私たちはNext.jsの未来の基盤を築いています：
+
+*   [**Middleware（安定版）**](#middleware-stable): アプリケーション全体の動的ルーティング
+*   [**オンデマンドISR（安定版）**](#on-demand-incremental-static-regeneration-stable): 再デプロイなしでコンテンツを更新
+*   [**Edge API Routes（実験的）**](#edge-api-routes-experimental): 高性能なAPIエンドポイント
+*   [**Edge SSR（実験的）**](#edge-server-rendering-experimental): Edge環境でのサーバーサイドレンダリング
+*   [**SWCプラグイン（実験的）**](#swc-plugins-experimental): 独自プラグインによるコンパイル拡張
+*   [**`next/image`の改善**](#improvements-to-nextimage): 新しい`next/future/image`コンポーネントを含む
+
+今すぐ`npm i next@latest`を実行してアップデートしてください。
+
+[Middleware（安定版）](#middleware-stable)
+-----------------------------------------
+
+Middlewareが12.2で安定版となり、ユーザーフィードバックに基づいてAPIが改善されました。
+
+Middlewareを使用すると、リクエストが完了する前にコードを実行できます。受信リクエストに基づいて、リライト、リダイレクト、ヘッダーの追加、クッキーの設定などでレスポンスを変更できます。
+
+```ts filename="middleware.ts"
+import { NextRequest, NextResponse } from 'next/server';
+ 
+// "beta"クッキーがあるリクエストの場合
+// /betaにリライトします
+export function middleware(req: NextRequest) {
+  const isInBeta = JSON.parse(req.cookies.get('beta') || 'false');
+  req.nextUrl.pathname = isInBeta ? '/beta' : '/';
+  return NextResponse.rewrite(req.nextUrl);
+}
+ 
+// 単一値またはマッチの配列をサポート
+export const config = {
+  matcher: '/',
+};
+```
+
+Middlewareの最新APIへの更新方法については、[移行ガイド](/docs/messages/middleware-upgrade-guide)をご覧ください。
+
+[Vercelで無料で試す](https://vercel.com/edge)か、`next start`を使用して[セルフホスティング](/docs/pages/building-your-application/deploying#self-hosting)時に利用できます。
+
+[オンデマンドISR（安定版）](#on-demand-incremental-static-regeneration-stable)
+-------------------------------------------------------------------------------------------------------
+
+オンデマンドインクリメンタル静的再生成（ISR）を使用すると、再デプロイせずにサイトのコンテンツを更新できます。ヘッドレスCMSやコマースプラットフォームでデータが変更された際に、すぐにサイトを更新できます。コミュニティから最も要望の多かった機能の1つで、安定版となったことを嬉しく思います。
+
+```js filename="pages/api/revalidate.js"
+export default async function handler(req, res) {
+  // 有効なリクエストか確認
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: '無効なトークン' });
+  }
+ 
+  try {
+    await res.revalidate('/path-to-revalidate');
+    return res.json({ revalidated: true });
+  } catch (err) {
+    // エラーが発生した場合、Next.jsは最後に正常に生成された
+    // ページを表示し続けます
+    return res.status(500).send('再検証エラー');
+  }
+}
+```
+
+インクリメンタル静的再生成は、[Next.jsビルドAPI](/docs/pages/building-your-application/deploying#nextjs-build-api)（`next build`）をサポートするすべてのプロバイダーで動作します。[Vercel](https://vercel.com/)にデプロイすると、オンデマンド再検証は約300msでグローバルに伝播します。
+
+詳細は[ドキュメント](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)を参照するか、[デモ](https://on-demand-isr.vercel.app/)で実際の動作をご覧ください。
+
+[Edge API Routes（実験的）](#edge-api-routes-experimental)
+---------------------------------------------------------------
+
+Next.jsでは、API Routesに[Edge Runtime](/docs/pages/api-reference/edge)を使用できるようになりました。Edge RuntimeはNode.jsよりも軽量で、低遅延のための高速起動を実現します。さらに、Edge API Routesはサーバーからのストリーミングレスポンスをサポートします。
+
+API Routeのランタイムは`config`で設定でき、`nodejs`（デフォルト）または`experimental-edge`を指定できます：
+
+```js filename="pages/api/hello.js"
+import type { NextRequest } from 'next/server';
+ 
+export default (req: NextRequest) => {
+  return new Response(`Hello, from ${req.url} I'm now an Edge API Route!`);
+};
+ 
+export const config = {
+  runtime: 'experimental-edge',
+};
+```
+
+Edge Runtimeは軽量なため、高速起動を実現するために制限があります。例えば、`fs`などのNode.js固有のAPIはサポートされていません。そのため、API Routesのデフォルトランタイムは`nodejs`のままです。
+
+詳細は[ドキュメント](/docs/pages/building-your-application/routing/api-routes)をご覧ください。
+
+[Edge SSR（実験的）](#edge-server-rendering-experimental)
+---------------------------------------------------------------------------
+
+Next.jsでは、サーバーレンダリングに[Edge Runtime](/docs/pages/api-reference/edge)を使用できるようになりました。
+
+前述のように、Edge RuntimeはNode.jsよりも軽量で、低遅延のための高速起動を実現します。React 18と組み合わせると、ページのストリーミングサーバーレンダリングが可能になります。
+
+Next.jsはデフォルトでNode.jsをサーバーサイドレンダリングのランタイムとして使用します。12.2以降、React 18を使用している場合、Edge Runtimeを選択できます。
+
+`next.config.js`でグローバルにランタイムを設定できます：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    runtime: 'experimental-edge',
+  },
+};
+```
+
+デフォルトのページランタイムを変更すると、[SSRストリーミング](/docs/app/building-your-application/routing/loading-ui-and-streaming)や[サーバーコンポーネント](/docs/getting-started/react-essentials)機能を含むすべてのページに影響します。ページごとにこのデフォルトを上書きすることもできます：
+
+```js filename="pages/index.js"
+export const config = {
+  runtime: 'nodejs',
+};
+ 
+export default function Home() {}
+```
+
+ランタイム中に`process.env.NEXT_RUNTIME`環境変数を確認するか、webpackコンパイル中に`options.nextRuntime`変数を検査することで、使用中のランタイムを検出できます。
+
+詳細は[ドキュメント](/docs/pages/building-your-application/rendering/edge-and-nodejs-runtimes)をご覧ください。
+
+[`next/image`の改善](#improvements-to-nextimage)
+----------------------------------------------------------
+
+### [`next/future/image`コンポーネント（実験的）](#nextfutureimage-component-experimental)
+
+現在のImageコンポーネントに関するフィードバックを受け、新しい`next/image`の早期プレビューを共有できることを嬉しく思います。この新しい改良版イメージコンポーネントは、クライアントサイドJavaScriptを減らし、画像のスタイリングを簡素化します：
+
+*   `<div>`や`<span>`ラッパーなしで単一の`<img>`をレンダリング
+*   標準の`style`プロップをサポート追加
+*   `layout`、`objectFit`、`objectPosition`プロップを削除（`style`または`className`を使用）
+*   `IntersectionObserver`実装を削除（[ネイティブの遅延読み込み](https://caniuse.com/loading-lazy-attr)を使用）
+*   `loader`設定を削除（`loader`プロップを使用）
+*   注：まだ`fill`モードはないため、`width`と`height`プロップが必要
+
+ネイティブの`loading="lazy"`はReactのハイドレーションやクライアントサイドJavaScriptを待つ必要がないため、パフォーマンスが向上します。
+
+詳細は[ドキュメント](/docs/pages/building-your-application/optimizing/images)をご覧ください。
+
+### [リモートパターン（実験的）](#remote-patterns-experimental)
+
+`next/image`では、組み込みの画像最適化APIを使用する際にリモート画像のワイルドカードを指定できる実験的な設定オプション`remotePatterns`をサポートしました。これにより、ドメイン名の完全一致のみを行う既存の[`images.domains`](http://images.domains)設定よりも強力なマッチングが可能になります。
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    images: {
+      remotePatterns: [
+        {
+          // `src`プロパティのホスト名は`.example.com`で終わる必要があります
+          // そうでない場合、400 Bad Requestが返されます
+          protocol: 'https',
+          hostname: '**.example.com',
+        },
+      ],
+    },
+  },
+};
+```
+
+詳細は[ドキュメント](/docs/pages/api-reference/components/image#remotepatterns)をご覧ください。
+
+### [画像最適化の無効化](#disable-image-optimization)
+
+ゼロコンフィグの画像最適化APIは、リクエスト時に画像をオンデマンドで最適化するためにサーバーが必要なため、`next export`の使用を妨げていました。これまで、`next export`をターゲットとするユーザーは、サードパーティの画像最適化プロバイダーを使用するように`loader`を設定する必要がありましたが、利用可能なプロバイダーがない場合の明確な解決策はありませんでした。本日より、`next export`ユーザーは新しい設定プロパティを使用して、すべての`next/image`インスタンスの画像最適化を無効にできるようになりました：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    images: {
+      unoptimized: true,
+    },
+  },
+};
+```
+
+[SWCプラグイン（実験的機能）](#swc-plugins-experimental)
+-------------------------------------------------------
+
+[Next.jsコンパイラ](/docs/architecture/nextjs-compiler)は、本番環境向けにJavaScriptコードを変換および最小化するために[SWC](https://swc.rs/)を使用します。SWCはNext.js 12.0で導入され、ローカル開発とビルドのパフォーマンスの両方を向上させました。
+
+コンパイル時にSWCの変換動作をカスタマイズするために、プラグイン（WebAssemblyで記述）を追加できるようになりました：
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcPlugins: [
+      ['css-variable/swc', { displayName: true, basePath: __dirname }],
+    ],
+  },
+};
+```
+
+詳細については、[ドキュメントを確認してください](https://github.com/vercel/next.js/blob/canary/docs/architecture/nextjs-compiler.md#experimental-swc-plugin-support)。
+
+[React 18サポートの改善](#react-18-support-improvements)
+---------------------------------------------------------------
+
+*   `styled-components`や`emotion`などのCSS-in-JSライブラリのサポートが改善され、よりスムーズなアップグレード体験と破壊的変更なしで利用可能になりました。
+*   AMPおよびHTMLのポスト最適化（CSS、フォントの最適化）が適切にサポートされるようになりました。
+*   `next/head`がReact 18をサポートするようになりました。
+*   スクリーンリーダーやその他の支援技術にページ遷移を適切に通知するために使用されるNext.jsのルートアナウンサーが、React 18をサポートするようになりました。
+
+[その他の改善点](#other-improvements)
+-----------------------------------------
+
+*   Next.jsコンパイラでのEmotion変換のサポート。`@emotion/babel-plugin`のほとんどの機能がサポートされるようになったため、`importMap`を使用していない限り、これを削除できます。詳細については、[ドキュメントを確認してください](/docs/architecture/nextjs-compiler#emotion)。
+*   Next.jsコンパイラでの`styled-components`変換のサポートが改善され、`cssProp`オプションを含むデフォルトオプションのカスタマイズが可能になりました。詳細については、[ドキュメントを確認してください](/docs/architecture/nextjs-compiler#styled-components)。
+*   JavaScript ESモジュールのサポートが向上し、`next/image`や`next/link`などのコンポーネントを適切に`import`できるようになりました。
+*   `next/link`に`<a>`を子として手動で追加する必要がなくなりました。これで、[後方互換性のある方法でこの動作を選択](https://github.com/vercel/next.js/pull/36436)できます。
+*   `browsersList`を変更してモダンなJavaScriptのみを提供する実験的なサポートを追加しました。`next.config.js`の`experimental`オプションで`browsersListForSwc: true`と`legacyBrowsers: false`を設定することで、この動作を選択できます。
+*   新しい`@swc/helpers`の最適化により、バンドル間の重複が防止され、最小構成で約`2KB`、大規模なアプリではさらにバンドルサイズが削減されます。
+*   Next.jsのインストールサイズを大幅に削減しました。pnpmにモノレポを移行することで、これを行い、重複するパッケージを削除しながら、使用するプリコンパイル済みバージョンを作成できます。これにより、インストールサイズが14MB削減されます。
+*   Next.jsのセルフホスティングを改善する取り組みの一環として、実験的な`outputStandalone: true`設定を`output: 'standalone'`に安定化しています。この設定により、必要なファイル/アセットのみを含めることでデプロイメントサイズが大幅に削減され、ビルドされたデプロイメントパッケージに`node_modules`をすべてインストールする必要がなくなります。この設定は、[`with-docker`の例](https://github.com/vercel/next.js/blob/canary/examples/with-docker/README.md)で実際に見ることができます。
+
+[レイアウトRFCと高度なルーティングサポート](#layouts-rfc--advanced-routing-support)
+--------------------------------------------------------------------------------
+
+見逃した方のために、先月[レイアウトRFC](/blog/layouts-rfc)を発表しました。これは2016年の導入以来、Next.jsにとって最大の更新であり、以下を含みます：
+
+*   **ネストされたレイアウト:** ネストされたルートで複雑なアプリケーションを構築。
+*   **サーバーコンポーネント向け設計:** サブツリーナビゲーションに最適化。
+*   **データフェッチングの改善:** ウォーターフォールを回避しながらレイアウトでフェッチ。
+*   **React 18機能の使用:** ストリーミング、トランジション、サスペンス。
+*   **クライアントとサーバーフルーティング:** SPAのような動作を持つサーバー中心のルーティング。
+*   **100%段階的に採用可能:** 破壊的変更なしで徐々に採用可能。
+*   **高度なルーティング規則:** オフスクリーンスタッシング、インスタントトランジションなど。
+
+詳細については、[RFCを確認する](/blog/layouts-rfc)か、[フィードバックを提供](https://github.com/vercel/next.js/discussions/37136)してください。
+
+[貢献者への感謝](#thank-you-contributors)
+--------------------------------------------------
+
+Next.jsは、**2,000人以上の個々の開発者**、Google ChromeやMetaなどの業界パートナー、そしてVercelのコアチームの共同作業の結果です。
+
+このリリースは、以下の方々の貢献によってもたらされました：@huozhi, @ijjk, @kwonoj, @ViolanteCodes, @akrabdev, @timneutkens, @jpveilleux, @stigkj, @jgoping, @oof2win2, @Brooooooklyn, @CGamesPlay, @lfades, @molebox, @steven-tey, @SukkaW, @Kikobeats, @balazsorban44, @erikbrinkman, @therealmarzouq, @remcohaszing, @perkinsjr, @shuding, @hanneslund, @housseindjirdeh, @RobertKeyser, @styfle, @htunnicliff, @lukeshumard, @sagnik3, @pixelass, @JoshuaKGoldberg, @rishabhpoddar, @nguyenyou, @kdy1, @sidwebworks, @gnoff, @gaspar09, @feugy, @mfix-stripe, @javivelasco, @Chastrlove, @goncharov-vlad, @NaveenDA, @Firfi, @idkwhojamesis, @FLCN-16, @icyJoseph, @ElijahPepe, @elskwid, @irvile, @Munawwar, @ykolbin, @hulufei, @baruchadi, @imadatyatalah, @await-ovo, @menosprezzi, @gazs, @Exortions, @rubens-lopes, @woochul2, @stefee, @stmtk1, @jlarmstrongiv, @MaedahBatool, @jameshfisher, @fabienheureux, @TxHawks, @mattbrandlysonos, @iggyzap, @src200, @AkifumiSato, @hermanskurichin, @kamilogorek, @ben-xD, @dawsonbooth, @Josehower, @crutchcorn, @ericmatthys, @CharlesStover, @charlypoly, @apmatthews, @naingaungphyo, @alexandrutasica, @stefanprobst, @dc7290, @DilwoarH, @tommarshall, @stanhong, @leerob, @appsbytom, @sshyam-gupta, @saulloalmeida, @indicozy, @ArianHamdi, @Clariity, @sebastianbenz, @7iomka, @gr-qft, @Schniz, @dgagn, @sokra, @okbel, @tbvjaos510, @dmvjs, @PepijnSenders, @JohnPhamous, @kyliau, @eric-burel, @alabhyajindal, @jsjoeio, @vorcigernix, @clearlyTHUYDOAN, @splatterxl, @manovotny, @maxproske, @nvh95, @frankievalentine, @nuta, @bagpyp, @dfelsie, @qqpann, @atcastle, @jsimonrichard, @mass2527, @ekamkohli, @Yuddomack, @tonyspiro, @saurabhmehta1601, @banner4422, @falsepopsky, @jantimon, @henriqueholtz, @ilfa, @matteobruni, @ryscheng, @hoonoh, @ForsakenHarmony, @william-keller, @AleksaC, @Miikis, @zakiego, @radunemerenco, @AliYusuf95, @dominiksipowicz。

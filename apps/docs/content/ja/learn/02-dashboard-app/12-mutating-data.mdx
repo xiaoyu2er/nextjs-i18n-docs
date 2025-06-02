@@ -1,0 +1,659 @@
+---
+source-updated-at: 2025-06-02T15:30:01.000Z
+translation-updated-at: 2025-06-02T19:25:23.138Z
+title: データの変更
+headline: 'App Router: データの変更'
+description: 'Reactサーバーアクションを使用してデータを変更し、Next.jsキャッシュを再検証します。'
+image: 'https://nextjs.org/api/learn-og?title=Mutating%20Data&amp;chapter=12'
+---
+
+前の章では、URL検索パラメータとNext.js APIを使用して検索とページネーションを実装しました。請求書の作成、更新、削除機能を追加して、Invoicesページの作業を続けましょう！
+
+[サーバーアクションとは？](#what-are-server-actions)
+----------------------------------------------------
+
+Reactサーバーアクションを使用すると、サーバー上で直接非同期コードを実行できます。これにより、データを変更するためのAPIエンドポイントを作成する必要がなくなります。代わりに、サーバー上で実行され、クライアントまたはサーバーコンポーネントから呼び出せる非同期関数を記述します。
+
+セキュリティはWebアプリケーションの最優先事項であり、さまざまな脅威に対して脆弱になる可能性があります。ここでサーバーアクションが役立ちます。暗号化されたクロージャ、厳密な入力チェック、エラーメッセージのハッシュ化、ホスト制限など、アプリケーションのセキュリティを大幅に向上させる機能が含まれています。
+
+[サーバーアクションとフォームの使用](#using-forms-with-server-actions)
+-------------------------------------------------------------------
+
+Reactでは、`<form>`要素の`action`属性を使用してアクションを呼び出すことができます。アクションは自動的にキャプチャされたデータを含むネイティブの[FormData](https://developer.mozilla.org/ja/docs/Web/API/FormData)オブジェクトを受け取ります。
+
+例：
+
+```
+// サーバーコンポーネント
+export default function Page() {
+  // アクション
+  async function create(formData: FormData) {
+    'use server';
+ 
+    // データ変更のロジック...
+  }
+ 
+  // "action"属性を使用してアクションを呼び出す
+  return <form action={create}>...</form>;
+}
+```
+
+サーバーコンポーネント内でサーバーアクションを呼び出す利点は、プログレッシブエンハンスメントです。クライアントでJavaScriptがまだ読み込まれていない場合でもフォームが機能します。例えば、インターネット接続が遅い場合などです。
+
+[Next.jsとサーバーアクション](#nextjs-with-server-actions)
+----------------------------------------------------------
+
+サーバーアクションはNext.jsの[キャッシュ](https://nextjs.org/docs/app/building-your-application/caching)とも深く統合されています。サーバーアクションを通じてフォームが送信されると、データを変更するだけでなく、`revalidatePath`や`revalidateTag`などのAPIを使用して関連するキャッシュを再検証することもできます。
+
+どのように連携するか見てみましょう！
+
+[請求書の作成](#creating-an-invoice)
+-------------------------------------------
+
+新しい請求書を作成する手順は次のとおりです：
+
+1.  ユーザーの入力をキャプチャするフォームを作成します。
+2.  サーバーアクションを作成し、フォームから呼び出します。
+3.  サーバーアクション内で、`formData`オブジェクトからデータを抽出します。
+4.  データを検証し、データベースに挿入する準備をします。
+5.  データを挿入し、エラーを処理します。
+6.  キャッシュを再検証し、ユーザーを請求書ページにリダイレクトします。
+
+### [1\. 新しいルートとフォームの作成](#1-create-a-new-route-and-form)
+
+開始するには、`/invoices`フォルダ内に`/create`という新しいルートセグメントを追加し、`page.tsx`ファイルを作成します：
+
+<Image
+  alt="createフォルダとその中のpage.tsxファイルを含むInvoicesフォルダ"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/create-invoice-route.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/create-invoice-route.png"
+  width="1600"
+  height="363"
+/>
+
+このルートを使用して新しい請求書を作成します。`page.tsx`ファイルに次のコードを貼り付け、時間をかけて調べてください：
+
+```tsx filename="/dashboard/invoices/create/page.tsx"
+import Form from '@/app/ui/invoices/create-form';
+import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import { fetchCustomers } from '@/app/lib/data';
+ 
+export default async function Page() {
+  const customers = await fetchCustomers();
+ 
+  return (
+    <main>
+      <Breadcrumbs
+        breadcrumbs={[
+          { label: '請求書', href: '/dashboard/invoices' },
+          {
+            label: '請求書作成',
+            href: '/dashboard/invoices/create',
+            active: true,
+          },
+        ]}
+      />
+      <Form customers={customers} />
+    </main>
+  );
+}
+```
+
+このページは`customers`を取得し、`<Form>`コンポーネントに渡すサーバーコンポーネントです。時間を節約するために、`<Form>`コンポーネントはすでに作成されています。
+
+`<Form>`コンポーネントに移動すると、フォームに次の要素があることがわかります：
+
+*   **顧客**のリストを含む1つの`<select>`（ドロップダウン）要素。
+*   **金額**用の`type="number"`を持つ1つの`<input>`要素。
+*   ステータス用の`type="radio"`を持つ2つの`<input>`要素。
+*   `type="submit"`を持つ1つのボタン。
+
+[http://localhost:3000/dashboard/invoices/create](http://localhost:3000/dashboard/invoices/create)にアクセスすると、次のUIが表示されます：
+
+<Image
+  alt="パンくずリストとフォームを含む請求書作成ページ"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/create-invoice-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/create-invoice-page.png"
+  width="960"
+  height="563"
+/>
+
+### [2\. サーバーアクションの作成](#2-create-a-server-action)
+
+次に、フォームが送信されたときに呼び出されるサーバーアクションを作成しましょう。
+
+`lib/`ディレクトリに移動し、`actions.ts`という新しいファイルを作成します。このファイルの先頭にReactの[`use server`](https://react.dev/reference/react/use-server)ディレクティブを追加します：
+
+```ts filename="/app/lib/actions.ts"
+'use server';
+```
+
+`'use server'`を追加することで、ファイル内のすべてのエクスポートされた関数をサーバーアクションとしてマークします。これらのサーバー関数は、クライアントおよびサーバーコンポーネントでインポートして使用できます。このファイル内で使用されていない関数は、最終的なアプリケーションバンドルから自動的に削除されます。
+
+アクション内に`"use server"`を追加することで、サーバーコンポーネント内に直接サーバーアクションを記述することもできます。ただし、このコースでは、すべてを別のファイルに整理しておきます。アクション用に別のファイルを作成することをお勧めします。
+
+`actions.ts`ファイルに、`formData`を受け入れる新しい非同期関数を作成します：
+
+```ts {3} filename="/app/lib/actions.ts"
+'use server';
+ 
+export async function createInvoice(formData: FormData) {}
+```
+
+次に、`<Form>`コンポーネントで、`actions.ts`ファイルから`createInvoice`をインポートします。`<form>`要素に`action`属性を追加し、`createInvoice`アクションを呼び出します。
+
+```tsx {10,18} filename="/app/ui/invoices/create-form.tsx"
+import { CustomerField } from '@/app/lib/definitions';
+import Link from 'next/link';
+import {
+  CheckIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  UserCircleIcon,
+} from '@heroicons/react/24/outline';
+import { Button } from '@/app/ui/button';
+import { createInvoice } from '@/app/lib/actions';
+ 
+export default function Form({
+  customers,
+}: {
+  customers: CustomerField[];
+}) {
+  return (
+    <form action={createInvoice}>
+      // ...
+  )
+}
+```
+
+> **知っておくと良いこと**：HTMLでは、`action`属性にURLを渡します。このURLは、フォームデータを送信する先（通常はAPIエンドポイント）です。
+> 
+> しかし、Reactでは、`action`属性は特別なプロップと見なされます。つまり、Reactはその上に構築してアクションを呼び出すことを可能にします。
+> 
+> 内部的には、サーバーアクションは`POST` APIエンドポイントを作成します。これが、サーバーアクションを使用するときに手動でAPIエンドポイントを作成する必要がない理由です。
+
+### [3\. `formData`からデータを抽出](#3-extract-the-data-from-formdata)
+
+`actions.ts`ファイルに戻り、`formData`の値を抽出する必要があります。使用できる[いくつかの方法](https://developer.mozilla.org/ja/docs/Web/API/FormData)があります。この例では、[`.get(name)`](https://developer.mozilla.org/ja/docs/Web/API/FormData/get)メソッドを使用します。
+
+```ts {3,4,5,6,7,8,9,10} filename="/app/lib/actions.ts"
+'use server';
+ 
+export async function createInvoice(formData: FormData) {
+  const rawFormData = {
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  };
+  // テスト：
+  console.log(rawFormData);
+}
+```
+
+> **ヒント**：多くのフィールドを持つフォームを扱う場合は、JavaScriptの[`Object.fromEntries()`](https://developer.mozilla.org/ja/docs/Web/JavaScript/Reference/Global_Objects/Object/fromEntries)と[`entries()`](https://developer.mozilla.org/ja/docs/Web/API/FormData/entries)メソッドの使用を検討してください。
+
+すべてが正しく接続されていることを確認するために、フォームを試してください。送信後、フォームに入力したデータが**ターミナル**（ブラウザではありません）にログとして表示されるはずです。
+
+データがオブジェクトの形になったので、作業がずっと簡単になります。
+
+### [4\. データの検証と準備](#4-validate-and-prepare-the-data)
+
+フォームデータをデータベースに送信する前に、正しい形式と型であることを確認する必要があります。コースの前半で覚えているかもしれませんが、請求書テーブルは次の形式のデータを期待しています：
+
+```ts filename="/app/lib/definitions.ts"
+export type Invoice = {
+  id: string; // データベースで作成されます
+  customer_id: string;
+  amount: number; // セント単位で保存
+  status: 'pending' | 'paid';
+  date: string;
+};
+```
+
+今のところ、フォームからは`customer_id`、`amount`、`status`しか取得していません。
+
+#### [型の検証と強制](#type-validation-and-coercion)
+
+フォームからのデータがデータベースで期待される型と一致していることを検証することが重要です。例えば、アクション内に`console.log`を追加すると：
+
+```
+console.log(typeof rawFormData.amount);
+```
+
+`amount`が`number`ではなく`string`型であることに気付くでしょう。これは、`type="number"`を持つ`input`要素が実際には数値ではなく文字列を返すためです！
+
+型検証を処理するには、いくつかのオプションがあります。手動で型を検証することもできますが、型検証ライブラリを使用すると時間と労力を節約できます。この例では、TypeScriptファーストの検証ライブラリである[Zod](https://zod.dev/)を使用します。
+
+`actions.ts`ファイルでZodをインポートし、フォームオブジェクトの形状に一致するスキーマを定義します。このスキーマは、データベースに保存する前に`formData`を検証します。
+
+```ts {3,5,6,7,8,9,10,11,13} filename="/app/lib/actions.ts"
+'use server';
+ 
+import { z } from 'zod';
+ 
+const FormSchema = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  amount: z.coerce.number(),
+  status: z.enum(['pending', 'paid']),
+  date: z.string(),
+});
+ 
+const CreateInvoice = FormSchema.omit({ id: true, date: true });
+ 
+export async function createInvoice(formData: FormData) {
+  // ...
+}
+```
+
+`amount`フィールドは、型を検証しながら文字列から数値に強制的に変更（coerce）するように特別に設定されています。
+
+次に、`rawFormData`を`CreateInvoice`に渡して型を検証できます：
+
+```ts {3} filename="/app/lib/actions.ts"
+// ...
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+}
+```
+
+#### [セント単位での値の保存](#storing-values-in-cents)
+
+JavaScriptの浮動小数点エラーを排除し、より高い精度を確保するために、通常はデータベースに通貨値をセント単位で保存するのが良い方法です。
+
+金額をセントに変換しましょう：
+
+```ts {8} filename="/app/lib/actions.ts"
+// ...
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+  const amountInCents = amount * 100;
+}
+```
+
+#### [新しい日付の作成](#creating-new-dates)
+
+最後に、請求書の作成日として「YYYY-MM-DD」形式の新しい日付を作成します：
+
+```ts {9} filename="/app/lib/actions.ts"
+// ...
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+}
+```
+
+### [5\. データをデータベースに挿入](#5-inserting-the-data-into-your-database)
+
+データベースに必要なすべての値が揃ったので、新しい請求書をデータベースに挿入するSQLクエリを作成し、変数を渡すことができます：
+
+```ts {2,4,17,18,19,20} filename="/app/lib/actions.ts"
+import { z } from 'zod';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+// ...
+ 
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+ 
+  await sql`
+    INSERT INTO invoices (customer_id, amount, status, date)
+    VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+  `;
+}
+```
+
+現時点では、エラーを処理していません。これについては次の章で説明します。今は、次のステップに進みましょう。
+
+### [6. 再検証とリダイレクト](#6-revalidate-and-redirect)
+
+Next.jsにはクライアントサイドのルーターキャッシュがあり、一定時間ルートセグメントをユーザーのブラウザに保存します。[プリフェッチ](/docs/app/building-your-application/routing/linking-and-navigating#1-prefetching)と組み合わせることで、サーバーへのリクエスト数を減らしながら、ユーザーがルート間を素早く移動できるようになります。
+
+請求書ルートに表示されるデータを更新するため、このキャッシュをクリアしてサーバーへの新しいリクエストをトリガーしたい場合があります。Next.jsの[`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)関数を使用してこれを行えます:
+
+```ts {4,25} filename="/app/lib/actions.ts"
+'use server';
+ 
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+// ...
+ 
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+ 
+  await sql`
+    INSERT INTO invoices (customer_id, amount, status, date)
+    VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+  `;
+ 
+  revalidatePath('/dashboard/invoices');
+}
+```
+
+データベースが更新されると、`/dashboard/invoices`パスが再検証され、サーバーから新しいデータが取得されます。
+
+この時点で、ユーザーを`/dashboard/invoices`ページにリダイレクトさせたい場合もあります。Next.jsの[`redirect`](/docs/app/api-reference/functions/redirect)関数を使用してこれを行えます:
+
+```ts {5,16} filename="/app/lib/actions.ts"
+'use server';
+ 
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+// ...
+ 
+export async function createInvoice(formData: FormData) {
+  // ...
+ 
+  revalidatePath('/dashboard/invoices');
+  redirect('/dashboard/invoices');
+}
+```
+
+おめでとうございます！最初のサーバーアクションを実装しました。新しい請求書を追加してテストしてみてください。すべてが正しく動作していれば:
+
+1. 送信時に`/dashboard/invoices`ルートにリダイレクトされるはずです
+2. テーブルの上部に新しい請求書が表示されるはずです
+
+[請求書の更新](#updating-an-invoice)
+-------------------------------------------
+
+請求書更新フォームは請求書作成フォームと似ていますが、データベースのレコードを更新するために請求書`id`を渡す必要があります。請求書`id`を取得して渡す方法を見てみましょう。
+
+請求書を更新する手順は次のとおりです:
+
+1. 請求書`id`で新しい動的ルートセグメントを作成
+2. ページパラメータから請求書`id`を読み取る
+3. データベースから特定の請求書を取得
+4. フォームに請求書データを事前入力
+5. データベースの請求書データを更新
+
+### [1. 請求書`id`で動的ルートセグメントを作成](#1-create-a-dynamic-route-segment-with-the-invoice-id)
+
+Next.jsでは、正確なセグメント名がわからず、データに基づいてルートを作成したい場合に[動的ルートセグメント](/docs/app/building-your-application/routing/dynamic-routes)を作成できます。これはブログ投稿のタイトルや商品ページなどに適しています。フォルダ名を角括弧で囲むことで動的ルートセグメントを作成できます。例: `[id]`, `[post]`, `[slug]`
+
+`/invoices`フォルダ内に`[id]`という新しい動的ルートを作成し、その中に`edit`ルートと`page.tsx`ファイルを作成します。ファイル構造は次のようになります:
+
+<Image
+  alt="[id]フォルダがネストされたinvoicesフォルダと、その中のeditフォルダ"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/edit-invoice-route.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/edit-invoice-route.png"
+  width="1600"
+  height="444"
+/>
+
+`<Table>`コンポーネントでは、テーブルレコードから請求書の`id`を受け取る`<UpdateInvoice />`ボタンがあることに注目してください。
+
+```tsx {11} filename="/app/ui/invoices/table.tsx"
+export default async function InvoicesTable({
+  query,
+  currentPage,
+}: {
+  query: string;
+  currentPage: number;
+}) {
+  return (
+    // ...
+    <td className="flex justify-end gap-2 whitespace-nowrap px-6 py-4 text-sm">
+      <UpdateInvoice id={invoice.id} />
+      <DeleteInvoice id={invoice.id} />
+    </td>
+    // ...
+  );
+}
+```
+
+`<UpdateInvoice />`コンポーネントに移動し、`Link`の`href`を更新して`id`プロップを受け入れます。テンプレートリテラルを使用して動的ルートセグメントにリンクできます:
+
+```tsx {9} filename="/app/ui/invoices/buttons.tsx"
+import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+ 
+// ...
+ 
+export function UpdateInvoice({ id }: { id: string }) {
+  return (
+    <Link
+      href={`/dashboard/invoices/${id}/edit`}
+      className="rounded-md border p-2 hover:bg-gray-100"
+    >
+      <PencilIcon className="w-5" />
+    </Link>
+  );
+}
+```
+
+### [2. ページ`params`から請求書`id`を読み取る](#2-read-the-invoice-id-from-page-params)
+
+`<Page>`コンポーネントに次のコードを貼り付けます:
+
+```tsx filename="/app/dashboard/invoices/[id]/edit/page.tsx"
+import Form from '@/app/ui/invoices/edit-form';
+import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import { fetchCustomers } from '@/app/lib/data';
+ 
+export default async function Page() {
+  return (
+    <main>
+      <Breadcrumbs
+        breadcrumbs={[
+          { label: '請求書', href: '/dashboard/invoices' },
+          {
+            label: '請求書編集',
+            href: `/dashboard/invoices/${id}/edit`,
+            active: true,
+          },
+        ]}
+      />
+      <Form invoice={invoice} customers={customers} />
+    </main>
+  );
+}
+```
+
+`/create`請求書ページと似ていますが、異なるフォーム(`edit-form.tsx`ファイルから)をインポートしていることに注目してください。このフォームには、顧客名、請求金額、ステータスの`defaultValue`が事前入力されている必要があります。フォームフィールドに事前入力するには、`id`を使用して特定の請求書を取得する必要があります。
+
+`searchParams`に加えて、ページコンポーネントは`id`にアクセスするために使用できる`params`プロップも受け入れます。`<Page>`コンポーネントを更新してこのプロップを受け取ります:
+
+```tsx {5,6,7} filename="/app/dashboard/invoices/[id]/edit/page.tsx"
+import Form from '@/app/ui/invoices/edit-form';
+import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import { fetchCustomers } from '@/app/lib/data';
+ 
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
+  // ...
+}
+```
+
+### [3. 特定の請求書を取得](#3-fetch-the-specific-invoice)
+
+次に:
+
+* `fetchInvoiceById`という新しい関数をインポートし、`id`を引数として渡します
+* ドロップダウンの顧客名を取得するために`fetchCustomers`をインポートします
+
+`Promise.all`を使用して請求書と顧客を並列で取得できます:
+
+```tsx {3,8,9,10,11} filename="/dashboard/invoices/[id]/edit/page.tsx"
+import Form from '@/app/ui/invoices/edit-form';
+import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import { fetchInvoiceById, fetchCustomers } from '@/app/lib/data';
+ 
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
+  const [invoice, customers] = await Promise.all([
+    fetchInvoiceById(id),
+    fetchCustomers(),
+  ]);
+  // ...
+}
+```
+
+`invoice`が潜在的に`undefined`である可能性があるため、ターミナルで`invoice`プロップに関する一時的なTypeScriptエラーが表示されます。今のところ心配する必要はありません。次の章でエラー処理を追加する際に解決します。
+
+素晴らしい！では、すべてが正しく接続されているかテストしてみましょう。[http://localhost:3000/dashboard/invoices](http://localhost:3000/dashboard/invoices)にアクセスし、編集する請求書の鉛筆アイコンをクリックします。ナビゲーション後、請求書の詳細が事前入力されたフォームが表示されるはずです:
+
+<Image
+  alt="パンくずリストとフォームのある請求書編集ページ"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/edit-invoice-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/edit-invoice-page.png"
+  width="960"
+  height="563"
+/>
+
+URLも`id`付きで更新されるはずです: `http://localhost:3000/dashboard/invoice/uuid/edit`
+
+> **UUID vs 自動増分キー**
+> 
+> 自動増分キー(例: 1, 2, 3など)の代わりにUUIDを使用しています。これによりURLは長くなりますが、UUIDはID衝突のリスクを排除し、グローバルに一意で、列挙攻撃のリスクを減らすため、大規模なデータベースに最適です。
+> 
+> ただし、よりクリーンなURLを好む場合は、自動増分キーを使用することを好むかもしれません。
+
+### [4. サーバーアクションに`id`を渡す](#4-pass-the-id-to-the-server-action)
+
+最後に、データベースで正しいレコードを更新できるように、`id`をサーバーアクションに渡したいと思います。次のように`id`を引数として渡すことは**できません**:
+
+```tsx filename="/app/ui/invoices/edit-form.tsx"
+// idを引数として渡すのは機能しません
+<form action={updateInvoice(id)}>
+```
+
+代わりに、JSの`bind`を使用してサーバーアクションに`id`を渡せます。これにより、サーバーアクションに渡される値がエンコードされます。
+
+```tsx {2,11,13} filename="/app/ui/invoices/edit-form.tsx"
+// ...
+import { updateInvoice } from '@/app/lib/actions';
+ 
+export default function EditInvoiceForm({
+  invoice,
+  customers,
+}: {
+  invoice: InvoiceForm;
+  customers: CustomerField[];
+}) {
+  const updateInvoiceWithId = updateInvoice.bind(null, invoice.id);
+ 
+  return <form action={updateInvoiceWithId}>{/* ... */}</form>;
+}
+```
+
+> **注:** フォーム内に隠し入力フィールドを使用することも可能です(例: `<input type="hidden" name="id" value={invoice.id} />`)。ただし、値はHTMLソースに平文で表示されるため、機密データには理想的ではありません。
+
+次に、`actions.ts`ファイルで、新しいアクション`updateInvoice`を作成します:
+
+```ts filename="/app/lib/actions.ts"
+// Zodを使用して期待される型を更新
+const UpdateInvoice = FormSchema.omit({ id: true, date: true });
+ 
+// ...
+ 
+export async function updateInvoice(id: string, formData: FormData) {
+  const { customerId, amount, status } = UpdateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  const amountInCents = amount * 100;
+ 
+  await sql`
+    UPDATE invoices
+    SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
+    WHERE id = ${id}
+  `;
+ 
+  revalidatePath('/dashboard/invoices');
+  redirect('/dashboard/invoices');
+}
+```
+
+`createInvoice`アクションと同様に、ここでは:
+
+1. `formData`からデータを抽出
+2. Zodで型を検証
+3. 金額をセントに変換
+4. SQLクエリに変数を渡す
+5. クライアントキャッシュをクリアして新しいサーバーリクエストを行うために`revalidatePath`を呼び出し
+6. ユーザーを請求書ページにリダイレクトするために`redirect`を呼び出し
+
+請求書を編集してテストしてみてください。フォームを送信すると、請求書ページにリダイレクトされ、請求書が更新されるはずです。
+
+[請求書の削除](#deleting-an-invoice)
+-------------------------------------------
+
+サーバーアクションを使用して請求書を削除するには、削除ボタンを`<form>`要素でラップし、`bind`を使用してサーバーアクションに`id`を渡します:
+
+```tsx {1,6,9} filename="/app/ui/invoices/buttons.tsx"
+import { deleteInvoice } from '@/app/lib/actions';
+ 
+// ...
+ 
+export function DeleteInvoice({ id }: { id: string }) {
+  const deleteInvoiceWithId = deleteInvoice.bind(null, id);
+ 
+  return (
+    <form action={deleteInvoiceWithId}>
+      <button type="submit" className="rounded-md border p-2 hover:bg-gray-100">
+        <span className="sr-only">削除</span>
+        <TrashIcon className="w-4" />
+      </button>
+    </form>
+  );
+}
+```
+
+`actions.ts`ファイル内に、`deleteInvoice`という新しいアクションを作成します。
+
+```ts filename="/app/lib/actions.ts"
+export async function deleteInvoice(id: string) {
+  await sql`DELETE FROM invoices WHERE id = ${id}`;
+  revalidatePath('/dashboard/invoices');
+}
+```
+
+このアクションは`/dashboard/invoices`パスで呼び出されているため、`redirect`を呼び出す必要はありません。`revalidatePath`を呼び出すと、新しいサーバーリクエストがトリガーされ、テーブルが再レンダリングされます。
+
+[さらに学ぶ](#further-reading)
+-----------------------------------
+
+この章では、サーバーアクションを使用してデータを変更する方法を学びました。また、Next.jsキャッシュを再検証する`revalidatePath` APIと、ユーザーを新しいページにリダイレクトする`redirect`の使用方法も学びました。
+
+さらに学ぶために、[サーバーアクションのセキュリティ](https://nextjs.org/blog/security-nextjs-server-components-actions)についても読むことができます。
