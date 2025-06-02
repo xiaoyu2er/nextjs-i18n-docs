@@ -1,0 +1,181 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-06-02T19:56:34.976Z
+title: Next.jsでDraft Modeを使用してコンテンツをプレビューする方法
+nav_title: Draft Mode
+description: Next.jsには静的ページと動的ページを切り替えるDraft Mode機能があります。Pages Routerとの連携方法について学べます。
+---
+
+[Pagesドキュメント](/docs/pages/building-your-application/routing/pages-and-layouts)と[データ取得ドキュメント](/docs/pages/building-your-application/data-fetching)では、`getStaticProps`と`getStaticPaths`を使用してビルド時にページを事前レンダリングする方法（**静的生成**）について説明しました。
+
+静的生成はヘッドレスCMSからデータを取得するページに有効です。しかし、ヘッドレスCMSで下書きを執筆中に、すぐにページ上でプレビューしたい場合には理想的ではありません。このような場合、ビルド時ではなく**リクエスト時**にページをレンダリングし、公開済みコンテンツではなく下書きコンテンツを取得する必要があります。Next.jsにはこの特定のケースに対して静的生成をバイパスする**Draft Mode**機能があります。以下はその使用方法です。
+
+## ステップ1: APIルートの作成とアクセス
+
+> Next.jsのAPIルートに慣れていない場合は、まず[API Routesドキュメント](/docs/pages/building-your-application/routing/api-routes)をご覧ください。
+
+まず、**APIルート**を作成します。任意の名前（例: `pages/api/draft.ts`）を付けることができます。
+
+このAPIルートでは、レスポンスオブジェクトに対して`setDraftMode`を呼び出す必要があります。
+
+```js
+export default function handler(req, res) {
+  // ...
+  res.setDraftMode({ enable: true })
+  // ...
+}
+```
+
+これにより、Draft Modeを有効にする**Cookie**が設定されます。このCookieを含む後続のリクエストは**Draft Mode**をトリガーし、静的に生成されたページの動作を変更します（詳細は後述）。
+
+以下のようなAPIルートを作成し、ブラウザから手動でアクセスすることでテストできます：
+
+```ts filename="pages/api/draft.ts"
+// ブラウザから手動でテストするためのシンプルな例
+export default function handler(req, res) {
+  res.setDraftMode({ enable: true })
+  res.end('Draft modeが有効になりました')
+}
+```
+
+ブラウザの開発者ツールを開いて`/api/draft`にアクセスすると、`__prerender_bypass`という名前のCookieを持つ`Set-Cookie`レスポンスヘッダーが表示されます。
+
+### ヘッドレスCMSから安全にアクセスする
+
+実際には、ヘッドレスCMSからこのAPIルートを安全に呼び出したいでしょう。具体的な手順は使用するヘッドレスCMSによって異なりますが、以下に一般的な手順を示します。
+
+これらの手順は、使用するヘッドレスCMSが**カスタム下書きURL**の設定をサポートしていることを前提としています。サポートしていない場合でも、この方法を使用して下書きURLを保護できますが、手動で下書きURLを構築してアクセスする必要があります。
+
+**まず**、任意のトークンジェネレーターを使用して**秘密トークン文字列**を作成します。この秘密はNext.jsアプリとヘッドレスCMSのみが知っている必要があります。これにより、CMSにアクセス権限のない人が下書きURLにアクセスするのを防ぎます。
+
+**次に**、ヘッドレスCMSがカスタム下書きURLの設定をサポートしている場合、下書きURLとして以下を指定します。ここでは下書きAPIルートが`pages/api/draft.ts`にあると仮定します。
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+- `<your-site>`はデプロイドメインに置き換えてください
+- `<token>`は生成した秘密トークンに置き換えてください
+- `<path>`はプレビューしたいページのパスです。`/posts/foo`をプレビューしたい場合は`&slug=/posts/foo`を使用します
+
+ヘッドレスCMSによっては、下書きURLに変数を含めることができ、`<path>`をCMSのデータに基づいて動的に設定できます（例: `&slug=/posts/{entry.fields.slug}`）
+
+**最後に**、下書きAPIルートで：
+
+- 秘密トークンが一致し、`slug`パラメータが存在することを確認します（どちらかが欠けている場合、リクエストは失敗します）
+- `res.setDraftMode`を呼び出します
+- その後、ブラウザを`slug`で指定されたパスにリダイレクトします（以下の例では[307リダイレクト](https://developer.mozilla.org/docs/Web/HTTP/Status/307)を使用しています）
+
+```js
+export default async (req, res) => {
+  // 秘密トークンと次のパラメータを確認
+  // この秘密はこのAPIルートとCMSのみが知っている必要がある
+  if (req.query.secret !== 'MY_SECRET_TOKEN' || !req.query.slug) {
+    return res.status(401).json({ message: '無効なトークンです' })
+  }
+
+  // ヘッドレスCMSに問い合わせて、提供された`slug`が存在するか確認
+  // getPostBySlugはヘッドレスCMSへの取得ロジックを実装する
+  const post = await getPostBySlug(req.query.slug)
+
+  // slugが存在しない場合、Draft Modeを有効にしない
+  if (!post) {
+    return res.status(401).json({ message: '無効なslugです' })
+  }
+
+  // Cookieを設定してDraft Modeを有効化
+  res.setDraftMode({ enable: true })
+
+  // 取得した投稿のパスにリダイレクト
+  // req.query.slugにリダイレクトしない（オープンリダイレクト脆弱性の可能性があるため）
+  res.redirect(post.slug)
+}
+```
+
+成功すると、ブラウザはDraft Mode Cookieと共にプレビューしたいパスにリダイレクトされます。
+
+## ステップ2: `getStaticProps`の更新
+
+次のステップは、Draft Modeをサポートするように`getStaticProps`を更新することです。
+
+Cookieが設定された状態（`res.setDraftMode`経由）で`getStaticProps`を持つページをリクエストすると、`getStaticProps`は**ビルド時**ではなく**リクエスト時**に呼び出されます。
+
+さらに、`context.draftMode`が`true`になる`context`オブジェクトと共に呼び出されます。
+
+```js
+export async function getStaticProps(context) {
+  if (context.draftMode) {
+    // 動的データを取得
+  }
+}
+```
+
+下書きAPIルートで`res.setDraftMode`を使用したため、`context.draftMode`は`true`になります。
+
+`getStaticPaths`も使用している場合、`context.params`も利用可能です。
+
+### 下書きデータの取得
+
+`context.draftMode`に基づいて異なるデータを取得するように`getStaticProps`を更新できます。
+
+例えば、ヘッドレスCMSが下書き投稿用に異なるAPIエンドポイントを持っている場合、以下のようにAPIエンドポイントURLを変更できます：
+
+```js
+export async function getStaticProps(context) {
+  const url = context.draftMode
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+  const res = await fetch(url)
+  // ...
+}
+```
+
+これで完了です！ヘッドレスCMSから（`secret`と`slug`を使用して）下書きAPIルートにアクセスするか、手動でアクセスすると、下書きコンテンツを表示できるようになります。また、公開せずに下書きを更新した場合も、下書きを表示できるはずです。
+
+ヘッドレスCMSで下書きURLとして設定するか、手動でアクセスすると下書きを表示できます：
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+## 詳細情報
+
+### Draft Mode Cookieのクリア
+
+デフォルトでは、Draft Modeセッションはブラウザを閉じると終了します。
+
+Draft Mode Cookieを手動でクリアするには、`setDraftMode({ enable: false })`を呼び出すAPIルートを作成します：
+
+```ts filename="pages/api/disable-draft.ts"
+export default function handler(req, res) {
+  res.setDraftMode({ enable: false })
+}
+```
+
+その後、`/api/disable-draft`にリクエストを送信してAPIルートを呼び出します。[`next/link`](/docs/pages/api-reference/components/link)を使用してこのルートを呼び出す場合、プリフェッチ時に誤ってCookieが削除されないように`prefetch={false}`を渡す必要があります。
+
+### `getServerSideProps`との連携
+
+Draft Modeは`getServerSideProps`と連携し、[`context`](/docs/pages/api-reference/functions/get-server-side-props#context-parameter)オブジェクトの`draftMode`キーとして利用可能です。
+
+> **知っておくと良い**: Draft Modeを使用する場合、`Cache-Control`ヘッダーを設定すべきではありません。なぜならバイパスできないからです。代わりに[ISR](/docs/pages/guides/incremental-static-regeneration)の使用を推奨します。
+
+### APIルートとの連携
+
+APIルートはリクエストオブジェクトの`draftMode`にアクセスできます。例：
+
+```js
+export default function myApiRoute(req, res) {
+  if (req.draftMode) {
+    // 下書きデータを取得
+  }
+}
+```
+
+### `next build`ごとに一意
+
+`next build`を実行するたびに、新しいバイパスCookie値が生成されます。
+
+これにより、バイパスCookieが推測されるのを防ぎます。
+
+> **知っておくと良い**: HTTP経由でローカルでDraft Modeをテストするには、ブラウザでサードパーティCookieとローカルストレージへのアクセスを許可する必要があります。

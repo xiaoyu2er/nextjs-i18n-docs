@@ -1,0 +1,228 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:12:55.037Z
+title: テイント (taint)
+description: オブジェクトと値のテイント機能を有効化します。
+version: experimental
+---
+
+## 使用方法
+
+`taint` オプションを有効にすると、オブジェクトや値にテイントを付与する実験的な React API が使用可能になります。この機能は、機密データが誤ってクライアントに渡されるのを防ぐのに役立ちます。有効にすると、以下の API が使用できます:
+
+- [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) - オブジェクト参照にテイントを付与
+- [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) - ユニークな値にテイントを付与
+
+> **補足**: このフラグを有効にすると、`app` ディレクトリに対して React の `experimental` チャンネルも有効になります。
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **警告**: 機密データがクライアントに露出するのを防ぐ唯一の手段としてテイント API に依存しないでください。[セキュリティに関する推奨事項](/blog/security-nextjs-server-components-actions)を参照してください。
+
+テイント API を使用すると、宣言的かつ明示的にサーバー-クライアント境界を越えて渡すことが許可されていないデータをマークすることで、防御的なプログラミングが可能になります。オブジェクトや値がサーバー-クライアント境界を越えて渡されようとすると、React はエラーをスローします。
+
+この機能は以下のようなケースで役立ちます:
+
+- データを読み取る方法を制御できない場合
+- 自分で定義していない機密データ構造を扱わなければならない場合
+- サーバーコンポーネントのレンダリング中に機密データにアクセスする場合
+
+データや API を設計する際は、機密データが必要とされないコンテキストに返されないようにすることを推奨します。
+
+## 注意点
+
+- テイントは参照によってのみオブジェクトを追跡できます。オブジェクトをコピーするとテイントが解除され、API が提供するすべての保証が失われます。コピーにもテイントを付与する必要があります。
+- テイントはテイントされた値から派生したデータを追跡できません。派生した値にもテイントを付与する必要があります。
+- 値は、その参照のライフタイムがスコープ内にある間のみテイントが維持されます。詳細は [`experimental_taintUniqueValue` のパラメータリファレンス](https://react.dev/reference/react/experimental_taintUniqueValue#parameters)を参照してください。
+
+## 例
+
+### オブジェクト参照にテイントを付与
+
+この例では、`getUserDetails` 関数が指定されたユーザーのデータを返します。ユーザーオブジェクト参照にテイントを付与することで、サーバー-クライアント境界を越えて渡せないようにします。例えば、`UserCard` がクライアントコンポーネントであると仮定します。
+
+```ts switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id: string): UserDetails {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'ユーザー情報オブジェクト全体を使用しないでください。代わりに必要なフィールドのみを選択してください。',
+    user
+  )
+
+  return user
+}
+```
+
+```js switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id) {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'ユーザー情報オブジェクト全体を使用しないでください。代わりに必要なフィールドのみを選択してください。',
+    user
+  )
+
+  return user
+}
+```
+
+テイントされた `userDetails` オブジェクトから個々のフィールドにアクセスすることは可能です。
+
+```tsx filename="app/contact/page.tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+```jsx filename="app/contact/page.js switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+しかし、オブジェクト全体をクライアントコンポーネントに渡すとエラーがスローされます。
+
+```tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const userDetails = await getUserDetails(id)
+
+  // エラーがスローされます
+  return <UserCard user={userDetails} />
+}
+```
+
+```jsx switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  // エラーがスローされます
+  return <UserCard user={userDetails} />
+}
+```
+
+### ユニークな値にテイントを付与
+
+この例では、`config.getConfigDetails` を呼び出すことでサーバー設定にアクセスできます。しかし、システム設定にはクライアントに公開したくない `SERVICE_API_KEY` が含まれています。
+
+`config.SERVICE_API_KEY` の値にテイントを付与できます。
+
+```ts switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig(): SystemConfig {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    '設定トークンをクライアントに渡さないでください',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+```js switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig() {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    '設定トークンをクライアントに渡さないでください',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+`systemConfig` オブジェクトの他のプロパティには引き続きアクセスできます。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+
+  return <ClientDashboard version={systemConfig.SERVICE_API_VERSION} />
+}
+```
+
+しかし、`SERVICE_API_KEY` を `ClientDashboard` に渡すとエラーがスローされます。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // PR で誰かがミスをした場合
+  const version = systemConfig.SERVICE_API_KEY
+
+  return <ClientDashboard version={version} />
+}
+```
+
+`systemConfig.SERVICE_API_KEY` が新しい変数に再代入されていても、クライアントコンポーネントに渡すとエラーがスローされることに注意してください。
+
+一方、テイントされたユニークな値から派生した値はクライアントに公開されます。
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // PR で誰かがミスをした場合
+  const version = `version::${systemConfig.SERVICE_API_KEY}`
+
+  return <ClientDashboard version={version} />
+}
+```
+
+より良いアプローチは、`getSystemConfig` が返すデータから `SERVICE_API_KEY` を削除することです。

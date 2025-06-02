@@ -1,0 +1,353 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-06-02T19:57:52.468Z
+title: Next.jsでの国際化 (i18n) 実装方法
+nav_title: 国際化
+description: Next.jsは国際化ルーティングと言語検出を組み込みでサポートしています。詳細はこちらをご覧ください。
+---
+
+<details>
+  <summary>サンプル</summary>
+
+- [i18nルーティング](https://github.com/vercel/next.js/tree/canary/examples/i18n-routing-pages)
+
+</details>
+
+Next.jsは`v10.0.0`以降、国際化（[i18n](https://ja.wikipedia.org/wiki/%E5%9B%BD%E9%9A%9B%E5%8C%96%E3%81%A8%E5%9C%B0%E5%9F%9F%E5%8C%96#%E5%91%BD%E5%90%8D)）ルーティングを組み込みでサポートしています。ロケールのリスト、デフォルトロケール、ドメイン固有のロケールを提供することで、Next.jsが自動的にルーティングを処理します。
+
+i18nルーティングサポートは現在、[`react-intl`](https://formatjs.io/docs/getting-started/installation)、[`react-i18next`](https://react.i18next.com/)、[`lingui`](https://lingui.dev/)、[`rosetta`](https://github.com/lukeed/rosetta)、[`next-intl`](https://github.com/amannn/next-intl)、[`next-translate`](https://github.com/aralroca/next-translate)、[`next-multilingual`](https://github.com/Avansai/next-multilingual)、[`tolgee`](https://tolgee.io/integrations/next)、[`paraglide-next`](https://inlang.com/m/osslbuzt/paraglide-next-i18n)、[`next-intlayer`](https://intlayer.org/doc/environment/nextjs)などの既存のi18nライブラリソリューションを補完することを目的としており、ルートとロケール解析を合理化します。
+
+## はじめに
+
+まず、`next.config.js`ファイルに`i18n`設定を追加します。
+
+ロケールは[UTSロケール識別子](https://www.unicode.org/reports/tr35/tr35-59/tr35.html#Identifiers)で、ロケールを定義する標準化された形式です。
+
+一般的にロケール識別子は、言語、地域、スクリプトをダッシュで区切って構成されます: `language-region-script`。地域とスクリプトはオプションです。例:
+
+- `en-US` - アメリカで話されている英語
+- `nl-NL` - オランダで話されているオランダ語
+- `nl` - オランダ語、特定の地域なし
+
+ユーザーのロケールが`nl-BE`で、設定にリストされていない場合、利用可能であれば`nl`にリダイレクトされ、それ以外の場合はデフォルトロケールにリダイレクトされます。
+国のすべての地域をサポートする予定がない場合は、フォールバックとして機能する国別ロケールを含めることが良いプラクティスです。
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    // アプリケーションでサポートしたいすべてのロケール
+    locales: ['en-US', 'fr', 'nl-NL'],
+    // ロケールプレフィックスがないパス（例: `/hello`）にアクセスした際に使用されるデフォルトロケール
+    defaultLocale: 'en-US',
+    // ロケールドメインとそれらが処理するデフォルトロケールのリスト
+    // （ドメインルーティングを設定する場合にのみ必要）
+    // 注: サブドメインはマッチングさせるためにドメイン値に含める必要があります（例: "fr.example.com"）
+    domains: [
+      {
+        domain: 'example.com',
+        defaultLocale: 'en-US',
+      },
+      {
+        domain: 'example.nl',
+        defaultLocale: 'nl-NL',
+      },
+      {
+        domain: 'example.fr',
+        defaultLocale: 'fr',
+        // オプションのhttpフィールドを使用して、httpsではなくhttpでローカルにロケールドメインをテストできます
+        http: true,
+      },
+    ],
+  },
+}
+```
+
+## ロケール戦略
+
+ロケール処理には2つの戦略があります: サブパスルーティングとドメインルーティング。
+
+### サブパスルーティング
+
+サブパスルーティングでは、ロケールをURLパスに配置します。
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en-US', 'fr', 'nl-NL'],
+    defaultLocale: 'en-US',
+  },
+}
+```
+
+上記の設定では、`en-US`、`fr`、`nl-NL`がルーティング可能で、`en-US`がデフォルトロケールです。`pages/blog.js`がある場合、次のURLが利用可能になります:
+
+- `/blog`
+- `/fr/blog`
+- `/nl-nl/blog`
+
+デフォルトロケールにはプレフィックスがありません。
+
+### ドメインルーティング
+
+ドメインルーティングを使用すると、異なるドメインからロケールを提供するように設定できます:
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en-US', 'fr', 'nl-NL', 'nl-BE'],
+    defaultLocale: 'en-US',
+
+    domains: [
+      {
+        // 注: サブドメインはマッチングさせるためにドメイン値に含める必要があります
+        // 例: www.example.comは、それが期待されるホスト名である場合に使用する必要があります
+        domain: 'example.com',
+        defaultLocale: 'en-US',
+      },
+      {
+        domain: 'example.fr',
+        defaultLocale: 'fr',
+      },
+      {
+        domain: 'example.nl',
+        defaultLocale: 'nl-NL',
+        // このドメインにリダイレクトされるべき他のロケールを指定
+        locales: ['nl-BE'],
+      },
+    ],
+  },
+}
+```
+
+例えば、`pages/blog.js`がある場合、次のURLが利用可能になります:
+
+- `example.com/blog`
+- `www.example.com/blog`
+- `example.fr/blog`
+- `example.nl/blog`
+- `example.nl/nl-BE/blog`
+
+## 自動ロケール検出
+
+ユーザーがアプリケーションのルート（通常は`/`）にアクセスすると、Next.jsは[`Accept-Language`](https://developer.mozilla.org/ja/docs/Web/HTTP/Headers/Accept-Language)ヘッダーと現在のドメインに基づいて、ユーザーが好むロケールを自動的に検出しようとします。
+
+デフォルトロケール以外のロケールが検出された場合、ユーザーは次のいずれかにリダイレクトされます:
+
+- **サブパスルーティングを使用する場合:** ロケールプレフィックス付きのパス
+- **ドメインルーティングを使用する場合:** そのロケールがデフォルトとして指定されているドメイン
+
+ドメインルーティングを使用する場合、`Accept-Language`ヘッダーが`fr;q=0.9`のユーザーが`example.com`にアクセスすると、そのドメインがデフォルトで`fr`ロケールを処理するため、`example.fr`にリダイレクトされます。
+
+サブパスルーティングを使用する場合、ユーザーは`/fr`にリダイレクトされます。
+
+### デフォルトロケールにプレフィックスを追加
+
+Next.js 12と[ミドルウェア](/docs/pages/building-your-application/routing/middleware)を使用すると、[回避策](https://github.com/vercel/next.js/discussions/18419)でデフォルトロケールにプレフィックスを追加できます。
+
+例えば、以下はいくつかの言語をサポートする`next.config.js`ファイルです。"default"ロケールが意図的に追加されていることに注意してください。
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['default', 'en', 'de', 'fr'],
+    defaultLocale: 'default',
+    localeDetection: false,
+  },
+  trailingSlash: true,
+}
+```
+
+次に、[ミドルウェア](/docs/pages/building-your-application/routing/middleware)を使用してカスタムルーティングルールを追加できます:
+
+```ts filename="middleware.ts"
+import { NextRequest, NextResponse } from 'next/server'
+
+const PUBLIC_FILE = /\.(.*)$/
+
+export async function middleware(req: NextRequest) {
+  if (
+    req.nextUrl.pathname.startsWith('/_next') ||
+    req.nextUrl.pathname.includes('/api/') ||
+    PUBLIC_FILE.test(req.nextUrl.pathname)
+  ) {
+    return
+  }
+
+  if (req.nextUrl.locale === 'default') {
+    const locale = req.cookies.get('NEXT_LOCALE')?.value || 'en'
+
+    return NextResponse.redirect(
+      new URL(`/${locale}${req.nextUrl.pathname}${req.nextUrl.search}`, req.url)
+    )
+  }
+}
+```
+
+この[ミドルウェア](/docs/pages/building-your-application/routing/middleware)は、[APIルート](/docs/pages/building-your-application/routing/api-routes)とフォントや画像などの[パブリック](/docs/pages/api-reference/file-conventions/public-folder)ファイルにデフォルトプレフィックスを追加するのをスキップします。デフォルトロケールへのリクエストがある場合、プレフィックス`/en`にリダイレクトします。
+
+### 自動ロケール検出の無効化
+
+自動ロケール検出は次のように無効にできます:
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    localeDetection: false,
+  },
+}
+```
+
+`localeDetection`を`false`に設定すると、Next.jsはユーザーの優先ロケールに基づいて自動的にリダイレクトしなくなり、上記で説明したロケールベースのドメインまたはロケールパスから検出されたロケール情報のみを提供します。
+
+## ロケール情報へのアクセス
+
+Next.jsルーターを介してロケール情報にアクセスできます。例えば、[`useRouter()`](/docs/pages/api-reference/functions/use-router)フックを使用すると、次のプロパティが利用可能です:
+
+- `locale` - 現在アクティブなロケールを含む
+- `locales` - 設定されているすべてのロケールを含む
+- `defaultLocale` - 設定されているデフォルトロケールを含む
+
+`getStaticProps`または`getServerSideProps`でページを[プリレンダリング](/docs/pages/building-your-application/rendering/static-site-generation)する場合、ロケール情報は関数に提供される[コンテキスト](/docs/pages/building-your-application/data-fetching/get-static-props)で提供されます。
+
+`getStaticPaths`を活用する場合、設定されたロケールは関数のコンテキストパラメータの`locales`の下で提供され、設定された`defaultLocale`は`defaultLocale`の下で提供されます。
+
+## ロケール間の遷移
+
+`next/link`または`next/router`を使用してロケール間を遷移できます。
+
+`next/link`の場合、`locale`プロップを提供して、現在アクティブなロケールから別のロケールに遷移できます。`locale`プロップが提供されない場合、クライアント遷移中に現在アクティブな`locale`が使用されます。例えば:
+
+```jsx
+import Link from 'next/link'
+
+export default function IndexPage(props) {
+  return (
+    <Link href="/another" locale="fr">
+      To /fr/another
+    </Link>
+  )
+}
+```
+
+`next/router`メソッドを直接使用する場合、遷移オプションを介して使用するべき`locale`を指定できます。例えば:
+
+```jsx
+import { useRouter } from 'next/router'
+
+export default function IndexPage(props) {
+  const router = useRouter()
+
+  return (
+    <div
+      onClick={() => {
+        router.push('/another', '/another', { locale: 'fr' })
+      }}
+    >
+      to /fr/another
+    </div>
+  )
+}
+```
+
+[ダイナミックルート](/docs/pages/building-your-application/routing/dynamic-routes)クエリ値や非表示のhrefクエリ値などのすべてのルーティング情報を保持しながらロケールのみを切り替えるには、`href`パラメータをオブジェクトとして提供できます:
+
+```jsx
+import { useRouter } from 'next/router'
+const router = useRouter()
+const { pathname, asPath, query } = router
+// ロケールのみを変更し、hrefのクエリを含む他のすべてのルート情報を維持
+router.push({ pathname, query }, asPath, { locale: nextLocale })
+```
+
+`router.push`のオブジェクト構造の詳細については[こちら](/docs/pages/api-reference/functions/use-router#with-url-object)を参照してください。
+
+ロケールがすでに含まれている`href`がある場合、ロケールプレフィックスの自動処理をオプトアウトできます:
+
+```jsx
+import Link from 'next/link'
+
+export default function IndexPage(props) {
+  return (
+    <Link href="/fr/another" locale={false}>
+      To /fr/another
+    </Link>
+  )
+}
+```
+
+## `NEXT_LOCALE`クッキーの活用
+
+Next.jsでは、`NEXT_LOCALE=the-locale`クッキーを設定でき、これはaccept-languageヘッダーよりも優先されます。このクッキーは言語スイッチャーを使用して設定でき、ユーザーがサイトに戻ってきたときに、`/`から正しいロケールの場所にリダイレクトする際にクッキーで指定されたロケールが使用されます。
+
+例えば、ユーザーのaccept-languageヘッダーが`fr`を好むが、`NEXT_LOCALE=en`クッキーが設定されている場合、`/`にアクセスすると、クッキーが削除または期限切れになるまで、ユーザーは`en`ロケールの場所にリダイレクトされます。
+
+## 検索エンジン最適化
+
+Next.jsはユーザーが訪問している言語を知っているため、自動的に`<html>`タグに`lang`属性を追加します。
+
+Next.jsはページのバリエーションを知らないため、[`next/head`](/docs/pages/api-reference/components/head)を使用して`hreflang`メタタグを追加するのはあなた次第です。`hreflang`の詳細については[Googleウェブマスター向けドキュメント](https://support.google.com/webmasters/answer/189077)で学べます。
+
+## 静的生成との連携方法
+
+> 国際化ルーティングはNext.jsのルーティングレイヤーを活用しないため、[`output: 'export'`](/docs/pages/guides/static-exports)とは統合されません。`output: 'export'`を使用しないハイブリッドNext.jsアプリケーションは完全にサポートされます。
+
+### ダイナミックルートと`getStaticProps`ページ
+
+[ダイナミックルート](/docs/pages/building-your-application/routing/dynamic-routes)を使用する`getStaticProps`ページの場合、プリレンダリングしたいページのすべてのロケールバリアントを[`getStaticPaths`](/docs/pages/building-your-application/data-fetching/get-static-paths)から返す必要があります。`paths`に対して返される`params`オブジェクトと共に、どのロケールをレンダリングしたいかを指定する`locale`フィールドも返せます。例えば:
+
+```jsx filename="pages/blog/[slug].js"
+export const getStaticPaths = ({ locales }) => {
+  return {
+    paths: [
+      // `locale`が提供されない場合、デフォルトロケールのみが生成されます
+      { params: { slug: 'post-1' }, locale: 'en-US' },
+      { params: { slug: 'post-1' }, locale: 'fr' },
+    ],
+    fallback: true,
+  }
+}
+```
+
+[自動静的最適化](/docs/pages/building-your-application/rendering/automatic-static-optimization)および非ダイナミックな`getStaticProps`ページの場合、**各ロケールに対してページのバージョンが生成されます**。これは、`getStaticProps`内で設定されているロケールの数に応じてビルド時間が増加する可能性があるため、考慮することが重要です。
+
+例えば、50のロケールが設定されており、`getStaticProps`を使用する10の非ダイナミックページがある場合、`getStaticProps`は500回呼び出されます。ビルドごとに10ページの50バージョンが生成されます。
+
+`getStaticProps`を使用するダイナミックページのビルド時間を短縮するには、[`fallback`モード](/docs/pages/api-reference/functions/get-static-paths#fallback-true)を使用します。これにより、ビルド時にプリレンダリングするためだけに`getStaticPaths`から最も人気のあるパスとロケールを返すことができます。その後、Next.jsはリクエスト時に残りのページをビルドします。
+
+### 自動静的最適化ページ
+
+[自動的に静的に最適化される](/docs/pages/building-your-application/rendering/automatic-static-optimization)ページの場合、各ロケールに対してページのバージョンが生成されます。
+
+### 非ダイナミックなgetStaticPropsページ
+
+非ダイナミックな`getStaticProps`ページの場合、上記のように各ロケールに対してバージョンが生成されます。`getStaticProps`はレンダリングされる各`locale`で呼び出されます。特定のロケールをプリレンダリングから除外したい場合は、`getStaticProps`から`notFound: true`を返すと、そのバリアントのページは生成されません。
+
+```js
+export async function getStaticProps({ locale }) {
+  // 外部APIエンドポイントを呼び出して投稿を取得
+  // 任意のデータ取得ライブラリを使用できます
+  const res = await fetch(`https://.../posts?locale=${locale}`)
+  const posts = await res.json()
+
+  if (posts.length === 0) {
+    return {
+      notFound: true,
+    }
+  }
+
+  // { props: posts }を返すことで、Blogコンポーネントは
+  // ビルド時に`posts`をプロップとして受け取ります
+  return {
+    props: {
+      posts,
+    },
+  }
+}
+```
+
+## i18n設定の制限
+
+- `locales`: 合計100ロケール
+- `domains`: 合計100ロケールドメイン項目
+
+> **知っておくと良い**: これらの制限は、最初に[ビルド時の潜在的なパフォーマンス問題](#dynamic-routes-and-getstaticprops-pages)を防ぐために追加されました。Next.js 12では[ミドルウェア](/docs/pages/building-your-application/routing/middleware)を使用したカスタムルーティングでこれらの制限を回避できます。

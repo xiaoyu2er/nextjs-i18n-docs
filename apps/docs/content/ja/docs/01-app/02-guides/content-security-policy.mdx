@@ -1,0 +1,299 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:00:07.510Z
+title: Next.jsアプリケーションにContent Security Policy (CSP)を設定する方法
+nav_title: Content Security Policy
+description: Next.jsアプリケーションにContent Security Policy (CSP)を設定する方法について学びましょう。
+related:
+  links:
+    - app/building-your-application/routing/middleware
+    - app/api-reference/functions/headers
+---
+
+{/* このドキュメントの内容はApp RouterとPages Routerで共有されています。Pages Router固有のコンテンツを追加する場合は`<PagesOnly>Content</PagesOnly>`コンポーネントを使用してください。共有コンテンツはコンポーネントでラップしないでください。 */}
+
+[Content Security Policy (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP)は、クロスサイトスクリプティング(XSS)、クリックジャッキング、その他のコードインジェクション攻撃など、さまざまなセキュリティ脅威からNext.jsアプリケーションを保護するために重要です。
+
+CSPを使用することで、開発者はコンテンツソース、スクリプト、スタイルシート、画像、フォント、オブジェクト、メディア(オーディオ、ビデオ)、iframeなどに対して許可されるオリジンを指定できます。
+
+<details>
+  <summary>例</summary>
+
+- [Strict CSP](https://github.com/vercel/next.js/tree/canary/examples/with-strict-csp)
+
+</details>
+
+## ナンス（Nonce）
+
+[ナンス](https://developer.mozilla.org/docs/Web/HTML/Global_attributes/nonce)は、一度限りの使用のために作成される一意のランダムな文字列です。CSPと組み合わせて使用することで、厳格なCSPディレクティブをバイパスして特定のインラインスクリプトやスタイルの実行を選択的に許可します。
+
+### ナンスを使用する理由
+
+CSPは悪意のあるスクリプトをブロックするように設計されていますが、インラインスクリプトが必要な正当なシナリオもあります。そのような場合、ナンスは正しいナンスを持つこれらのスクリプトの実行を許可する方法を提供します。
+
+### ミドルウェアでナンスを追加する
+
+[ミドルウェア](/docs/app/building-your-application/routing/middleware)を使用すると、ページがレンダリングされる前にヘッダーを追加し、ナンスを生成できます。
+
+ページが表示されるたびに、新しいナンスを生成する必要があります。これは、**ナンスを追加するために動的レンダリングを使用する必要がある**ことを意味します。
+
+例:
+
+```ts filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // 改行文字とスペースを置換
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // 改行文字とスペースを置換
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+デフォルトでは、ミドルウェアはすべてのリクエストで実行されます。[`matcher`](/docs/app/building-your-application/routing/middleware#matcher)を使用して、特定のパスでミドルウェアを実行するようにフィルタリングできます。
+
+CSPヘッダーを必要としないプリフェッチ(`next/link`からの)と静的アセットのマッチングを無視することをお勧めします。
+
+```ts filename="middleware.ts" switcher
+export const config = {
+  matcher: [
+    /*
+     * 以下で始まるパスを除くすべてのリクエストパスにマッチ:
+     * - api (APIルート)
+     * - _next/static (静的ファイル)
+     * - _next/image (画像最適化ファイル)
+     * - favicon.ico (ファビコンファイル)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+```js filename="middleware.js" switcher
+export const config = {
+  matcher: [
+    /*
+     * 以下で始まるパスを除くすべてのリクエストパスにマッチ:
+     * - api (APIルート)
+     * - _next/static (静的ファイル)
+     * - _next/image (画像最適化ファイル)
+     * - favicon.ico (ファビコンファイル)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+### ナンスの読み取り
+
+<PagesOnly>
+  ナンスをページに提供するには
+  [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)を使用します:
+
+```tsx filename="pages/index.tsx" switcher
+import Script from 'next/script'
+
+import type { GetServerSideProps } from 'next'
+
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+import Script from 'next/script'
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export async function getServerSideProps({ req }) {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+[`headers`](/docs/app/api-reference/functions/headers)を使用して[Server Component](/docs/app/getting-started/server-and-client-components)からナンスを読み取ることができます:
+
+```tsx filename="app/page.tsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+</AppOnly>
+
+## ナンスなしの場合
+
+ナンスを必要としないアプリケーションでは、[`next.config.js`](/docs/app/api-reference/config/next-config-js)ファイルに直接CSPヘッダーを設定できます:
+
+```js filename="next.config.js"
+const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-eval' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## バージョン履歴
+
+ナンスを適切に処理および適用するには、Next.jsの`v13.4.20+`を使用することをお勧めします。
