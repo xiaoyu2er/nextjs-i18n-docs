@@ -155,7 +155,7 @@ Output format:
 
 ${context}
 
-NEXT MESSAGE IS THE TEXT TO TRANSLATE, PLEASE TRANSLATE IT TO ${langConfig.name}:
+⚠️ IMPORTANT: The next message contains the COMPLETE original text that needs to be translated. Please translate the ENTIRE content without omitting any parts, sections, or formatting elements. Preserve all whitespace, line breaks, and structural formatting exactly as they appear in the original, PLEASE TRANSLATE IT TO ${langConfig.name}:
 `;
 
   logger.debug(
