@@ -1,0 +1,659 @@
+---
+source-updated-at: 2025-06-02T15:30:01.000Z
+translation-updated-at: 2025-06-02T19:47:41.129Z
+title: Изменение данных
+headline: 'App Router: Изменение данных'
+description: 'Изменяйте данные с помощью Server Actions в React и перевалидируйте кеш Next.js.'
+image: 'https://nextjs.org/api/learn-og?title=Mutating%20Data&amp;chapter=12'
+---
+
+В предыдущей главе вы реализовали поиск и пагинацию с использованием URL Search Params и API Next.js. Давайте продолжим работу над страницей Invoices, добавив возможность создавать, обновлять и удалять счета!
+
+[Что такое Server Actions?](#what-are-server-actions)
+----------------------------------------------------
+
+Server Actions в React позволяют запускать асинхронный код напрямую на сервере. Они устраняют необходимость создавать API-эндпоинты для изменения данных. Вместо этого вы пишете асинхронные функции, которые выполняются на сервере и могут быть вызваны из клиентских или серверных компонентов.
+
+Безопасность — главный приоритет для веб-приложений, так как они могут быть уязвимы к различным угрозам. Именно здесь пригодятся Server Actions. Они включают такие функции, как зашифрованные замыкания, строгая проверка ввода, хеширование сообщений об ошибках, ограничения хостов и многое другое — всё это работает вместе, чтобы значительно повысить безопасность вашего приложения.
+
+[Использование форм с Server Actions](#using-forms-with-server-actions)
+-------------------------------------------------------------------
+
+В React вы можете использовать атрибут `action` в элементе `<form>` для вызова действий. Действие автоматически получит нативный объект [FormData](https://developer.mozilla.org/en-US/docs/Web/API/FormData), содержащий захваченные данные.
+
+Например:
+
+```
+// Server Component
+export default function Page() {
+  // Action
+  async function create(formData: FormData) {
+    'use server';
+ 
+    // Логика изменения данных...
+  }
+ 
+  // Вызов действия с помощью атрибута "action"
+  return <form action={create}>...</form>;
+}
+```
+
+Преимущество вызова Server Action внутри серверного компонента — прогрессивное улучшение: формы работают даже если JavaScript ещё не загрузился на клиенте. Например, при медленном интернет-соединении.
+
+[Next.js с Server Actions](#nextjs-with-server-actions)
+----------------------------------------------------------
+
+Server Actions также глубоко интегрированы с [кешированием](https://nextjs.org/docs/app/building-your-application/caching) в Next.js. Когда форма отправляется через Server Action, вы можете не только изменять данные, но и перевалидировать связанный кеш с помощью API, таких как `revalidatePath` и `revalidateTag`.
+
+Давайте посмотрим, как это всё работает вместе!
+
+[Создание счета](#creating-an-invoice)
+-------------------------------------------
+
+Вот шаги, которые вы выполните для создания нового счета:
+
+1.  Создайте форму для захвата ввода пользователя.
+2.  Создайте Server Action и вызовите её из формы.
+3.  Внутри Server Action извлеките данные из объекта `formData`.
+4.  Проверьте и подготовьте данные для вставки в базу данных.
+5.  Вставьте данные и обработайте возможные ошибки.
+6.  Перевалидируйте кеш и перенаправьте пользователя обратно на страницу счетов.
+
+### [1\. Создание нового маршрута и формы](#1-create-a-new-route-and-form)
+
+Для начала внутри папки `/invoices` добавьте новый сегмент маршрута `/create` с файлом `page.tsx`:
+
+<Image
+  alt="Папка Invoices с вложенной папкой create и файлом page.tsx внутри неё"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/create-invoice-route.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/create-invoice-route.png"
+  width="1600"
+  height="363"
+/>
+
+Вы будете использовать этот маршрут для создания новых счетов. Внутри файла `page.tsx` вставьте следующий код, затем изучите его:
+
+```tsx filename="/dashboard/invoices/create/page.tsx"
+import Form from '@/app/ui/invoices/create-form';
+import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import { fetchCustomers } from '@/app/lib/data';
+ 
+export default async function Page() {
+  const customers = await fetchCustomers();
+ 
+  return (
+    <main>
+      <Breadcrumbs
+        breadcrumbs={[
+          { label: 'Счета', href: '/dashboard/invoices' },
+          {
+            label: 'Создать счет',
+            href: '/dashboard/invoices/create',
+            active: true,
+          },
+        ]}
+      />
+      <Form customers={customers} />
+    </main>
+  );
+}
+```
+
+Ваша страница — это серверный компонент, который получает `customers` и передаёт их в компонент `<Form>`. Чтобы сэкономить время, мы уже создали компонент `<Form>` за вас.
+
+Перейдите к компоненту `<Form>`, и вы увидите, что форма:
+
+*   Имеет один элемент `<select>` (выпадающий список) со списком **клиентов**.
+*   Имеет один элемент `<input>` для **суммы** с `type="number"`.
+*   Имеет два элемента `<input>` для статуса с `type="radio"`.
+*   Имеет одну кнопку с `type="submit"`.
+
+На [http://localhost:3000/dashboard/invoices/create](http://localhost:3000/dashboard/invoices/create) вы должны увидеть следующий интерфейс:
+
+<Image
+  alt="Страница создания счетов с хлебными крошками и формой"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/create-invoice-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/create-invoice-page.png"
+  width="960"
+  height="563"
+/>
+
+### [2\. Создание Server Action](#2-create-a-server-action)
+
+Отлично, теперь давайте создадим Server Action, которая будет вызываться при отправке формы.
+
+Перейдите в папку `lib/` и создайте новый файл с именем `actions.ts`. В начале этого файла добавьте директиву React [`use server`](https://react.dev/reference/react/use-server):
+
+```ts filename="/app/lib/actions.ts"
+'use server';
+```
+
+Добавляя `'use server'`, вы помечаете все экспортируемые функции в файле как Server Actions. Эти серверные функции затем можно импортировать и использовать в клиентских и серверных компонентах. Любые функции в этом файле, которые _не_ используются, будут автоматически удалены из финального бандла приложения.
+
+Вы также можете писать Server Actions напрямую внутри серверных компонентов, добавляя `"use server"` внутри действия. Но для этого курса мы будем хранить их все в отдельном файле. Мы рекомендуем иметь отдельный файл для ваших действий.
+
+В вашем файле `actions.ts` создайте новую асинхронную функцию, которая принимает `formData`:
+
+```ts {3} filename="/app/lib/actions.ts"
+'use server';
+ 
+export async function createInvoice(formData: FormData) {}
+```
+
+Затем в вашем компоненте `<Form>` импортируйте `createInvoice` из файла `actions.ts`. Добавьте атрибут `action` к элементу `<form>` и вызовите действие `createInvoice`.
+
+```tsx {10,18} filename="/app/ui/invoices/create-form.tsx"
+import { CustomerField } from '@/app/lib/definitions';
+import Link from 'next/link';
+import {
+  CheckIcon,
+  ClockIcon,
+  CurrencyDollarIcon,
+  UserCircleIcon,
+} from '@heroicons/react/24/outline';
+import { Button } from '@/app/ui/button';
+import { createInvoice } from '@/app/lib/actions';
+ 
+export default function Form({
+  customers,
+}: {
+  customers: CustomerField[];
+}) {
+  return (
+    <form action={createInvoice}>
+      // ...
+  )
+}
+```
+
+> **Полезно знать**: В HTML вы бы передавали URL в атрибут `action`. Этот URL был бы местом, куда должны быть отправлены данные формы (обычно API-эндпоинт).
+> 
+> Однако в React атрибут `action` считается специальным пропсом — это означает, что React расширяет его, позволяя вызывать действия.
+> 
+> Под капотом Server Actions создают `POST` API-эндпоинт. Вот почему вам не нужно вручную создавать API-эндпоинты при использовании Server Actions.
+
+### [3\. Извлечение данных из `formData`](#3-extract-the-data-from-formdata)
+
+Вернувшись в файл `actions.ts`, вам нужно извлечь значения из `formData`. Для этого есть [несколько методов](https://developer.mozilla.org/en-US/docs/Web/API/FormData). Для этого примера давайте используем метод [`.get(name)`](https://developer.mozilla.org/en-US/docs/Web/API/FormData/get).
+
+```ts {3,4,5,6,7,8,9,10} filename="/app/lib/actions.ts"
+'use server';
+ 
+export async function createInvoice(formData: FormData) {
+  const rawFormData = {
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  };
+  // Проверка:
+  console.log(rawFormData);
+}
+```
+
+> **Совет:** Если вы работаете с формами, у которых много полей, вы можете рассмотреть использование метода [`entries()`](https://developer.mozilla.org/en-US/docs/Web/API/FormData/entries) с [`Object.fromEntries()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/fromEntries) в JavaScript.
+
+Чтобы проверить, что всё подключено правильно, попробуйте отправить форму. После отправки вы должны увидеть данные, которые вы только что ввели в форму, в вашем **терминале** (не в браузере).
+
+Теперь, когда ваши данные имеют форму объекта, с ними будет гораздо проще работать.
+
+### [4\. Проверка и подготовка данных](#4-validate-and-prepare-the-data)
+
+Прежде чем отправлять данные формы в вашу базу данных, вы хотите убедиться, что они в правильном формате и с правильными типами. Если вы помните из начала курса, ваша таблица счетов ожидает данные в следующем формате:
+
+```ts filename="/app/lib/definitions.ts"
+export type Invoice = {
+  id: string; // Будет создано в базе данных
+  customer_id: string;
+  amount: number; // Хранится в центах
+  status: 'pending' | 'paid';
+  date: string;
+};
+```
+
+Пока у вас есть только `customer_id`, `amount` и `status` из формы.
+
+#### [Проверка типов и приведение](#type-validation-and-coercion)
+
+Важно проверить, что данные из вашей формы соответствуют ожидаемым типам в вашей базе данных. Например, если вы добавите `console.log` внутри вашего действия:
+
+```
+console.log(typeof rawFormData.amount);
+```
+
+Вы заметите, что `amount` имеет тип `string`, а не `number`. Это потому, что элементы `input` с `type="number"` на самом деле возвращают строку, а не число!
+
+Для проверки типов у вас есть несколько вариантов. Хотя вы можете проверять типы вручную, использование библиотеки для проверки типов может сэкономить вам время и усилия. Для вашего примера мы будем использовать [Zod](https://zod.dev/), библиотеку валидации, ориентированную на TypeScript, которая может упростить эту задачу.
+
+В вашем файле `actions.ts` импортируйте Zod и определите схему, которая соответствует форме вашего объекта. Эта схема будет проверять `formData` перед сохранением в базу данных.
+
+```ts {3,5,6,7,8,9,10,11,13} filename="/app/lib/actions.ts"
+'use server';
+ 
+import { z } from 'zod';
+ 
+const FormSchema = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  amount: z.coerce.number(),
+  status: z.enum(['pending', 'paid']),
+  date: z.string(),
+});
+ 
+const CreateInvoice = FormSchema.omit({ id: true, date: true });
+ 
+export async function createInvoice(formData: FormData) {
+  // ...
+}
+```
+
+Поле `amount` специально настроено на приведение (изменение) из строки в число с одновременной проверкой его типа.
+
+Затем вы можете передать ваш `rawFormData` в `CreateInvoice` для проверки типов:
+
+```ts {3} filename="/app/lib/actions.ts"
+// ...
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+}
+```
+
+#### [Хранение значений в центах](#storing-values-in-cents)
+
+Обычно хорошей практикой является хранение денежных значений в центах в вашей базе данных, чтобы избежать ошибок с плавающей точкой в JavaScript и обеспечить большую точность.
+
+Давайте преобразуем сумму в центы:
+
+```ts {8} filename="/app/lib/actions.ts"
+// ...
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+  const amountInCents = amount * 100;
+}
+```
+
+#### [Создание новых дат](#creating-new-dates)
+
+Наконец, давайте создадим новую дату в формате "YYYY-MM-DD" для даты создания счета:
+
+```ts {9} filename="/app/lib/actions.ts"
+// ...
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+}
+```
+
+### [5\. Вставка данных в базу данных](#5-inserting-the-data-into-your-database)
+
+Теперь, когда у вас есть все значения, необходимые для вашей базы данных, вы можете создать SQL-запрос для вставки нового счета в вашу базу данных и передать переменные:
+
+```ts {2,4,17,18,19,20} filename="/app/lib/actions.ts"
+import { z } from 'zod';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+// ...
+ 
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+ 
+  await sql`
+    INSERT INTO invoices (customer_id, amount, status, date)
+    VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+  `;
+}
+```
+
+Сейчас мы не обрабатываем никакие ошибки. Мы поговорим об этом в следующей главе. А пока давайте перейдём к следующему шагу.
+
+### [6. Ревалидация и редирект](#6-revalidate-and-redirect)
+
+Next.js имеет клиентский кеш маршрутизатора, который временно хранит сегменты маршрутов в браузере пользователя. Вместе с [префетчингом](/docs/app/building-your-application/routing/linking-and-navigating#1-prefetching) этот кеш обеспечивает быструю навигацию между маршрутами, уменьшая количество запросов к серверу.
+
+Поскольку вы обновляете данные, отображаемые на маршруте счетов, вам нужно очистить этот кеш и инициировать новый запрос к серверу. Это можно сделать с помощью функции [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) из Next.js:
+
+```ts {4,25} filename="/app/lib/actions.ts"
+'use server';
+ 
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+// ...
+ 
+export async function createInvoice(formData: FormData) {
+  const { customerId, amount, status } = CreateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+ 
+  await sql`
+    INSERT INTO invoices (customer_id, amount, status, date)
+    VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+  `;
+ 
+  revalidatePath('/dashboard/invoices');
+}
+```
+
+После обновления базы данных путь `/dashboard/invoices` будет ревалидирован, и свежие данные будут загружены с сервера.
+
+На этом этапе также нужно перенаправить пользователя обратно на страницу `/dashboard/invoices`. Это можно сделать с помощью функции [`redirect`](/docs/app/api-reference/functions/redirect) из Next.js:
+
+```ts {5,16} filename="/app/lib/actions.ts"
+'use server';
+ 
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import postgres from 'postgres';
+ 
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+ 
+// ...
+ 
+export async function createInvoice(formData: FormData) {
+  // ...
+ 
+  revalidatePath('/dashboard/invoices');
+  redirect('/dashboard/invoices');
+}
+```
+
+Поздравляем! Вы только что реализовали свое первое серверное действие (Server Action). Протестируйте его, добавив новый счет. Если все работает правильно:
+
+1. После отправки формы вы должны быть перенаправлены на маршрут `/dashboard/invoices`.
+2. Новый счет должен появиться в верхней части таблицы.
+
+[Обновление счета](#updating-an-invoice)
+-------------------------------------------
+
+Форма обновления счета похожа на форму создания, но вам нужно передать `id` счета для обновления записи в базе данных. Давайте посмотрим, как получить и передать `id` счета.
+
+Шаги для обновления счета:
+
+1. Создайте новый динамический сегмент маршрута с `id` счета.
+2. Получите `id` счета из параметров страницы.
+3. Загрузите конкретный счет из базы данных.
+4. Заполните форму данными счета.
+5. Обновите данные счета в базе данных.
+
+### [1. Создание динамического сегмента маршрута с `id` счета](#1-create-a-dynamic-route-segment-with-the-invoice-id)
+
+Next.js позволяет создавать [Динамические сегменты маршрутов](/docs/app/building-your-application/routing/dynamic-routes), когда точное название сегмента неизвестно и нужно создавать маршруты на основе данных. Это могут быть заголовки блогов, страницы продуктов и т.д. Динамические сегменты создаются путем заключения имени папки в квадратные скобки, например, `[id]`, `[post]` или `[slug]`.
+
+В папке `/invoices` создайте новый динамический маршрут `[id]`, а затем новый маршрут `edit` с файлом `page.tsx`. Структура файлов должна выглядеть так:
+
+<Image
+  alt="Папка Invoices с вложенной папкой [id] и папкой edit внутри нее"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/edit-invoice-route.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/edit-invoice-route.png"
+  width="1600"
+  height="444"
+/>
+
+В компоненте `<Table>` обратите внимание на кнопку `<UpdateInvoice />`, которая получает `id` счета из записей таблицы.
+
+```tsx {11} filename="/app/ui/invoices/table.tsx"
+export default async function InvoicesTable({
+  query,
+  currentPage,
+}: {
+  query: string;
+  currentPage: number;
+}) {
+  return (
+    // ...
+    <td className="flex justify-end gap-2 whitespace-nowrap px-6 py-4 text-sm">
+      <UpdateInvoice id={invoice.id} />
+      <DeleteInvoice id={invoice.id} />
+    </td>
+    // ...
+  );
+}
+```
+
+Перейдите к компоненту `<UpdateInvoice />` и обновите атрибут `href` компонента `Link`, чтобы он принимал пропс `id`. Можно использовать шаблонные литералы для ссылки на динамический сегмент маршрута:
+
+```tsx {9} filename="/app/ui/invoices/buttons.tsx"
+import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+ 
+// ...
+ 
+export function UpdateInvoice({ id }: { id: string }) {
+  return (
+    <Link
+      href={`/dashboard/invoices/${id}/edit`}
+      className="rounded-md border p-2 hover:bg-gray-100"
+    >
+      <PencilIcon className="w-5" />
+    </Link>
+  );
+}
+```
+
+### [2. Получение `id` счета из параметров страницы](#2-read-the-invoice-id-from-page-params)
+
+Вернитесь к компоненту `<Page>` и вставьте следующий код:
+
+```tsx filename="/app/dashboard/invoices/[id]/edit/page.tsx"
+import Form from '@/app/ui/invoices/edit-form';
+import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import { fetchCustomers } from '@/app/lib/data';
+ 
+export default async function Page() {
+  return (
+    <main>
+      <Breadcrumbs
+        breadcrumbs={[
+          { label: 'Счета', href: '/dashboard/invoices' },
+          {
+            label: 'Редактировать счет',
+            href: `/dashboard/invoices/${id}/edit`,
+            active: true,
+          },
+        ]}
+      />
+      <Form invoice={invoice} customers={customers} />
+    </main>
+  );
+}
+```
+
+Обратите внимание, что он похож на страницу создания счета, но импортирует другую форму (из файла `edit-form.tsx`). Эта форма должна быть **предварительно заполнена** значениями `defaultValue` для имени клиента, суммы счета и статуса. Чтобы предварительно заполнить поля формы, нужно загрузить конкретный счет с помощью `id`.
+
+Помимо `searchParams`, компоненты страниц также принимают пропс `params`, который можно использовать для доступа к `id`. Обновите компонент `<Page>`, чтобы он принимал этот пропс:
+
+```tsx {5,6,7} filename="/app/dashboard/invoices/[id]/edit/page.tsx"
+import Form from '@/app/ui/invoices/edit-form';
+import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import { fetchCustomers } from '@/app/lib/data';
+ 
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
+  // ...
+}
+```
+
+### [3. Загрузка конкретного счета](#3-fetch-the-specific-invoice)
+
+Затем:
+
+* Импортируйте новую функцию `fetchInvoiceById` и передайте ей `id`.
+* Импортируйте `fetchCustomers` для загрузки имен клиентов для выпадающего списка.
+
+Можно использовать `Promise.all` для параллельной загрузки счета и клиентов:
+
+```tsx {3,8,9,10,11} filename="/dashboard/invoices/[id]/edit/page.tsx"
+import Form from '@/app/ui/invoices/edit-form';
+import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import { fetchInvoiceById, fetchCustomers } from '@/app/lib/data';
+ 
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
+  const [invoice, customers] = await Promise.all([
+    fetchInvoiceById(id),
+    fetchCustomers(),
+  ]);
+  // ...
+}
+```
+
+Вы увидите временную ошибку TypeScript для пропса `invoice` в терминале, потому что `invoice` может быть `undefined`. Пока не беспокойтесь об этом — вы исправите это в следующей главе при добавлении обработки ошибок.
+
+Отлично! Теперь протестируйте, что все правильно подключено. Перейдите по адресу [http://localhost:3000/dashboard/invoices](http://localhost:3000/dashboard/invoices) и нажмите на иконку карандаша для редактирования счета. После перехода вы должны увидеть форму, предварительно заполненную данными счета:
+
+<Image
+  alt="Страница редактирования счета с хлебными крошками и формой"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/edit-invoice-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/edit-invoice-page.png"
+  width="960"
+  height="563"
+/>
+
+URL также должен обновиться с `id`, например: `http://localhost:3000/dashboard/invoice/uuid/edit`
+
+> **UUID vs. Автоинкрементные ключи**
+> 
+> Мы используем UUID вместо инкрементных ключей (например, 1, 2, 3 и т.д.). Это делает URL длиннее, но UUID исключают риск коллизии идентификаторов, являются глобально уникальными и снижают риск атак перечисления — что делает их идеальными для больших баз данных.
+> 
+> Однако, если вы предпочитаете более чистые URL, можно использовать автоинкрементные ключи.
+
+### [4. Передача `id` в серверное действие](#4-pass-the-id-to-the-server-action)
+
+Наконец, нужно передать `id` в серверное действие, чтобы обновить правильную запись в базе данных. **Нельзя** передать `id` как аргумент следующим образом:
+
+```tsx filename="/app/ui/invoices/edit-form.tsx"
+// Передача id как аргумента не сработает
+<form action={updateInvoice(id)}>
+```
+
+Вместо этого можно передать `id` в серверное действие с помощью JS `bind`. Это гарантирует, что любые значения, переданные в серверное действие, будут закодированы.
+
+```tsx {2,11,13} filename="/app/ui/invoices/edit-form.tsx"
+// ...
+import { updateInvoice } from '@/app/lib/actions';
+ 
+export default function EditInvoiceForm({
+  invoice,
+  customers,
+}: {
+  invoice: InvoiceForm;
+  customers: CustomerField[];
+}) {
+  const updateInvoiceWithId = updateInvoice.bind(null, invoice.id);
+ 
+  return <form action={updateInvoiceWithId}>{/* ... */}</form>;
+}
+```
+
+> **Примечание:** Использование скрытого поля ввода в форме также работает (например, `<input type="hidden" name="id" value={invoice.id} />`). Однако значения будут видны в исходном HTML-коде, что не идеально для конфиденциальных данных.
+
+Затем в файле `actions.ts` создайте новое действие `updateInvoice`:
+
+```ts filename="/app/lib/actions.ts"
+// Используйте Zod для обновления ожидаемых типов
+const UpdateInvoice = FormSchema.omit({ id: true, date: true });
+ 
+// ...
+ 
+export async function updateInvoice(id: string, formData: FormData) {
+  const { customerId, amount, status } = UpdateInvoice.parse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  const amountInCents = amount * 100;
+ 
+  await sql`
+    UPDATE invoices
+    SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
+    WHERE id = ${id}
+  `;
+ 
+  revalidatePath('/dashboard/invoices');
+  redirect('/dashboard/invoices');
+}
+```
+
+Аналогично действию `createInvoice`, здесь вы:
+
+1. Извлекаете данные из `formData`.
+2. Проверяете типы с помощью Zod.
+3. Конвертируете сумму в центы.
+4. Передаете переменные в SQL-запрос.
+5. Вызываете `revalidatePath` для очистки клиентского кеша и нового запроса к серверу.
+6. Вызываете `redirect` для перенаправления пользователя на страницу счетов.
+
+Протестируйте, отредактировав счет. После отправки формы вы должны быть перенаправлены на страницу счетов, и счет должен быть обновлен.
+
+[Удаление счета](#deleting-an-invoice)
+-------------------------------------------
+
+Чтобы удалить счет с помощью серверного действия, оберните кнопку удаления в элемент `<form>` и передайте `id` в серверное действие с помощью `bind`:
+
+```tsx {1,6,9} filename="/app/ui/invoices/buttons.tsx"
+import { deleteInvoice } from '@/app/lib/actions';
+ 
+// ...
+ 
+export function DeleteInvoice({ id }: { id: string }) {
+  const deleteInvoiceWithId = deleteInvoice.bind(null, id);
+ 
+  return (
+    <form action={deleteInvoiceWithId}>
+      <button type="submit" className="rounded-md border p-2 hover:bg-gray-100">
+        <span className="sr-only">Удалить</span>
+        <TrashIcon className="w-4" />
+      </button>
+    </form>
+  );
+}
+```
+
+В файле `actions.ts` создайте новое действие `deleteInvoice`.
+
+```ts filename="/app/lib/actions.ts"
+export async function deleteInvoice(id: string) {
+  await sql`DELETE FROM invoices WHERE id = ${id}`;
+  revalidatePath('/dashboard/invoices');
+}
+```
+
+Поскольку это действие вызывается на маршруте `/dashboard/invoices`, не нужно вызывать `redirect`. Вызов `revalidatePath` инициирует новый запрос к серверу и перерисовку таблицы.
+
+[Дополнительные материалы](#further-reading)
+-----------------------------------
+
+В этой главе вы узнали, как использовать серверные действия для изменения данных. Также вы узнали, как использовать API `revalidatePath` для ревалидации кеша Next.js и `redirect` для перенаправления пользователя на новую страницу.
+
+Для дополнительного изучения можно прочитать о [безопасности серверных действий](https://nextjs.org/blog/security-nextjs-server-components-actions).
