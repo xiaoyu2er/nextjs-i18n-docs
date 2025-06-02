@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
 export default function LearnIndexPage() {
+  const t = useTranslations('LearnPage');
   const tHome = useTranslations('HomePage');
   const learnTabs = getLearnTabs();
 
@@ -20,13 +21,10 @@ export default function LearnIndexPage() {
         <div className="container max-w-6xl mx-auto px-6 relative z-10">
           <div className="text-center">
             <h1 className="text-5xl md:text-7xl font-extrabold text-fd-foreground mb-6 leading-tight">
-              {tHome('learn', { defaultValue: 'Learn Next.js' })}
+              {t('title')}
             </h1>
             <p className="text-xl md:text-2xl text-fd-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              {tHome('featuresSubtitle', {
-                defaultValue:
-                  'Choose a learning path to get started with Next.js internationalization.',
-              })}
+              {t('subtitle')}
             </p>
           </div>
         </div>
@@ -64,7 +62,7 @@ export default function LearnIndexPage() {
 
                 {/* Call to action */}
                 <div className="flex items-center text-purple-600 dark:text-purple-400 font-medium opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-                  <span className="mr-2">Start learning</span>
+                  <span className="mr-2">{t('startLearning')}</span>
                   <svg
                     className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1"
                     fill="none"
