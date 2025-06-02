@@ -1,0 +1,396 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:42:27.344Z
+title: Создание API с помощью Next.js
+description: Узнайте, как создавать API с использованием Next.js.
+author:
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+date: 2025-02-28T14:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/building-apis-with-nextjs/twitter-card.png
+---
+
+В этом руководстве рассказывается, как создавать API с помощью Next.js, включая настройку проекта, работу с App Router и Route Handlers, обработку нескольких HTTP-методов, реализацию динамической маршрутизации, создание переиспользуемой middleware-логики и принятие решений о необходимости выделенного API-слоя.
+
+*   [1\. Начало работы](#1-начало-работы)
+    *   [1.1 Создание Next.js приложения](#11-создание-nextjs-приложения)
+    *   [1.2 App Router против Pages Router](#12-app-router-против-pages-router)
+*   [2\. Зачем (и когда) создавать API с Next.js](#2-зачем-и-когда-создавать-api-с-nextjs)
+*   [3\. Создание API с Route Handlers](#3-создание-api-с-route-handlers)
+    *   [3.1 Базовая настройка файлов](#31-базовая-настройка-файлов)
+    *   [3.2 Несколько HTTP-методов в одном файле](#32-несколько-http-методов-в-одном-файле)
+*   [4\. Работа с Web API](#4-работа-с-web-api)
+    *   [4.1 Прямое использование Request & Response](#41-прямое-использование-request--response)
+    *   [4.2 Параметры запроса](#42-параметры-запроса)
+    *   [4.3 Заголовки и куки](#43-заголовки-и-куки)
+*   [5\. Динамические маршруты](#5-динамические-маршруты)
+*   [6\. Использование Next.js в качестве прокси или промежуточного слоя](#6-использование-nextjs-в-качестве-прокси-или-промежуточного-слоя)
+*   [7\. Создание переиспользуемой "middleware"-логики](#7-создание-переиспользуемой-middleware-логики)
+*   [8\. Деплой и особенности "SPA Mode"](#8-деплой-и-особенности-spa-mode)
+    *   [8.1 Стандартный деплой на Node.js](#81-стандартный-деплой-на-nodejs)
+    *   [8.2 SPA/Статический экспорт](#82-spaстатический-экспорт)
+    *   [8.3 Деплой API на Vercel](#83-деплой-api-на-vercel)
+*   [9\. Когда можно не создавать API-эндпоинт](#9-когда-можно-не-создавать-api-эндпоинт)
+*   [10\. Собираем всё вместе](#10-собираем-всё-вместе)
+*   [Заключение](#заключение)
+*   [Часто задаваемые вопросы](#часто-задаваемые-вопросы)
+    *   [А как насчёт Server Actions?](#а-как-насчёт-server-actions)
+    *   [Можно ли использовать TypeScript с Route Handlers?](#можно-ли-использовать-typescript-с-route-handlers)
+    *   [Какие лучшие практики аутентификации?](#какие-лучшие-практики-аутентификации)
+
+[1\. Начало работы](#1-начало-работы)
+-----------------------------------------
+
+### [1.1 Создание Next.js приложения](#11-создание-nextjs-приложения)
+
+Если вы начинаете с нуля, создайте новый проект Next.js с помощью:
+
+```bash filename="Terminal"
+npx create-next-app@latest --api
+```
+
+> **Примечание:** Флаг `--api` автоматически включает пример `route.ts` в папке `app/` вашего нового проекта, демонстрируя создание API-эндпоинта.
+
+### [1.2 App Router против Pages Router](#12-app-router-против-pages-router)
+
+*   **Pages Router**: Исторически Next.js использовал `pages/api/*` для API. Этот подход опирался на объекты запроса/ответа Node.js и API, похожее на Express.
+*   **App Router (по умолчанию)**: Представленный в Next.js 13, App Router полностью использует стандартные Web API Request/Response. Вместо `pages/api/*` теперь можно размещать файлы `route.ts` или `route.js` в любом месте директории `app/`.
+
+> **Почему стоит переключиться?** "Route Handlers" в App Router основаны на [Web Platform Request/Response APIs](https://developer.mozilla.org/en-US/docs/Web/API), а не на специфичных для Node.js API. Это упрощает обучение, уменьшает трение и позволяет повторно использовать знания в разных инструментах.
+
+[2\. Зачем (и когда) создавать API с Next.js](#2-зачем-и-когда-создавать-api-с-nextjs)
+------------------------------------------------------------------------------------------
+
+1.  **Публичный API для нескольких клиентов**
+    
+    *   Можно создать публичный API, который будет использоваться вашим Next.js веб-приложением, отдельным мобильным приложением или любым сторонним сервисом. Например, вы можете получать данные из /api/users как в React-сайте, так и в React Native мобильном приложении.
+2.  **Прокси к существующему бэкенду**
+    
+    *   Иногда нужно скрыть или объединить внешние [микросервисы](https://vercel.com/blog/how-vercel-adopted-microfrontends) за единым эндпоинтом. Route Handlers в Next.js могут выступать в роли прокси или промежуточного слоя для другого существующего бэкенда. Например, можно перехватывать запросы, обрабатывать аутентификацию, преобразовывать данные и затем передавать запрос вышестоящему API.
+3.  **Вебхуки и интеграции**
+    
+    *   Если вы получаете внешние колбэки или вебхуки (например, от Stripe, GitHub, Twilio), их можно обрабатывать с помощью Route Handlers.
+4.  **Кастомная аутентификация**
+    
+    *   Если нужны сессии, токены или другая логика аутентификации, можно хранить куки, читать заголовки и отвечать соответствующими данными в API-слое Next.js.
+
+> **Примечание:** Если вам нужно только серверное получение данных для вашего Next.js приложения (и не требуется делиться этими данными внешне), Server Components может быть достаточно для получения данных непосредственно во время рендеринга — отдельный API-слой не требуется.
+
+[3\. Создание API с Route Handlers](#3-создание-api-с-route-handlers)
+---------------------------------------------------------------------------------
+
+### [3.1 Базовая настройка файлов](#31-базовая-настройка-файлов)
+
+В App Router (`app/`) создайте папку, представляющую ваш маршрут, и внутри неё файл `route.ts`.
+
+Например, для создания эндпоинта на `/api/users`:
+
+```
+app
+└── api
+    └── users
+        └── route.ts
+```
+
+### [3.2 Несколько HTTP-методов в одном файле](#32-несколько-http-методов-в-одном-файле)
+
+В отличие от API-маршрутов в Pages Router (где был один экспорт по умолчанию), из одного файла можно экспортировать несколько функций, представляющих разные HTTP-методы.
+
+```ts filename="app/api/users/route.ts"
+export async function GET(request: Request) {
+  // Например, здесь можно получить данные из БД
+  const users = [
+    { id: 1, name: 'Алиса' },
+    { id: 2, name: 'Боб' }
+  ];
+  return new Response(JSON.stringify(users), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+ 
+export async function POST(request: Request) {
+  // Разбираем тело запроса
+  const body = await request.json();
+  const { name } = body;
+ 
+  // Например, вставляем нового пользователя в БД
+  const newUser = { id: Date.now(), name };
+ 
+  return new Response(JSON.stringify(newUser), {
+    status: 201,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+```
+
+Теперь GET-запрос к `/api/users` возвращает список пользователей, а POST-запрос на тот же URL добавляет нового пользователя.
+
+[4\. Работа с Web API](#4-работа-с-web-api)
+-----------------------------------------------------
+
+### [4.1 Прямое использование Request & Response](#41-прямое-использование-request--response)
+
+По умолчанию методы Route Handler (`GET`, `POST` и т.д.) получают стандартный объект [Request](https://developer.mozilla.org/docs/Web/API/Request), и вы должны возвращать стандартный объект [Response](https://developer.mozilla.org/docs/Web/API/Response).
+
+### [4.2 Параметры запроса](#42-параметры-запроса)
+
+```ts filename="app/api/search/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const query = searchParams.get('query'); // например, `/api/search?query=hello`
+ 
+  return new Response(
+    JSON.stringify({ result: `Вы искали: ${query}` }),
+    {
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+}
+```
+
+### [4.3 Заголовки и куки](#43-заголовки-и-куки)
+
+```ts filename="app/api/auth/route.ts"
+import { NextRequest } from 'next/server';
+import { cookies, headers } from 'next/headers';
+ 
+export async function GET(request: NextRequest) {
+  // 1. Использование помощников из 'next/headers'
+  const cookieStore = await cookies();
+  const token = cookieStore.get('token');
+ 
+  const headersList = await headers();
+  const referer = headersList.get('referer');
+ 
+  // 2. Использование стандартных Web API
+  const userAgent = request.headers.get('user-agent');
+ 
+  return new Response(JSON.stringify({ token, referer, userAgent }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+```
+
+Функции `cookies()` и `headers()` могут быть полезны, если вы планируете повторно использовать общую логику в другом серверном коде Next.js. Обратите внимание, что Next.js также предоставляет `NextRequest` и `NextResponse`, которые расширяют базовые Web API.
+
+[5\. Динамические маршруты](#5-динамические-маршруты)
+---------------------------------------
+
+Для создания динамических путей (например, `/api/users/:id`) используйте **Dynamic Segments** в структуре папок:
+
+```
+app
+└── api
+    └── users
+        └── [id]
+            └── route.ts
+```
+
+Этот файл соответствует URL типа `/api/users/123`, где `123` захватывается как параметр.
+
+```ts filename="app/api/users/[id]/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const id = (await params).id;
+  // Например, запрос пользователя с ID `id` из БД
+  return new Response(JSON.stringify({ id, name: `Пользователь ${id}` }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const id = (await params).id;
+  // Например, удаление пользователя с ID `id` из БД
+  return new Response(null, { status: 204 });
+}
+```
+
+Здесь `params.id` даёт вам динамический сегмент.
+
+[6\. Использование Next.js в качестве прокси или промежуточного слоя](#6-использование-nextjs-в-качестве-прокси-или-промежуточного-слоя)
+--------------------------------------------------------------------------------------------------
+
+Распространённый сценарий — **проксирование** существующего бэкенд-сервиса. Можно аутентифицировать запросы, вести логирование или преобразовывать данные перед отправкой на удалённый сервер или бэкенд:
+
+```ts filename="app/api/external/route.ts"
+import { NextRequest } from 'next/server';
+ 
+export async function GET(request: NextRequest) {
+  const response = await fetch('https://example.com/api/data', {
+    // Опционально: передача заголовков, добавление токенов аутентификации и т.д.
+    headers: { Authorization: `Bearer ${process.env.API_TOKEN}` },
+  });
+ 
+  // Преобразование или передача ответа
+  const data = await response.json();
+  const transformed = { ...data, source: 'проксировано-через-nextjs' };
+ 
+  return new Response(JSON.stringify(transformed), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+```
+
+Теперь клиентам нужно только вызывать `/api/external`, а Next.js обработает остальное. Это иногда называют "Backend for Frontend" или BFF.
+
+[7\. Создание переиспользуемой "middleware"-логики](#7-создание-переиспользуемой-middleware-логики)
+-----------------------------------------------------------------------------
+
+Если нужно применить одну и ту же логику (например, проверки аутентификации, логирование) к нескольким Route Handlers, можно создать переиспользуемые функции, оборачивающие ваши обработчики:
+
+```ts filename="lib/with-auth.ts"
+import { NextRequest } from 'next/server';
+ 
+type Handler = (req: NextRequest, context?: any) => Promise<Response>;
+ 
+export function withAuth(handler: Handler): Handler {
+  return async (req, context) => {
+    const token = req.cookies.get('token')?.value;
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Не авторизован' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+ 
+    // Если аутентификация прошла, вызываем оригинальный обработчик
+    return handler(req, context);
+  };
+}
+```
+
+Затем в вашем Route Handler:
+
+```ts filename="app/api/secret/route.ts"
+import { NextRequest } from 'next/server';
+import { withAuth } from '@/lib/with-auth';
+ 
+async function secretGET(request: NextRequest) {
+  return new Response(JSON.stringify({ secret: 'Здесь водятся драконы' }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export const GET = withAuth(secretGET);
+```
+
+[8\. Деплой и особенности "SPA Mode"](#8-деплой-и-особенности-spa-mode)
+-----------------------------------------------------------------------------------------
+
+### [8.1 Стандартный деплой на Node.js](#81-стандартный-деплой-на-nodejs)
+
+Стандартный деплой Next.js сервера с использованием `next start` позволяет использовать такие функции, как Route Handlers, Server Components, Middleware и другие — с возможностью работы с динамической информацией во время запроса.
+
+Дополнительная конфигурация не требуется. Подробнее см. в разделе [Деплой](/docs/app/building-your-application/deploying).
+
+### [8.2 SPA/Статический экспорт](#82-spaстатический-экспорт)
+
+Next.js также поддерживает экспорт всего сайта как [статического Single-Page Application (SPA)](/docs/app/building-your-application/upgrading/single-page-applications).
+
+Это можно включить, установив:
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  output: 'export',
+};
+ 
+export default nextConfig;
+```
+
+В **режиме статического экспорта** Next.js генерирует чисто статические HTML, CSS и JS. **Нельзя выполнять серверный код** (например, API-эндпоинты). Если API всё ещё нужен, его придётся размещать отдельно (например, на отдельном Node.js сервере).
+
+> **Примечание:**
+> 
+> *   **GET Route Handlers** [могут быть статически экспортированы](/docs/app/building-your-application/deploying/static-exports#route-handlers), если они не зависят от динамических данных запроса. Они становятся статическими файлами в папке `out`.
+> *   **Все остальные серверные функции** (динамические запросы, перезапись куки и т.д.) **не поддерживаются** в чистом SPA экспорте.
+
+### [8.3 Развертывание API на Vercel](#83-deploying-apis-on-vercel)
+
+Если вы развертываете свое Next.js-приложение на Vercel, у нас есть [руководство по развертыванию API](https://vercel.com/guides/hosting-backend-apis). Оно включает другие функции Vercel, такие как [программное ограничение частоты запросов (rate-limiting)](https://vercel.com/docs/security/vercel-waf/rate-limiting-sdk) через Vercel Firewall. Vercel также предлагает [Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs), которые часто требуются при работе с API.
+
+[9\. Когда можно не создавать конечную точку API](#9-when-to-skip-creating-an-api-endpoint)
+-------------------------------------------------------------------------------------
+
+С **React Server Components** в App Router вы можете получать данные напрямую на сервере, не создавая публичную конечную точку:
+
+```tsx filename="app/users/page.tsx"
+// (Server Component)
+export default async function UsersPage() {
+  // Этот fetch выполняется на сервере (клиентский код здесь не нужен)
+  const res = await fetch('https://api.example.com/users');
+  const data = await res.json();
+ 
+  return (
+    <main>
+      <h1>Пользователи</h1>
+      <ul>
+        {data.map((user: any) => (
+          <li key={user.id}>{user.name}</li>
+        ))}
+      </ul>
+    </main>
+  );
+}
+```
+
+Если ваши данные используются только внутри вашего Next.js-приложения, вам может вообще не понадобиться публичное API.
+
+[10\. Собираем все вместе](#10-putting-it-all-together)
+-----------------------------------------------------------
+
+1.  **Создайте новый проект Next.js**: `npx create-next-app@latest --api`.
+2.  **Добавьте Route Handlers** в директорию `app/` (например, `app/api/users/route.ts`).
+3.  **Экспортируйте HTTP-методы** (`GET`, `POST`, `PUT`, `DELETE` и т.д.) в том же файле.
+4.  **Используйте стандартные веб-API** для работы с объектом `Request` и возврата `Response`.
+5.  **Создайте публичное API**, если вам нужно, чтобы другие клиенты использовали ваши данные, или для проксирования серверного сервиса.
+6.  **Получайте данные** из новых API-маршрутов на клиенте (например, внутри Client Component или с помощью `fetch('/api/...')`).
+7.  Или **вообще не создавайте API**, если Server Component может просто получать данные.
+8.  **Добавьте общий шаблон "middleware"** (например, `withAuth()`) для аутентификации или другой повторяющейся логики.
+9.  **Разверните** в среде с поддержкой Node.js для серверных функций или **экспортируйте** статически, если вам нужно только статическое SPA.
+
+[Заключение](#conclusion)
+-------------------------
+
+Использование **App Router** и **Route Handlers** в Next.js дает вам гибкий, современный способ создания API, напрямую использующих **Web Platform**. Вы можете:
+
+*   **Создать полноценное публичное API** для использования веб-, мобильными или сторонними клиентами.
+*   **Проксировать** и настраивать вызовы существующих внешних сервисов.
+*   **Реализовать** повторно используемый слой "middleware" для аутентификации, логирования или любой повторяющейся логики.
+*   **Динамически маршрутизировать** запросы с помощью структуры папок `[id]`.
+
+[Часто задаваемые вопросы](#frequently-asked-questions)
+---------------------------------------------------------
+
+### [А как насчет Server Actions?](#what-about-server-actions)
+
+Можно рассматривать [Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) как автоматически генерируемые `POST` API-маршруты, которые можно вызывать с клиента.
+
+Они предназначены для операций изменения данных, таких как создание, обновление или удаление. Вы вызываете Server Action как обычную JavaScript-функцию, вместо явного `fetch` к определенному API-маршруту.
+
+Хотя сетевой запрос все равно происходит, вам не нужно управлять им явно. URL-путь генерируется автоматически и [шифруется](/docs/app/building-your-application/data-fetching/server-actions-and-mutations#security), поэтому вы не можете вручную обратиться к маршруту типа `/api/users` в браузере.
+
+Если вы планируете использовать Server Actions _и_ предоставлять публичное API, мы рекомендуем вынести основную логику в [Data Access Layer](/blog/security-nextjs-server-components-actions) и вызывать одну и ту же логику как из Server Action, так и из API-маршрута.
+
+### [Можно ли использовать TypeScript с Route Handlers?](#can-i-use-typescript-with-route-handlers)
+
+Да, вы можете использовать TypeScript с Route Handlers. Например, определяя типы `Request` и `Response` в вашем файле `route`.
+
+Подробнее о [TypeScript в Next.js](/docs/app/api-reference/config/typescript).
+
+### [Какие лучшие практики для аутентификации?](#what-are-the-best-practices-for-authentication)
+
+Узнайте больше в нашей [документации по аутентификации](/docs/app/building-your-application/authentication).

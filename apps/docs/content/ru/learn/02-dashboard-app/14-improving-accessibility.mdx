@@ -1,0 +1,369 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:45:48.167Z
+title: Повышение доступности
+headline: 'App Router: Повышение доступности'
+description: Реализация валидации форм на стороне сервера и улучшение их доступности.
+image: 'https://nextjs.org/api/learn-og?title=Improving%20Accessibility&amp;chapter=14'
+---
+
+В предыдущей главе мы рассмотрели, как перехватывать ошибки (включая 404) и показывать пользователю запасной вариант. Однако осталась ещё одна важная часть: валидация форм. Давайте разберём, как реализовать валидацию на стороне сервера с помощью Server Actions и как отображать ошибки формы с использованием хука React [`useActionState`](https://react.dev/reference/react/useActionState) — не забывая о доступности!
+
+[Что такое доступность?](#what-is-accessibility)
+------------------------------------------------
+
+Доступность (accessibility) означает проектирование и реализацию веб-приложений, которыми могут пользоваться все, включая людей с ограниченными возможностями. Это обширная тема, охватывающая множество аспектов, таких как навигация с клавиатуры, семантический HTML, изображения, цвета, видео и т.д.
+
+Хотя мы не будем углубляться в доступность в этом курсе, мы обсудим доступные функции в Next.js и некоторые распространённые практики для повышения доступности ваших приложений.
+
+> Если вы хотите узнать больше о доступности, рекомендуем курс [Learn Accessibility](https://web.dev/learn/accessibility/) от [web.dev](https://web.dev/).
+
+[Использование ESLint-плагина для доступности в Next.js](#using-the-eslint-accessibility-plugin-in-nextjs)
+----------------------------------------------------------------------------------------------------
+
+Next.js включает плагин [`eslint-plugin-jsx-a11y`](https://www.npmjs.com/package/eslint-plugin-jsx-a11y) в свою конфигурацию ESLint, чтобы помочь выявлять проблемы с доступностью на ранних этапах. Например, этот плагин предупреждает, если у вас есть изображения без `alt`-текста, неправильно используются атрибуты `aria-*` и `role`, и многое другое.
+
+Если вы хотите попробовать это, добавьте `next lint` как скрипт в файл `package.json`:
+
+```json {5} filename="/package.json"
+"scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start",
+    "lint": "next lint"
+},
+```
+
+Затем выполните `pnpm lint` в терминале:
+
+```bash filename="Terminal"
+pnpm lint
+```
+
+Это поможет вам установить и настроить ESLint для вашего проекта. Если вы запустите `pnpm lint` сейчас, вы должны увидеть следующий вывод:
+
+```bash filename="Terminal"
+✔ No ESLint warnings or errors
+```
+
+Но что произойдёт, если у вас есть изображение без `alt`-текста? Давайте проверим!
+
+Перейдите в `/app/ui/invoices/table.tsx` и удалите проп `alt` у изображения. Вы можете использовать поиск в редакторе, чтобы быстро найти `<Image>`:
+
+```tsx {6} filename="/app/ui/invoices/table.tsx"
+<Image
+  src={invoice.image_url}
+  className="rounded-full"
+  width={28}
+  height={28}
+  alt={`${invoice.name}'s profile picture`} // Удалите эту строку
+/>
+```
+
+Теперь снова выполните `pnpm lint`, и вы увидите следующее предупреждение:
+
+```bash filename="Terminal"
+./app/ui/invoices/table.tsx
+45:25  Warning: Image elements must have an alt prop,
+either with meaningful text, or an empty string for decorative images. jsx-a11y/alt-text
+```
+
+Хотя добавление и настройка линтера не является обязательным шагом, это может помочь выявлять проблемы с доступностью в процессе разработки.
+
+[Улучшение доступности форм](#improving-form-accessibility)
+-------------------------------------------------------------
+
+Мы уже делаем три вещи для улучшения доступности наших форм:
+
+*   **Семантический HTML**: Использование семантических элементов (`<input>`, `<option>` и т.д.) вместо `<div>`. Это позволяет вспомогательным технологиям (AT) фокусироваться на элементах ввода и предоставлять пользователю соответствующую контекстную информацию, делая форму более удобной для навигации и понимания.
+*   **Подписи**: Включение `<label>` и атрибута `htmlFor` гарантирует, что каждое поле формы имеет описательную текстовую метку. Это улучшает поддержку AT, предоставляя контекст, а также повышает удобство использования, позволяя пользователям кликать по метке для фокусировки на соответствующем поле ввода.
+*   **Контур фокуса**: Поля правильно стилизованы, чтобы показывать контур при фокусировке. Это критически важно для доступности, так как визуально указывает на активный элемент на странице, помогая пользователям клавиатуры и экранных читателей понимать, где они находятся в форме. Вы можете проверить это, нажав `tab`.
+
+Эти практики закладывают хорошую основу для повышения доступности ваших форм для многих пользователей. Однако они не охватывают **валидацию форм** и **ошибки**.
+
+[Валидация форм](#form-validation)
+-----------------------------------
+
+Перейдите по адресу [http://localhost:3000/dashboard/invoices/create](http://localhost:3000/dashboard/invoices/create) и отправьте пустую форму. Что произойдёт?
+
+Вы получите ошибку! Это происходит потому, что вы отправляете пустые значения формы в ваше Server Action. Вы можете предотвратить это, выполнив валидацию формы на клиенте или сервере.
+
+### [Валидация на стороне клиента](#client-side-validation)
+
+Есть несколько способов выполнить валидацию форм на клиенте. Самый простой — использовать встроенную валидацию браузера, добавив атрибут `required` к элементам `<input>` и `<select>` в ваших формах. Например:
+
+```tsx {7} filename="/app/ui/invoices/create-form.tsx"
+<input
+  id="amount"
+  name="amount"
+  type="number"
+  placeholder="Enter USD amount"
+  className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+  required
+/>
+```
+
+Снова отправьте форму. Браузер покажет предупреждение, если вы попытаетесь отправить форму с пустыми значениями.
+
+Этот подход в целом приемлем, так как некоторые вспомогательные технологии поддерживают валидацию браузера.
+
+Альтернативой клиентской валидации является валидация на стороне сервера. Давайте посмотрим, как её реализовать в следующем разделе. А пока удалите атрибуты `required`, если вы их добавили.
+
+### [Валидация на стороне сервера (Server-Side validation)](#server-side-validation)
+
+Проверяя формы на сервере, вы можете:
+
+*   Убедиться, что данные соответствуют ожидаемому формату перед отправкой в базу данных.
+*   Снизить риск обхода клиентской валидации злоумышленниками.
+*   Иметь единый источник истины для определения _валидных_ данных.
+
+В вашем компоненте `create-form.tsx` импортируйте хук `useActionState` из `react`. Поскольку `useActionState` — это хук, вам нужно преобразовать форму в клиентский компонент с помощью директивы `"use client"`:
+
+```tsx {1,4} filename="/app/ui/invoices/create-form.tsx"
+'use client';
+ 
+// ...
+import { useActionState } from 'react';
+```
+
+Внутри вашего компонента Form хук `useActionState`:
+
+*   Принимает два аргумента: `(action, initialState)`.
+*   Возвращает два значения: `[state, formAction]` — состояние формы и функцию, которая вызывается при отправке формы.
+
+Передайте ваше действие `createInvoice` в качестве аргумента `useActionState`, а внутри атрибута `<form action={}>` вызовите `formAction`.
+
+```tsx {5,7} filename="/app/ui/invoices/create-form.tsx"
+// ...
+import { useActionState } from 'react';
+ 
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const [state, formAction] = useActionState(createInvoice, initialState);
+ 
+  return <form action={formAction}>...</form>;
+}
+```
+
+`initialState` может быть любым объектом, который вы определите. В данном случае создайте объект с двумя пустыми ключами: `message` и `errors`, а также импортируйте тип `State` из файла `actions.ts`. `State` пока не существует, но мы создадим его далее:
+
+```tsx {2,6} filename="/app/ui/invoices/create-form.tsx"
+// ...
+import { createInvoice, State } from '@/app/lib/actions';
+import { useActionState } from 'react';
+ 
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const initialState: State = { message: null, errors: {} };
+  const [state, formAction] = useActionState(createInvoice, initialState);
+ 
+  return <form action={formAction}>...</form>;
+}
+```
+
+Это может показаться сложным на первый взгляд, но станет понятнее после обновления серверного действия. Давайте сделаем это сейчас.
+
+В файле `action.ts` вы можете использовать Zod для валидации данных формы. Обновите `FormSchema` следующим образом:
+
+```ts {4,8,10} filename="/app/lib/actions.ts"
+const FormSchema = z.object({
+  id: z.string(),
+  customerId: z.string({
+    invalid_type_error: 'Пожалуйста, выберите клиента.',
+  }),
+  amount: z.coerce
+    .number()
+    .gt(0, { message: 'Пожалуйста, введите сумму больше $0.' }),
+  status: z.enum(['pending', 'paid'], {
+    invalid_type_error: 'Пожалуйста, выберите статус счёта.',
+  }),
+  date: z.string(),
+});
+```
+
+*   `customerId` — Zod уже выбрасывает ошибку, если поле клиента пустое, так как ожидает тип `string`. Но давайте добавим дружественное сообщение, если пользователь не выберет клиента.
+*   `amount` — Поскольку вы преобразуете тип суммы из `string` в `number`, она по умолчанию будет равна нулю, если строка пустая. Давайте укажем Zod, что сумма всегда должна быть больше 0, с помощью функции `.gt()`.
+*   `status` — Zod уже выбрасывает ошибку, если поле статуса пустое, так как ожидает значения "pending" или "paid". Давайте также добавим дружественное сообщение, если пользователь не выберет статус.
+
+Далее обновите ваше действие `createInvoice`, чтобы оно принимало два параметра — `prevState` и `formData`:
+
+```ts {1,2,3,4,5,6,7,8,10} filename="/app/lib/actions.ts"
+export type State = {
+  errors?: {
+    customerId?: string[];
+    amount?: string[];
+    status?: string[];
+  };
+  message?: string | null;
+};
+ 
+export async function createInvoice(prevState: State, formData: FormData) {
+  // ...
+}
+```
+
+*   `formData` — то же, что и раньше.
+*   `prevState` — содержит состояние, переданное из хука `useActionState`. В этом примере вы не будете использовать его в действии, но это обязательный параметр.
+
+Затем замените функцию Zod `parse()` на `safeParse()`:
+
+```ts {3} filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Проверка полей формы с помощью Zod
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // ...
+}
+```
+
+`safeParse()` вернёт объект, содержащий либо поле `success`, либо `error`. Это поможет обрабатывать валидацию более аккуратно, без необходимости помещать эту логику в блок `try/catch`.
+
+Перед отправкой информации в базу данных проверьте, были ли поля формы успешно валидированы, с помощью условия:
+
+```ts {10,11,12,13,14,15} filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Проверка полей формы с помощью Zod
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // Если валидация формы не прошла, верните ошибки. Иначе продолжайте.
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Не заполнены обязательные поля. Не удалось создать счёт.',
+    };
+  }
+ 
+  // ...
+}
+```
+
+Если `validatedFields` не успешен, мы возвращаем функцию с сообщениями об ошибках от Zod.
+
+> **Совет:** console.log `validatedFields` и отправьте пустую форму, чтобы увидеть её структуру.
+
+Наконец, поскольку вы обрабатываете валидацию формы отдельно, вне блока try/catch, вы можете вернуть конкретное сообщение для любых ошибок базы данных. Ваш финальный код должен выглядеть так:
+
+```ts filename="/app/lib/actions.ts"
+export async function createInvoice(prevState: State, formData: FormData) {
+  // Проверка формы с помощью Zod
+  const validatedFields = CreateInvoice.safeParse({
+    customerId: formData.get('customerId'),
+    amount: formData.get('amount'),
+    status: formData.get('status'),
+  });
+ 
+  // Если валидация формы не прошла, верните ошибки. Иначе продолжайте.
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Не заполнены обязательные поля. Не удалось создать счёт.',
+    };
+  }
+ 
+  // Подготовка данных для вставки в базу данных
+  const { customerId, amount, status } = validatedFields.data;
+  const amountInCents = amount * 100;
+  const date = new Date().toISOString().split('T')[0];
+ 
+  // Вставка данных в базу данных
+  try {
+    await sql`
+      INSERT INTO invoices (customer_id, amount, status, date)
+      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+    `;
+  } catch (error) {
+    // Если произошла ошибка базы данных, верните более конкретное сообщение.
+    return {
+      message: 'Ошибка базы данных: Не удалось создать счёт.',
+    };
+  }
+ 
+  // Ревалидация кэша страницы счетов и перенаправление пользователя.
+  revalidatePath('/dashboard/invoices');
+  redirect('/dashboard/invoices');
+}
+```
+
+Отлично, теперь давайте отобразим ошибки в вашем компоненте формы. Вернувшись в компонент `create-form.tsx`, вы можете получить доступ к ошибкам через состояние формы `state`.
+
+Добавьте **тернарный оператор**, который проверяет каждую конкретную ошибку. Например, после поля клиента вы можете добавить:
+
+```tsx {14,27,28,29,30,31,32,33,34} filename="/app/ui/invoices/create-form.tsx"
+<form action={formAction}>
+  <div className="rounded-md bg-gray-50 p-4 md:p-6">
+    {/* Имя клиента */}
+    <div className="mb-4">
+      <label htmlFor="customer" className="mb-2 block text-sm font-medium">
+        Выберите клиента
+      </label>
+      <div className="relative">
+        <select
+          id="customer"
+          name="customerId"
+          className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+          defaultValue=""
+          aria-describedby="customer-error"
+        >
+          <option value="" disabled>
+            Выберите клиента
+          </option>
+          {customers.map((name) => (
+            <option key={name.id} value={name.id}>
+              {name.name}
+            </option>
+          ))}
+        </select>
+        <UserCircleIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
+      </div>
+      <div id="customer-error" aria-live="polite" aria-atomic="true">
+        {state.errors?.customerId &&
+          state.errors.customerId.map((error: string) => (
+            <p className="mt-2 text-sm text-red-500" key={error}>
+              {error}
+            </p>
+          ))}
+      </div>
+    </div>
+    // ...
+  </div>
+</form>
+```
+
+> **Совет:** Вы можете console.log `state` внутри вашего компонента и проверить, всё ли правильно подключено. Проверьте консоль в Dev Tools, так как ваша форма теперь является клиентским компонентом.
+
+В коде выше вы также добавляете следующие ARIA-метки:
+
+*   `aria-describedby="customer-error"`: Устанавливает связь между элементом `select` и контейнером с сообщением об ошибке. Указывает, что контейнер с `id="customer-error"` описывает элемент `select`. Программы чтения с экрана будут озвучивать это описание при взаимодействии пользователя с `select`, чтобы уведомить его об ошибках.
+*   `id="customer-error"`: Этот атрибут `id` уникально идентифицирует HTML-элемент, содержащий сообщение об ошибке для ввода `select`. Это необходимо для установления связи с `aria-describedby`.
+*   `aria-live="polite"`: Программа чтения с экрана должна вежливо уведомлять пользователя при обновлении ошибки внутри `div`. Когда содержимое изменяется (например, когда пользователь исправляет ошибку), программа чтения с экрана объявит эти изменения, но только когда пользователь бездействует, чтобы не прерывать его.
+
+[Практика: Добавление ARIA-меток](#practice-adding-aria-labels)
+============================================================
+
+Используя пример выше, добавьте ошибки к остальным полям формы. Вы также должны показать сообщение внизу формы, если какие-либо поля не заполнены. Ваш интерфейс должен выглядеть так:
+
+<Image
+  alt="Форма создания счёта с сообщениями об ошибках для каждого поля."
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/light/form-validation-page.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/learn/dark/form-validation-page.png"
+  width="960"
+  height="568"
+/>
+
+Когда будете готовы, запустите `pnpm lint`, чтобы проверить, правильно ли вы используете ARIA-метки.
+
+Если хотите бросить себе вызов, примените знания, полученные в этой главе, и добавьте валидацию формы в компонент `edit-form.tsx`.
+
+Вам нужно:
+
+*   Добавить `useActionState` в ваш компонент `edit-form.tsx`.
+*   Изменить действие `updateInvoice` для обработки ошибок валидации от Zod.
+*   Отобразить ошибки в вашем компоненте и добавить ARIA-метки для улучшения доступности.
+
+Когда будете готовы, разверните сниппет ниже, чтобы увидеть решение:

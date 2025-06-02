@@ -1,0 +1,572 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:42:04.488Z
+title: Next.js 15
+description: >-
+  Next.js 15 представляет поддержку React 19, улучшения кэширования, стабильную версию
+  Turbopack для разработки, новые API и многое другое.
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Jimmy Lai
+    image: /static/team/jimmy.jpg
+  - name: Rich Haines
+    image: /static/team/rich.jpg
+date: 2024-10-21T17:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15/twitter-card.png
+---
+
+Next.js 15 официально стабилен и готов к использованию в продакшене. Этот релиз основан на обновлениях из [RC1](/blog/next-15-rc) и [RC2](/blog/next-15-rc2). Мы сосредоточились на стабильности, добавив при этом несколько интересных обновлений, которые, как мы думаем, вам понравятся. Попробуйте Next.js 15 уже сегодня:
+
+```bash filename="terminal"
+# Используйте новый автоматизированный CLI для обновления
+npx @next/codemod@canary upgrade latest
+ 
+# ...или обновите вручную
+npm install next@latest react@rc react-dom@rc
+```
+
+Мы также рады рассказать больше о предстоящих изменениях на [Next.js Conf](/conf) в этот четверг, 24 октября.
+
+Вот что нового в Next.js 15:
+
+*   [**`@next/codemod` CLI:**](#smooth-upgrades-with-nextcodemod-cli) Легко обновитесь до последних версий Next.js и React.
+*   [**Асинхронные API запросов (Критическое изменение):**](#async-request-apis-breaking-change) Постепенный шаг к упрощённой модели рендеринга и кэширования.
+*   [**Семантика кэширования (Критическое изменение):**](#caching-semantics) Запросы `fetch`, `GET` Route Handlers и клиентские навигации больше не кэшируются по умолчанию.
+*   [**Поддержка React 19:**](#react-19) Поддержка React 19, React Compiler (экспериментально) и улучшения обработки ошибок гидратации.
+*   [**Turbopack Dev (Стабильно):**](#turbopack-dev) Улучшения производительности и стабильности.
+*   [**Индикатор статики:**](#static-route-indicator) Новый визуальный индикатор показывает статические маршруты во время разработки.
+*   [**API `unstable_after` (Экспериментально):**](#executing-code-after-a-response-with-unstable_after-experimental) Выполнение кода после завершения потоковой передачи ответа.
+*   [**API `instrumentation.js` (Стабильно):**](#instrumentationjs-stable) Новый API для наблюдения за жизненным циклом сервера.
+*   [**Улучшенные формы (`next/form`):**](#form-component) Улучшение HTML-форм с клиентской навигацией.
+*   [**`next.config`:**](#support-for-nextconfigts) Поддержка TypeScript для `next.config.ts`.
+*   [**Улучшения для самостоятельного хостинга:**](#improvements-for-self-hosting) Больше контроля над заголовками `Cache-Control`.
+*   [**Безопасность Server Actions:**](#enhanced-security-for-server-actions) Неугадываемые конечные точки и удаление неиспользуемых действий.
+*   [**Бандлинг внешних пакетов (Стабильно):**](#optimizing-bundling-of-external-packages-stable) Новые опции конфигурации для App и Pages Router.
+*   [**Поддержка ESLint 9:**](#eslint-9-support) Добавлена поддержка ESLint 9.
+*   [**Производительность разработки и сборки:**](#development-and-build-improvements) Улучшенное время сборки и более быстрый Fast Refresh.
+
+[Плавные обновления с `@next/codemod` CLI](#smooth-upgrades-with-nextcodemod-cli)
+---------------------------------------------------------------------------------
+
+Мы включаем кодмоды (автоматизированные преобразования кода) в каждый крупный релиз Next.js, чтобы помочь автоматизировать обновление критических изменений.
+
+Чтобы сделать обновления ещё более плавными, мы выпустили улучшенный CLI для кодмодов:
+
+```bash filename="Terminal"
+npx @next/codemod@canary upgrade latest
+```
+
+Этот инструмент помогает обновить вашу кодовую базу до последних стабильных или предрелизных версий. CLI обновит ваши зависимости, покажет доступные кодмоды и проведёт вас через процесс их применения.
+
+Тег `canary` использует последнюю версию кодмода, тогда как `latest` указывает версию Next.js. Мы рекомендуем использовать canary-версию кодмода, даже если вы обновляетесь до последней версии Next.js, так как мы планируем продолжать улучшать инструмент на основе ваших отзывов.
+
+Узнайте больше о [Next.js codemod CLI](/docs/app/building-your-application/upgrading/codemods).
+
+[Асинхронные API запросов (Критическое изменение)](#async-request-apis-breaking-change)
+---------------------------------------------------------------------------
+
+В традиционном рендеринге на стороне сервера (SSR) сервер ждёт запроса перед рендерингом любого контента. Однако не все компоненты зависят от данных, специфичных для запроса, поэтому ждать запроса для их рендеринга необязательно. В идеале сервер должен подготовить как можно больше до получения запроса. Чтобы включить это и заложить основу для будущих оптимизаций, нам нужно знать, когда ждать запроса.
+
+Поэтому мы переводим API, которые зависят от данных, специфичных для запроса — такие как `headers`, `cookies`, `params` и `searchParams` — в **асинхронный** режим.
+
+```
+import { cookies } from 'next/headers';
+ 
+export async function AdminPanel() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('token');
+ 
+  // ...
+}
+```
+
+Это **критическое изменение**, которое затрагивает следующие API:
+
+*   `cookies`
+*   `headers`
+*   `draftMode`
+*   `params` в `layout.js`, `page.js`, `route.js`, `default.js`, `generateMetadata` и `generateViewport`
+*   `searchParams` в `page.js`
+
+Для упрощения миграции эти API временно можно использовать синхронно, но в разработке и продакшене будут показываться предупреждения до следующей мажорной версии. Доступен [кодмод](/docs/app/building-your-application/upgrading/codemods) для автоматизации миграции:
+
+```bash filename="Terminal"
+npx @next/codemod@canary next-async-request-api .
+```
+
+В случаях, когда кодмод не может полностью перенести ваш код, прочитайте [руководство по обновлению](/docs/app/building-your-application/upgrading/version-15). Мы также предоставили [пример](https://github.com/leerob/next-saas-starter/pull/62) миграции приложения Next.js на новые API.
+
+[Семантика кэширования](#caching-semantics)
+---------------------------------------
+
+Next.js App Router запускался с определёнными настройками кэширования по умолчанию. Они были разработаны для предоставления наиболее производительного варианта по умолчанию с возможностью отказаться от него при необходимости.
+
+На основе ваших отзывов мы пересмотрели наши [эвристики кэширования](https://x.com/feedthejim/status/1785242054773145636) и их взаимодействие с такими проектами, как Partial Prerendering (PPR), и с сторонними библиотеками, использующими `fetch`.
+
+В Next.js 15 мы меняем настройки кэширования по умолчанию для `GET` Route Handlers и Client Router Cache с "кэшируется по умолчанию" на "не кэшируется по умолчанию". Если вы хотите сохранить предыдущее поведение, вы можете продолжить явно включать кэширование.
+
+Мы продолжаем улучшать кэширование в Next.js в ближайшие месяцы и скоро поделимся дополнительными деталями.
+
+### [`GET` Route Handlers больше не кэшируются по умолчанию](#get-route-handlers-are-no-longer-cached-by-default)
+
+В Next.js 14 Route Handlers, использующие метод HTTP `GET`, кэшировались по умолчанию, если только они не использовали динамические функции или динамические опции конфигурации. В Next.js 15 `GET` функции **не кэшируются по умолчанию**.
+
+Вы всё ещё можете включить кэширование, используя статическую опцию конфигурации маршрута, такую как `export dynamic = 'force-static'`.
+
+Специальные Route Handlers, такие как [`sitemap.ts`](/docs/app/api-reference/file-conventions/metadata/sitemap), [`opengraph-image.tsx`](/docs/app/api-reference/file-conventions/metadata/opengraph-image), [`icon.tsx`](/docs/app/api-reference/file-conventions/metadata/app-icons) и другие [файлы метаданных](/docs/app/api-reference/file-conventions/metadata), остаются статическими по умолчанию, если они не используют динамические функции или динамические опции конфигурации.
+
+### [Клиентский Router Cache больше не кэширует компоненты страниц по умолчанию](#client-router-cache-no-longer-caches-page-components-by-default)
+
+В Next.js 14.2.0 мы представили экспериментальный флаг [`staleTimes`](/docs/app/api-reference/next-config-js/staleTimes), позволяющий настраивать [Router Cache](/docs/app/building-your-application/caching#client-side-router-cache).
+
+В Next.js 15 этот флаг остаётся доступным, но мы меняем поведение по умолчанию, устанавливая `staleTime` равным `0` для сегментов страниц. Это означает, что при навигации по приложению клиент всегда будет отражать последние данные из компонентов страниц, которые становятся активными в ходе навигации. Однако некоторые важные поведения остаются неизменными:
+
+*   Данные общих макетов не будут перезапрашиваться с сервера, чтобы продолжать поддерживать [частичный рендеринг](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering).
+*   Навигация назад/вперёд всё ещё будет восстанавливаться из кэша, чтобы обеспечить восстановление позиции прокрутки браузером.
+*   [`loading.js`](/docs/app/api-reference/file-conventions/loading) останется в кэше на 5 минут (или значение конфигурации `staleTimes.static`).
+
+Вы можете включить предыдущее поведение Client Router Cache, установив следующую конфигурацию:
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+    },
+  },
+};
+ 
+export default nextConfig;
+```
+
+[React 19](#react-19)
+---------------------
+
+В рамках релиза Next.js 15 мы приняли решение согласоваться с предстоящим релизом React 19.
+
+В версии 15 App Router использует React 19 RC, а также мы добавили обратную совместимость с React 18 для Pages Router на основе отзывов сообщества. Если вы используете Pages Router, это позволяет вам обновиться до React 19, когда будете готовы.
+
+Хотя React 19 всё ещё находится на стадии RC, наши обширные тестирования в реальных приложениях и тесная работа с командой React дали нам уверенность в его стабильности. Основные критические изменения были хорошо протестированы и не затронут существующих пользователей App Router. Поэтому мы решили выпустить Next.js 15 как стабильный сейчас, чтобы ваши проекты были полностью готовы к GA React 19.
+
+Чтобы обеспечить максимально плавный переход, мы предоставили [кодмоды и автоматизированные инструменты](#smooth-upgrades-with-codemod-cli) для упрощения процесса миграции.
+
+Прочитайте [руководство по обновлению Next.js 15](/docs/app/building-your-application/upgrading/version-15), [руководство по обновлению React 19](https://react.dev/blog/2024/04/25/react-19-upgrade-guide) и посмотрите [ключевой доклад React Conf](https://www.youtube.com/live/T8TZQ6k4SLE?t=1788), чтобы узнать больше.
+
+### [Pages Router на React 18](#pages-router-on-react-18)
+
+Next.js 15 сохраняет обратную совместимость для Pages Router с React 18, позволяя пользователям продолжать использовать React 18, получая при этом улучшения Next.js 15.
+
+После первого Release Candidate (RC1) мы сместили фокус, чтобы включить поддержку React 18 на основе отзывов сообщества. Эта гибкость позволяет вам использовать Next.js 15 с Pages Router на React 18, давая вам больший контроль над процессом обновления.
+
+> **Примечание:** Хотя возможно запускать Pages Router на React 18 и App Router на React 19 в одном приложении, мы не рекомендуем такую настройку. Это может привести к непредсказуемому поведению и несоответствиям типов, поскольку базовые API и логика рендеринга между двумя версиями могут не полностью совпадать.
+
+### [React Compiler (Экспериментально)](#react-compiler-experimental)
+
+[React Compiler](https://react.dev/learn/react-compiler) — это новый экспериментальный компилятор, созданный командой React в Meta. Компилятор глубоко понимает ваш код через семантику чистого JavaScript и [Правила React](https://react.dev/reference/rules), что позволяет ему добавлять автоматические оптимизации в ваш код. Компилятор уменьшает количество ручного мемоизирования, которое разработчики должны делать с помощью API, таких как `useMemo` и `useCallback`, — упрощая код, облегчая его поддержку и уменьшая количество ошибок.
+
+В Next.js 15 мы добавили поддержку [React Compiler](https://react.dev/learn/react-compiler). Узнайте больше о React Compiler и [доступных опциях конфигурации Next.js](https://react.dev/learn/react-compiler#usage-with-nextjs).
+
+> **Примечание:** React Compiler в настоящее время доступен только как плагин Babel, что приведёт к более медленному времени разработки и сборки.
+
+### [Улучшения обработки ошибок гидратации (Hydration error improvements)](#hydration-error-improvements)
+
+Next.js 14.1 [представил улучшения](/blog/next-14-1#improved-error-messages-and-fast-refresh) в сообщениях об ошибках и ошибках гидратации. Next.js 15 продолжает развивать эти улучшения, добавляя усовершенствованный вид ошибок гидратации. Теперь ошибки гидратации отображают исходный код ошибки с предложениями по её устранению.
+
+Например, вот как выглядело сообщение об ошибке гидратации в Next.js 14.1:
+
+<Image
+  alt="Сообщение об ошибке гидратации в Next.js 14.1"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc/hydration-error-before-light.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc/hydration-error-before-dark.png"
+  width="962"
+  height="517"
+/>
+
+В Next.js 15 это было улучшено до:
+
+<Image
+  alt="Улучшенное сообщение об ошибке гидратации в Next.js 15"
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc/hydration-error-after-light.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc/hydration-error-after-dark.png"
+  width="960"
+  height="654"
+/>
+
+[Turbopack Dev](#turbopack-dev)
+-------------------------------
+
+Мы рады сообщить, что `next dev --turbo` теперь **стабилен и готов** ускорить ваш процесс разработки. Мы использовали его для работы над [vercel.com](https://vercel.com), [nextjs.org](https://nextjs.org), [v0](https://v0.dev) и всеми нашими другими приложениями с отличными результатами.
+
+Например, с `vercel.com`, большим приложением Next.js, мы наблюдали:
+
+*   До **76,7% быстрее** запуск локального сервера.
+*   До **96,3% быстрее** обновления кода с Fast Refresh.
+*   До **45,8% быстрее** компиляция начального маршрута без кэширования (Turbopack пока не поддерживает кэширование на диске).
+
+Подробнее о Turbopack Dev вы можете узнать в нашем новом [посте в блоге](/blog/turbopack-for-development-stable).
+
+[Индикатор статических маршрутов (Static Route Indicator)](#static-route-indicator)
+-------------------------------------------------
+
+Next.js теперь отображает индикатор статических маршрутов во время разработки, чтобы помочь вам определить, какие маршруты являются статическими или динамическими. Этот визуальный сигнал упрощает оптимизацию производительности, позволяя понять, как ваши страницы рендерятся.
+
+<Image
+  alt=""
+  srcLight="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc2/static-route-light.png"
+  srcDark="https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-15-rc2/static-route-dark.png"
+  width="1720"
+  height="516"
+/>
+
+Вы также можете использовать вывод команды [next build](/docs/app/api-reference/cli/next#next-build-options) для просмотра стратегии рендеринга всех маршрутов.
+
+Это обновление является частью наших постоянных усилий по улучшению наблюдаемости в Next.js, что упрощает разработчикам мониторинг, отладку и оптимизацию их приложений. Мы также работаем над специальными инструментами для разработчиков, подробности появятся в ближайшее время.
+
+Узнайте больше об [индикаторе статических маршрутов](/docs/app/api-reference/next-config-js/devIndicators#appisrstatus-static-indicator), который можно отключить.
+
+[Выполнение кода после ответа с `unstable_after` (Experimental)](#executing-code-after-a-response-with-unstable_after-experimental)
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+При обработке пользовательского запроса сервер обычно выполняет задачи, непосредственно связанные с вычислением ответа. Однако вам может потребоваться выполнить такие задачи, как логирование, аналитика и синхронизация с другими внешними системами.
+
+Поскольку эти задачи не связаны напрямую с ответом, пользователь не должен ждать их завершения. Откладывание работы после ответа пользователю представляет проблему, потому что бессерверные функции прекращают вычисления сразу после закрытия ответа.
+
+`after()` — это новый экспериментальный API, который решает эту проблему, позволяя запланировать выполнение работы после завершения потоковой передачи ответа, что позволяет выполнять вторичные задачи без блокировки основного ответа.
+
+Чтобы использовать его, добавьте `experimental.after` в `next.config.js`:
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    after: true,
+  },
+};
+ 
+export default nextConfig;
+```
+
+Затем импортируйте функцию в Server Components, Server Actions, Route Handlers или Middleware.
+
+```
+import { unstable_after as after } from 'next/server';
+import { log } from '@/app/utils';
+ 
+export default function Layout({ children }) {
+  // Вторичная задача
+  after(() => {
+    log();
+  });
+ 
+  // Основная задача
+  return <>{children}</>;
+}
+```
+
+Узнайте больше о [`unstable_after`](/docs/app/api-reference/functions/unstable_after).
+
+[`instrumentation.js` (Stable)](#instrumentationjs-stable)
+----------------------------------------------------------
+
+Файл `instrumentation` с API `register()` позволяет пользователям подключаться к жизненному циклу сервера Next.js для мониторинга производительности, отслеживания источников ошибок и глубокой интеграции с библиотеками наблюдаемости, такими как [OpenTelemetry](https://opentelemetry.io/).
+
+Эта функция теперь **стабильна**, и опцию конфигурации `experimental.instrumentationHook` можно удалить.
+
+Кроме того, мы сотрудничали с [Sentry](https://sentry.io/) для разработки нового хука `onRequestError`, который можно использовать для:
+
+*   Сбора важного контекста обо всех ошибках, возникающих на сервере, включая:
+    *   Роутер: Pages Router или App Router
+    *   Контекст сервера: Server Component, Server Action, Route Handler или Middleware
+*   Отправки ошибок в ваш любимый сервис наблюдаемости.
+
+```
+export async function onRequestError(err, request, context) {
+  await fetch('https://...', {
+    method: 'POST',
+    body: JSON.stringify({ message: err.message, request, context }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+ 
+export async function register() {
+  // инициализация SDK вашего любимого сервиса наблюдаемости
+}
+```
+
+Узнайте больше о функции [`onRequestError`](/docs/app/api-reference/file-conventions/instrumentation#onrequesterror-optional).
+
+[Компонент `<Form>`](#form-component)
+-------------------------------------
+
+Новый компонент `<Form>` расширяет HTML-элемент `<form>` с возможностями [префетчинга (prefetching)](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching), [клиентской навигации (client-side navigation)](/docs/app/building-your-application/routing/linking-and-navigating#5-soft-navigation) и прогрессивного улучшения.
+
+Он полезен для форм, которые ведут на новую страницу, например, формы поиска, которая ведёт на страницу результатов.
+
+```jsx filename="app/page.jsx"
+import Form from 'next/form';
+ 
+export default function Page() {
+  return (
+    <Form action="/search">
+      <input name="query" />
+      <button type="submit">Submit</button>
+    </Form>
+  );
+}
+```
+
+Компонент `<Form>` включает:
+
+*   **Префетчинг**: Когда форма находится в поле зрения, [layout](/docs/app/api-reference/file-conventions/layout) и [loading](/docs/app/api-reference/file-conventions/loading) UI предварительно загружаются, что ускоряет навигацию.
+*   **Клиентская навигация**: При отправке формы общие лейауты и клиентское состояние сохраняются.
+*   **Прогрессивное улучшение**: Если JavaScript ещё не загрузился, форма всё равно работает через полную перезагрузку страницы.
+
+Раньше для реализации этих возможностей требовалось много ручного кода. Например:
+
+Пример
+
+```
+// Примечание: Код сокращён для демонстрации.
+// Не рекомендуется для использования в продакшн-коде.
+ 
+'use client'
+ 
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+ 
+export default function Form(props) {
+  const action = props.action
+  const router = useRouter()
+ 
+  useEffect(() => {
+    // если цель формы — URL, предзагружаем его
+    if (typeof action === 'string') {
+      router.prefetch(action)
+    }
+  }, [action, router])
+ 
+  function onSubmit(event) {
+    event.preventDefault()
+ 
+    // собираем все поля формы и вызываем `router.push` с данными в URL
+    const formData = new FormData(event.currentTarget)
+    const data = new URLSearchParams()
+ 
+    for (const [name, value] of formData) {
+      data.append(name, value as string)
+    }
+ 
+    router.push(`${action}?${data.toString()}`)
+  }
+ 
+  if (typeof action === 'string') {
+    return <form onSubmit={onSubmit} {...props} />
+  }
+ 
+  return <form {...props} />
+}
+```
+
+Узнайте больше о [компоненте `<Form>`](/docs/app/api-reference/components/form).
+
+[Поддержка `next.config.ts`](#support-for-nextconfigts)
+---------------------------------------------------------
+
+Next.js теперь поддерживает файлы TypeScript `next.config.ts` и предоставляет тип `NextConfig` для автодополнения и типобезопасных опций:
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  /* опции конфигурации здесь */
+};
+ 
+export default nextConfig;
+```
+
+Узнайте больше о [поддержке TypeScript](/docs/app/building-your-application/configuring/typescript#type-checking-nextconfigts) в Next.js.
+
+[Улучшения для самостоятельного хостинга](#improvements-for-self-hosting)
+---------------------------------------------------------------
+
+При самостоятельном хостинге приложений вам может потребоваться больше контроля над директивами `Cache-Control`.
+
+Один из распространённых случаев — управление периодом `stale-while-revalidate` для страниц ISR. Мы реализовали два улучшения:
+
+1.  Теперь вы можете настроить значение [`expireTime`](/docs/app/api-reference/next-config-js/expireTime) в `next.config`. Ранее это была опция `experimental.swrDelta`.
+2.  Обновлено значение по умолчанию до одного года, что гарантирует, что большинство CDN смогут полностью применять семантику `stale-while-revalidate` как задумано.
+
+Мы также больше не переопределяем пользовательские значения `Cache-Control` значениями по умолчанию, что обеспечивает полный контроль и совместимость с любой настройкой CDN.
+
+Наконец, мы улучшили оптимизацию изображений при самостоятельном хостинге. Ранее мы рекомендовали устанавливать `sharp` для оптимизации изображений на вашем сервере Next.js. Эта рекомендация иногда пропускалась. В Next.js 15 вам больше не нужно вручную устанавливать `sharp` — Next.js будет автоматически использовать `sharp` при использовании `next start` или запуске в [режиме standalone output](/docs/app/api-reference/next-config-js/output).
+
+Чтобы узнать больше, ознакомьтесь с нашим новым [демо и обучающим видео](https://x.com/leeerob/status/1843796169173995544) по самостоятельному хостингу Next.js.
+
+[Улучшенная безопасность Server Actions](#enhanced-security-for-server-actions)
+-----------------------------------------------------------------------------
+
+[Server Actions](https://react.dev/reference/rsc/server-actions) — это серверные функции, которые можно вызывать с клиента. Они определяются добавлением директивы `'use server'` в начале файла и экспортом асинхронной функции.
+
+Даже если Server Action или вспомогательная функция не импортируется в других частях вашего кода, она всё равно остаётся общедоступной HTTP-точкой. Хотя такое поведение технически корректно, оно может привести к непреднамеренному раскрытию таких функций.
+
+Для повышения безопасности мы внедрили следующие улучшения:
+
+*   **Устранение мёртвого кода**: Неиспользуемые Server Actions не будут иметь свои ID раскрыты в клиентском JavaScript-бандле, что уменьшает размер бандла и улучшает производительность.
+*   **Безопасные ID действий**: Next.js теперь создаёт непредсказуемые, недетерминированные ID, чтобы клиент мог ссылаться и вызывать Server Action. Эти ID периодически пересчитываются между сборками для повышения безопасности.
+
+```
+// app/actions.js
+'use server';
+ 
+// Это действие **используется** в нашем приложении, поэтому Next.js
+// создаст безопасный ID, чтобы клиент мог ссылаться
+// и вызывать Server Action.
+export async function updateUserAction(formData) {}
+ 
+// Это действие **не используется** в нашем приложении, поэтому Next.js
+// автоматически удалит этот код во время `next build`
+// и не создаст публичную точку входа.
+export async function deleteUserAction(formData) {}
+```
+
+Всё равно следует рассматривать Server Actions как публичные HTTP-точки. Узнайте больше о [защите Server Actions](/blog/security-nextjs-server-components-actions#write).
+
+[Оптимизация бандлинга внешних пакетов (Stable)](#optimizing-bundling-of-external-packages-stable)
+-----------------------------------------------------------------------------------------------------
+
+Бандлинг внешних пакетов может улучшить производительность холодного старта вашего приложения. В **App Router** внешние пакеты бандлятся по умолчанию, и вы можете исключить определённые пакеты, используя новую опцию конфигурации [`serverExternalPackages`](/docs/app/api-reference/next-config-js/serverExternalPackages).
+
+В **Pages Router** внешние пакеты по умолчанию не бандлятся, но вы можете указать список пакетов для бандлинга, используя существующую опцию [`transpilePackages`](/docs/pages/api-reference/next-config-js/transpilePackages). С этой опцией конфигурации вам нужно указывать каждый пакет вручную.
+
+Чтобы унифицировать конфигурацию между App и Pages Router, мы представляем новую опцию [`bundlePagesRouterDependencies`](/docs/pages/api-reference/next-config-js/bundlePagesRouterDependencies), чтобы соответствовать автоматическому бандлингу по умолчанию в App Router. Затем вы можете использовать [`serverExternalPackages`](/docs/app/api-reference/next-config-js/serverExternalPackages) для исключения определённых пакетов, если это необходимо.
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  // Автоматически бандлить внешние пакеты в Pages Router:
+  bundlePagesRouterDependencies: true,
+  // Исключить определённые пакеты из бандлинга для App и Pages Router:
+  serverExternalPackages: ['package-name'],
+};
+ 
+export default nextConfig;
+```
+
+Узнайте больше об [оптимизации внешних пакетов](/docs/app/building-your-application/optimizing/package-bundling).
+
+[Поддержка ESLint 9](#eslint-9-support)
+-------------------------------------
+
+Next.js 15 также представляет поддержку [ESLint 9](https://eslint.org/blog/2024/04/eslint-v9.0.0-released), после окончания поддержки ESLint 8 5 октября 2024 года.
+
+Чтобы обеспечить плавный переход, Next.js остаётся обратно совместимым, что означает, что вы можете продолжать использовать ESLint 8 или 9.
+
+Если вы обновитесь до ESLint 9, и мы обнаружим, что вы ещё не перешли на [новый формат конфигурации](https://eslint.org/blog/2024/04/eslint-v9.0.0-released/#flat-config-is-now-the-default-and-has-some-changes), Next.js автоматически применит escape-хатч `ESLINT_USE_FLAT_CONFIG=false` для облегчения миграции.
+
+Кроме того, устаревшие опции, такие как `—ext` и `—ignore-path`, будут удалены при запуске `next lint`. Обратите внимание, что ESLint в конечном итоге запретит эти старые конфигурации в ESLint 10, поэтому мы рекомендуем начать миграцию как можно скорее.
+
+Для получения дополнительной информации об этих изменениях ознакомьтесь с [руководством по миграции](https://eslint.org/docs/latest/use/migrate-to-9.0.0).
+
+В рамках этого обновления мы также обновили `eslint-plugin-react-hooks` до версии `v5.0.0`, которая вводит новые правила использования React Hooks. Вы можете ознакомиться со всеми изменениями в [списке изменений для eslint-plugin-react-hooks@5.0.0](https://github.com/facebook/react/releases/tag/eslint-plugin-react-hooks%405.0.0).
+
+[Улучшения разработки и сборки](#development-and-build-improvements)
+-------------------------------------------------------------------------
+
+### [HMR для Server Components](#server-components-hmr)
+
+Во время разработки Server Components перевыполняются при сохранении. Это означает, что любые `fetch`-запросы к вашим API-эндпоинтам или сторонним сервисам также вызываются.
+
+Чтобы улучшить производительность локальной разработки и снизить потенциальные затраты на платные API-вызовы, мы теперь гарантируем, что Hot Module Replacement (HMR) может повторно использовать ответы `fetch` из предыдущих рендеров.
+
+Узнайте больше о [кэше HMR для Server Components](/docs/app/api-reference/next-config-js/serverComponentsHmrCache).
+
+### [Ускоренная статическая генерация для App Router](#faster-static-generation-for-the-app-router)
+
+Мы оптимизировали процесс статической генерации для ускорения сборки, особенно для страниц с медленными сетевыми запросами.
+
+Ранее наш процесс статической оптимизации рендерил страницы дважды — сначала для генерации данных для клиентской навигации, а затем для рендеринга HTML при первом посещении страницы. Теперь мы повторно используем первый рендер, исключая второй проход, что снижает нагрузку и ускоряет сборку.
+
+Кроме того, воркеры статической генерации теперь используют общий кеш `fetch` между страницами. Если вызов `fetch` не отказывается от кеширования, его результаты будут повторно использованы другими страницами, обрабатываемыми тем же воркером. Это уменьшает количество запросов для одних и тех же данных.
+
+### [Расширенный контроль статической генерации (Экспериментально)](#advanced-static-generation-control-experimental)
+
+Мы добавили экспериментальную поддержку более тонкого контроля над процессом статической генерации для сложных сценариев, где это может быть полезно.
+
+Рекомендуем придерживаться текущих значений по умолчанию, если у вас нет специфических требований, так как эти настройки могут увеличить потребление ресурсов и привести к ошибкам нехватки памяти из-за повышенной параллельной обработки.
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    // сколько раз Next.js будет повторять попытки генерации страниц при ошибках
+    // перед завершением сборки с ошибкой
+    staticGenerationRetryCount: 1
+    // сколько страниц будет обрабатываться одним воркером
+    staticGenerationMaxConcurrency: 8
+    // минимальное количество страниц перед созданием нового воркера экспорта
+    staticGenerationMinPagesPerWorker: 25
+  },
+}
+ 
+export default nextConfig;
+```
+
+Подробнее о [настройках статической генерации](/docs/app/api-reference/next-config-js/staticGeneration).
+
+[Другие изменения](#other-changes)
+-------------------------------
+
+*   **\[Критическое\]** next/image: Удалена зависимость `squoosh` в пользу `sharp` как опциональной ([PR](https://github.com/vercel/next.js/pull/63321))
+*   **\[Критическое\]** next/image: Изменено значение по умолчанию `Content-Disposition` на `attachment` ([PR](https://github.com/vercel/next.js/pull/65631))
+*   **\[Критическое\]** next/image: Ошибка при наличии пробелов в начале или конце `src` ([PR](https://github.com/vercel/next.js/pull/65637))
+*   **\[Критическое\]** Middleware: Применено условие `react-server` для ограничения нерекомендуемых импортов React API ([PR](https://github.com/vercel/next.js/pull/65424))
+*   **\[Критическое\]** next/font: Удалена поддержка внешнего пакета `@next/font` ([PR](https://github.com/vercel/next.js/pull/65601))
+*   **\[Критическое\]** next/font: Удалено хеширование `font-family` ([PR](https://github.com/vercel/next.js/pull/53608))
+*   **\[Критическое\]** Кеширование: `force-dynamic` теперь устанавливает значение `no-store` по умолчанию для кеша `fetch` ([PR](https://github.com/vercel/next.js/pull/64145))
+*   **\[Критическое\]** Конфигурация: Включены по умолчанию `swcMinify` ([PR](https://github.com/vercel/next.js/pull/65579)), `missingSuspenseWithCSRBailout` ([PR](https://github.com/vercel/next.js/pull/65688)) и `outputFileTracing` ([PR](https://github.com/vercel/next.js/pull/65579)), удалены устаревшие опции
+*   **\[Критическое\]** Удалена автоинструментация для Speed Insights (теперь необходимо использовать пакет [@vercel/speed-insights](https://www.npmjs.com/package/@vercel/speed-insights)) ([PR](https://github.com/vercel/next.js/pull/64199))
+*   **\[Критическое\]** Удалено расширение `.xml` для динамических маршрутов sitemap и выравнивание URL sitemap между разработкой и продакшеном ([PR](https://github.com/vercel/next.js/pull/65507))
+*   **\[Критическое\]** Экспорт `export const runtime = "experimental-edge"` в App Router объявлен устаревшим. Теперь следует использовать `export const runtime = "edge"`. Добавлен [кодмод](/docs/app/building-your-application/upgrading/codemods#app-dir-runtime-config-experimental-edge) для автоматического перехода ([PR](https://github.com/vercel/next.js/pull/70480))
+*   **\[Критическое\]** Вызов `revalidateTag` и `revalidatePath` во время рендеринга теперь вызывает ошибку ([PR](https://github.com/vercel/next.js/pull/71093))
+*   **\[Критическое\]** Файлы `instrumentation.js` и `middleware.js` теперь используют вендорные пакеты React ([PR](https://github.com/vercel/next.js/pull/69619))
+*   **\[Критическое\]** Минимальная требуемая версия Node.js обновлена до 18.18.0 ([PR](https://github.com/vercel/next.js/pull/67274))
+*   **\[Критическое\]** `next/dynamic`: удалено устаревшее свойство `suspense`, и при использовании компонента в App Router больше не вставляется пустая граница Suspense ([PR](https://github.com/vercel/next.js/pull/67014))
+*   **\[Критическое\]** При разрешении модулей в Edge Runtime условие `worker` больше не применяется ([PR](https://github.com/vercel/next.js/pull/66808))
+*   **\[Критическое\]** Запрещено использование `ssr: false` с `next/dynamic` в Server Components ([PR](https://github.com/vercel/next.js/pull/70378))
+*   **\[Улучшение\]** Метаданные: Обновлены fallback-значения переменных окружения для `metadataBase` при размещении на Vercel ([PR](https://github.com/vercel/next.js/pull/65089))
+*   **\[Улучшение\]** Исправлено tree-shaking при смешанных импортах namespace и named из `optimizePackageImports` ([PR](https://github.com/vercel/next.js/pull/64894))
+*   **\[Улучшение\]** Parallel Routes: Catch-all маршруты теперь получают все известные параметры ([PR](https://github.com/vercel/next.js/pull/65063))
+*   **\[Улучшение\]** Настройка `bundlePagesExternals` стала стабильной и переименована в `bundlePagesRouterDependencies`
+*   **\[Улучшение\]** Настройка `serverComponentsExternalPackages` стала стабильной и переименована в `serverExternalPackages`
+*   **\[Улучшение\]** create-next-app: Новые проекты теперь игнорируют все файлы `.env` по умолчанию ([PR](https://github.com/vercel/next.js/pull/61920))
+*   **\[Улучшение\]** `outputFileTracingRoot`, `outputFileTracingIncludes` и `outputFileTracingExcludes` переведены из экспериментальных в стабильные ([PR](https://github.com/vercel/next.js/pull/68464))
+*   **\[Улучшение\]** Исключено слияние глобальных CSS-файлов с CSS-модулями глубже в дереве ([PR](https://github.com/vercel/next.js/pull/67373))
+*   **\[Улучшение\]** Обработчик кеша теперь можно указать через переменную окружения `NEXT_CACHE_HANDLER_PATH` ([PR](https://github.com/vercel/next.js/pull/70537/))
+*   **\[Улучшение\]** Pages Router теперь поддерживает React 18 и React 19 ([PR](https://github.com/vercel/next.js/pull/69484))
+*   **\[Улучшение\]** В Error Overlay добавлена кнопка для копирования URL Node.js Inspector, если инспектор включен ([PR](https://github.com/vercel/next.js/pull/69357))
+*   **\[Улучшение\]** Клиентские префетчи в App Router теперь используют атрибут `priority` ([PR](https://github.com/vercel/next.js/pull/67356))
+*   **\[Улучшение\]** Next.js теперь предоставляет функцию `unstable_rethrow` для повторного выброса внутренних ошибок в App Router ([PR](https://github.com/vercel/next.js/pull/65831))
+*   **\[Улучшение\]** `unstable_after` теперь можно использовать в статических страницах ([PR](https://github.com/vercel/next.js/pull/71231))
+*   **\[Улучшение\]** Если компонент `next/dynamic` используется во время SSR, его чанк будет префетчен ([PR](https://github.com/vercel/next.js/pull/65486))
+*   **\[Улучшение\]** Опция `esmExternals` теперь поддерживается в App Router ([PR](https://github.com/vercel/next.js/pull/65041))
+*   **\[Улучшение\]** Опция `experimental.allowDevelopmentBuild` позволяет использовать `NODE_ENV=development` с `next build` для отладки ([PR](https://github.com/vercel/next.js/pull/65463))
+*   **\[Улучшение\]** Трансформы Server Action теперь отключены в Pages Router ([PR](https://github.com/vercel/next.js/pull/71028))
+*   **\[Улучшение\]** Воркеры сборки теперь предотвращают зависание сборки при завершении работы ([PR](https://github.com/vercel/next.js/pull/70997))
+*   **\[Улучшение\]** При редиректе из Server Action ревалидации теперь применяются корректно ([PR](https://github.com/vercel/next.js/pull/70715))
+*   **\[Улучшение\]** Динамические параметры теперь корректно обрабатываются для parallel routes в Edge Runtime ([PR](https://github.com/vercel/next.js/pull/70667))
+*   **\[Улучшение\]** Статические страницы теперь учитывают `staleTime` после первоначальной загрузки ([PR](https://github.com/vercel/next.js/pull/70640))
+*   **\[Улучшение\]** `vercel/og` обновлен с исправлением утечки памяти ([PR](https://github.com/vercel/next.js/pull/70214))
+*   **\[Улучшение\]** Обновлены временные метки для совместимости с пакетами типа `msw` для мокирования API ([PR](https://github.com/vercel/next.js/pull/68193))
+*   **\[Улучшение\]** Предварительно сгенерированные страницы теперь используют статический `staleTime` ([PR](https://github.com/vercel/next.js/pull/67868))
+
+Подробнее см. в [руководстве по обновлению](/docs/app/building-your-application/upgrading/version-15).
+
+[Участники](#contributors)
+-----------------------------
+
+Next.js — результат совместной работы более 3000 разработчиков, индустриальных партнеров, таких как Google и Meta, и нашей основной команды в Vercel. Этот релиз стал возможен благодаря:
+
+*   **Команде Next.js**: [Andrew](https://github.com/acdlite), [Hendrik](https://github.com/unstubbable), [Janka](https://github.com/lubieowoce), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [Jiwon](https://github.com/devjiwonchoi), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sam](https://github.com/samcx), [Sebastian](https://github.com/sebmarkbage), [Sebbie](https://github.com/eps1lon), [Shu](https://github.com/shuding), [Wyatt](https://github.com/wyattjoh), и [Zack](https://github.com/ztanner).
+*   **Команде Turbopack**: [Alex](https://github.com/arlyon), [Benjamin](https://github.com/bgw), [Donny](https://github.com/kdy1), [Maia](https://github.com/padmaia), [Niklas](https://github.com/mischnic), [Tim](https://github.com/timneutkens), [Tobias](https://github.com/sokra), и [Will](https://github.com/wbinnssmith).
+*   **Команде документации Next.js**: [Delba](https://github.com/delbaoliveira), [Rich](https://github.com/molebox), [Ismael](https://github.com/ismaelrumzan), и [Lee](https://github.com/leerob).
+
+Отдельная благодарность @AbhiShake1, @Aerilym, @AhmedBaset, @AnaTofuZ, @Arindam200, @Arinji2, @ArnaudFavier, @ArnoldVanN, @Auxdible, @B33fb0n3, @Bhavya031, @Bjornnyborg, @BunsDev, @CannonLock, @CrutchTheClutch, @DeepakBalaraman, @DerTimonius, @Develliot, @EffectDoplera, @Ehren12, @Ethan-Arrowood, @FluxCapacitor2, @ForsakenHarmony, @Francoscopic, @Gomah, @GyoHeon, @Hemanshu-Upadhyay, @HristovCodes, @HughHzyb, @IAmKushagraSharma, @IDNK2203, @IGassmann, @ImDR, @IncognitoTGT, @Jaaneek, @JamBalaya56562, @Jeffrey-Zutt, @JohnGemstone, @JoshuaKGoldberg, @Julian-Louis, @Juneezee, @KagamiChan, @Kahitar, @KeisukeNagakawa, @KentoMoriwaki, @Kikobeats, @KonkenBonken, @Kuboczoch, @Lada496, @LichuAcu, @LorisSigrist, @Lsnsh, @Luk-z, @Luluno01, @M-YasirGhaffar, @Maaz-Ahmed007, @Manoj-M-S, @ManuLpz4, @Marukome0743, @MaxLeiter, @MehfoozurRehman, @MildTomato, @MonstraG, @N2D4, @NavidNourani, @Nayeem-XTREME, @Netail, @NilsJacobsen, @Ocheretovich, @OlyaPolya, @PapatMayuri, @PaulAsjes, @PlagueFPS, @ProchaLu, @Pyr33x, @QiuranHu, @RiskyMH, @Sam-Phillemon9493, @Sayakie, @Shruthireddy04, @SouthLink, @Strift, @SukkaW, @Teddir, @Tim-Zj, @TrevorSayre, @Unsleeping, @Willem-Jaap, @a89529294, @abdull-haseeb, @abhi12299, @acdlite, @actopas, @adcichowski, @adiguno, @agadzik, @ah100101, @akazwz, @aktoriukas, @aldosch, @alessiomaffeis, @allanchau, @alpedia0, @amannn, @amikofalvy, @anatoliik-lyft, @anay-208, @andrii-bodnar, @anku255, @ankur-dwivedi, @aralroca, @archanaagivale30, @arlyon, @atik-persei, @avdeev, @baeharam, @balazsorban44, @bangseongbeom, @begalinsaf, @bennettdams, @bewinsnw, @bgw, @blvdmitry, @bobaaaaa, @boris-szl, @bosconian-dynamics, @brekk, @brianshano, @cfrank, @chandanpasunoori, @chentsulin, @chogyejin, @chrisjstott, @christian-bromann, @codeSTACKr, @coderfin, @coltonehrman, @controversial, @coopbri, @creativoma, @crebelskydico, @crutchcorn, @darthmaim, @datner, @davidsa03, @delbaoliveira, @devjiwonchoi, @devnyxie, @dhruv-kaushik, @dineshh-m, @diogocapela, @dnhn, @domdomegg, @domin-mnd, @dvoytenko, @ebCrypto, @ekremkenter, @emmerich, @flybayer, @floriangosse, @forsakenharmony, @francoscopic, @frys, @gabrielrolfsen, @gaojude, @gdborton, @greatvivek11, @gnoff, @guisehn, @GyoHeon, @hamirmahal, @hiro0218, @hirotomoyamada, @housseindjirdeh, @hungdoansy, @huozhi, @hwangstar156, @iampoul, @ianmacartney, @icyJoseph, @ijjk, @imddc, @imranolas, @iscekic, @jantimon, @jaredhan418, @jeanmax1me, @jericopulvera, @jjm2317, @jlbovenzo, @joelhooks, @joeshub, @jonathan-ingram, @jonluca, @jontewks, @joostmeijles, @jophy-ye, @jordienr, @jordyfontoura, @kahlstrm, @karlhorky, @karlkeefer, @kartheesan05, @kdy1, @kenji-webdev, @kevva, @khawajaJunaid, @kidonng, @kiner-tang, @kippmr, @kjac, @kjugi, @kshehadeh, @kutsan, @kwonoj, @kxlow, @leerob, @lforst, @li-jia-nan, @liby, @lonr, @lorensr, @lovell, @lubieowoce, @luciancah, @luismiramirez, @lukahartwig, @lumirlumir, @luojiyin1987, @mamuso, @manovotny, @marlier, @mauroaccornero, @maxhaomh, @mayank1513, @mcnaveen, @md-rejoyan-islam, @mehmetozguldev, @mert-duzgun, @mirasayon, @mischnic, @mknichel, @mobeigi, @molebox, @mratlamwala, @mud-ali, @n-ii-ma, @n1ckoates, @nattui, @nauvalazhar, @neila-a, @neoFinch, @niketchandivade, @nisabmohd, @none23, @notomo, @notrab, @nsams, @nurullah, @okoyecharles, @omahs, @paarthmadan, @pathliving, @pavelglac, @penicillin0, @phryneas, @pkiv, @pnutmath, @qqww08, @r34son, @raeyoung-kim, @remcohaszing, @remorses, @rezamauliadi, @rishabhpoddar, @ronanru, @royalfig, @rubyisrust, @ryan-nauman, @ryohidaka, @ryota-murakami, @s-ekai, @saltcod, @samcx, @samijaber, @sean-rallycry, @sebmarkbage, @shubh73, @shuding, @sirTangale, @sleevezip, @slimbde, @soedirgo, @sokra, @sommeeeer, @sopranopillow, @souporserious, @srkirkland, @steadily-worked, @steveluscher, @stipsan, @styfle, @stylessh, @syi0808, @symant233, @tariknh, @theoludwig, @timfish, @timfuhrmann, @timneutkens, @tknickman, @todor0v, @tokkiyaa, @torresgol10, @tranvanhieu01012002, @txxxxc, @typeofweb, @unflxw, @unstubbable, @versecafe, @vicb, @vkryachko, @wbinnssmith, @webtinax, @weicheng95, @wesbos, @whatisagi, @wiesson, @woutvanderploeg, @wyattjoh, @xiaohanyu, @xixixao, @xugetsu, @yosefbeder, @ypessoa, @ytori, @yunsii, @yurivangeffen, @z0n, @zce, @zhawtof, @zsh77, и @ztanner за помощь!
