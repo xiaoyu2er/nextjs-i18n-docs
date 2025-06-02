@@ -1,0 +1,217 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T19:59:50.436Z
+title: Next.jsでDraft Modeを使用してコンテンツをプレビューする方法
+nav_title: Draft Mode
+description: Next.jsには静的ページと動的ページを切り替えるDraft Modeがあります。App Routerでの動作方法について学びましょう。
+related:
+  title: 次のステップ
+  description: Draft Modeの使用方法について詳しくはAPIリファレンスをご覧ください。
+  links:
+    - app/api-reference/functions/draft-mode
+---
+
+**Draft Mode**を使用すると、ヘッドレスCMSの下書きコンテンツをNext.jsアプリケーションでプレビューできます。ビルド時に生成される静的ページで便利で、[動的レンダリング](/docs/app/getting-started/partial-prerendering#dynamic-rendering)に切り替えて、サイト全体を再ビルドせずに下書きの変更を確認できます。
+
+このページでは、Draft Modeを有効化して使用する方法を説明します。
+
+## ステップ1: ルートハンドラを作成
+
+[ルートハンドラ](/docs/app/building-your-application/routing/route-handlers)を作成します。任意の名前を付けられます（例: `app/api/draft/route.ts`）。
+
+```ts filename="app/api/draft/route.ts" switcher
+export async function GET(request: Request) {
+  return new Response('')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+export async function GET() {
+  return new Response('')
+}
+```
+
+次に、[`draftMode`](/docs/app/api-reference/functions/draft-mode)関数をインポートし、`enable()`メソッドを呼び出します。
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+これにより、Draft Modeを有効化する**Cookie**が設定されます。このCookieを含む後続のリクエストはDraft Modeをトリガーし、静的に生成されたページの動作を変更します。
+
+`/api/draft`にアクセスし、ブラウザの開発者ツールで確認することで手動でテストできます。`__prerender_bypass`という名前のCookieを含む`Set-Cookie`レスポンスヘッダーに注目してください。
+
+## ステップ2: ヘッドレスCMSからルートハンドラにアクセス
+
+> 以下の手順は、使用しているヘッドレスCMSが**カスタム下書きURL**の設定をサポートしていることを前提としています。サポートしていない場合でも、この方法で下書きURLを保護できますが、手動で下書きURLを構築してアクセスする必要があります。具体的な手順は使用するヘッドレスCMSによって異なります。
+
+ヘッドレスCMSからルートハンドラに安全にアクセスするには:
+
+1. 任意のトークンジェネレータを使用して**秘密トークン文字列**を作成します。この秘密はNext.jsアプリとヘッドレスCMSのみが知っている必要があります。
+2. ヘッドレスCMSがカスタム下書きURLの設定をサポートしている場合、下書きURLを指定します（ルートハンドラが`app/api/draft/route.ts`にあると仮定）。例:
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+> - `<your-site>`はデプロイドメインに置き換えてください
+> - `<token>`は生成した秘密トークンに置き換えてください
+> - `<path>`は表示したいページのパスです。`/posts/one`を表示したい場合は`&slug=/posts/one`を使用します
+>
+> ヘッドレスCMSによっては、下書きURLに変数を含めることができ、`<path>`をCMSのデータに基づいて動的に設定できます（例: `&slug=/posts/{entry.fields.slug}`）
+
+3. ルートハンドラで、秘密トークンが一致することと`slug`パラメータが存在することを確認し（どちらかが欠けている場合はリクエストは失敗）、`draftMode.enable()`を呼び出してCookieを設定します。その後、ブラウザを`slug`で指定されたパスにリダイレクトします:
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // クエリ文字列パラメータを解析
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // 秘密トークンと次のパラメータを確認
+  // この秘密はこのルートハンドラとCMSのみが知っている必要があります
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Invalid token', { status: 401 })
+  }
+
+  // ヘッドレスCMSに問い合わせて指定された`slug`が存在するか確認
+  // getPostBySlugはヘッドレスCMSへのフェッチロジックを実装します
+  const post = await getPostBySlug(slug)
+
+  // slugが存在しない場合、Draft Modeの有効化を防ぐ
+  if (!post) {
+    return new Response('Invalid slug', { status: 401 })
+  }
+
+  // Cookieを設定してDraft Modeを有効化
+  const draft = await draftMode()
+  draft.enable()
+
+  // 取得した投稿のパスにリダイレクト
+  // searchParams.slugにはリダイレクトしない（オープンリダイレクト脆弱性の可能性があるため）
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // クエリ文字列パラメータを解析
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // 秘密トークンと次のパラメータを確認
+  // この秘密はこのルートハンドラとCMSのみが知っている必要があります
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Invalid token', { status: 401 })
+  }
+
+  // ヘッドレスCMSに問い合わせて指定された`slug`が存在するか確認
+  // getPostBySlugはヘッドレスCMSへのフェッチロジックを実装します
+  const post = await getPostBySlug(slug)
+
+  // slugが存在しない場合、Draft Modeの有効化を防ぐ
+  if (!post) {
+    return new Response('Invalid slug', { status: 401 })
+  }
+
+  // Cookieを設定してDraft Modeを有効化
+  const draft = await draftMode()
+  draft.enable()
+
+  // 取得した投稿のパスにリダイレクト
+  // searchParams.slugにはリダイレクトしない（オープンリダイレクト脆弱性の可能性があるため）
+  redirect(post.slug)
+}
+```
+
+成功すると、ブラウザはDraft Mode Cookieと共に表示したいパスにリダイレクトされます。
+
+## ステップ3: 下書きコンテンツをプレビュー
+
+次のステップは、`draftMode().isEnabled`の値を確認するようにページを更新することです。
+
+Cookieが設定されたページをリクエストすると、データは**ビルド時ではなくリクエスト時**にフェッチされます。
+
+さらに、`isEnabled`の値は`true`になります。
+
+```tsx filename="app/page.tsx" switcher
+// データをフェッチするページ
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// データをフェッチするページ
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+ヘッドレスCMSから（`secret`と`slug`を使用して）下書きルートハンドラにアクセスするか、URLを手動で使用すると、下書きコンテンツを表示できるようになります。また、公開せずに下書きを更新した場合、その下書きを表示できるはずです。
