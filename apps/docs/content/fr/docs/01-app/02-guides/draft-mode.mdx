@@ -1,0 +1,217 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:00:44.032Z
+title: Comment prévisualiser du contenu avec le mode brouillon dans Next.js
+nav_title: Mode brouillon
+description: Next.js propose un mode brouillon pour basculer entre les pages statiques et dynamiques. Découvrez ici comment cela fonctionne avec App Router.
+related:
+  title: Prochaines étapes
+  description: Consultez la référence API pour plus d'informations sur l'utilisation du mode brouillon.
+  links:
+    - app/api-reference/functions/draft-mode
+---
+
+Le **mode brouillon** vous permet de prévisualiser du contenu en cours de rédaction depuis votre CMS headless dans votre application Next.js. Ceci est particulièrement utile pour les pages statiques générées au moment de la construction, car il vous permet de basculer vers un [rendu dynamique](/docs/app/getting-started/partial-prerendering#dynamic-rendering) et de voir les modifications en cours sans avoir à reconstruire l'intégralité de votre site.
+
+Cette page vous guide pas à pas pour activer et utiliser le mode brouillon.
+
+## Étape 1 : Créer un gestionnaire de route
+
+Créez un [gestionnaire de route](/docs/app/building-your-application/routing/route-handlers). Il peut porter n'importe quel nom, par exemple `app/api/draft/route.ts`.
+
+```ts filename="app/api/draft/route.ts" switcher
+export async function GET(request: Request) {
+  return new Response('')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+export async function GET() {
+  return new Response('')
+}
+```
+
+Ensuite, importez la fonction [`draftMode`](/docs/app/api-reference/functions/draft-mode) et appelez la méthode `enable()`.
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+Cette action définit un **cookie** pour activer le mode brouillon. Les requêtes ultérieures contenant ce cookie déclencheront le mode brouillon et modifieront le comportement des pages générées statiquement.
+
+Vous pouvez tester cela manuellement en visitant `/api/draft` et en examinant les outils de développement de votre navigateur. Notez l'en-tête de réponse `Set-Cookie` avec un cookie nommé `__prerender_bypass`.
+
+## Étape 2 : Accéder au gestionnaire de route depuis votre CMS headless
+
+> Ces étapes supposent que votre CMS headless prend en charge la configuration d'**URLs de brouillon personnalisées**. Si ce n'est pas le cas, vous pouvez toujours utiliser cette méthode pour sécuriser vos URLs de brouillon, mais vous devrez construire et accéder à l'URL manuellement. Les étapes spécifiques varieront selon le CMS headless utilisé.
+
+Pour accéder de manière sécurisée au gestionnaire de route depuis votre CMS headless :
+
+1. Créez une **chaîne de jeton secrète** à l'aide d'un générateur de jetons de votre choix. Ce secret ne sera connu que par votre application Next.js et votre CMS headless.
+2. Si votre CMS headless prend en charge les URLs de brouillon personnalisées, spécifiez une URL de brouillon (en supposant que votre gestionnaire de route se trouve à `app/api/draft/route.ts`). Par exemple :
+
+```bash filename="Terminal"
+https://<votre-site>/api/draft?secret=<jeton>&slug=<chemin>
+```
+
+> - `<votre-site>` doit être votre domaine de déploiement.
+> - `<jeton>` doit être remplacé par le jeton secret que vous avez généré.
+> - `<chemin>` doit être le chemin de la page que vous souhaitez visualiser. Si vous voulez voir `/posts/un`, utilisez `&slug=/posts/un`.
+>
+> Votre CMS headless peut vous permettre d'inclure une variable dans l'URL de brouillon pour que `<chemin>` soit défini dynamiquement en fonction des données du CMS, comme ceci : `&slug=/posts/{entry.fields.slug}`
+
+3. Dans votre gestionnaire de route, vérifiez que le secret correspond et que le paramètre `slug` existe (sinon, la requête doit échouer), appelez `draftMode.enable()` pour définir le cookie. Ensuite, redirigez le navigateur vers le chemin spécifié par `slug` :
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // Analyser les paramètres de la chaîne de requête
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Vérifier le secret et les paramètres suivants
+  // Ce secret ne doit être connu que par ce gestionnaire de route et le CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Jeton invalide', { status: 401 })
+  }
+
+  // Interroger le CMS headless pour vérifier si le `slug` fourni existe
+  // getPostBySlug implémenterait la logique de récupération nécessaire auprès du CMS headless
+  const post = await getPostBySlug(slug)
+
+  // Si le slug n'existe pas, empêcher l'activation du mode brouillon
+  if (!post) {
+    return new Response('Slug invalide', { status: 401 })
+  }
+
+  // Activer le mode brouillon en définissant le cookie
+  const draft = await draftMode()
+  draft.enable()
+
+  // Rediriger vers le chemin du post récupéré
+  // Nous ne redirigeons pas vers searchParams.slug pour éviter les vulnérabilités de redirection ouverte
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // Analyser les paramètres de la chaîne de requête
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Vérifier le secret et les paramètres suivants
+  // Ce secret ne doit être connu que par ce gestionnaire de route et le CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Jeton invalide', { status: 401 })
+  }
+
+  // Interroger le CMS headless pour vérifier si le `slug` fourni existe
+  // getPostBySlug implémenterait la logique de récupération nécessaire auprès du CMS headless
+  const post = await getPostBySlug(slug)
+
+  // Si le slug n'existe pas, empêcher l'activation du mode brouillon
+  if (!post) {
+    return new Response('Slug invalide', { status: 401 })
+  }
+
+  // Activer le mode brouillon en définissant le cookie
+  const draft = await draftMode()
+  draft.enable()
+
+  // Rediriger vers le chemin du post récupéré
+  // Nous ne redirigeons pas vers searchParams.slug pour éviter les vulnérabilités de redirection ouverte
+  redirect(post.slug)
+}
+```
+
+Si cela réussit, le navigateur sera redirigé vers le chemin que vous souhaitez visualiser avec le cookie de mode brouillon.
+
+## Étape 3 : Prévisualiser le contenu en brouillon
+
+L'étape suivante consiste à mettre à jour votre page pour vérifier la valeur de `draftMode().isEnabled`.
+
+Si vous demandez une page pour laquelle le cookie est défini, les données seront récupérées au **moment de la requête** (au lieu du moment de la construction).
+
+De plus, la valeur de `isEnabled` sera `true`.
+
+```tsx filename="app/page.tsx" switcher
+// page qui récupère des données
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// page qui récupère des données
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+Si vous accédez au gestionnaire de route de brouillon (avec `secret` et `slug`) depuis votre CMS headless ou manuellement via l'URL, vous devriez maintenant pouvoir voir le contenu en brouillon. Et si vous mettez à jour votre brouillon sans le publier, vous devriez pouvoir visualiser les modifications.

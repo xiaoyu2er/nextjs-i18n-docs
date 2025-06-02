@@ -1,0 +1,377 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:10:24.973Z
+title: Utilisation du cache
+description: Apprenez à utiliser la directive use cache pour mettre en cache des données dans votre application Next.js.
+version: canary
+related:
+  title: Articles connexes
+  description: Voir les références API associées.
+  links:
+    - app/api-reference/config/next-config-js/useCache
+    - app/api-reference/config/next-config-js/dynamicIO
+    - app/api-reference/config/next-config-js/cacheLife
+    - app/api-reference/functions/cacheTag
+    - app/api-reference/functions/cacheLife
+    - app/api-reference/functions/revalidateTag
+---
+
+La directive `use cache` vous permet de marquer une route, un composant React ou une fonction comme pouvant être mis en cache. Elle peut être utilisée en haut d'un fichier pour indiquer que toutes les exportations du fichier doivent être mises en cache, ou en ligne en haut d'une fonction ou d'un composant pour mettre en cache la valeur de retour.
+
+## Utilisation
+
+`use cache` est actuellement une fonctionnalité expérimentale. Pour l'activer, ajoutez l'option [`useCache`](/docs/app/api-reference/config/next-config-js/useCache) à votre fichier `next.config.ts` :
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    useCache: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    useCache: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **Bon à savoir :** `use cache` peut également être activé avec l'option [`dynamicIO`](/docs/app/api-reference/config/next-config-js/dynamicIO).
+
+Ensuite, ajoutez `use cache` au niveau du fichier, du composant ou de la fonction :
+
+```tsx
+// Niveau fichier
+'use cache'
+
+export default async function Page() {
+  // ...
+}
+
+// Niveau composant
+export async function MyComponent() {
+  'use cache'
+  return <></>
+}
+
+// Niveau fonction
+export async function getData() {
+  'use cache'
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+## Fonctionnement de `use cache`
+
+### Clés de cache
+
+La clé d'une entrée de cache est générée à l'aide d'une version sérialisée de ses entrées, qui inclut :
+
+- L'ID de build (généré pour chaque build)
+- L'ID de fonction (un identifiant sécurisé unique à la fonction)
+- Les arguments (ou props) [sérialisables](https://react.dev/reference/rsc/use-server#serializable-parameters-and-return-values) de la fonction.
+
+Les arguments passés à la fonction mise en cache, ainsi que toutes les valeurs qu'elle lit depuis la portée parente, deviennent automatiquement une partie de la clé. Cela signifie que la même entrée de cache sera réutilisée tant que ses entrées restent identiques.
+
+## Arguments non sérialisables
+
+Tous les arguments, props ou valeurs fermées non sérialisables deviendront des références à l'intérieur de la fonction mise en cache et ne pourront être que transmis, sans être inspectés ni modifiés. Ces valeurs non sérialisables seront remplies au moment de la requête et ne feront pas partie de la clé de cache.
+
+Par exemple, une fonction mise en cache peut prendre du JSX comme prop `children` et retourner `<div>{children}</div>`, mais elle ne pourra pas introspecter l'objet `children` réel. Cela vous permet d'imbriquer du contenu non mis en cache dans un composant mis en cache.
+
+```tsx filename="app/ui/cached-component.tsx" switcher
+function CachedComponent({ children }: { children: ReactNode }) {
+  'use cache'
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/ui/cached-component.js" switcher
+function CachedComponent({ children }) {
+  'use cache'
+  return <div>{children}</div>
+}
+```
+
+## Valeurs de retour
+
+La valeur de retour de la fonction pouvant être mise en cache doit être sérialisable. Cela garantit que les données mises en cache peuvent être stockées et récupérées correctement.
+
+## `use cache` au moment du build
+
+Lorsqu'elle est utilisée en haut d'un [layout](/docs/app/api-reference/file-conventions/layout) ou d'une [page](/docs/app/api-reference/file-conventions/page), le segment de route sera prérendu, permettant ainsi d'être [revalidé](#during-revalidation) ultérieurement.
+
+Cela signifie que `use cache` ne peut pas être utilisé avec des [API au moment de la requête](/docs/app/getting-started/partial-prerendering#dynamic-rendering) comme `cookies` ou `headers`.
+
+## `use cache` au runtime
+
+Sur le **serveur**, les entrées de cache des composants ou fonctions individuels seront mises en cache en mémoire.
+
+Ensuite, sur le **client**, tout contenu retourné depuis le cache du serveur sera stocké dans la mémoire du navigateur pour la durée de la session ou jusqu'à [revalidation](#during-revalidation).
+
+## Pendant la revalidation
+
+Par défaut, `use cache` a une période de revalidation côté serveur de **15 minutes**. Bien que cette période puisse être utile pour du contenu ne nécessitant pas de mises à jour fréquentes, vous pouvez utiliser les API `cacheLife` et `cacheTag` pour configurer quand les entrées de cache individuelles doivent être revalidées.
+
+- [`cacheLife`](/docs/app/api-reference/functions/cacheLife) : Configure la durée de vie d'une entrée de cache.
+- [`cacheTag`](/docs/app/api-reference/functions/cacheTag) : Crée des tags pour une revalidation à la demande.
+
+Ces deux API s'intègrent aux couches de cache client et serveur, ce qui signifie que vous pouvez configurer vos sémantiques de cache en un seul endroit et les appliquer partout.
+
+Consultez les documentations des API [`cacheLife`](/docs/app/api-reference/functions/cacheLife) et [`cacheTag`](/docs/app/api-reference/functions/cacheTag) pour plus d'informations.
+
+## Exemples
+
+### Mise en cache d'une route entière avec `use cache`
+
+Pour prérendre une route entière, ajoutez `use cache` en haut des fichiers **`layout` et `page`**. Chacun de ces segments est traité comme un point d'entrée séparé dans votre application et sera mis en cache indépendamment.
+
+```tsx filename="app/layout.tsx" switcher
+'use cache'
+
+export default function Layout({ children }: { children: ReactNode }) {
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/page.tsx" switcher
+'use cache'
+
+export default function Layout({ children }) {
+  return <div>{children}</div>
+}
+```
+
+Tous les composants importés et imbriqués dans le fichier `page` hériteront du comportement de cache de `page`.
+
+```tsx filename="app/page.tsx" switcher
+'use cache'
+
+async function Users() {
+  const users = await fetch('/api/users')
+  // boucle à travers les utilisateurs
+}
+
+export default function Page() {
+  return (
+    <main>
+      <Users />
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use cache'
+
+async function Users() {
+  const users = await fetch('/api/users')
+  // boucle à travers les utilisateurs
+}
+
+export default function Page() {
+  return (
+    <main>
+      <Users />
+    </main>
+  )
+}
+```
+
+> **Bon à savoir :**
+>
+> - Si `use cache` est ajouté uniquement au `layout` ou à la `page`, seul ce segment de route et les composants qui y sont importés seront mis en cache.
+> - Si l'un des enfants imbriqués dans la route utilise des [API dynamiques](/docs/app/getting-started/partial-prerendering#dynamic-rendering), alors la route ne sera pas prérendue.
+
+### Mise en cache de la sortie d'un composant avec `use cache`
+
+Vous pouvez utiliser `use cache` au niveau du composant pour mettre en cache toutes les requêtes ou calculs effectués dans ce composant. L'entrée de cache sera réutilisée tant que les props sérialisées produisent la même valeur dans chaque instance.
+
+```tsx filename="app/components/bookings.tsx" highlight={2} switcher
+export async function Bookings({ type = 'haircut' }: BookingsProps) {
+  'use cache'
+  async function getBookingsData() {
+    const data = await fetch(`/api/bookings?type=${encodeURIComponent(type)}`)
+    return data
+  }
+  return //...
+}
+
+interface BookingsProps {
+  type: string
+}
+```
+
+```jsx filename="app/components/bookings.js" highlight={2} switcher
+export async function Bookings({ type = 'haircut' }) {
+  'use cache'
+  async function getBookingsData() {
+    const data = await fetch(`/api/bookings?type=${encodeURIComponent(type)}`)
+    return data
+  }
+  return //...
+}
+```
+
+### Mise en cache de la sortie d'une fonction avec `use cache`
+
+Comme vous pouvez ajouter `use cache` à n'importe quelle fonction asynchrone, vous n'êtes pas limité à la mise en cache des composants ou des routes uniquement. Vous pourriez vouloir mettre en cache une requête réseau, une requête de base de données ou un calcul lent.
+
+```tsx filename="app/actions.ts" highlight={2} switcher
+export async function getData() {
+  'use cache'
+
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+```jsx filename="app/actions.js" highlight={2} switcher
+export async function getData() {
+  'use cache'
+
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+### Entrelacement
+
+Si vous devez passer des arguments non sérialisables à une fonction pouvant être mise en cache, vous pouvez les passer comme `children`. Cela signifie que la référence `children` peut changer sans affecter l'entrée de cache.
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const uncachedData = await getData()
+  return (
+    <CacheComponent>
+      <DynamicComponent data={uncachedData} />
+    </CacheComponent>
+  )
+}
+
+async function CacheComponent({ children }: { children: ReactNode }) {
+  'use cache'
+  const cachedData = await fetch('/api/cached-data')
+  return (
+    <div>
+      <PrerenderedComponent data={cachedData} />
+      {children}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const uncachedData = await getData()
+  return (
+    <CacheComponent>
+      <DynamicComponent data={uncachedData} />
+    </CacheComponent>
+  )
+}
+
+async function CacheComponent({ children }) {
+  'use cache'
+  const cachedData = await fetch('/api/cached-data')
+  return (
+    <div>
+      <PrerenderedComponent data={cachedData} />
+      {children}
+    </div>
+  )
+}
+```
+
+Vous pouvez également passer des Server Actions à travers des composants mis en cache vers des Client Components sans les invoquer à l'intérieur de la fonction pouvant être mise en cache.
+
+```tsx filename="app/page.tsx" switcher
+import ClientComponent from './ClientComponent'
+
+export default async function Page() {
+  const performUpdate = async () => {
+    'use server'
+    // Effectue une mise à jour côté serveur
+    await db.update(...)
+  }
+
+  return <CacheComponent performUpdate={performUpdate} />
+}
+
+async function CachedComponent({
+  performUpdate,
+}: {
+  performUpdate: () => Promise<void>
+}) {
+  'use cache'
+  // N'appelez pas performUpdate ici
+  return <ClientComponent action={performUpdate} />
+}
+```
+
+```jsx filename="app/page.js" switcher
+import ClientComponent from './ClientComponent'
+
+export default async function Page() {
+  const performUpdate = async () => {
+    'use server'
+    // Effectue une mise à jour côté serveur
+    await db.update(...)
+  }
+
+  return <CacheComponent performUpdate={performUpdate} />
+}
+
+async function CachedComponent({ performUpdate }) {
+  'use cache'
+  // N'appelez pas performUpdate ici
+  return <ClientComponent action={performUpdate} />
+}
+```
+
+```tsx filename="app/ClientComponent.tsx" switcher
+'use client'
+
+export default function ClientComponent({
+  action,
+}: {
+  action: () => Promise<void>
+}) {
+  return <button onClick={action}>Mettre à jour</button>
+}
+```
+
+```jsx filename="app/ClientComponent.js" switcher
+'use client'
+
+export default function ClientComponent({ action }) {
+  return <button onClick={action}>Mettre à jour</button>
+}
+```
+
+## Support des plateformes
+
+| Option de déploiement                                               | Supporté          |
+| ------------------------------------------------------------------- | ----------------- |
+| [Serveur Node.js](/docs/app/getting-started/deploying#nodejs-server) | Oui               |
+| [Conteneur Docker](/docs/app/getting-started/deploying#docker)      | Oui               |
+| [Export statique](/docs/app/getting-started/deploying#static-export) | Non               |
+| [Adaptateurs](/docs/app/getting-started/deploying#adapters)         | Dépend de la plateforme |
+
+Apprenez à [configurer la mise en cache](/docs/app/guides/self-hosting#caching-and-isr) lors de l'hébergement autonome de Next.js.
+
+## Historique des versions
+
+| Version   | Changements                                                 |
+| --------- | ------------------------------------------------------- |
+| `v15.0.0` | `"use cache"` est introduit comme fonctionnalité expérimentale. |

@@ -1,0 +1,271 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T19:59:08.240Z
+title: Comment auto-héberger votre application Next.js
+nav_title: Auto-hébergement
+description: Apprenez à auto-héberger votre application Next.js sur un serveur Node.js, une image Docker ou des fichiers HTML statiques (export statique).
+---
+
+{/* Le contenu de ce document est partagé entre le routeur App et Pages. Vous pouvez utiliser le composant `<PagesOnly>Contenu</PagesOnly>` pour ajouter du contenu spécifique au routeur Pages. Tout contenu partagé ne doit pas être encapsulé dans un composant. */}
+
+Lors du [déploiement](/docs/app/getting-started/deploying) de votre application Next.js, vous pouvez configurer la manière dont les différentes fonctionnalités sont gérées en fonction de votre infrastructure.
+
+> **🎥 Regarder :** En savoir plus sur l'auto-hébergement de Next.js → [YouTube (45 minutes)](https://www.youtube.com/watch?v=sIVL4JMqRfc).
+
+## Optimisation des images
+
+L'[optimisation des images](/docs/app/api-reference/components/image) via `next/image` fonctionne en auto-hébergement sans configuration lors d'un déploiement avec `next start`. Si vous préférez utiliser un service distinct pour optimiser les images, vous pouvez [configurer un chargeur d'images](/docs/app/api-reference/components/image#loader).
+
+L'optimisation des images peut être utilisée avec un [export statique](/docs/app/guides/static-exports#image-optimization) en définissant un chargeur d'images personnalisé dans `next.config.js`. Notez que les images sont optimisées lors de l'exécution, pas pendant la construction.
+
+> **Bon à savoir :**
+>
+> - Sur les systèmes Linux basés sur glibc, l'optimisation des images peut nécessiter une [configuration supplémentaire](https://sharp.pixelplumbing.com/install#linux-memory-allocator) pour éviter une utilisation excessive de la mémoire.
+> - En savoir plus sur le [comportement de mise en cache des images optimisées](/docs/app/api-reference/components/image#minimumcachettl) et comment configurer la durée de vie (TTL).
+> - Vous pouvez également [désactiver l'optimisation des images](/docs/app/api-reference/components/image#unoptimized) tout en conservant les autres avantages de `next/image`. Par exemple, si vous optimisez vous-même les images séparément.
+
+## Middleware
+
+Le [middleware](/docs/app/building-your-application/routing/middleware) fonctionne en auto-hébergement sans configuration lors d'un déploiement avec `next start`. Comme il nécessite un accès à la requête entrante, il n'est pas pris en charge avec un [export statique](/docs/app/guides/static-exports).
+
+Le middleware utilise le [runtime Edge](/docs/app/api-reference/edge), un sous-ensemble des API Node.js disponibles pour garantir une faible latence, puisqu'il peut s'exécuter devant chaque route ou ressource de votre application. Si vous ne souhaitez pas cela, vous pouvez utiliser le [runtime Node.js complet](/blog/next-15-2#nodejs-middleware-experimental) pour exécuter le middleware.
+
+Si vous souhaitez ajouter une logique (ou utiliser un package externe) nécessitant toutes les API Node.js, vous pouvez déplacer cette logique dans un [layout](/docs/app/api-reference/file-conventions/layout) en tant que [composant serveur](/docs/app/getting-started/server-and-client-components). Par exemple, vérifier les [en-têtes](/docs/app/api-reference/functions/headers) et [rediriger](/docs/app/api-reference/functions/redirect). Vous pouvez également utiliser des en-têtes, cookies ou paramètres de requête pour [rediriger](/docs/app/api-reference/config/next-config-js/redirects#header-cookie-and-query-matching) ou [réécrire](/docs/app/api-reference/config/next-config-js/rewrites#header-cookie-and-query-matching) via `next.config.js`. Si cela ne fonctionne pas, vous pouvez aussi utiliser un [serveur personnalisé](/docs/pages/guides/custom-server).
+
+## Variables d'environnement
+
+Next.js prend en charge les variables d'environnement au moment de la construction et lors de l'exécution.
+
+**Par défaut, les variables d'environnement ne sont disponibles que sur le serveur**. Pour exposer une variable d'environnement au navigateur, elle doit être préfixée par `NEXT_PUBLIC_`. Cependant, ces variables publiques seront intégrées dans le bundle JavaScript lors de `next build`.
+
+<PagesOnly>
+
+Pour lire les variables d'environnement lors de l'exécution, nous recommandons d'utiliser `getServerSideProps` ou [d'adopter progressivement le routeur App](/docs/app/guides/migrating/app-router-migration).
+
+</PagesOnly>
+
+<AppOnly>
+
+Vous pouvez lire en toute sécurité les variables d'environnement sur le serveur pendant le rendu dynamique.
+
+```tsx filename="app/page.ts" switcher
+import { connection } from 'next/server'
+
+export default async function Component() {
+  await connection()
+  // cookies, headers et autres API dynamiques
+  // activeront également le rendu dynamique, ce qui signifie
+  // que cette variable d'environnement est évaluée lors de l'exécution
+  const value = process.env.MY_VALUE
+  // ...
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { connection } from 'next/server'
+
+export default async function Component() {
+  await connection()
+  // cookies, headers et autres API dynamiques
+  // activeront également le rendu dynamique, ce qui signifie
+  // que cette variable d'environnement est évaluée lors de l'exécution
+  const value = process.env.MY_VALUE
+  // ...
+}
+```
+
+</AppOnly>
+
+Cela vous permet d'utiliser une seule image Docker pouvant être promue à travers plusieurs environnements avec des valeurs différentes.
+
+> **Bon à savoir :**
+>
+> - Vous pouvez exécuter du code au démarrage du serveur avec la [fonction `register`](/docs/app/guides/instrumentation).
+> - Nous ne recommandons pas d'utiliser l'option [runtimeConfig](/docs/pages/api-reference/config/next-config-js/runtime-configuration), car elle ne fonctionne pas avec le mode de sortie autonome. Nous recommandons plutôt d'[adopter progressivement](/docs/app/guides/migrating/app-router-migration) le routeur App.
+
+## Mise en cache et ISR
+
+Next.js peut mettre en cache les réponses, les pages statiques générées, les sorties de construction et d'autres ressources statiques comme les images, polices et scripts.
+
+La mise en cache et la revalidation des pages (avec la [régénération statique incrémentielle](/docs/app/guides/incremental-static-regeneration)) utilisent le **même cache partagé**. Par défaut, ce cache est stocké sur le système de fichiers (sur disque) sur votre serveur Next.js. **Cela fonctionne automatiquement en auto-hébergement** avec les routeurs App et Pages.
+
+Vous pouvez configurer l'emplacement du cache Next.js si vous souhaitez persister les pages et données mises en cache dans un stockage durable, ou partager le cache entre plusieurs conteneurs ou instances de votre application Next.js.
+
+### Mise en cache automatique
+
+- Next.js définit l'en-tête `Cache-Control` à `public, max-age=31536000, immutable` pour les ressources réellement immuables. Cela ne peut pas être modifié. Ces fichiers immuables contiennent un hachage SHA dans leur nom, ils peuvent donc être mis en cache indéfiniment. Par exemple, les [imports d'images statiques](/docs/app/getting-started/images#local-images). Vous pouvez [configurer la durée de vie (TTL)](/docs/app/api-reference/components/image#minimumcachettl) pour les images.
+- La régénération statique incrémentielle (ISR) définit l'en-tête `Cache-Control` à `s-maxage: <revalidate in getStaticProps>, stale-while-revalidate`. Ce temps de revalidation est défini dans votre [fonction `getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) en secondes. Si vous définissez `revalidate: false`, la durée de mise en cache par défaut sera d'un an.
+- Les pages rendues dynamiquement définissent un en-tête `Cache-Control` à `private, no-cache, no-store, max-age=0, must-revalidate` pour empêcher la mise en cache de données spécifiques à l'utilisateur. Cela s'applique aux routeurs App et Pages. Cela inclut également le [mode brouillon](/docs/app/guides/draft-mode).
+
+### Ressources statiques
+
+Si vous souhaitez héberger des ressources statiques sur un domaine ou CDN différent, vous pouvez utiliser la configuration `assetPrefix` dans `next.config.js`. Next.js utilisera ce préfixe pour récupérer les fichiers JavaScript ou CSS. Séparer vos ressources sur un domaine différent a l'inconvénient d'un temps supplémentaire pour la résolution DNS et TLS.
+
+[En savoir plus sur `assetPrefix`](/docs/app/api-reference/config/next-config-js/assetPrefix).
+
+### Configuration de la mise en cache
+
+Par défaut, les ressources mises en cache seront stockées en mémoire (50 Mo par défaut) et sur disque. Si vous hébergez Next.js avec une plateforme d'orchestration de conteneurs comme Kubernetes, chaque pod aura une copie du cache. Pour éviter d'afficher des données obsolètes puisque le cache n'est pas partagé entre les pods par défaut, vous pouvez configurer le cache Next.js pour fournir un gestionnaire de cache et désactiver la mise en cache en mémoire.
+
+Pour configurer l'emplacement du cache ISR/Data lors de l'auto-hébergement, vous pouvez définir un gestionnaire personnalisé dans votre fichier `next.config.js` :
+
+```jsx filename="next.config.js"
+module.exports = {
+  cacheHandler: require.resolve('./cache-handler.js'),
+  cacheMaxMemorySize: 0, // désactiver la mise en cache en mémoire par défaut
+}
+```
+
+Ensuite, créez `cache-handler.js` à la racine de votre projet, par exemple :
+
+```jsx filename="cache-handler.js"
+const cache = new Map()
+
+module.exports = class CacheHandler {
+  constructor(options) {
+    this.options = options
+  }
+
+  async get(key) {
+    // Cela peut être stocké n'importe où, comme un stockage durable
+    return cache.get(key)
+  }
+
+  async set(key, data, ctx) {
+    // Cela peut être stocké n'importe où, comme un stockage durable
+    cache.set(key, {
+      value: data,
+      lastModified: Date.now(),
+      tags: ctx.tags,
+    })
+  }
+
+  async revalidateTag(tags) {
+    // tags est soit une chaîne, soit un tableau de chaînes
+    tags = [tags].flat()
+    // Parcourir toutes les entrées du cache
+    for (let [key, value] of cache) {
+      // Si les tags de la valeur incluent le tag spécifié, supprimer cette entrée
+      if (value.tags.some((tag) => tags.includes(tag))) {
+        cache.delete(key)
+      }
+    }
+  }
+
+  // Si vous souhaitez avoir un cache temporaire en mémoire pour une seule requête qui est réinitialisé
+  // avant la prochaine requête, vous pouvez utiliser cette méthode
+  resetRequestCache() {}
+}
+```
+
+L'utilisation d'un gestionnaire de cache personnalisé vous permet d'assurer la cohérence entre tous les pods hébergeant votre application Next.js. Par exemple, vous pouvez enregistrer les valeurs mises en cache n'importe où, comme [Redis](https://github.com/vercel/next.js/tree/canary/examples/cache-handler-redis) ou AWS S3.
+
+> **Bon à savoir :**
+>
+> - `revalidatePath` est une couche de commodité au-dessus des tags de cache. Appeler `revalidatePath` appellera la fonction `revalidateTag` avec un tag spécial par défaut pour la page fournie.
+
+## Cache de construction
+
+Next.js génère un ID lors de `next build` pour identifier quelle version de votre application est servie. La même construction doit être utilisée et démarrée sur plusieurs conteneurs.
+
+Si vous reconstruisez pour chaque étape de votre environnement, vous devrez générer un ID de construction cohérent à utiliser entre les conteneurs. Utilisez la commande `generateBuildId` dans `next.config.js` :
+
+```jsx filename="next.config.js"
+module.exports = {
+  generateBuildId: async () => {
+    // Cela peut être n'importe quoi, comme le dernier hash git
+    return process.env.GIT_HASH
+  },
+}
+```
+
+## Désynchronisation de version
+
+Next.js atténue automatiquement la plupart des cas de [désynchronisation de version](https://www.industrialempathy.com/posts/version-skew/) et recharge automatiquement l'application pour récupérer les nouvelles ressources lorsqu'elle est détectée. Par exemple, s'il y a une incompatibilité dans le `deploymentId`, les transitions entre pages effectueront une navigation complète plutôt que d'utiliser une valeur préchargée.
+
+Lors du rechargement de l'application, il peut y avoir une perte d'état si elle n'est pas conçue pour persister entre les navigations. Par exemple, utiliser l'état de l'URL ou le stockage local persisterait l'état après un rafraîchissement. Cependant, l'état des composants comme `useState` serait perdu lors de telles navigations.
+
+<AppOnly>
+
+## Streaming et Suspense
+
+Le routeur App de Next.js prend en charge les [réponses en streaming](/docs/app/building-your-application/routing/loading-ui-and-streaming) en auto-hébergement. Si vous utilisez Nginx ou un proxy similaire, vous devrez le configurer pour désactiver la mise en mémoire tampon et activer le streaming.
+
+Par exemple, vous pouvez désactiver la mise en mémoire tampon dans Nginx en définissant `X-Accel-Buffering` à `no` :
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*{/}?',
+        headers: [
+          {
+            key: 'X-Accel-Buffering',
+            value: 'no',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Pré-rendu partiel
+
+Le [pré-rendu partiel (expérimental)](/docs/app/getting-started/partial-prerendering) fonctionne par défaut avec Next.js et n'est pas une fonctionnalité réservée aux CDN. Cela inclut le déploiement en tant que serveur Node.js (via `next start`) et avec un conteneur Docker.
+
+## Utilisation avec les CDN
+
+Lors de l'utilisation d'un CDN devant votre application Next.js, la page inclura l'en-tête de réponse `Cache-Control: private` lorsque les API dynamiques sont accédées. Cela garantit que la page HTML résultante est marquée comme non mise en cache. Si la page est entièrement pré-rendue en statique, elle inclura `Cache-Control: public` pour permettre la mise en cache sur le CDN.
+
+Si vous n'avez pas besoin d'un mélange de composants statiques et dynamiques, vous pouvez rendre toute votre route statique et mettre en cache le HTML sur un CDN. Cette optimisation statique automatique est le comportement par défaut lors de l'exécution de `next build` si les API dynamiques ne sont pas utilisées.
+
+À mesure que le pré-rendu partiel devient stable, nous fournirons un support via l'API des adaptateurs de déploiement.
+
+</AppOnly>
+
+<AppOnly>
+
+## `after`
+
+[`after`](/docs/app/api-reference/functions/after) est entièrement pris en charge en auto-hébergement avec `next start`.
+
+Lors de l'arrêt du serveur, assurez un arrêt gracieux en envoyant les signaux `SIGINT` ou `SIGTERM` et en attendant. Cela permet au serveur Next.js d'attendre que les fonctions de rappel ou promesses en attente utilisées dans `after` soient terminées.
+
+</AppOnly>
+
+<PagesOnly>
+
+## Arrêts gracieux manuels
+
+En auto-hébergement, vous pouvez exécuter du code lorsque le serveur s'arrête sur les signaux `SIGTERM` ou `SIGINT`.
+
+Vous pouvez définir la variable d'environnement `NEXT_MANUAL_SIG_HANDLE` à `true` puis enregistrer un gestionnaire pour ce signal dans votre fichier `_document.js`. Vous devrez enregistrer la variable d'environnement directement dans le script `package.json`, et non dans le fichier `.env`.
+
+> **Bon à savoir** : La gestion manuelle des signaux n'est pas disponible dans `next dev`.
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "NEXT_MANUAL_SIG_HANDLE=true next start"
+  }
+}
+```
+
+```js filename="pages/_document.js"
+if (process.env.NEXT_MANUAL_SIG_HANDLE) {
+  process.on('SIGTERM', () => {
+    console.log('Reçu SIGTERM : nettoyage')
+    process.exit(0)
+  })
+  process.on('SIGINT', () => {
+    console.log('Reçu SIGINT : nettoyage')
+    process.exit(0)
+  })
+}
+```
+
+</PagesOnly>
