@@ -1,0 +1,171 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:01:25.926Z
+title: Cómo configurar el almacenamiento en caché para compilaciones de Integración Continua (CI)
+nav_title: Almacenamiento en caché en CI
+description: Aprenda a configurar CI para almacenar en caché las compilaciones de Next.js
+---
+
+Para mejorar el rendimiento de las compilaciones, Next.js guarda una caché en `.next/cache` que se comparte entre compilaciones.
+
+Para aprovechar esta caché en entornos de Integración Continua (CI), su flujo de trabajo de CI deberá configurarse para persistir correctamente la caché entre compilaciones.
+
+> Si su CI no está configurado para persistir `.next/cache` entre compilaciones, puede que vea un error de [No se detectó caché](/docs/messages/no-cache).
+
+Aquí hay algunas configuraciones de ejemplo para proveedores comunes de CI:
+
+## Vercel
+
+El almacenamiento en caché de Next.js se configura automáticamente. No es necesario realizar ninguna acción. Si está usando Turborepo en Vercel, [aprenda más aquí](https://vercel.com/docs/monorepos/turborepo).
+
+## CircleCI
+
+Edite su paso `save_cache` en `.circleci/config.yml` para incluir `.next/cache`:
+
+```yaml
+steps:
+  - save_cache:
+      key: dependency-cache-{{ checksum "yarn.lock" }}
+      paths:
+        - ./node_modules
+        - ./.next/cache
+```
+
+Si no tiene una clave `save_cache`, siga la [documentación de CircleCI sobre configuración de caché](https://circleci.com/docs/2.0/caching/).
+
+## Travis CI
+
+Agregue o combine lo siguiente en su `.travis.yml`:
+
+```yaml
+cache:
+  directories:
+    - $HOME/.cache/yarn
+    - node_modules
+    - .next/cache
+```
+
+## GitLab CI
+
+Agregue o combine lo siguiente en su `.gitlab-ci.yml`:
+
+```yaml
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+    - .next/cache/
+```
+
+## Netlify CI
+
+Utilice [Netlify Plugins](https://www.netlify.com/products/build/plugins/) con [`@netlify/plugin-nextjs`](https://www.npmjs.com/package/@netlify/plugin-nextjs).
+
+## AWS CodeBuild
+
+Agregue (o combine) lo siguiente a su `buildspec.yml`:
+
+```yaml
+cache:
+  paths:
+    - 'node_modules/**/*' # Almacena `node_modules` para `yarn` o `npm i` más rápido
+    - '.next/cache/**/*' # Almacena Next.js para recompilaciones más rápidas
+```
+
+## GitHub Actions
+
+Usando [actions/cache](https://github.com/actions/cache) de GitHub, agregue el siguiente paso en su archivo de flujo de trabajo:
+
+```yaml
+uses: actions/cache@v4
+with:
+  # Vea aquí para almacenamiento con `yarn`, `bun` u otros gestores de paquetes https://github.com/actions/cache/blob/main/examples.md o puede usar almacenamiento con actions/setup-node https://github.com/actions/setup-node
+  path: |
+    ~/.npm
+    ${{ github.workspace }}/.next/cache
+  # Genera una nueva caché cuando cambian paquetes o archivos fuente.
+  key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+  # Si los archivos fuente cambiaron pero no los paquetes, recompila desde una caché previa.
+  restore-keys: |
+    ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+```
+
+## Bitbucket Pipelines
+
+Agregue o combine lo siguiente en su `bitbucket-pipelines.yml` al nivel superior (mismo nivel que `pipelines`):
+
+```yaml
+definitions:
+  caches:
+    nextcache: .next/cache
+```
+
+Luego refiéralo en la sección `caches` del `step` de su pipeline:
+
+```yaml
+- step:
+    name: your_step_name
+    caches:
+      - node
+      - nextcache
+```
+
+## Heroku
+
+Usando el [almacenamiento personalizado](https://devcenter.heroku.com/articles/nodejs-support#custom-caching) de Heroku, agregue un arreglo `cacheDirectories` en su package.json de nivel superior:
+
+```javascript
+"cacheDirectories": [".next/cache"]
+```
+
+## Azure Pipelines
+
+Usando la [tarea Cache](https://docs.microsoft.com/en-us/azure/devops/pipelines/tasks/utility/cache) de Azure Pipelines, agregue la siguiente tarea a su archivo yaml del pipeline antes de la tarea que ejecuta `next build`:
+
+```yaml
+- task: Cache@2
+  displayName: 'Cache .next/cache'
+  inputs:
+    key: next | $(Agent.OS) | yarn.lock
+    path: '$(System.DefaultWorkingDirectory)/.next/cache'
+```
+
+## Jenkins (Pipeline)
+
+Usando el plugin [Job Cacher](https://www.jenkins.io/doc/pipeline/steps/jobcacher/) de Jenkins, agregue el siguiente paso de compilación a su `Jenkinsfile` donde normalmente ejecutaría `next build` o `npm install`:
+
+```yaml
+stage("Restore npm packages") {
+    steps {
+        // Escribe archivo de bloqueo para caché basado en hash GIT_COMMIT
+        writeFile file: "next-lock.cache", text: "$GIT_COMMIT"
+
+        cache(caches: [
+            arbitraryFileCache(
+                path: "node_modules",
+                includes: "**/*",
+                cacheValidityDecidingFile: "package-lock.json"
+            )
+        ]) {
+            sh "npm install"
+        }
+    }
+}
+stage("Build") {
+    steps {
+        // Escribe archivo de bloqueo para caché basado en hash GIT_COMMIT
+        writeFile file: "next-lock.cache", text: "$GIT_COMMIT"
+
+        cache(caches: [
+            arbitraryFileCache(
+                path: ".next/cache",
+                includes: "**/*",
+                cacheValidityDecidingFile: "next-lock.cache"
+            )
+        ]) {
+            // aka `next build`
+            sh "npm run build"
+        }
+    }
+}
+```

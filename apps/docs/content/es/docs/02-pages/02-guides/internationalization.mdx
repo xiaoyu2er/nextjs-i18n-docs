@@ -1,0 +1,357 @@
+---
+source-updated-at: 2025-05-21T18:33:43.000Z
+translation-updated-at: 2025-06-02T19:59:37.072Z
+title: Cómo implementar internacionalización en Next.js
+nav_title: Internacionalización
+description: Next.js tiene soporte integrado para enrutamiento internacionalizado y detección de idioma. Aprende más aquí.
+---
+
+<details>
+  <summary>Ejemplos</summary>
+
+- [Enrutamiento i18n](https://github.com/vercel/next.js/tree/canary/examples/i18n-routing-pages)
+
+</details>
+
+Next.js tiene soporte integrado para enrutamiento internacionalizado ([i18n](https://en.wikipedia.org/wiki/Internationalization_and_localization#Naming)) desde la versión `v10.0.0`. Puedes proporcionar una lista de locales, el locale predeterminado y locales específicos de dominio, y Next.js manejará automáticamente el enrutamiento.
+
+El soporte de enrutamiento i18n actualmente está diseñado para complementar soluciones existentes de bibliotecas i18n como [`react-intl`](https://formatjs.io/docs/getting-started/installation), [`react-i18next`](https://react.i18next.com/), [`lingui`](https://lingui.dev/), [`rosetta`](https://github.com/lukeed/rosetta), [`next-intl`](https://github.com/amannn/next-intl), [`next-translate`](https://github.com/aralroca/next-translate), [`next-multilingual`](https://github.com/Avansai/next-multilingual), [`tolgee`](https://tolgee.io/integrations/next), [`paraglide-next`](https://inlang.com/m/osslbuzt/paraglide-next-i18n), [`next-intlayer`](https://intlayer.org/doc/environment/nextjs) y otras, simplificando las rutas y el análisis de locales.
+
+## Primeros pasos
+
+Para comenzar, agrega la configuración `i18n` a tu archivo `next.config.js`.
+
+Los locales son [Identificadores de Locale UTS](https://www.unicode.org/reports/tr35/tr35-59/tr35.html#Identifiers), un formato estandarizado para definir locales.
+
+Generalmente, un Identificador de Locale está compuesto por un idioma, región y script separados por un guión: `idioma-region-script`. La región y el script son opcionales. Un ejemplo:
+
+- `en-US` - Inglés como se habla en Estados Unidos
+- `nl-NL` - Holandés como se habla en los Países Bajos
+- `nl` - Holandés, sin región específica
+
+Si el locale del usuario es `nl-BE` y no está listado en tu configuración, se redirigirá a `nl` si está disponible, o al locale predeterminado en caso contrario.
+Si no planeas admitir todas las regiones de un país, es una buena práctica incluir locales de país que actuarán como respaldo.
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    // Estos son todos los locales que deseas admitir en
+    // tu aplicación
+    locales: ['en-US', 'fr', 'nl-NL'],
+    // Este es el locale predeterminado que deseas que se use al visitar
+    // una ruta sin prefijo de locale, ej. `/hello`
+    defaultLocale: 'en-US',
+    // Esta es una lista de dominios de locale y el locale predeterminado que
+    // deben manejar (solo se requieren al configurar enrutamiento por dominio)
+    // Nota: los subdominios deben incluirse en el valor del dominio para coincidir, ej. "fr.example.com".
+    domains: [
+      {
+        domain: 'example.com',
+        defaultLocale: 'en-US',
+      },
+      {
+        domain: 'example.nl',
+        defaultLocale: 'nl-NL',
+      },
+      {
+        domain: 'example.fr',
+        defaultLocale: 'fr',
+        // también se puede usar un campo http opcional para probar
+        // dominios de locale localmente con http en lugar de https
+        http: true,
+      },
+    ],
+  },
+}
+```
+
+## Estrategias de Locale
+
+Hay dos estrategias para manejar locales: Enrutamiento por Sub-ruta y Enrutamiento por Dominio.
+
+### Enrutamiento por Sub-ruta
+
+El Enrutamiento por Sub-ruta coloca el locale en la ruta de la URL.
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en-US', 'fr', 'nl-NL'],
+    defaultLocale: 'en-US',
+  },
+}
+```
+
+Con la configuración anterior `en-US`, `fr` y `nl-NL` estarán disponibles para enrutar, y `en-US` es el locale predeterminado. Si tienes un `pages/blog.js`, las siguientes URLs estarán disponibles:
+
+- `/blog`
+- `/fr/blog`
+- `/nl-nl/blog`
+
+El locale predeterminado no tiene prefijo.
+
+### Enrutamiento por Dominio
+
+Al usar el enrutamiento por dominio, puedes configurar locales para ser servidos desde diferentes dominios:
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en-US', 'fr', 'nl-NL', 'nl-BE'],
+    defaultLocale: 'en-US',
+
+    domains: [
+      {
+        // Nota: los subdominios deben incluirse en el valor del dominio para coincidir
+        // ej. www.example.com debe usarse si ese es el nombre de host esperado
+        domain: 'example.com',
+        defaultLocale: 'en-US',
+      },
+      {
+        domain: 'example.fr',
+        defaultLocale: 'fr',
+      },
+      {
+        domain: 'example.nl',
+        defaultLocale: 'nl-NL',
+        // especifica otros locales que deben redirigirse
+        // a este dominio
+        locales: ['nl-BE'],
+      },
+    ],
+  },
+}
+```
+
+Por ejemplo, si tienes `pages/blog.js`, las siguientes URLs estarán disponibles:
+
+- `example.com/blog`
+- `www.example.com/blog`
+- `example.fr/blog`
+- `example.nl/blog`
+- `example.nl/nl-BE/blog`
+
+## Detección Automática de Locale
+
+Cuando un usuario visita la raíz de la aplicación (generalmente `/`), Next.js intentará detectar automáticamente qué locale prefiere el usuario basándose en el encabezado [`Accept-Language`](https://developer.mozilla.org/docs/Web/HTTP/Headers/Accept-Language) y el dominio actual.
+
+Si se detecta un locale diferente al predeterminado, el usuario será redirigido a:
+
+- **Con Enrutamiento por Sub-ruta:** La ruta con prefijo de locale
+- **Con Enrutamiento por Dominio:** El dominio con ese locale especificado como predeterminado
+
+Con Enrutamiento por Dominio, si un usuario con el encabezado `Accept-Language` `fr;q=0.9` visita `example.com`, será redirigido a `example.fr` ya que ese dominio maneja el locale `fr` por defecto.
+
+Con Enrutamiento por Sub-ruta, el usuario sería redirigido a `/fr`.
+
+### Prefijar el Locale Predeterminado
+
+Con Next.js 12 y [Middleware](/docs/pages/building-your-application/routing/middleware), podemos agregar un prefijo al locale predeterminado con una [solución alternativa](https://github.com/vercel/next.js/discussions/18419).
+
+Por ejemplo, aquí hay un archivo `next.config.js` con soporte para algunos idiomas. Nota que el locale `"default"` se ha agregado intencionalmente.
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['default', 'en', 'de', 'fr'],
+    defaultLocale: 'default',
+    localeDetection: false,
+  },
+  trailingSlash: true,
+}
+```
+
+Luego, podemos usar [Middleware](/docs/pages/building-your-application/routing/middleware) para agregar reglas de enrutamiento personalizadas:
+
+```ts filename="middleware.ts"
+import { NextRequest, NextResponse } from 'next/server'
+
+const PUBLIC_FILE = /\.(.*)$/
+
+export async function middleware(req: NextRequest) {
+  if (
+    req.nextUrl.pathname.startsWith('/_next') ||
+    req.nextUrl.pathname.includes('/api/') ||
+    PUBLIC_FILE.test(req.nextUrl.pathname)
+  ) {
+    return
+  }
+
+  if (req.nextUrl.locale === 'default') {
+    const locale = req.cookies.get('NEXT_LOCALE')?.value || 'en'
+
+    return NextResponse.redirect(
+      new URL(`/${locale}${req.nextUrl.pathname}${req.nextUrl.search}`, req.url)
+    )
+  }
+}
+```
+
+Este [Middleware](/docs/pages/building-your-application/routing/middleware) omite agregar el prefijo predeterminado a [API Routes](/docs/pages/building-your-application/routing/api-routes) y archivos [públicos](/docs/pages/api-reference/file-conventions/public-folder) como fuentes o imágenes. Si se hace una solicitud al locale predeterminado, redirigimos a nuestro prefijo `/en`.
+
+### Desactivar la Detección Automática de Locale
+
+La detección automática de locale se puede desactivar con:
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    localeDetection: false,
+  },
+}
+```
+
+Cuando `localeDetection` está configurado como `false`, Next.js ya no redirigirá automáticamente basándose en el locale preferido del usuario y solo proporcionará información de locale detectada desde el dominio basado en locale o la ruta de locale como se describió anteriormente.
+
+## Accediendo a la información del locale
+
+Puedes acceder a la información del locale a través del enrutador de Next.js. Por ejemplo, usando el hook [`useRouter()`](/docs/pages/api-reference/functions/use-router) están disponibles las siguientes propiedades:
+
+- `locale` contiene el locale actualmente activo.
+- `locales` contiene todos los locales configurados.
+- `defaultLocale` contiene el locale predeterminado configurado.
+
+Al [pre-renderizar](/docs/pages/building-your-application/rendering/static-site-generation) páginas con `getStaticProps` o `getServerSideProps`, la información del locale se proporciona en [el contexto](/docs/pages/building-your-application/data-fetching/get-static-props) proporcionado a la función.
+
+Al aprovechar `getStaticPaths`, los locales configurados se proporcionan en el parámetro de contexto de la función bajo `locales` y el `defaultLocale` configurado bajo `defaultLocale`.
+
+## Transición entre locales
+
+Puedes usar `next/link` o `next/router` para transicionar entre locales.
+
+Para `next/link`, se puede proporcionar una propiedad `locale` para transicionar a un locale diferente del actualmente activo. Si no se proporciona ninguna propiedad `locale`, se usará el `locale` actualmente activo durante las transiciones del cliente. Por ejemplo:
+
+```jsx
+import Link from 'next/link'
+
+export default function IndexPage(props) {
+  return (
+    <Link href="/another" locale="fr">
+      To /fr/another
+    </Link>
+  )
+}
+```
+
+Cuando usas los métodos de `next/router` directamente, puedes especificar el `locale` que debe usarse a través de las opciones de transición. Por ejemplo:
+
+```jsx
+import { useRouter } from 'next/router'
+
+export default function IndexPage(props) {
+  const router = useRouter()
+
+  return (
+    <div
+      onClick={() => {
+        router.push('/another', '/another', { locale: 'fr' })
+      }}
+    >
+      to /fr/another
+    </div>
+  )
+}
+```
+
+Nota que para manejar el cambio solo del `locale` manteniendo toda la información de enrutamiento como valores de consulta de [rutas dinámicas](/docs/pages/building-your-application/routing/dynamic-routes) o valores de consulta href ocultos, puedes proporcionar el parámetro `href` como un objeto:
+
+```jsx
+import { useRouter } from 'next/router'
+const router = useRouter()
+const { pathname, asPath, query } = router
+// cambia solo el locale y mantén toda la información de ruta incluyendo la consulta del href
+router.push({ pathname, query }, asPath, { locale: nextLocale })
+```
+
+Consulta [aquí](/docs/pages/api-reference/functions/use-router#with-url-object) para más información sobre la estructura del objeto para `router.push`.
+
+Si tienes un `href` que ya incluye el locale, puedes optar por no manejar automáticamente el prefijo de locale:
+
+```jsx
+import Link from 'next/link'
+
+export default function IndexPage(props) {
+  return (
+    <Link href="/fr/another" locale={false}>
+      To /fr/another
+    </Link>
+  )
+}
+```
+
+## Aprovechando la cookie `NEXT_LOCALE`
+
+Next.js permite configurar una cookie `NEXT_LOCALE=el-locale`, que tiene prioridad sobre el encabezado accept-language. Esta cookie se puede configurar usando un selector de idioma y luego, cuando un usuario regresa al sitio, aprovechará el locale especificado en la cookie al redirigir desde `/` a la ubicación correcta del locale.
+
+Por ejemplo, si un usuario prefiere el locale `fr` en su encabezado accept-language pero se ha configurado una cookie `NEXT_LOCALE=en`, al visitar `/` el usuario será redirigido a la ubicación del locale `en` hasta que la cookie se elimine o expire.
+
+## Optimización para Motores de Búsqueda
+
+Como Next.js sabe qué idioma está visitando el usuario, agregará automáticamente el atributo `lang` a la etiqueta `<html>`.
+
+Next.js no sabe sobre las variantes de una página, por lo que depende de ti agregar las etiquetas meta `hreflang` usando [`next/head`](/docs/pages/api-reference/components/head). Puedes aprender más sobre `hreflang` en la [documentación de Google Webmasters](https://support.google.com/webmasters/answer/189077).
+
+## ¿Cómo funciona esto con Generación Estática?
+
+> Nota que el Enrutamiento Internacionalizado no se integra con [`output: 'export'`](/docs/pages/guides/static-exports) ya que no aprovecha la capa de enrutamiento de Next.js. Las aplicaciones híbridas de Next.js que no usan `output: 'export'` son totalmente compatibles.
+
+### Rutas Dinámicas y Páginas `getStaticProps`
+
+Para páginas que usan `getStaticProps` con [Rutas Dinámicas](/docs/pages/building-your-application/routing/dynamic-routes), todas las variantes de locale de la página que se desean prerrenderizar deben devolverse desde [`getStaticPaths`](/docs/pages/building-your-application/data-fetching/get-static-paths). Junto con el objeto `params` devuelto para `paths`, también puedes devolver un campo `locale` especificando qué locale deseas renderizar. Por ejemplo:
+
+```jsx filename="pages/blog/[slug].js"
+export const getStaticPaths = ({ locales }) => {
+  return {
+    paths: [
+      // si no se proporciona `locale`, solo se generará el defaultLocale
+      { params: { slug: 'post-1' }, locale: 'en-US' },
+      { params: { slug: 'post-1' }, locale: 'fr' },
+    ],
+    fallback: true,
+  }
+}
+```
+
+Para páginas [Optimizadas Estáticamente de Forma Automática](/docs/pages/building-your-application/rendering/automatic-static-optimization) y páginas no dinámicas con `getStaticProps`, **se generará una versión de la página para cada locale**. Esto es importante considerarlo porque puede aumentar los tiempos de construcción dependiendo de cuántos locales estén configurados dentro de `getStaticProps`.
+
+Por ejemplo, si tienes 50 locales configurados con 10 páginas no dinámicas que usan `getStaticProps`, esto significa que `getStaticProps` se llamará 500 veces. Se generarán 50 versiones de las 10 páginas durante cada construcción.
+
+Para disminuir el tiempo de construcción de páginas dinámicas con `getStaticProps`, usa un [modo `fallback`](/docs/pages/api-reference/functions/get-static-paths#fallback-true). Esto te permite devolver solo las rutas y locales más populares desde `getStaticPaths` para prerrenderizar durante la construcción. Luego, Next.js construirá las páginas restantes en tiempo de ejecución a medida que se soliciten.
+
+### Páginas Optimizadas Estáticamente de Forma Automática
+
+Para páginas que están [optimizadas estáticamente de forma automática](/docs/pages/building-your-application/rendering/automatic-static-optimization), se generará una versión de la página para cada locale.
+
+### Páginas No Dinámicas con `getStaticProps`
+
+Para páginas no dinámicas con `getStaticProps`, se genera una versión para cada locale como se mencionó anteriormente. `getStaticProps` se llama con cada `locale` que se está renderizando. Si deseas excluir un cierto locale de ser prerrenderizado, puedes devolver `notFound: true` desde `getStaticProps` y esa variante de la página no se generará.
+
+```js
+export async function getStaticProps({ locale }) {
+  // Llama a un endpoint de API externa para obtener posts.
+  // Puedes usar cualquier biblioteca de obtención de datos
+  const res = await fetch(`https://.../posts?locale=${locale}`)
+  const posts = await res.json()
+
+  if (posts.length === 0) {
+    return {
+      notFound: true,
+    }
+  }
+
+  // Al devolver { props: posts }, el componente Blog
+  // recibirá `posts` como prop en tiempo de construcción
+  return {
+    props: {
+      posts,
+    },
+  }
+}
+```
+
+## Límites para la configuración i18n
+
+- `locales`: 100 locales en total
+- `domains`: 100 elementos de dominio de locale en total
+
+> **Nota importante**: Estos límites se agregaron inicialmente para evitar posibles [problemas de rendimiento en tiempo de construcción](#rutas-dinámicas-y-páginas-getstaticprops). Puedes solucionar estos límites con enrutamiento personalizado usando [Middleware](/docs/pages/building-your-application/routing/middleware) en Next.js 12.

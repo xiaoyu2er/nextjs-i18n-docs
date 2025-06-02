@@ -1,0 +1,614 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:03:34.818Z
+title: Cómo implementar Regeneración Estática Incremental (ISR)
+nav_title: ISR
+description: Aprende a crear o actualizar páginas estáticas en tiempo de ejecución con Regeneración Estática Incremental.
+---
+
+<details>
+  <summary>Ejemplos</summary>
+
+- [Next.js Commerce](https://vercel.com/templates/next.js/nextjs-commerce)
+- [ISR bajo demanda](https://on-demand-isr.vercel.app)
+- [Formularios en Next.js](https://github.com/vercel/next.js/tree/canary/examples/next-forms)
+
+</details>
+
+La Regeneración Estática Incremental (ISR) permite:
+
+- Actualizar contenido estático sin reconstruir todo el sitio
+- Reducir la carga del servidor sirviendo páginas estáticas prerrenderizadas para la mayoría de solicitudes
+- Asegurar que los encabezados `cache-control` adecuados se añadan automáticamente a las páginas
+- Manejar grandes cantidades de páginas de contenido sin tiempos largos de `next build`
+
+Aquí un ejemplo mínimo:
+
+<AppOnly>
+
+```tsx filename="app/blog/[id]/page.tsx" switcher
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+// Next.js invalidará la caché cuando llegue una
+// solicitud, como máximo una vez cada 60 segundos.
+export const revalidate = 60
+
+// Prerrenderizaremos solo los parámetros de `generateStaticParams` en tiempo de compilación.
+// Si llega una solicitud para una ruta no generada,
+// Next.js renderizará la página en el servidor bajo demanda.
+export const dynamicParams = true // o false, para mostrar 404 en rutas desconocidas
+
+export async function generateStaticParams() {
+  const posts: Post[] = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+  return posts.map((post) => ({
+    id: String(post.id),
+  }))
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const post: Post = await fetch(`https://api.vercel.app/blog/${id}`).then(
+    (res) => res.json()
+  )
+  return (
+    <main>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/blog/[id]/page.js" switcher
+// Next.js invalidará la caché cuando llegue una
+// solicitud, como máximo una vez cada 60 segundos.
+export const revalidate = 60
+
+// Prerrenderizaremos solo los parámetros de `generateStaticParams` en tiempo de compilación.
+// Si llega una solicitud para una ruta no generada,
+// Next.js renderizará la página en el servidor bajo demanda.
+export const dynamicParams = true // o false, para mostrar 404 en rutas desconocidas
+
+export async function generateStaticParams() {
+  const posts = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+  return posts.map((post) => ({
+    id: String(post.id),
+  }))
+}
+
+export default async function Page({ params }) {
+  const { id } = await params
+  const post = await fetch(`https://api.vercel.app/blog/${id}`).then((res) =>
+    res.json()
+  )
+  return (
+    <main>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </main>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+```tsx filename="pages/blog/[id].tsx" switcher
+import type { GetStaticPaths, GetStaticProps } from 'next'
+
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+interface Props {
+  post: Post
+}
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const posts = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+  const paths = posts.map((post: Post) => ({
+    params: { id: String(post.id) },
+  }))
+
+  // Prerrenderizaremos solo estas rutas en tiempo de compilación.
+  // { fallback: 'blocking' } renderizará páginas en el servidor
+  // bajo demanda si la ruta no existe.
+  return { paths, fallback: false }
+}
+
+export const getStaticProps: GetStaticProps<Props> = async ({
+  params,
+}: {
+  params: { id: string }
+}) => {
+  const post = await fetch(`https://api.vercel.app/blog/${params.id}`).then(
+    (res) => res.json()
+  )
+
+  return {
+    props: { post },
+    // Next.js invalidará la caché cuando llegue una
+    // solicitud, como máximo una vez cada 60 segundos.
+    revalidate: 60,
+  }
+}
+
+export default function Page({ post }: Props) {
+  return (
+    <main>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="pages/blog/[id].jsx" switcher
+export async function getStaticPaths() {
+  const posts = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // Prerrenderizaremos solo estas rutas en tiempo de compilación.
+  // { fallback: false } significa que otras rutas mostrarán 404.
+  return { paths, fallback: false }
+}
+
+export async function getStaticProps({ params }) {
+  const post = await fetch(`https://api.vercel.app/blog/${params.id}`).then(
+    (res) => res.json()
+  )
+
+  return {
+    props: { post },
+    // Next.js invalidará la caché cuando llegue una
+    // solicitud, como máximo una vez cada 60 segundos.
+    revalidate: 60,
+  }
+}
+
+export default function Page({ post }) {
+  return (
+    <main>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </main>
+  )
+}
+```
+
+</PagesOnly>
+
+Así funciona este ejemplo:
+
+1. Durante `next build`, se generan todas las entradas de blog conocidas (hay 25 en este ejemplo)
+2. Todas las solicitudes a estas páginas (ej. `/blog/1`) se almacenan en caché y son instantáneas
+3. Después de 60 segundos, la siguiente solicitud mostrará la página en caché (obsoleta)
+4. La caché se invalida y comienza a generarse una nueva versión de la página en segundo plano
+5. Una vez generada con éxito, Next.js mostrará y almacenará en caché la página actualizada
+6. Si se solicita `/blog/26`, Next.js generará y almacenará esta página bajo demanda
+
+## Referencia
+
+<AppOnly>
+
+### Configuración del segmento de ruta
+
+- [`revalidate`](/docs/app/api-reference/file-conventions/route-segment-config#revalidate)
+- [`dynamicParams`](/docs/app/api-reference/file-conventions/route-segment-config#dynamicparams)
+
+### Funciones
+
+- [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)
+- [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)
+
+</AppOnly>
+
+<PagesOnly>
+
+### Funciones
+
+- [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)
+- [`res.revalidate`](/docs/pages/building-your-application/routing/api-routes#response-helpers)
+
+</PagesOnly>
+
+## Ejemplos
+
+<AppOnly>
+
+### Revalidación basada en tiempo
+
+Esto obtiene y muestra una lista de entradas de blog en `/blog`. Después de una hora, la caché para esta página se invalida en la próxima visita. Luego, en segundo plano, se genera una nueva versión con las entradas más recientes.
+
+```tsx filename="app/blog/page.tsx" switcher
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+export const revalidate = 3600 // invalida cada hora
+
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog')
+  const posts: Post[] = await data.json()
+  return (
+    <main>
+      <h1>Entradas del Blog</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+export const revalidate = 3600 // invalida cada hora
+
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog')
+  const posts = await data.json()
+  return (
+    <main>
+      <h1>Entradas del Blog</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+```
+
+Recomendamos establecer un tiempo alto de revalidación. Por ejemplo, 1 hora en lugar de 1 segundo. Si necesita más precisión, considere usar revalidación bajo demanda. Para datos en tiempo real, considere cambiar a [renderizado dinámico](/docs/app/getting-started/partial-prerendering#dynamic-rendering).
+
+### Revalidación bajo demanda con `revalidatePath`
+
+Para un método más preciso de revalidación, invalide páginas bajo demanda con la función `revalidatePath`.
+
+Por ejemplo, esta Acción de Servidor se llamaría después de agregar una nueva entrada. Independientemente de cómo obtenga los datos en su Componente de Servidor, ya sea usando `fetch` o conectando a una base de datos, esto limpiará la caché para toda la ruta y permitirá al Componente de Servidor obtener datos frescos.
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost() {
+  // Invalida la ruta /posts en la caché
+  revalidatePath('/posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost() {
+  // Invalida la ruta /posts en la caché
+  revalidatePath('/posts')
+}
+```
+
+[Ver demo](https://on-demand-isr.vercel.app) y [explorar código fuente](https://github.com/vercel/on-demand-isr).
+
+### Revalidación bajo demanda con `revalidateTag`
+
+Para la mayoría de casos, prefiera revalidar rutas completas. Si necesita control más granular, use `revalidateTag`. Por ejemplo, puede etiquetar llamadas `fetch` individuales:
+
+```tsx filename="app/blog/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog', {
+    next: { tags: ['posts'] },
+  })
+  const posts = await data.json()
+  // ...
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog', {
+    next: { tags: ['posts'] },
+  })
+  const posts = await data.json()
+  // ...
+}
+```
+
+Si usa un ORM o conecta a una base de datos, puede usar `unstable_cache`:
+
+```tsx filename="app/blog/page.tsx" switcher
+import { unstable_cache } from 'next/cache'
+import { db, posts } from '@/lib/db'
+
+const getCachedPosts = unstable_cache(
+  async () => {
+    return await db.select().from(posts)
+  },
+  ['posts'],
+  { revalidate: 3600, tags: ['posts'] }
+)
+
+export default async function Page() {
+  const posts = getCachedPosts()
+  // ...
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+import { unstable_cache } from 'next/cache'
+import { db, posts } from '@/lib/db'
+
+const getCachedPosts = unstable_cache(
+  async () => {
+    return await db.select().from(posts)
+  },
+  ['posts'],
+  { revalidate: 3600, tags: ['posts'] }
+)
+
+export default async function Page() {
+  const posts = getCachedPosts()
+  // ...
+}
+```
+
+Luego puede usar `revalidateTag` en [Acciones de Servidor](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) o [Manejadores de Ruta](/docs/app/building-your-application/routing/route-handlers):
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function createPost() {
+  // Invalida todos los datos etiquetados con 'posts' en la caché
+  revalidateTag('posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function createPost() {
+  // Invalida todos los datos etiquetados con 'posts' en la caché
+  revalidateTag('posts')
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+### Validación bajo demanda con `res.revalidate()`
+
+Para un método más preciso de revalidación, use `res.revalidate` para generar una nueva página bajo demanda desde un Enrutador API.
+
+Por ejemplo, esta Ruta API puede llamarse en `/api/revalidate?secret=<token>` para revalidar una entrada de blog. Cree un token secreto solo conocido por su app Next.js. Este secreto evitará acceso no autorizado a la Ruta API de revalidación.
+
+```ts filename="pages/api/revalidate.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // Verificar secreto para confirmar solicitud válida
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: 'Token inválido' })
+  }
+
+  try {
+    // Esta debe ser la ruta real no reescrita
+    // ej. para "/posts/[id]" debe ser "/posts/1"
+    await res.revalidate('/posts/1')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // Si hay error, Next.js continuará mostrando
+    // la última página generada exitosamente
+    return res.status(500).send('Error al revalidar')
+  }
+}
+```
+
+```js filename="pages/api/revalidate.js" switcher
+export default async function handler(req, res) {
+  // Verificar secreto para confirmar solicitud válida
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: 'Token inválido' })
+  }
+
+  try {
+    // Esta debe ser la ruta real no reescrita
+    // ej. para "/posts/[id]" debe ser "/posts/1"
+    await res.revalidate('/posts/1')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // Si hay error, Next.js continuará mostrando
+    // la última página generada exitosamente
+    return res.status(500).send('Error al revalidar')
+  }
+}
+```
+
+Si usa revalidación bajo demanda, no necesita especificar un tiempo `revalidate` en `getStaticProps`. Next.js usará el valor por defecto `false` (sin revalidación) y solo revalidará la página bajo demanda cuando se llame a `res.revalidate()`.
+
+</PagesOnly>
+
+### Manejo de excepciones no capturadas
+
+<AppOnly>
+
+Si ocurre un error al intentar revalidar datos, se seguirán sirviendo los últimos datos generados exitosamente desde la caché. En la siguiente solicitud, Next.js reintentará revalidar. [Más sobre manejo de errores](/docs/app/getting-started/error-handling).
+
+</AppOnly>
+
+<PagesOnly>
+
+Si hay un error dentro de `getStaticProps` durante regeneración en segundo plano, o lanza un error manualmente, se seguirá mostrando la última página generada exitosamente. En la siguiente solicitud, Next.js reintentará llamar a `getStaticProps`.
+
+```tsx filename="pages/blog/[id].tsx" switcher
+import type { GetStaticProps } from 'next'
+
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+interface Props {
+  post: Post
+}
+
+export const getStaticProps: GetStaticProps<Props> = async ({
+  params,
+}: {
+  params: { id: string }
+}) => {
+  // Si esta solicitud lanza un error no capturado, Next.js no
+  // invalidará la página actualmente mostrada y
+  // reintentará getStaticProps en la próxima solicitud.
+  const res = await fetch(`https://api.vercel.app/blog/${params.id}`)
+  const post: Post = await res.json()
+
+  if (!res.ok) {
+    // Si hay error del servidor, puede lanzar un error
+    // en lugar de retornar para que la caché no se actualice
+    // hasta la próxima solicitud exitosa.
+    throw new Error(`Error al obtener entradas, estado recibido ${res.status}`)
+  }
+
+  return {
+    props: { post },
+    // Next.js invalidará la caché cuando llegue una
+    // solicitud, como máximo una vez cada 60 segundos.
+    revalidate: 60,
+  }
+}
+```
+
+```jsx filename="pages/blog/[id].jsx" switcher
+export async function getStaticProps({ params }) {
+  // Si esta solicitud lanza un error no capturado, Next.js no
+  // invalidará la página actualmente mostrada y
+  // reintentará getStaticProps en la próxima solicitud.
+  const res = await fetch(`https://api.vercel.app/blog/${params.id}`)
+  const post = await res.json()
+
+  if (!res.ok) {
+    // Si hay error del servidor, puede lanzar un error
+    // en lugar de retornar para que la caché no se actualice
+    // hasta la próxima solicitud exitosa.
+    throw new Error(`Error al obtener entradas, estado recibido ${res.status}`)
+  }
+
+  return {
+    props: { post },
+    // Next.js invalidará la caché cuando llegue una
+    // solicitud, como máximo una vez cada 60 segundos.
+    revalidate: 60,
+  }
+}
+```
+
+</PagesOnly>
+
+### Personalizando la ubicación de la caché
+
+Puede configurar la ubicación de la caché de Next.js si desea persistir páginas y datos en almacenamiento duradero, o compartir la caché entre múltiples contenedores o instancias de su aplicación. [Más información](/docs/app/guides/self-hosting#caching-and-isr).
+
+## Solución de problemas
+
+### Depuración de datos en caché en desarrollo local
+
+Si usa la API `fetch`, puede añadir registro adicional para entender qué solicitudes están en caché o no. [Más sobre la opción `logging`](/docs/app/api-reference/config/next-config-js/logging).
+
+```jsx filename="next.config.js"
+module.exports = {
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
+}
+```
+
+### Verificar el comportamiento correcto en producción
+
+Para verificar que sus páginas se almacenan en caché y se revalidan correctamente en producción, puede probar localmente ejecutando `next build` y luego `next start` para ejecutar el servidor de producción de Next.js.
+
+Esto le permitirá probar el comportamiento de ISR (Regeneración Incremental Estática) como funcionaría en un entorno de producción. Para depuración adicional, agregue la siguiente variable de entorno a su archivo `.env`:
+
+```bash filename=".env"
+NEXT_PRIVATE_DEBUG_CACHE=1
+```
+
+Esto hará que el servidor de Next.js registre en la consola los aciertos y fallos de la caché ISR. Puede inspeccionar la salida para ver qué páginas se generan durante `next build`, así como cómo se actualizan las páginas cuando se accede a las rutas bajo demanda.
+
+## Consideraciones
+
+<AppOnly>
+
+- ISR solo es compatible cuando se utiliza el entorno de ejecución Node.js (predeterminado).
+- ISR no es compatible al crear una [Exportación Estática](/docs/app/guides/static-exports).
+- Si tiene múltiples solicitudes `fetch` en una ruta renderizada estáticamente, y cada una tiene una frecuencia de `revalidate` diferente, se utilizará el tiempo más bajo para ISR. Sin embargo, esas frecuencias de revalidación seguirán siendo respetadas por la [Caché de Datos](/docs/app/deep-dive/caching#data-cache).
+- Si alguna de las solicitudes `fetch` utilizadas en una ruta tiene un tiempo de `revalidate` de `0`, o un `no-store` explícito, la ruta se [renderizará dinámicamente](/docs/app/getting-started/partial-prerendering#dynamic-rendering).
+- El Middleware no se ejecutará para solicitudes ISR bajo demanda, lo que significa que cualquier reescritura de ruta o lógica en el Middleware no se aplicará. Asegúrese de revalidar la ruta exacta. Por ejemplo, `/post/1` en lugar de una reescritura `/post-1`.
+
+</AppOnly>
+
+<PagesOnly>
+
+- ISR solo es compatible cuando se utiliza el entorno de ejecución Node.js (predeterminado).
+- ISR no es compatible al crear una [Exportación Estática](/docs/app/guides/static-exports).
+- El Middleware no se ejecutará para solicitudes ISR bajo demanda, lo que significa que cualquier reescritura de ruta o lógica en el Middleware no se aplicará. Asegúrese de revalidar la ruta exacta. Por ejemplo, `/post/1` en lugar de una reescritura `/post-1`.
+
+</PagesOnly>
+
+## Compatibilidad con plataformas
+
+| Opción de despliegue                                                | Compatible         |
+| ------------------------------------------------------------------- | ------------------ |
+| [Servidor Node.js](/docs/app/getting-started/deploying#nodejs-server) | Sí                |
+| [Contenedor Docker](/docs/app/getting-started/deploying#docker)      | Sí                |
+| [Exportación estática](/docs/app/getting-started/deploying#static-export) | No                |
+| [Adaptadores](/docs/app/getting-started/deploying#adapters)         | Depende de la plataforma |
+
+Aprenda cómo [configurar ISR](/docs/app/guides/self-hosting#caching-and-isr) al alojar Next.js usted mismo.
+
+## Historial de versiones
+
+| Versión   | Cambios                                                                             |
+| --------- | ----------------------------------------------------------------------------------- |
+| `v14.1.0` | El `cacheHandler` personalizado es estable.                                         |
+| `v13.0.0` | Se introduce el App Router.                                                         |
+| `v12.2.0` | Pages Router: ISR bajo demanda es estable                                           |
+| `v12.0.0` | Pages Router: Se añade [ISR con detección de bots](/blog/next-12#bot-aware-isr-fallback). |
+| `v9.5.0`  | Pages Router: [Se introduce ISR estable](/blog/next-9-5).                           |

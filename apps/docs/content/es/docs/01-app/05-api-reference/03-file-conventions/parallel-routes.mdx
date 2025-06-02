@@ -1,0 +1,482 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:11:06.564Z
+title: Rutas Paralelas
+description: Renderiza simultáneamente una o más páginas en la misma vista que pueden navegarse de forma independiente. Un patrón para aplicaciones altamente dinámicas.
+related:
+  links:
+    - app/api-reference/file-conventions/default
+---
+
+Las Rutas Paralelas te permiten renderizar simultáneamente o condicionalmente una o más páginas dentro del mismo diseño. Son útiles para secciones altamente dinámicas de una aplicación, como paneles de control y feeds en sitios sociales.
+
+Por ejemplo, considerando un panel de control, puedes usar rutas paralelas para renderizar simultáneamente las páginas `team` y `analytics`:
+
+<Image
+  alt="Diagrama de Rutas Paralelas"
+  srcLight="/docs/light/parallel-routes.png"
+  srcDark="/docs/dark/parallel-routes.png"
+  width="1600"
+  height="942"
+/>
+
+## Convención
+
+### Slots (Ranuras)
+
+Las rutas paralelas se crean usando **slots** (ranuras) con nombre. Los slots se definen con la convención `@folder`. Por ejemplo, la siguiente estructura de archivos define dos slots: `@analytics` y `@team`:
+
+<Image
+  alt="Estructura de archivos de Rutas Paralelas"
+  srcLight="/docs/light/parallel-routes-file-system.png"
+  srcDark="/docs/dark/parallel-routes-file-system.png"
+  width="1600"
+  height="687"
+/>
+
+Los slots se pasan como props al diseño padre compartido. Para el ejemplo anterior, el componente en `app/layout.js` ahora acepta los props de slots `@analytics` y `@team`, y puede renderizarlos en paralelo junto con el prop `children`:
+
+```tsx filename="app/layout.tsx" switcher
+export default function Layout({
+  children,
+  team,
+  analytics,
+}: {
+  children: React.ReactNode
+  analytics: React.ReactNode
+  team: React.ReactNode
+}) {
+  return (
+    <>
+      {children}
+      {team}
+      {analytics}
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function Layout({ children, team, analytics }) {
+  return (
+    <>
+      {children}
+      {team}
+      {analytics}
+    </>
+  )
+}
+```
+
+Sin embargo, los slots **no** son segmentos de ruta y no afectan la estructura de la URL. Por ejemplo, para `/@analytics/views`, la URL será `/views` ya que `@analytics` es un slot. Los slots se combinan con el componente [Page](/docs/app/api-reference/file-conventions/page) regular para formar la página final asociada con el segmento de ruta. Debido a esto, no puedes tener slots [estáticos](/docs/app/getting-started/partial-prerendering#static-rendering) y [dinámicos](/docs/app/getting-started/partial-prerendering#dynamic-rendering) separados en el mismo nivel de segmento de ruta. Si un slot es dinámico, todos los slots en ese nivel deben ser dinámicos.
+
+> **Nota importante**:
+>
+> - El prop `children` es un slot implícito que no necesita mapearse a una carpeta. Esto significa que `app/page.js` es equivalente a `app/@children/page.js`.
+
+### `default.js`
+
+Puedes definir un archivo `default.js` para renderizar como respaldo para slots no coincidentes durante la carga inicial o recarga completa de página.
+
+Considera la siguiente estructura de carpetas. El slot `@team` tiene una página `/settings`, pero `@analytics` no.
+
+<Image
+  alt="Rutas no coincidentes en Rutas Paralelas"
+  srcLight="/docs/light/parallel-routes-unmatched-routes.png"
+  srcDark="/docs/dark/parallel-routes-unmatched-routes.png"
+  width="1600"
+  height="930"
+/>
+
+Al navegar a `/settings`, el slot `@team` renderizará la página `/settings` mientras mantiene la página activa actual para el slot `@analytics`.
+
+Al refrescar, Next.js renderizará un `default.js` para `@analytics`. Si `default.js` no existe, se renderizará un `404` en su lugar.
+
+Además, dado que `children` es un slot implícito, también necesitas crear un archivo `default.js` para renderizar un respaldo para `children` cuando Next.js no pueda recuperar el estado activo de la página padre.
+
+## Comportamiento
+
+Por defecto, Next.js mantiene un seguimiento del _estado_ activo (o subpágina) para cada slot. Sin embargo, el contenido renderizado dentro de un slot dependerá del tipo de navegación:
+
+- [**Navegación Suave**](/docs/app/building-your-application/routing/linking-and-navigating#5-soft-navigation): Durante la navegación del lado del cliente, Next.js realizará un [renderizado parcial](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering), cambiando la subpágina dentro del slot, mientras mantiene las subpáginas activas de los otros slots, incluso si no coinciden con la URL actual.
+- **Navegación Dura**: Después de una carga completa de página (refresco del navegador), Next.js no puede determinar el estado activo para los slots que no coinciden con la URL actual. En su lugar, renderizará un archivo [`default.js`](#defaultjs) para los slots no coincidentes, o `404` si `default.js` no existe.
+
+> **Nota importante**:
+>
+> - El `404` para rutas no coincidentes ayuda a garantizar que no renderices accidentalmente una ruta paralela en una página para la que no estaba destinada.
+
+## Ejemplos
+
+### Con `useSelectedLayoutSegment(s)`
+
+Tanto [`useSelectedLayoutSegment`](/docs/app/api-reference/functions/use-selected-layout-segment) como [`useSelectedLayoutSegments`](/docs/app/api-reference/functions/use-selected-layout-segments) aceptan un parámetro `parallelRoutesKey`, que te permite leer el segmento de ruta activo dentro de un slot.
+
+```tsx filename="app/layout.tsx" switcher
+'use client'
+
+import { useSelectedLayoutSegment } from 'next/navigation'
+
+export default function Layout({ auth }: { auth: React.ReactNode }) {
+  const loginSegment = useSelectedLayoutSegment('auth')
+  // ...
+}
+```
+
+```jsx filename="app/layout.js" switcher
+'use client'
+
+import { useSelectedLayoutSegment } from 'next/navigation'
+
+export default function Layout({ auth }) {
+  const loginSegment = useSelectedLayoutSegment('auth')
+  // ...
+}
+```
+
+Cuando un usuario navega a `app/@auth/login` (o `/login` en la barra de URL), `loginSegment` será igual a la cadena `"login"`.
+
+### Rutas Condicionales
+
+Puedes usar Rutas Paralelas para renderizar condicionalmente rutas basadas en ciertas condiciones, como el rol del usuario. Por ejemplo, para renderizar una página de panel de control diferente para los roles `/admin` o `/user`:
+
+<Image
+  alt="Diagrama de rutas condicionales"
+  srcLight="/docs/light/conditional-routes-ui.png"
+  srcDark="/docs/dark/conditional-routes-ui.png"
+  width="1600"
+  height="898"
+/>
+
+```tsx filename="app/dashboard/layout.tsx" switcher
+import { checkUserRole } from '@/lib/auth'
+
+export default function Layout({
+  user,
+  admin,
+}: {
+  user: React.ReactNode
+  admin: React.ReactNode
+}) {
+  const role = checkUserRole()
+  return role === 'admin' ? admin : user
+}
+```
+
+```jsx filename="app/dashboard/layout.js" switcher
+import { checkUserRole } from '@/lib/auth'
+
+export default function Layout({ user, admin }) {
+  const role = checkUserRole()
+  return role === 'admin' ? admin : user
+}
+```
+
+### Grupos de Pestañas
+
+Puedes agregar un `layout` dentro de un slot para permitir que los usuarios naveguen el slot de forma independiente. Esto es útil para crear pestañas.
+
+Por ejemplo, el slot `@analytics` tiene dos subpáginas: `/page-views` y `/visitors`.
+
+<Image
+  alt="Slot analytics con dos subpáginas y un layout"
+  srcLight="/docs/light/parallel-routes-tab-groups.png"
+  srcDark="/docs/dark/parallel-routes-tab-groups.png"
+  width="1600"
+  height="768"
+/>
+
+Dentro de `@analytics`, crea un archivo [`layout`](/docs/app/api-reference/file-conventions/layout) para compartir las pestañas entre las dos páginas:
+
+```tsx filename="app/@analytics/layout.tsx" switcher
+import Link from 'next/link'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <nav>
+        <Link href="/page-views">Page Views</Link>
+        <Link href="/visitors">Visitors</Link>
+      </nav>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```jsx filename="app/@analytics/layout.js" switcher
+import Link from 'next/link'
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <nav>
+        <Link href="/page-views">Page Views</Link>
+        <Link href="/visitors">Visitors</Link>
+      </nav>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+### Modales
+
+Las Rutas Paralelas pueden usarse junto con [Rutas de Interceptación](/docs/app/api-reference/file-conventions/intercepting-routes) para crear modales que admitan enlaces profundos. Esto te permite resolver desafíos comunes al construir modales, como:
+
+- Hacer que el contenido del modal sea **compartible a través de una URL**.
+- **Preservar el contexto** cuando se refresca la página, en lugar de cerrar el modal.
+- **Cerrar el modal en la navegación hacia atrás** en lugar de ir a la ruta anterior.
+- **Reabrir el modal en la navegación hacia adelante**.
+
+Considera el siguiente patrón de UI, donde un usuario puede abrir un modal de login desde un diseño usando navegación del lado del cliente, o acceder a una página separada `/login`:
+
+<Image
+  alt="Diagrama de Rutas Paralelas"
+  srcLight="/docs/light/parallel-routes-auth-modal.png"
+  srcDark="/docs/dark/parallel-routes-auth-modal.png"
+  width="1600"
+  height="687"
+/>
+
+Para implementar este patrón, comienza creando una ruta `/login` que renderice tu página **principal** de login.
+
+<Image
+  alt="Diagrama de Rutas Paralelas"
+  srcLight="/docs/light/parallel-routes-modal-login-page.png"
+  srcDark="/docs/dark/parallel-routes-modal-login-page.png"
+  width="1600"
+  height="768"
+/>
+
+```tsx filename="app/login/page.tsx" switcher
+import { Login } from '@/app/ui/login'
+
+export default function Page() {
+  return <Login />
+}
+```
+
+```jsx filename="app/login/page.js" switcher
+import { Login } from '@/app/ui/login'
+
+export default function Page() {
+  return <Login />
+}
+```
+
+Luego, dentro del slot `@auth`, agrega un archivo [`default.js`](/docs/app/api-reference/file-conventions/default) que devuelva `null`. Esto asegura que el modal no se renderice cuando no está activo.
+
+```tsx filename="app/@auth/default.tsx" switcher
+export default function Default() {
+  return null
+}
+```
+
+```jsx filename="app/@auth/default.js" switcher
+export default function Default() {
+  return null
+}
+```
+
+Dentro de tu slot `@auth`, intercepta la ruta `/login` actualizando la carpeta `/(.)login`. Importa el componente `<Modal>` y sus hijos al archivo `/(.)login/page.tsx`:
+
+```tsx filename="app/@auth/(.)login/page.tsx" switcher
+import { Modal } from '@/app/ui/modal'
+import { Login } from '@/app/ui/login'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Login />
+    </Modal>
+  )
+}
+```
+
+```jsx filename="app/@auth/(.)login/page.js" switcher
+import { Modal } from '@/app/ui/modal'
+import { Login } from '@/app/ui/login'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Login />
+    </Modal>
+  )
+}
+```
+
+> **Nota importante:**
+>
+> - La convención usada para interceptar la ruta, ej. `(.)`, depende de tu estructura de archivos. Ver [Convención de Rutas de Interceptación](/docs/app/api-reference/file-conventions/intercepting-routes#convention).
+> - Al separar la funcionalidad del `<Modal>` del contenido del modal (`<Login>`), puedes asegurar que cualquier contenido dentro del modal, ej. [formularios](/docs/app/guides/forms), sean Componentes del Servidor. Ver [Intercalado de Componentes del Cliente y Servidor](/docs/app/getting-started/server-and-client-components#examples#supported-pattern-passing-server-components-to-client-components-as-props) para más información.
+
+#### Abriendo el modal
+
+Ahora, puedes aprovechar el enrutador de Next.js para abrir y cerrar el modal. Esto asegura que la URL se actualice correctamente cuando el modal está abierto, y al navegar hacia atrás y adelante.
+
+Para abrir el modal, pasa el slot `@auth` como prop al diseño padre y renderízalo junto con el prop `children`.
+
+```tsx filename="app/layout.tsx" switcher
+import Link from 'next/link'
+
+export default function Layout({
+  auth,
+  children,
+}: {
+  auth: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <>
+      <nav>
+        <Link href="/login">Abrir modal</Link>
+      </nav>
+      <div>{auth}</div>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import Link from 'next/link'
+
+export default function Layout({ auth, children }) {
+  return (
+    <>
+      <nav>
+        <Link href="/login">Abrir modal</Link>
+      </nav>
+      <div>{auth}</div>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+Cuando el usuario haga clic en el `<Link>`, el modal se abrirá en lugar de navegar a la página `/login`. Sin embargo, al refrescar o cargar inicialmente, navegar a `/login` llevará al usuario a la página principal de login.
+
+#### Cerrando el modal
+
+Puedes cerrar el modal llamando a `router.back()` o usando el componente `Link`.
+
+```tsx filename="app/ui/modal.tsx" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export function Modal({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          router.back()
+        }}
+      >
+        Cerrar modal
+      </button>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```jsx filename="app/ui/modal.js" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export function Modal({ children }) {
+  const router = useRouter()
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          router.back()
+        }}
+      >
+        Cerrar modal
+      </button>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+Cuando uses el componente `Link` para navegar fuera de una página que no debería renderizar el slot `@auth` más, necesitamos asegurarnos de que la ruta paralela coincida con un componente que devuelva `null`. Por ejemplo, al navegar de vuelta a la página raíz, creamos un componente `@auth/page.tsx`:
+
+```tsx filename="app/ui/modal.tsx" switcher
+import Link from 'next/link'
+
+export function Modal({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <Link href="/">Cerrar modal</Link>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```jsx filename="app/ui/modal.js" switcher
+import Link from 'next/link'
+
+export function Modal({ children }) {
+  return (
+    <>
+      <Link href="/">Cerrar modal</Link>
+      <div>{children}</div>
+    </>
+  )
+}
+```
+
+```tsx filename="app/@auth/page.tsx" switcher
+export default function Page() {
+  return null
+}
+```
+
+```jsx filename="app/@auth/page.js" switcher
+export default function Page() {
+  return null
+}
+```
+
+O si navegas a cualquier otra página (como `/foo`, `/foo/bar`, etc), puedes usar un slot catch-all:
+
+```tsx filename="app/@auth/[...catchAll]/page.tsx" switcher
+export default function CatchAll() {
+  return null
+}
+```
+
+```jsx filename="app/@auth/[...catchAll]/page.js" switcher
+export default function CatchAll() {
+  return null
+}
+```
+
+> **Nota importante:**
+>
+> - Usamos una ruta catch-all en nuestro slot `@auth` para cerrar el modal debido a cómo se comportan las rutas paralelas(#behavior). Dado que las navegaciones del lado del cliente a una ruta que ya no coincide con el slot permanecerán visibles, necesitamos hacer coincidir el slot con una ruta que devuelva `null` para cerrar el modal.
+> - Otros ejemplos podrían incluir abrir un modal de foto en una galería mientras también tienes una página dedicada `/photo/[id]`, o abrir un carrito de compras en un modal lateral.
+> - [Ver un ejemplo](https://github.com/vercel-labs/nextgram) de modales con Rutas Interceptadas y Paralelas.
+
+### UI de Carga y Error
+
+Las Rutas Paralelas pueden transmitirse de forma independiente, permitiéndote definir estados de error y carga independientes para cada ruta:
+
+<Image
+  alt="Las rutas paralelas permiten estados personalizados de error y carga"
+  srcLight="/docs/light/parallel-routes-cinematic-universe.png"
+  srcDark="/docs/dark/parallel-routes-cinematic-universe.png"
+  width="1600"
+  height="1218"
+/>
+
+Consulta la documentación de [UI de Carga](/docs/app/building-your-application/routing/loading-ui-and-streaming) y [Manejo de Errores](/docs/app/getting-started/error-handling) para más información.

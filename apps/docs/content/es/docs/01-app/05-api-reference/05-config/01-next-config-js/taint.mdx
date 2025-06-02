@@ -1,0 +1,228 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:14:04.731Z
+title: Taint (marcado de objetos)
+description: Habilita el marcado de objetos y valores como no seguros.
+version: experimental
+---
+
+## Uso
+
+La opción `taint` habilita el soporte para las APIs experimentales de React que permiten marcar objetos y valores como no seguros. Esta característica ayuda a prevenir que datos sensibles sean accidentalmente pasados al cliente. Cuando está habilitada, puedes usar:
+
+- [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) para marcar referencias de objetos.
+- [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) para marcar valores únicos.
+
+> **Importante**: Activar esta opción también habilita el canal `experimental` de React para el directorio `app`.
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **Advertencia:** No dependas de la API de marcado como único mecanismo para prevenir la exposición de datos sensibles al cliente. Consulta nuestras [recomendaciones de seguridad](/blog/security-nextjs-server-components-actions).
+
+Las APIs de marcado te permiten ser defensivo, marcando de forma declarativa y explícita los datos que no pueden cruzar el límite entre Servidor y Cliente. Cuando un objeto o valor marcado intenta cruzar este límite, React lanza un error.
+
+Esto es útil para casos donde:
+
+- Los métodos para leer datos están fuera de tu control
+- Tienes que trabajar con estructuras de datos sensibles que no definiste
+- Se accede a datos sensibles durante el renderizado de Componentes del Servidor
+
+Se recomienda modelar tus datos y APIs para que la información sensible no se devuelva en contextos donde no sea necesaria.
+
+## Limitaciones
+
+- El marcado solo puede rastrear objetos por referencia. Copiar un objeto crea una versión no marcada, perdiendo todas las garantías de la API. Debes marcar la copia.
+- El marcado no puede rastrear datos derivados de un valor marcado. También necesitas marcar el valor derivado.
+- Los valores permanecen marcados mientras su referencia esté en ámbito. Consulta la [referencia de parámetros de `experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue#parameters) para más información.
+
+## Ejemplos
+
+### Marcando una referencia de objeto
+
+En este caso, la función `getUserDetails` devuelve datos de un usuario. Marcamos la referencia del objeto usuario para que no pueda cruzar el límite Servidor-Cliente. Por ejemplo, asumiendo que `UserCard` es un Componente Cliente.
+
+```ts switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id: string): UserDetails {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'No uses todo el objeto de información del usuario. En su lugar, selecciona solo los campos que necesites.',
+    user
+  )
+
+  return user
+}
+```
+
+```js switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id) {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'No uses todo el objeto de información del usuario. En su lugar, selecciona solo los campos que necesites.',
+    user
+  )
+
+  return user
+}
+```
+
+Aún podemos acceder a campos individuales del objeto `userDetails` marcado.
+
+```tsx filename="app/contact/page.tsx" switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+```jsx filename="app/contact/page.js" switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+Ahora, pasar el objeto completo al Componente Cliente lanzará un error.
+
+```tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const userDetails = await getUserDetails(id)
+
+  // Lanza un error
+  return <UserCard user={userDetails} />
+}
+```
+
+```jsx switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  // Lanza un error
+  return <UserCard user={userDetails} />
+}
+```
+
+### Marcando un valor único
+
+En este caso, podemos acceder a la configuración del servidor mediante llamadas a `config.getConfigDetails`. Sin embargo, la configuración del sistema contiene `SERVICE_API_KEY` que no queremos exponer a los clientes.
+
+Podemos marcar el valor `config.SERVICE_API_KEY`.
+
+```ts switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig(): SystemConfig {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'No pases tokens de configuración al cliente',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+```js switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig() {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'No pases tokens de configuración al cliente',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+Aún podemos acceder a otras propiedades del objeto `systemConfig`.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+
+  return <ClientDashboard version={systemConfig.SERVICE_API_VERSION} />
+}
+```
+
+Sin embargo, pasar `SERVICE_API_KEY` a `ClientDashboard` lanza un error.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // Alguien comete un error en un PR
+  const version = systemConfig.SERVICE_API_KEY
+
+  return <ClientDashboard version={version} />
+}
+```
+
+Nota que, aunque `systemConfig.SERVICE_API_KEY` se reasigne a una nueva variable, pasarla a un Componente Cliente seguirá lanzando un error.
+
+Mientras que un valor derivado de un valor único marcado, será expuesto al cliente.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // Alguien comete un error en un PR
+  const version = `version::${systemConfig.SERVICE_API_KEY}`
+
+  return <ClientDashboard version={version} />
+}
+```
+
+Un enfoque mejor sería eliminar `SERVICE_API_KEY` de los datos devueltos por `getSystemConfig`.
