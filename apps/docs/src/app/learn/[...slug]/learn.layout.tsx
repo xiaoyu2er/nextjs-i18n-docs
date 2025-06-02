@@ -27,7 +27,6 @@ export function DocsLayout({
   const sidebarTree = getLearnSidebarTree(tree, pathname);
   const docsLayout: DocsLayoutProps = {
     ...baseOptions,
-    links: [],
     tree: sidebarTree,
     sidebar: {
       tabs,

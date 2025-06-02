@@ -54,7 +54,6 @@ export function DocsLayout({
 
   const docsLayout: DocsLayoutProps = {
     ...baseOptions,
-    links: [],
     tree,
     sidebar: {
       banner: (

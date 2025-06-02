@@ -20,7 +20,8 @@ export const useBaseOptions = () => {
       {
         icon: <Book />,
         text: t('doc'),
-        url: '/docs/',
+        url: '/docs',
+        active: 'nested-url',
       },
 
       {
@@ -33,7 +34,7 @@ export const useBaseOptions = () => {
       {
         icon: <NotebookIcon />,
         text: t('learn'),
-        url: '/learn/',
+        url: '/learn',
         active: 'nested-url',
       },
     ],
