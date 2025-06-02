@@ -1,0 +1,216 @@
+---
+source-updated-at: 2025-05-30T16:38:07.000Z
+translation-updated-at: 2025-06-02T19:17:25.831Z
+title: Next.js 13.1
+description: >-
+  Next.js 13.1 introduce mejoras en el directorio app, transpilación de módulos integrada, runtime Edge estable para API Routes y muchas mejoras en el soporte de Turbopack.
+author:
+  - name: OJ Kwon
+    image: /static/team/oj.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2022-12-22T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-1/twitter-card.png
+---
+
+Next.js 13.1 incluye mejoras tanto para los directorios `pages/` (estable) como `app/` (beta):
+
+*   [**Mejoras en el directorio `app` (Beta):**](#mejoras-en-fiabilidad-y-soporte-para-el-directorio-app) Mejor fiabilidad y rendimiento.
+*   [**Transpilación de módulos integrada:**](#transpilación-de-módulos-integrada-estable) Incorporando capacidades de `next-transpile-modules` al núcleo.
+*   [**Runtime Edge (Estable):**](#un-runtime-ligero-de-nodejs-para-el-edge-ahora-estable-para-api-routes) Un runtime ligero de Node.js para el Edge.
+*   [**Actualizaciones de Turbopack:**](#mejoras-en-turbopack) Soporte para Tailwind CSS, `next/image`, `@next/font` y más.
+*   [**Mejoras en Middleware:**](#middleware-avanzado-de-nextjs) Devolver respuestas y establecer cabeceras de solicitud.
+*   [**Resolución de imports en SWC:**](#resolución-de-imports-para-haces-más-pequeños) Para haces JavaScript más pequeños al usar archivos barrel.
+*   [Mejoras en el uso de memoria, nuevas plantillas y más!](#otras-mejoras)
+
+Actualiza hoy ejecutando:
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+[Mejoras en fiabilidad y soporte para el directorio `app`](#mejoras-en-fiabilidad-y-soporte-para-el-directorio-app)
+-----------------------------------------------------------------------------------------------------------
+
+En Next.js 13, anunciamos el nuevo directorio `app` (beta). Este nuevo sistema de enrutamiento y obtención de datos puede adoptarse gradualmente junto con su directorio `pages` existente.
+
+El directorio `app` proporciona muchos beneficios, incluyendo diseños mejorados, ubicación conjunta de componentes, pruebas y estilos, obtención de datos a nivel de componente y más. Gracias a sus comentarios y pruebas tempranas, hemos realizado varias mejoras en la fiabilidad del directorio `app`:
+
+*   **Sin Divs de Layout:** Anteriormente, el directorio `app` agregaba elementos `<div>` adicionales para desplazar los diseños a la vista al navegar. Con 13.1, estos elementos extra ya no se crean. El comportamiento de desplazamiento se conserva.
+*   **Plugin de TypeScript:** Hemos construido un nuevo plugin de TypeScript que proporciona sugerencias para opciones de configuración de páginas y diseños, lleva la documentación directamente a su IDE y proporciona pistas útiles sobre Componentes de Servidor y Cliente (como evitar el uso de `useState` en Componentes de Servidor). [Aprende más](https://www.youtube.com/watch?v=pqMqn9fKEf8).
+*   **Mejoras en Fiabilidad:** Hemos corregido numerosos errores, incluyendo mejor soporte para módulos CSS, desduplicación correcta de `cache()` y `fetch()` para diseños y páginas, fugas de memoria y más.
+*   **Menos JavaScript en el Cliente:** El directorio `app` ahora incluye `9.3kB` menos de JavaScript en el cliente que el directorio `pages`. Esta línea base no aumenta si agregas 1 o 1000 Componentes de Servidor a tu aplicación. El runtime de React es temporalmente un poco más grande, el aumento es causado por el runtime de React Server Components, que maneja mecánicas que Next.js manejaba anteriormente. Estamos trabajando para reducir esto aún más.
+
+|  | `pages/` | `app/` | diferencia |
+| --- | --- | --- | --- |
+| Total First Load JS | `Línea base` | `-9.3kB` | `12.1%` más pequeño |
+| Runtime Next.js | `Línea base` | `-12kB` | `56.8%` más pequeño |
+| Runtime React | `Línea base` | `+2.7kB` | `5.2%` más grande |
+
+Estamos emocionados por continuar progresando en la estabilidad del directorio `app`. La [documentación beta](https://beta.nextjs.org/) para el directorio `app` ha tenido cientos de actualizaciones [basadas en sus comentarios](https://vercel.com/blog/using-vercel-comments-to-improve-the-next-js-13-documentation).
+
+[Transpilación de módulos integrada (estable)](#transpilación-de-módulos-integrada-estable)
+-------------------------------------------------------------------------------
+
+Ahora puedes marcar dependencias de paquetes locales (como monorepos) o de dependencias externas (`node_modules`) para ser transpiladas y empaquetadas. Este soporte integrado reemplaza el popular paquete `next-transpile-modules`.
+
+```
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  transpilePackages: ['@acme/ui', 'lodash-es'],
+};
+ 
+module.exports = nextConfig;
+```
+
+Estamos agradecidos con Pierre de la Martinière ([@martpie](https://twitter.com/martpie_)) por su trabajo en este paquete y su ayuda para garantizar que el soporte integrado cumpliera con las necesidades de la comunidad.
+
+[Resolución de imports para haces más pequeños](#resolución-de-imports-para-haces-más-pequeños)
+-------------------------------------------------------------------------------
+
+Muchos paquetes npm populares hacen uso de "archivos barrel" para proporcionar un único archivo que reexporta otros módulos. Por ejemplo:
+
+```ts filename="@acme/ui/index.ts"
+export { default as Button } from './dist/Button';
+export { default as Slider } from './dist/Slider';
+export { default as Dropdown } from './dist/Dropdown';
+```
+
+Esto permite a los consumidores del paquete usar exportaciones nombradas en una sola línea:
+
+```
+import { Button, Slider, Dropdown } from '@acme/ui';
+```
+
+Si bien los empaquetadores entienden estos archivos barrel y pueden eliminar reexportaciones no utilizadas (llamada "eliminación de código muerto"), este proceso implica analizar/compilar todos los archivos reexportados. En el caso de bibliotecas publicadas, algunos paquetes npm incluyen archivos barrel que tienen miles de módulos reexportados, lo que ralentiza los tiempos de compilación. Estas bibliotecas recomendaban `babel-plugin-transform-imports` para evitar este problema, pero para aquellos que usan SWC, no había soporte previo. Hemos agregado una nueva transformación SWC integrada en Next.js llamada `modularizeImports`.
+
+Esta nueva configuración habilita la transformación SWC que cambia sus declaraciones de importación según un patrón definido. Por ejemplo, el código anterior para usar tres componentes se convertiría automáticamente para usar importaciones directas, sin que el desarrollador necesite escribir este código manualmente:
+
+```
+// Antes (con archivo barrel)
+import { Button, Slider, Dropdown } from '@acme/ui';
+ 
+// Después (con importaciones modularizadas del plugin)
+import Button from '@acme/ui/dist/Button';
+import Slider from '@acme/ui/dist/Slider';
+import Dropdown from '@acme/ui/dist/Dropdown';
+```
+
+Esta transformación es posible con la opción `modularizeImports` en `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  modularizeImports: {
+    '@acme/ui': {
+      transform: '@acme/ui/dist/{{member}}',
+    },
+  },
+};
+```
+
+Aprovechar esta transformación con `@mui/icons-material` o `lodash` permite omitir la compilación de archivos no utilizados. [Aprende más](/docs/architecture/nextjs-compiler#modularize-imports).
+
+[Ver un demo](https://twitter.com/nextjs/status/1610288783311732737) para ver esto en acción.
+
+[Un runtime ligero de Node.js para el Edge, ahora estable para API routes](#un-runtime-ligero-de-nodejs-para-el-edge-ahora-estable-para-api-routes)
+---------------------------------------------------------------------------------------------------------------------------------
+
+El Runtime Edge dentro de Next.js usa un subconjunto estricto de APIs de Node.js (como `Request`, `Response` y más) que son compatibles con plataformas de computación Edge como Vercel o cuando se autoalojan. Estas APIs funcionan en todas partes, incluyendo en el navegador, permitiendo a los desarrolladores aprenderlas una vez y escribirlas en todas partes.
+
+```ts filename="pages/api/hello.ts"
+// El prefijo "experimental-" ya no es necesario
+export const config = {
+  runtime: 'edge',
+};
+ 
+export default function handler(req: Request) {
+  return new Response('Hello World');
+}
+```
+
+Next.js Middleware ya usa este runtime ligero edge por defecto para mejor rendimiento. Como Middleware puede ejecutarse antes de cada solicitud en su aplicación, tener un runtime ligero es crítico para garantizar baja latencia. En Next.js 12.2, agregamos la capacidad de usar opcionalmente este runtime para [API Routes](https://nextjs.org/blog/next-12-2#edge-api-routes-experimental) también.
+
+Con 13.1, el Runtime Edge dentro de Next.js es **ahora estable** para API routes. Cuando se autoalojan, Middleware y API Routes que usan el Runtime Edge se ejecutarán como una carga de trabajo de región única por defecto como parte de `next start`. En Vercel, Next.js Middleware y API Routes se [implementan globalmente usando Vercel Edge Functions](https://vercel.com/docs/concepts/next.js/overview) para la menor latencia posible. Vercel Edge Functions también están [ahora generalmente disponibles](https://vercel.com/blog/edge-functions-generally-available).
+
+[Mejoras en Turbopack](#mejoras-en-turbopack)
+-------------------------------------------------
+
+Después de lanzar el [Turbopack](https://nextjs.org/docs/app/api-reference/turbopack) alpha con Next.js 13, nos hemos enfocado en mejorar la fiabilidad, agregar soporte para las características más solicitadas y definir planes para plugins y uso en otros frameworks.
+
+Desde Next.js 13.0.0, Turbopack:
+
+*   Soporta PostCSS, incluyendo Tailwind CSS
+*   Soporta `next/image`
+*   Soporta `@next/font` (Google Fonts)
+*   Soporta carga de CSS desde declaraciones `import()` dinámicas
+*   Soporta source maps de CSS (gracias a `@ahabhgk` por [su contribución](https://github.com/vercel/turbo/pull/2839))
+*   Mejor manejo de errores en el overlay de errores de `next dev`
+*   Mejor uso de memoria
+*   Mejor soporte para módulos CSS
+*   Mejor algoritmo de chunking para actualizaciones HMR
+*   Mejor fiabilidad para source maps HMR
+
+Estamos agradecidos con Evan You y la comunidad de Vite por sus comentarios y contribuciones para garantizar que los benchmarks de Turbopack sean lo más precisos posible. Hemos trabajado junto con el equipo de Vite para validar los últimos benchmarks de Turbopack y hacer numerosas mejoras a nuestra metodología de prueba.
+
+Como resultado de esta colaboración, ahora usamos una métrica más precisa que incluye el tiempo gastado en el mecanismo de actualización de React. Pudimos mejorar el tiempo de React Fast Refresh en 30ms en Turbopack así como en Next.js 13.1 en webpack. También hemos agregado un nuevo benchmark para usar Vite con SWC, que muestra un rendimiento mejorado en comparación con usar Vite predeterminado con Babel. Vea los [benchmarks actualizados](https://nextjs.org/docs/app/api-reference/turbopack) o lea sobre la [metodología de prueba](https://nextjs.org/docs/app/api-reference/turbopack).
+
+Prueba la versión alpha de Turbopack hoy en Next.js 13 con `next dev --turbo`. Si tienes algún comentario, háznoslo saber en la [Discusión de GitHub](https://github.com/vercel/turbo/discussions/2312).
+
+[Middleware avanzado de Next.js](#middleware-avanzado-de-nextjs)
+----------------------------------------------------------
+
+Gracias a sus comentarios, estamos haciendo que Next.js Middleware sea más poderoso que nunca. Con 13.1, ahora puedes devolver respuestas desde Middleware, así como establecer cabeceras en la solicitud.
+
+Estas mejoras en la API te dan una nueva y poderosa flexibilidad para personalizar cada parte del ciclo de vida de enrutamiento de Next.js. La opción de configuración `experimental.allowMiddlewareResponseBody` dentro de `next.config.js` ya no es necesaria.
+
+Ahora puedes establecer más fácilmente cabeceras en la solicitud, así como responder directamente sin tener que hacer `rewrite` o `redirect`:
+
+```ts filename="middleware.ts"
+import { NextResponse } from 'next/server';
+ 
+export function middleware(request: Request) {
+  // Verifica si un usuario tiene acceso...
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ message: 'No autorizado' });
+  }
+ 
+  // Agrega una nueva cabecera, esto cambiará las cabeceras de solicitud entrantes
+  // que puedes leer en getServerSideProps y API routes
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-version', '13.1');
+ 
+  return NextResponse.next({
+    request: {
+      // Aplica nuevas cabeceras de solicitud
+      headers: requestHeaders,
+    },
+  });
+}
+```
+
+Aprende más sobre [Middleware avanzado de Next.js](/docs/pages/building-your-application/routing/middleware).
+
+[Otras mejoras](#otras-mejoras)
+-----------------------------------------
+
+*   `@next/font` ahora soporta agregar múltiples pesos y estilos de fuente en la misma declaración de fuente. [Aprende más](/docs/pages/building-your-application/optimizing/fonts#google-fonts).
+*   `next/dynamic` ahora usa primitivos de React `lazy()` y `<Suspense>`. La opción anterior `suspense` ya no es necesaria. Con estos cambios, `next/dynamic` es ahora compatible con el directorio `app`.
+*   `create-next-app` ha sido actualizado con un nuevo diseño, ahora incluyendo [`@next/font`](/docs/pages/building-your-application/optimizing/fonts) por defecto para autoalojamiento automático de fuentes con cero desplazamiento de diseño. Pruébalo con `npx create-next-app@latest` o [implementa la plantilla](https://vercel.com/templates/next.js/nextjs-boilerplate).
+*   Hemos hecho numerosas mejoras al [App Directory Playground](https://app-dir.vercel.app/), que muestra algunas de las últimas características y convenciones del directorio `app` (beta) en Next.js 13. [Implementa el tuyo](https://vercel.com/templates/next.js/app-directory).
+*   Hemos creado una [plantilla de galería de imágenes de alto rendimiento](https://vercel.com/templates/next.js/image-gallery-starter), que incluye placeholders de imágenes, carga diferida, optimización automática, soporte para teclado y más. [Implementa el tuyo](https://vercel.com/templates/next.js/image-gallery-starter).
+*   Hemos creado un recurso para entender cómo [migrar una aplicación grande, de código abierto con React y Express.js](https://vercel.com/blog/migrating-a-large-open-source-react-application-to-next-js-and-vercel) a Next.js, incluyendo un recorrido detallado y enlaces a commits específicos.
+
+[Comunidad](#comunidad)
+-----------------------
+
+Next.js es el resultado del trabajo combinado de más de 2,400 desarrolladores individuales, socios de la industria como Google y Meta, y nuestro equipo central en Vercel. Con más de 3.6 millones de descargas npm por semana y 97,900+ estrellas en GitHub, Next.js es una de las formas más populares de construir la Web.
+
+Únete a la comunidad en [Discusiones de GitHub](https://github.com/vercel/next.js/discussions), [Reddit](https://www.reddit.com/r/nextjs/), y [Discord](https://nextjs.org/discord).
+
+Este lanzamiento fue traído a ustedes por:
+
+*   El equipo de **Next.js**: [Balazs](https://github.com/balazsorban44), [Hannes](https://github.com/hanneslund), [Jan](https://github.com/jankaifer), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sebastian](https://github.com/sebmarkbage), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens), y [Wyatt](https://github.com/wyattjoh).
+*   El equipo de **Turbopack**: [Alex](https://github.com/alexkirsz), [Donny](https://github.com/kdy1), [Justin](https://github.com/jridgewell), [Leah](https://github.com/forsakenharmony), [LongYinan](https://github.com/brooooooklyn), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra), y [Will](https://github.com/wbinnssmith).
+
+Y las contribuciones de: @aarnadlr, @aaronbrown-vercel, @aaronjy, @abayomi185, @ademilter, @adictonator, @adilansari, @adtc, @alantoa, @aleksa-codes, @alfred-mountfield, @alpha-xek, @andarist, @andykenward, @anujssstw, @artdevgame, @artechventure, @arturbien, @aziyatali, @bennettdams, @bertho-zero, @blue-devil1134, @bot08, @brkalow, @brvnonascimento, @chanceaclark, @chibicode, @chrisipanaque, @chunsch, @colinking, @craigwheeler, @ctjlewis, @cvolant, @danmindru, @davidnx, @delbaoliveira, @devvspaces, @dtinth, @ducanhgh, @duncanogle, @ethomson, @fantaasm, @feugy, @fomichroman, @gruz0, @haschikeks, @hughlilly, @idoob, @iiegor, @imranbarbhuiya, @ingovals, @inokawa, @ishaqibrahimbot, @ismaelrumzan, @jakemstar, @janicklas-ralph, @jaredpalmer, @jaykch, @jimcresswell, @joliss, @josephcsoti, @joshuaslate, @joulev, @jueungrace, @juliusmarminge, @karlhorky, @kikobeats, @kleintorres, @koenpunt, @koltong, @kosai106, @labyrinthitis, @lachlanjc, @laityned, @leerob, @leoortizz, @lorenzobloedow, @lucasassisrosa, @m7yue, @manovotny, @marcus-rise, @matthew-heath, @mattpr, @maxleiter, @maxproske, @meenie, @mmaaaaz, @mnajdova, @moetazaneta, @mrkldshv, @nathanhammond, @nekochantaiwan, @nfinished, @niedziolkamichal, @nocell, @notrab, @nuta, @nutlope, @obusk, @orionmiz, @peraltafederico, @reshmi-sriram, @reyrodrigez, @rightones, @rishabhpoddar, @saseungmin, @serkanbektas, @sferadev, @silvioprog, @sivtu, @soonoo, @sqve, @steven-tey, @sukkaw, @superbahbi, @teobler, @theevilhead, @thomasballinger, @timeyoutakeit, @valentinh, @ws-jm, @wxh06, @yasath, @yutsuten, y @zekicaneksi.

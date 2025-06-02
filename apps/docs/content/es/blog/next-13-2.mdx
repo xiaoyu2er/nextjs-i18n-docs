@@ -1,0 +1,375 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-06-02T19:18:26.712Z
+title: Next.js 13.2
+description: >-
+  Next.js 13.2 introduce mejoras significativas al Enrutador de Aplicaciones (App Router) en preparación
+  para su estabilidad, incluyendo soporte para SEO, Manejadores de Rutas (Route Handlers), MDX para Componentes
+  del Servidor (Server Components), Enlaces con Tipado Seguro (Type-Safe Links), y más.
+author:
+  - name: Casey Gowrie
+    image: /static/team/casey.png
+  - name: Jimmy Lai
+    image: /static/team/jimmy.jpg
+  - name: Luba Kravchenko
+    image: /static/team/luba.png
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2023-02-23T18:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-2/twitter-card.png
+---
+
+Next.js 13.2 incluye mejoras importantes al Enrutador de Aplicaciones (`app`) en preparación para su estabilidad:
+
+*   [**Soporte SEO Integrado:**](#built-in-seo-support-with-new-metadata-api) Nueva API de Metadatos para configurar etiquetas `meta` estáticas y dinámicas.
+*   [**Manejadores de Rutas (Route Handlers):**](#custom-route-handlers) Manejadores de solicitudes personalizados, construidos sobre las APIs Web `Request` y `Response`.
+*   [**MDX para Componentes del Servidor (Server Components):**](#mdx-for-server-components) Usa componentes React dentro de Markdown, solo del lado del servidor.
+*   [**Analizador MDX en Rust (Rust MDX Parser):**](#rust-mdx-parser) Análisis más rápido de Markdown con un nuevo complemento en Rust.
+*   [**Superposición de Errores Mejorada (Improved Error Overlay):**](#improved-error-overlay) Trazas de pila separadas para Next.js y React para mejor legibilidad.
+*   [**Enlaces con Tipado Estático (Statically Typed Links) (Beta):**](#statically-typed-links) Previene enlaces rotos con `next/link` y TypeScript.
+*   [**Mejoras en Turbopack (Alpha):**](#turbopack-improvements) Compatibilidad con cargadores (loaders) de Webpack y soporte mejorado.
+*   [**Caché de Next.js (Beta):**](#nextjs-cache) ISR progresivo y reimplementaciones más rápidas de cambios de código.
+
+Actualiza hoy ejecutando:
+
+```bash filename="Terminal"
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+[Soporte SEO integrado con la nueva API de Metadatos](#built-in-seo-support-with-new-metadata-api)
+-----------------------------------------------------------------------------------------
+
+Next.js ha sido diseñado desde el principio para [permitir la optimización para motores de búsqueda](https://nextjs.org/learn/seo/introduction-to-seo).
+
+Servir contenido HTML pre-renderizado no solo ayuda a mejorar la indexación para motores de búsqueda, sino que también mejora el rendimiento de tu aplicación. Si bien Next.js ha proporcionado una API simple para modificar metadatos en tu aplicación (`next/head`) durante muchas versiones, queríamos rediseñar y mejorar cómo optimizas para motores de búsqueda con el Enrutador de Aplicaciones (`app`).
+
+La nueva API de Metadatos te permite definir metadatos (por ejemplo, etiquetas `meta` y `link` dentro del elemento `head` de tu HTML) con una configuración explícita de metadatos en cualquier diseño (layout) o página que sea un Componente del Servidor (Server Component).
+
+```tsx filename="app/layout.tsx"
+import type { Metadata } from 'next';
+ 
+export const metadata: Metadata = {
+  title: 'Inicio',
+  description: 'Bienvenido a Next.js',
+};
+```
+
+Esta API es simple, componible y está diseñada para ser compatible con el renderizado del servidor en flujo continuo (streaming). Por ejemplo, puedes establecer atributos comunes de metadatos en tu diseño raíz para toda la aplicación, y componer y fusionar objetos de metadatos para otras rutas en tu aplicación.
+
+Esto incluye soporte tanto para metadatos dinámicos como estáticos:
+
+```js filename="layout.js / page.js"
+// Metadatos estáticos
+export const metadata = {
+  title: '...',
+};
+ 
+// Metadatos dinámicos
+export async function generateMetadata({ params, searchParams }) {
+  const product = await getProduct(params.id);
+  return { title: product.title };
+}
+```
+
+Todas las opciones de metadatos están disponibles, incluyendo la capacidad de proporcionar metadatos personalizados, con soporte para TypeScript a través del [plugin de TypeScript](/docs/app/building-your-application/configuring/typescript#using-the-typescript-plugin) o agregando el tipo `Metadata`.
+
+Por ejemplo, puedes definir imágenes de open graph a través de metadatos:
+
+```tsx filename="app/layout.tsx"
+export const metadata = {
+  openGraph: {
+    title: 'Next.js',
+    description: 'El Framework de React para la Web',
+    url: 'https://nextjs.org',
+    siteName: 'Next.js',
+    images: [
+      {
+        url: 'https://nextjs.org/og.png',
+        width: 800,
+        height: 600,
+      },
+    ],
+    locale: 'en-US',
+    type: 'website',
+  },
+};
+ 
+export default function Layout({ children }) {}
+```
+
+La API de Metadatos está disponible en 13.2 para el Enrutador de Aplicaciones (`app`), reemplazando el archivo especial `head.js` anterior. No está disponible para el directorio `pages`.
+
+[Aprende más sobre SEO](/learn/seo/introduction-to-seo) o consulta la [referencia de API para Metadatos](/docs/app/api-reference/file-conventions/metadata). Nos gustaría agradecer a [next-seo](https://github.com/garmeeh/next-seo) por su trabajo en el paquete comunitario y sus comentarios sobre el diseño inicial de la API.
+
+[Manejadores de Rutas Personalizados (Custom Route Handlers)](#custom-route-handlers)
+-----------------------------------------------
+
+Una de las piezas faltantes para el lanzamiento beta original del Enrutador de Aplicaciones (`app`) fueron las Rutas API, que existen en el directorio `pages/api`. Quisimos aprovechar esta oportunidad para crear una versión nueva y más moderna de las Rutas API que estuvieran profundamente integradas en el nuevo sistema de enrutamiento para `app`.
+
+Los Manejadores de Rutas (Route Handlers) te permiten crear manejadores de solicitudes personalizados para una ruta determinada usando las APIs Web [Request](https://developer.mozilla.org/docs/Web/API/Request) y [Response](https://developer.mozilla.org/docs/Web/API/Response).
+
+```ts filename="app/example/route.ts"
+export async function GET(request: Request) {}
+```
+
+Los Manejadores de Rutas tienen una API isomórfica para admitir tanto los entornos de ejecución Edge como Node.js sin problemas, incluyendo soporte para respuestas en flujo continuo (streaming). Dado que los Manejadores de Rutas usan la misma [configuración de segmentos de ruta](/docs/app/building-your-application/routing) que las páginas y diseños, admiten características muy esperadas como el [Renderizado Estático](/docs/app/building-your-application/routing/route-handlers#static-and-dynamic-route-handlers) de propósito general y la [Revalidación](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data).
+
+Un archivo `route.ts` puede exportar una función asíncrona nombrada por los verbos HTTP: `GET`, `HEAD`, `OPTIONS`, `POST`, `PUT`, `DELETE` y `PATCH`. Estas funciones luego pueden ser envueltas y abstraídas para crear ayudantes/lógica reutilizable para tu lógica de ruta personalizada.
+
+Otras funciones del servidor, como `cookies` y `headers`, pueden usarse dentro de los Manejadores de Rutas, junto con cualquier API Web sobre la que se construyan estas abstracciones. Esto permite compartir código entre Componentes del Servidor y Manejadores de Rutas.
+
+```ts filename="app/example/route.ts"
+import { cookies } from 'next/headers';
+ 
+export async function GET(request: Request) {
+  const cookieStore = cookies();
+  const token = cookieStore.get('token');
+ 
+  return new Response('¡Hola, Next.js!', {
+    status: 200,
+    headers: { 'Set-Cookie': `token=${token}` },
+  });
+}
+```
+
+Los Manejadores de Rutas están disponibles en 13.2 para el Enrutador de Aplicaciones (`app`) usando el archivo especial `route.ts`. No están disponibles en el directorio `pages`, ya que son un reemplazo de las Rutas API.
+
+[Aprende más sobre Manejadores de Rutas](/docs/app/building-your-application/routing/route-handlers) o [consulta la referencia de API](/docs/app/api-reference/file-conventions/route). Nos gustaría agradecer a SvelteKit por su [arte previo e inspiración](https://kit.svelte.dev/docs/routing#server) aquí.
+
+[MDX para Componentes del Servidor (MDX for Server Components)](#mdx-for-server-components)
+-------------------------------------------------------
+
+MDX es un superconjunto de markdown que te permite escribir JSX directamente en tus archivos markdown. Es una forma poderosa de agregar interactividad dinámica e incrustar componentes React dentro de tu contenido.
+
+Con 13.2, ahora puedes usar MDX completamente con Componentes del Servidor (Server Components) de React, lo que significa menos JavaScript del lado del cliente para cargas de página más rápidas, todo mientras conservas las poderosas capacidades de React para plantillas de UI dinámica. Puedes agregar interactividad a tu contenido MDX según sea necesario.
+
+El plugin `@next/mdx` ha sido actualizado con soporte para un nuevo archivo especial, `mdx-components.js|ts`, definido en la raíz de tu aplicación para proporcionar componentes personalizados:
+
+```js filename="your-project/mdx-components.js"
+// Este archivo te permite proporcionar componentes React personalizados
+// para usar en archivos MDX. Puedes importar y usar cualquier
+// componente React que desees, incluyendo componentes de
+// otras bibliotecas.
+function H1({ children }) {
+  // ...
+}
+ 
+function H2({ children }) {
+  // ...
+}
+ 
+export function useMDXComponents(components) {
+  return { h1: H1, h2: H2, ...components };
+}
+```
+
+Además, hemos trabajado con paquetes comunitarios para obtener contenido MDX [`next-mdx-remote`](https://github.com/hashicorp/next-mdx-remote#react-server-components-rsc--nextjs-app-directory-support) y [`contentlayer`](https://www.contentlayer.dev/) para agregar soporte para Componentes del Servidor de React.
+
+[Aprende más sobre cómo configurar MDX con Componentes del Servidor](/docs/app/building-your-application/configuring/mdx) o [implementa nuestro ejemplo](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fapp-dir-mdx&project-name=app-dir-mdx&repository-name=app-dir-mdx).
+
+[Analizador MDX en Rust (Rust MDX Parser)](#rust-mdx-parser)
+-----------------------------------
+
+Como parte de la habilitación de MDX para Componentes del Servidor, también hemos reescrito el analizador MDX en Rust para mejorar el rendimiento. Esta es una mejora significativa sobre el analizador anterior basado en JavaScript, que mostraba ralentizaciones notables al procesar un gran número de archivos MDX.
+
+Puedes optar por usar el analizador Rust en `next.config.js`. Por ejemplo, con `@next/mdx`:
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    appDir: true,
+    mdxRs: true,
+  },
+};
+ 
+const withMDX = require('@next/mdx')();
+module.exports = withMDX(nextConfig);
+```
+
+Nos gustaría agradecer a [Titus Wormer](https://wooorm.com) a quien patrocinamos para trabajar en este proyecto. Si deseas usar esto fuera de Next.js, consulta el nuevo paquete [mdxjs-rs](https://github.com/wooorm/mdxjs-rs).
+
+[Enlaces con Tipado Estático (Statically Typed Links)](#statically-typed-links)
+-------------------------------------------------
+
+Next.js ahora puede tipar estáticamente los enlaces en el directorio `app` para prevenir errores tipográficos y otros errores al usar `next/link`, mejorando la seguridad de tipos al navegar entre páginas.
+
+```
+import Link from 'next/link'
+ 
+// ✅
+<Link href="/about" />
+// ✅
+<Link href="/blog/nextjs" />
+// ✅
+<Link href={`/blog/${slug}`} />
+ 
+// ❌ Errores de TypeScript si href no es una ruta válida
+<Link href="/aboot" />
+```
+
+Esta característica requiere usar el nuevo Enrutador de Aplicaciones, así como TypeScript.
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    appDir: true,
+    typedRoutes: true,
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+Esta característica ahora está disponible en beta. `rewrites` y `redirects` aún no son compatibles.
+
+[Aprende más sobre rutas con tipado estático](/docs/app/building-your-application/configuring/typescript#statically-typed-links).
+
+[Superposición de Errores Mejorada (Improved Error Overlay)](#improved-error-overlay)
+-------------------------------------------------
+
+Para ayudar a mejorar la legibilidad y capacidad de depuración de errores, hemos realizado varias mejoras en la superposición de errores de Next.js.
+
+En 13.2, las trazas de pila de Next.js y React ahora están separadas, lo que facilita identificar de dónde proviene el error. Además, la superposición de errores ahora muestra la versión actual de Next.js, ayudándote a entender si tu versión está actualizada.
+
+![La superposición de errores mejorada en 13.2 mostrando obsolescencia de versión.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-2/error.png)
+
+La superposición de errores mejorada en 13.2 mostrando obsolescencia de versión.
+
+También hemos [mejorado la salida de errores](https://github.com/facebook/react/issues/24519#issuecomment-1439915463) para errores de hidratación de React, que ahora son más legibles y fáciles de depurar.
+
+[Mejoras en Turbopack](#turbopack-improvements)
+-------------------------------------------------
+
+[Turbopack](https://nextjs.org/docs/app/api-reference/turbopack), anunciado en alpha con Next.js 13, es un empaquetador incremental diseñado para acelerar tanto el desarrollo local, como las compilaciones de producción en el futuro.
+
+Nos hemos enfocado en admitir las características existentes de Next.js en Turbopack y mejorar la estabilidad general a medida que avanzamos hacia la beta. Desde nuestro último lanzamiento, hemos agregado:
+
+*   Soporte para `next/dynamic`
+*   Soporte para `rewrites`, `redirects`, `headers` y `pageExtensions` en `next.config.js`
+*   Soporte para 404s y errores en `pages`
+*   Soporte para módulos CSS `composes: ... from ...`
+*   Mejor confiabilidad en Fast Refresh y recuperación de errores
+*   Mejor manejo de precedencia CSS
+*   Mejor evaluación en tiempo de compilación
+
+También hemos corregido muchos errores y mejorado la estabilidad mientras probamos Turbopack con algunas de nuestras aplicaciones internas más grandes de Next.js y con los primeros clientes de Vercel.
+
+### [Transformación de Archivos Personalizada con Cargadores (Loaders) de Webpack](#custom-file-transformation-with-webpack-loaders)
+
+Turbopack ahora incluye soporte y compatibilidad para algunos cargadores (loaders) de webpack. Esto significa que puedes usar muchos cargadores del ecosistema de Webpack para transformar archivos de diferentes tipos a JavaScript. Cargadores como `@mdx-js/loader`, `@svgr/webpack` y `babel-loader` son compatibles. [Aprende más](https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack) sobre cómo personalizar Turbopack.
+
+Por ejemplo, usa `experimental.turbo.loaders` para configurar una lista de cargadores para cada extensión de archivo:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    turbo: {
+      loaders: {
+        '.md': [
+          {
+            // Formato de opción
+            loader: '@mdx-js/loader',
+            options: {
+              format: 'md',
+            },
+          },
+        ],
+        '.svg': ['@svgr/webpack'],
+      },
+    },
+  },
+};
+```
+
+Consulta el [ejemplo de Turbopack usando cargadores](https://github.com/vercel/next.js/tree/canary/examples/with-turbopack-loaders) para un ejemplo completo.
+
+### [Alias de Resolución al Estilo de Webpack](#webpack-style-resolve-aliases)
+
+Turbopack ahora puede configurarse para modificar la resolución de módulos a través de alias, similar a [`resolve.alias`](https://webpack.js.org/configuration/resolve/#resolvealias) de webpack. Configura esto a través de `experimental.turbo.resolveAlias`:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        underscore: 'lodash',
+        mocha: { browser: 'mocha/browser-entry.js' },
+      },
+    },
+  },
+};
+```
+
+[Caché de Next.js](#nextjs-cache)
+------------------------------
+
+Next.js 13.2 introduce la nueva Caché de Next.js (beta), una evolución de [ISR](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data) que desbloquea:
+
+*   ISR progresivo a nivel de componente
+*   Actualizaciones más rápidas sin solicitudes de red
+*   Reimplementaciones más rápidas de cambios de código en páginas estáticas
+
+Para páginas que son completamente estáticas, ISR funciona de la misma manera que hoy. Para páginas que tienen una captura de datos más granular, mezclando estático y dinámico, la Caché de Next.js utiliza una caché más granular y efímera.
+
+Con la base de los Componentes del Servidor de React y la captura de datos colocalizada en el Enrutador de Aplicaciones (`app`) de Next.js, ahora puedes encapsular datos estáticos o dinámicos junto con su componente consumidor.
+
+```jsx filename="app/page.jsx"
+export default async function Page() {
+  const [staticData, dynamicData, revalidatedData] = await Promise.all([
+    // En caché hasta invalidación manual
+    fetch(`https://...`),
+    // Recuperado en cada solicitud
+    fetch(`https://...`, { cache: 'no-store' }),
+    // En caché con un tiempo de vida de 10 segundos
+    fetch(`https://...`, { next: { revalidate: 10 } }),
+  ]);
+ 
+  return <div>...</div>;
+}
+```
+
+Mientras desarrollas localmente con el Enrutador de Aplicaciones, ahora verás el mismo comportamiento de caché en `next dev` que en producción con `next start`. Esto mejora la velocidad de Fast Refresh cuando cambia cualquier Componente del Servidor o código de carga de datos.
+
+Con la Caché de Next.js, tu aplicación controla la caché, no las APIs de terceros. Esto difiere de los encabezados `cache-control`, donde el upstream controla cuánto tiempo se almacena en caché el valor.
+
+### [Caché de Next.js con la API de Caché de Vercel](#nextjs-cache-with-the-vercel-cache-api)
+
+[Next.js en Vercel](https://vercel.com/docs/concepts/next.js/overview) te ofrece infraestructura definida por el framework. Escribes código de aplicación, como la obtención de datos a nivel de componente con `fetch`, y nosotros implementamos infraestructura distribuida globalmente sin esfuerzo adicional.
+
+El nuevo caché de Next.js hace que los cambios en el código sean independientes de los cambios en los datos. Esto puede acelerar drásticamente el redespliegue de páginas estáticas, ya que la generación de estas páginas puede utilizar el caché existente.
+
+Esta nueva API de Caché de Vercel está diseñada para funcionar con cualquier framework, pero tiene integración nativa con el caché de Next.js. [Aprende más sobre cómo ISR evolucionó al caché de Next.js](https://vercel.com/blog/vercel-cache-api-nextjs-cache), así como cómo funciona el caché de Next.js al desplegar en Vercel.
+
+### [Caché de Next.js en Auto-hospedaje](#nextjs-cache-when-self-hosted)
+
+En entornos auto-hospedados, se utiliza un caché LRU, que por defecto es de 50 MB. Todas las entradas en el caché se escriben automáticamente en disco por defecto. Este caché de sistema de archivos puede compartirse entre nodos si tienen la misma clave de caché, similar a [cómo funciona ISR actualmente](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration#self-hosting-isr).
+
+Para desarrolladores que buscan personalizar y modificar el núcleo del caché de Next.js, pueden modificar las claves de caché subyacentes y cambiar cómo y dónde se persisten las entradas del caché, incluyendo desactivar completamente la persistencia.
+
+[Otras Mejoras](#other-improvements)
+-----------------------------------------
+
+*   **Fuentes:** Tras una increíble adopción por la comunidad, `@next/font` ahora está integrado en Next.js como `next/font`. Esto significa que ya no necesitas instalar `@next/font` por separado. [Aprende más](/docs/pages/building-your-application/optimizing/fonts).
+*   **Fuentes:** La propiedad `font-display` por defecto para `next/font` ha sido cambiada a `font-display: swap` en lugar de `optional` basado en feedback de la comunidad.
+*   **Rendimiento:** Optimizado el proceso de construcción para usar menos memoria, ~550MB ahorrados en nuestras pruebas ([PR](https://github.com/vercel/next.js/pull/45639)).
+*   **Rendimiento:** Evita cargar la configuración del proyecto múltiples veces, resultando en ~400ms más rápido en construcciones (promedio) en nuestras pruebas ([PR](https://github.com/vercel/next.js/pull/45637)).
+*   **Rendimiento:** Optimizado el componente de error para reducir 0.4kb del payload HTML sin cambiar el estilo ([PR](https://github.com/vercel/next.js/pull/45586)).
+*   **Rendimiento:** Reducido el tamaño del bundle edge en ~130KB, casi la mitad del tamaño, para disminuir aún más el tamaño de arranque en frío al desplegar en entornos edge como Vercel ([PR](https://github.com/vercel/next.js/pull/45601)).
+*   **Seguridad:** Añadida configuración `images.contentDispositionType: "attachment"` para forzar la descarga de imágenes al visitar directamente la API de Optimización de Imágenes ([PR](https://github.com/vercel/next.js/pull/46254)).
+
+[Comunidad](#community)
+-----------------------
+
+Next.js es el resultado del trabajo combinado de más de 2,500 desarrolladores individuales, socios de la industria como Google y Meta, y nuestro equipo central en Vercel. Con más de 3.9 millones de descargas npm por semana y más de 100,000 estrellas en GitHub, Next.js es una de las formas más populares de construir la Web.
+
+Únete a la comunidad en [GitHub Discussions](https://github.com/vercel/next.js/discussions), [Reddit](https://www.reddit.com/r/nextjs/), y [Discord](https://nextjs.org/discord).
+
+Este lanzamiento fue posible gracias a:
+
+*   El equipo de **Next.js**: [Balazs](https://github.com/balazsorban44), [Hannes](https://github.com/hanneslund), [Jan](https://github.com/jankaifer), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sebastian](https://github.com/sebmarkbage), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens), [Wyatt](https://github.com/wyattjoh), y [Andrew](https://twitter.com/acdlite).
+*   El equipo de **Turbopack**: [Alex](https://github.com/alexkirsz), [Donny](https://github.com/kdy1), [Justin](https://github.com/jridgewell), [Leah](https://github.com/forsakenharmony), [LongYinan](https://github.com/brooooooklyn), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra), y [Will](https://github.com/wbinnssmith).
+
+Y las contribuciones de: @timneutkens, @loettz, @okcoker, @clive-h-townsend, @shuding, @JanKaifer, @sepiropht, @hanneslund, @huozhi, @aralroca, @balazsorban44, @cristobaldominguez95, @vinaykulk621, @Brooooooklyn, @feedthejim, @samsisle, @MarDi66, @styfle, @therealrinku, @sebmarkbage, @cravend, @hu0p, @kdy1, @ijjk, @juzhiyuan, @IvanKiral, @LukeSchlangen, @wojtekolek, @samdenty, @Josehower, @bennettdams, @SCG82, @mike-plummer, @kwonoj, @David0z, @denchance, @joulev, @wbinnssmith, @alexkirsz, @UnknownMonk, @leerob, @sairajchouhan, @imranbarbhuiya, @jomeswang, @ductnn, @thomasballinger, @chibicode, @jridgewell, @sreetamdas, @Juneezee, @SukkaW, @wyattjoh, @michaeloliverx, @cattmote, @joefreeman, @valentincostam, @qrohlf, @ossan-engineer, @rishabhpoddar, @vasucp1207, @Schniz, @andrii-bodnar, @gergelyke, @abstractvector, @wherehows, @BrodaNoel, @taep96, @abe1272001, @0xadada, @nbouvrette, @teobler, @lubakravche, @molebox, y @hiddenest.

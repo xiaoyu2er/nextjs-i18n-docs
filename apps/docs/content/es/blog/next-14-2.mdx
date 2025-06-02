@@ -1,0 +1,218 @@
+---
+source-updated-at: 2025-05-29T18:05:49.000Z
+translation-updated-at: 2025-06-02T19:16:37.864Z
+title: Next.js 14.2
+description: >-
+  Next.js 14.2 incluye mejoras en desarrollo, producción y caché.
+  Con nuevas opciones de configuración, 99% de pruebas de Turbopack aprobadas y más.
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2024-04-11T17:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/twitter-card.png
+---
+
+Next.js 14.2 incluye mejoras en desarrollo, producción y caché.
+
+*   [**Turbopack para Desarrollo (Candidato a Lanzamiento):**](#turbopack-para-desarrollo-candidato-a-lanzamiento) 99.8% de pruebas aprobadas para `next dev --turbo`.
+*   [**Mejoras en Construcción y Producción:**](#mejoras-en-construccion-y-produccion) Reducción en el uso de memoria y optimizaciones CSS.
+*   [**Mejoras en Caché:**](#mejoras-en-cache) Periodos de invalidación configurables con `staleTimes`.
+*   [**Mejoras en DX de Errores:**](#mejoras-en-dx-de-errores) Mejores errores de desajuste de hidratación y actualizaciones de diseño.
+
+Actualiza hoy o comienza con:
+
+```bash filename="Terminal"
+npx create-next-app@latest
+```
+
+[Turbopack para Desarrollo (Candidato a Lanzamiento)](#turbopack-para-desarrollo-candidato-a-lanzamiento)
+--------------------------------------------------------------------------------------------------------
+
+Durante los últimos meses, hemos estado trabajando en mejorar el rendimiento del desarrollo local con Turbopack. En la versión 14.2, el **Candidato a Lanzamiento** de Turbopack ya está disponible para desarrollo local:
+
+*   **99.8%** de las [pruebas de integración](https://areweturboyet.com/) ahora pasan.
+*   Hemos verificado que los 300 paquetes más usados de `npm` en aplicaciones Next.js pueden compilarse con Turbopack.
+*   Todos los [ejemplos de Next.js](https://github.com/vercel/next.js/tree/canary/examples) funcionan con Turbopack.
+*   Hemos integrado [Lightning CSS](https://lightningcss.dev/), un empaquetador y minificador CSS rápido, escrito en Rust.
+
+Hemos probado extensivamente Turbopack con aplicaciones de Vercel. Por ejemplo, con `vercel.com`, una aplicación grande de Next.js, hemos observado:
+
+*   Hasta **76.7% más rápido** en el inicio del servidor local.
+*   Hasta **96.3% más rápido** en actualizaciones de código con Fast Refresh.
+*   Hasta **45.8% más rápido** en la compilación inicial de rutas sin caché (Turbopack aún no tiene caché en disco).
+
+Turbopack sigue siendo opcional y puedes probarlo con:
+
+```bash filename="Terminal"
+next dev --turbo
+```
+
+Ahora nos enfocaremos en mejorar el uso de memoria, implementar caché persistente y `next build --turbo`.
+
+*   **Uso de Memoria** - Hemos construido herramientas de bajo nivel para investigar el uso de memoria. Ahora puedes [generar trazas](/docs/architecture/turbopack#generating-trace-files) que incluyen métricas de rendimiento e información general del uso de memoria. Estas trazas nos permiten investigar sin necesidad de acceder al código fuente de tu aplicación.
+*   **Caché Persistente** - Estamos explorando las mejores opciones de arquitectura y esperamos compartir más detalles en futuras versiones.
+*   **`next build`** - Aunque Turbopack aún no está disponible para builds, **74.7%** de las pruebas ya pasan. Puedes seguir el progreso en [areweturboyet.com/build](https://areweturboyet.com/build).
+
+Para ver una lista de [características soportadas](/docs/architecture/turbopack#supported-features) y [no soportadas](/docs/architecture/turbopack#unsupported-features) en Turbopack, consulta nuestra [documentación](/docs/architecture/turbopack).
+
+[Mejoras en Construcción y Producción](#mejoras-en-construccion-y-produccion)
+-----------------------------------------------------------------------------
+
+Además de mejoras en empaquetado con Turbopack, hemos trabajado para mejorar el rendimiento general de construcción y producción para todas las aplicaciones Next.js (tanto Pages como App Router).
+
+### [Tree-shaking](#tree-shaking)
+
+Identificamos una optimización para el límite entre Server y Client Components que permite eliminar exportaciones no utilizadas (tree-shaking). Por ejemplo, importar un solo componente `Icon` desde un archivo con `"use client"` ya no incluye todos los demás iconos del paquete. Esto puede reducir significativamente el tamaño del bundle JavaScript en producción.
+
+Al probar esta optimización en una biblioteca popular como `react-aria-components`, el tamaño final del bundle se redujo en **-51.3%**.
+
+> **Nota:** Esta optimización no funciona actualmente con archivos barrel. Mientras tanto, puedes usar la opción de configuración [`optimizePackageImports`](/docs/app/api-reference/next-config-js/optimizePackageImports):
+> 
+> ```ts filename="next.config.ts"
+> module.exports = {
+>   experimental: {
+>     optimizePackageImports: ['package-name'],
+>   },
+> };
+> ```
+
+### [Uso de Memoria en Construcción](#uso-de-memoria-en-construccion)
+
+Para aplicaciones Next.js extremadamente grandes, notamos fallos por falta de memoria (OOMs) durante builds de producción. Tras investigar reportes de usuarios, identificamos que el problema era el sobre-empaquetado y minificación (Next.js creaba menos archivos JavaScript más grandes con duplicación). Hemos refactorizado la lógica de empaquetado y optimizado el compilador para estos casos.
+
+Nuestras pruebas iniciales muestran que en una aplicación Next.js mínima, el uso de memoria y tamaño de archivos de caché disminuyó **de 2.2GB a menos de 190MB** en promedio.
+
+Para facilitar la depuración del rendimiento de memoria, hemos introducido un flag `--experimental-debug-memory-usage` en `next build`. Más información en nuestra [documentación](/docs/app/building-your-application/optimizing/memory-usage).
+
+### [CSS](#css)
+
+Actualizamos cómo se optimiza CSS durante builds de producción en Next.js, dividiendo CSS para evitar conflictos de estilos al navegar entre páginas.
+
+El orden y fusión de chunks CSS ahora se define por el orden de importación. Por ejemplo, `base-button.module.css` se ordenará antes que `page.module.css`:
+
+```tsx filename="base-button.tsx"
+import styles from './base-button.module.css';
+ 
+export function BaseButton() {
+  return <button className={styles.primary} />;
+}
+```
+
+```tsx filename="page.tsx"
+import { BaseButton } from './base-button';
+import styles from './page.module.css';
+ 
+export function Page() {
+  return <BaseButton className={styles.primary} />;
+}
+```
+
+Para mantener el orden correcto de CSS, recomendamos:
+
+*   Usar [CSS Modules](/docs/app/building-your-application/styling/css-modules) en lugar de [estilos globales](/docs/app/building-your-application/styling/css-modules#global-styles).
+*   Importar un CSS Module solo en un único archivo JS/TS.
+*   Si usas clases globales, importa los estilos globales en el mismo archivo JS/TS.
+
+No esperamos que este cambio afecte negativamente a la mayoría de aplicaciones. Sin embargo, si observas estilos inesperados al actualizar, revisa el orden de importación de CSS según las recomendaciones en nuestra [documentación](/docs/app/building-your-application/styling/css#ordering-and-merging).
+
+[Mejoras en Caché](#mejoras-en-cache)
+-------------------------------------
+
+El caché es una parte crítica para construir aplicaciones web rápidas y confiables. Al realizar mutaciones, tanto usuarios como desarrolladores esperan que el caché se actualice para reflejar los últimos cambios. Hemos estado explorando cómo mejorar la experiencia de caché en Next.js con App Router.
+
+### [`staleTimes` (Experimental)](#staletimes-experimental)
+
+El [Client-side Router Cache](/docs/app/building-your-application/caching#data-cache-and-client-side-router-cache) es una capa de caché diseñada para proporcionar una experiencia de navegación rápida almacenando rutas visitadas y pre-cargadas en el cliente.
+
+Basándonos en comentarios de la comunidad, hemos añadido una opción experimental `staleTimes` para permitir configurar el periodo de invalidación del [client-side router cache](/docs/app/building-your-application/caching#router-cache).
+
+Por defecto, las rutas pre-cargadas (usando el componente `<Link>` sin el prop `prefetch`) se almacenan en caché por 30 segundos, y si el prop `prefetch` está en `true`, 5 minutos. Puedes sobrescribir estos valores definiendo [tiempos de revalidación personalizados](/docs/app/building-your-application/caching#duration-3) en `next.config.js`:
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+`staleTimes` busca mejorar la experiencia actual para usuarios que quieren más control sobre las heurísticas de caché, pero no es la solución completa. En próximas versiones, nos enfocaremos en mejorar la semántica general del caché y proporcionar soluciones más flexibles.
+
+Más información sobre `staleTimes` en nuestra [documentación](/docs/app/api-reference/next-config-js/staleTimes).
+
+### [Rutas Paralelas e Interceptoras](#parallel-and-intercepting-routes)
+
+Continuamos iterando en las [Rutas Paralelas](/docs/app/building-your-application/routing/parallel-routes) y [Rutas Interceptoras](/docs/app/building-your-application/routing/intercepting-routes), mejorando ahora la integración con la Caché del Enrutador del lado del cliente (Client-side Router Cache).
+
+*   Las rutas paralelas e interceptoras que invocan Acciones del Servidor (Server Actions) con [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) o [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) revalidarán la caché y actualizarán los espacios visibles manteniendo la vista actual del usuario.
+*   De manera similar, llamar a [`router.refresh`](/docs/app/building-your-application/caching#routerrefresh) ahora actualiza correctamente los espacios visibles, manteniendo la vista actual.
+
+[Mejoras en la Experiencia de Desarrollo (DX) de Errores](#errors-dx-improvements)
+-------------------------------------------------
+
+En la versión 14.1, comenzamos a trabajar en [mejorar la legibilidad de los mensajes de error y los seguimientos de pila (stack traces)](/blog/next-14-1#improved-error-messages-and-fast-refresh) al ejecutar `next dev`. Este trabajo continuó en la 14.2 para incluir mensajes de error más claros, mejoras en el diseño de la superposición (overlay) tanto para el Enrutador de la Aplicación (App Router) como para el Enrutador de Páginas (Pages Router), soporte para modo claro y oscuro, y registros (logs) más claros en `dev` y `build`.
+
+Por ejemplo, los errores de Hidratación (Hydration) de React son una fuente común de confusión en nuestra comunidad. Si bien hicimos mejoras para ayudar a los usuarios a identificar la fuente de discrepancias en la hidratación (ver abajo), estamos trabajando con el equipo de React para mejorar los mensajes de error subyacentes y mostrar el nombre del archivo donde ocurrió el error.
+
+**Antes:**
+
+![Un ejemplo de la superposición de errores de Next.js antes de la versión 14.2.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/error-overlay-before.png)
+
+Un ejemplo de la superposición de errores de Next.js antes de la versión 14.2.
+
+**Después:**
+
+![Un ejemplo de la superposición de errores de Next.js después de la versión 14.2.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-14-2/error-overlay-after.png)
+
+Un ejemplo de la superposición de errores de Next.js después de la versión 14.2.
+
+[React 19](#react-19)
+---------------------
+
+En febrero, el equipo de React anunció el próximo lanzamiento de [React 19](https://react.dev/blog/2024/02/15/react-labs-what-we-have-been-working-on-february-2024#the-next-major-version-of-react). Para prepararnos para React 19, estamos trabajando en integrar las últimas características y mejoras en Next.js, y planeamos lanzar una versión importante para orquestar estos cambios.
+
+Nuevas características como Acciones (Actions) y sus hooks relacionados, que han estado disponibles en Next.js desde el [canal canario (canary channel) de React](https://react.dev/blog/2023/05/03/react-canaries), ahora estarán disponibles para todas las aplicaciones React (incluidas las aplicaciones solo del lado del cliente). Estamos emocionados de ver una mayor adopción de estas características en el ecosistema de React.
+
+[Otras Mejoras](#other-improvements)
+-----------------------------------------
+
+*   **\[Docs\]** Nueva documentación sobre Optimización de Video ([PR](https://github.com/vercel/next.js/pull/60574)).
+*   **\[Docs\]** Nueva documentación sobre `instrumentation.ts` ([PR](https://github.com/vercel/next.js/pull/61403))
+*   **\[Feature\]** Nueva propiedad `overrideSrc` para `next/image` ([PR](https://github.com/vercel/next.js/pull/64221)).
+*   **\[Feature\]** Nuevo argumento `revalidateReason` para `getStaticProps` ([PR](https://github.com/vercel/next.js/pull/64258)).
+*   **\[Improvement\]** Lógica de transmisión (streaming) refactorizada, reduciendo el tiempo para transmitir páginas en producción ([PR](https://github.com/vercel/next.js/pull/63427)).
+*   **\[Improvement\]** Soporte para Acciones del Servidor (Server Actions) anidadas ([PR](https://github.com/vercel/next.js/pull/61001)).
+*   **\[Improvement\]** Soporte para localización en Sitemaps generados ([PR](https://github.com/vercel/next.js/pull/53765)).
+*   **\[Improvement\]** Mejoras visuales en los registros (logs) de desarrollo y construcción ([PR](https://github.com/vercel/next.js/pull/62946))
+*   **\[Improvement\]** La protección contra desfases (skew protection) es estable en Vercel ([Docs](https://vercel.com/docs/skew-protection)).
+*   **\[Improvement\]** Hacer `useSelectedLayoutSegment` compatible con el Enrutador de Páginas (Pages Router) ([PR](https://github.com/vercel/next.js/pull/62584)).
+*   **\[Improvement\]** Omitir advertencias de `metadataBase` cuando las URLs absolutas no necesitan resolverse ([PR](https://github.com/vercel/next.js/pull/61898)).
+*   **\[Improvement\]** Corregir Acciones del Servidor (Server Actions) que no se enviaban sin JavaScript habilitado cuando se desplegaban en Vercel ([PR](https://github.com/vercel/next.js/pull/63978))
+*   **\[Improvement\]** Corregir error sobre una Acción del Servidor no encontrada en el manifiesto de acciones si se activaba después de navegar fuera de la página de referencia, o si se usaba dentro de un segmento de ruta paralela inactiva ([PR](https://github.com/vercel/next.js/pull/64227))
+*   **\[Improvement\]** Corregir importaciones CSS en componentes cargados por `next/dynamic` ([PR](https://github.com/vercel/next.js/pull/64294)).
+*   **\[Improvement\]** Advertir cuando a una imagen animada le falta la propiedad `unoptimized` ([PR](https://github.com/vercel/next.js/pull/61045)).
+*   **\[Improvement\]** Mostrar un mensaje de error si `images.loaderFile` no exporta una función predeterminada ([PR](https://github.com/vercel/next.js/pull/64036))
+
+[Comunidad](#community)
+-----------------------
+
+Next.js ahora tiene más de 1 millón de desarrolladores activos mensuales. Estamos agradecidos por el apoyo y las contribuciones de la comunidad. Únase a la conversación en [GitHub Discussions](https://github.com/vercel/next.js/discussions), [Reddit](https://www.reddit.com/r/nextjs/), y [Discord](/discord).
+
+[Contribuidores](#contributors)
+-----------------------------
+
+Next.js es el resultado del trabajo combinado de más de 3,000 desarrolladores individuales, socios de la industria como Google y Meta, y nuestro equipo central en Vercel. Este lanzamiento fue posible gracias a:
+
+*   El equipo de **Next.js**: [Andrew](https://github.com/acdlite), [Balazs](https://github.com/balazsorban44), [Ethan](https://github.com/Ethan-Arrowood), [Janka](https://github.com/lubieowoce), [Jiachi](https://github.com/huozhi), [Jimmy](https://github.com/feedthejim), [JJ](https://github.com/ijjk), [Josh](https://github.com/gnoff), [Sam](https://github.com/samcx), [Sebastian](https://github.com/sebmarkbage), [Sebbie](https://github.com/eps1lon), [Shu](https://github.com/shuding), [Steven](https://github.com/styfle), [Tim](https://github.com/timneutkens), [Wyatt](https://github.com/wyattjoh), y [Zack](https://github.com/ztanner).
+*   El equipo de **Turbopack**: [Donny](https://github.com/kdy1), [Leah](https://github.com/forsakenharmony), [Maia](https://github.com/padmaia), [OJ](https://github.com/kwonoj), [Tobias](https://github.com/sokra), y [Will](https://github.com/wbinnssmith).
+*   **Documentación de Next.js**: [Delba](https://github.com/delbaoliveira), [Steph](https://github.com/StephDietz), [Michael](https://github.com/manovotny), [Anthony](https://github.com/anthonyshew), y [Lee](https://github.com/leerob).
+
+Un enorme agradecimiento a @taishikato, @JesseKoldewijn, @Evavic44, @feugy, @liamlaverty, @dvoytenko, @SukkaW, @wbinnssmith, @rishabhpoddar, @better-salmon, @ziyafenn, @A7med3bdulBaset, @jasonuc, @yossydev, @Prachi-meon, @InfiniteCodeMonkeys, @ForsakenHarmony, @miketimmerman, @kwonoj, @williamli, @gnoff, @jsteele-stripe, @chungweileong94, @WITS, @sogoagain, @junioryono, @eisafaqiri, @yannbolliger, @aramikuto, @rocketman-21, @kenji-webdev, @michaelpeterswa, @Dannymx, @vpaflah, @zeevo, @chrisweb, @stefangeneralao, @tknickman, @Kikobeats, @ubinatus, @code-haseeb, @hmmChase, @byhow, @DanielRivers, @wojtekmaj, @paramoshkinandrew, @OMikkel, @theitaliandev, @oliviertassinari, @Ishaan2053, @Sandeep-Mani, @alyahmedaly, @Lezzio, @devjiwonchoi, @juliusmarminge, @szmazhr, @eddiejaoude, @itz-Me-Pj, @AndersDJohnson, @gentamura, @tills13, @dijonmusters, @SaiGanesh21, @vordgi, @ryota-murakami, @tszhong0411, @officialrajdeepsingh, @alexpuertasr, @AkifumiSato, @Jonas-PFX, @icyJoseph, @florian-lp, @pbzona, @erfanium, @remcohaszing, @bernardobelchior, @willashe, @kevinmitch14, @smakosh, @mnjongerius, @asobirov, @theoholl, @suu3, @ArianHamdi, @adrianha, @Sina-Abf, @kuzeykose, @meenie, @nphmuller, @javivelasco, @belgattitude, @Svetoslav99, @johnslemmer, @colbyfayock, @mehranmf31, @m-nakamura145, @ryo8000, @aryaemami59, @bestlyg, @jinsoul75, @petrovmiroslav, @nattui, @zhuyedev, @dongwonnn, @nhducit, @flotwig, @Schmavery, @abhinaypandey02, @rvetere, @coffeecupjapan, @cjimmy, @Soheiljafarnejad, @jantimon, @zengspr, @wesbos, @neomad1337, @MaxLeiter, y @devr77 por su ayuda.

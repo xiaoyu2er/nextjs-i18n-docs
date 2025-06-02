@@ -1,0 +1,911 @@
+---
+source-updated-at: 2025-05-29T19:07:21.000Z
+translation-updated-at: 2025-06-02T19:25:53.685Z
+title: RFC de Layouts
+description: >-
+  Rutas anidadas y layouts, enrutamiento en cliente y servidor, características de React 18, y
+  diseñado para Componentes del Servidor.
+author:
+  - name: Delba de Oliveira
+    image: /static/team/delba.jpg
+  - name: Lee Robinson
+    image: /static/team/lee.jpg
+  - name: Sebastian Markbåge
+    image: /static/team/seb.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2022-05-23T20:30:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/twitter-card.png
+---
+
+Este RFC (Request for Comment) describe la actualización más grande de Next.js desde su introducción en 2016:
+
+*   **Layouts anidados:** Construye aplicaciones complejas con rutas anidadas.
+*   **Diseñado para Componentes del Servidor:** Optimizado para navegación en subárboles.
+*   **Mejor obtención de datos:** Obtén datos en layouts evitando cascadas.
+*   **Uso de características de React 18:** Streaming, Transiciones y Suspense.
+*   **Enrutamiento en cliente y servidor:** Enrutamiento centrado en servidor con comportamiento _similar a SPA_.
+*   **100% adoptable incrementalmente:** Sin cambios disruptivos para una adopción gradual.
+*   **Patrones avanzados de enrutamiento:** Rutas paralelas, rutas interceptoras y más.
+
+El nuevo enrutador de Next.js se construirá sobre las [características recientemente lanzadas de React 18](https://reactjs.org/blog/2022/03/29/react-v18.html). Planeamos introducir valores predeterminados y convenciones que permitan adoptar fácilmente estas nuevas características y aprovechar sus beneficios.
+
+> El trabajo en este RFC está en curso y anunciaremos cuando las nuevas características estén disponibles. Para proporcionar feedback, únete a la conversación en [Github Discussions](https://github.com/vercel/next.js/discussions/37136).
+
+[Tabla de Contenidos](#tabla-de-contenidos)
+-------------------------------------------
+
+*   [Motivación](#motivación)
+*   [Terminología](#terminología)
+*   [Cómo funciona el enrutamiento actualmente](#cómo-funciona-el-enrutamiento-actualmente)
+*   [El directorio `app`](#introduciendo-el-enrutador-app)
+*   [Definiendo rutas](#definiendo-rutas)
+*   [Layouts](#layouts)
+*   [Páginas](#páginas)
+*   [Componentes del Servidor de React](#componentes-del-servidor-de-react)
+*   [Obtención de datos](#obtención-de-datos)
+*   [Grupos de rutas (Nuevo)](#grupos-de-rutas)
+*   [Enrutamiento centrado en servidor (Nuevo)](#enrutamiento-centrado-en-servidor)
+*   [Estados de carga instantáneos (Nuevo)](#estados-de-carga-instantáneos)
+*   [Manejo de errores (Nuevo)](#manejo-de-errores)
+*   [Plantillas (Nuevo)](#plantillas)
+*   [Patrones avanzados de enrutamiento (Nuevo)](#patrones-avanzados-de-enrutamiento)
+*   [Conclusión](#conclusión)
+
+[Motivación](#motivación)
+-------------------------
+
+Hemos recopilado feedback de la comunidad en GitHub, Discord, Reddit y nuestra encuesta de desarrolladores sobre las limitaciones actuales del enrutamiento en Next.js. Encontramos que:
+
+*   La experiencia del desarrollador al crear layouts puede mejorarse. Debería ser fácil crear layouts que puedan anidarse, compartirse entre rutas y preservar su estado en la navegación.
+*   Muchas aplicaciones de Next.js son paneles o consolas que se beneficiarían de soluciones de enrutamiento más avanzadas.
+
+Aunque el sistema de enrutamiento actual ha funcionado bien desde los inicios de Next.js, queremos facilitar la construcción de aplicaciones web más performantes y ricas en características.
+
+Como mantenedores del framework, también queremos construir un sistema de enrutamiento compatible con versiones anteriores y alineado con el futuro de React.
+
+> **Nota:** Algunas convenciones de enrutamiento se inspiraron en el enrutador basado en Relay de Meta, donde se desarrollaron originalmente algunas características de los Componentes del Servidor, así como en enrutadores del lado del cliente como React Router y Ember.js. La convención del archivo `layout.js` se inspiró en el trabajo realizado en SvelteKit. También agradecemos a [Cassidy](https://twitter.com/cassidoo) por abrir [un RFC anterior sobre layouts](https://github.com/vercel/next.js/discussions/26389).
+
+[Terminología](#terminología)
+-----------------------------
+
+Este RFC introduce nuevas convenciones y sintaxis de enrutamiento. La terminología se basa en React y términos estándar de la plataforma web. A lo largo del RFC, verás estos términos vinculados a sus definiciones.
+
+*   **Árbol:** Convención para visualizar una estructura jerárquica. Por ejemplo, un árbol de componentes con componentes padre e hijos, una estructura de carpetas, etc.
+*   **Subárbol:** Parte del árbol, comenzando en la raíz (primero) y terminando en las hojas (último).
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/terminology.png)
+
+*   **Ruta URL:** Parte de la URL que viene después del dominio.
+*   **Segmento URL:** Parte de la ruta URL delimitada por barras.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/url-anatomy.png)
+
+[Cómo funciona el enrutamiento actualmente](#cómo-funciona-el-enrutamiento-actualmente)
+--------------------------------------------------------------------------------------
+
+Actualmente, Next.js usa el sistema de archivos para mapear carpetas y archivos individuales en el directorio [Pages](/docs/pages/building-your-application/routing/pages-and-layouts) a rutas accesibles mediante URLs. Cada archivo **página** exporta un Componente React y tiene una **ruta** asociada basada en su nombre de archivo. Por ejemplo:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/routing-today.png)
+
+*   **Rutas dinámicas:** Next.js soporta [Rutas dinámicas](/docs/pages/building-your-application/routing/dynamic-routes) (incluyendo variaciones catch all) con las convenciones `[param].js`, `[...param].js` y `[[...param]].js`.
+*   **Layouts:** Next.js ofrece soporte para layouts simples [basados en componentes](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern), layouts por página usando un [patrón de propiedad](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern#per-page-layouts), y un layout global único usando una [app personalizada](/docs/pages/building-your-application/routing/pages-and-layouts#layout-pattern#single-shared-layout-with-custom-app).
+*   **Obtención de datos:** Next.js proporciona métodos de obtención de datos ([`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props), [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)) que pueden usarse a nivel de página (ruta). Estos métodos determinan si una página debe generarse estáticamente ([`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)) o renderizarse en el servidor ([`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)). Además, puedes usar [Regeneración Estática Incremental (ISR)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) para crear o actualizar páginas estáticas después de construir un sitio.
+*   **Renderizado:** Next.js ofrece tres opciones de renderizado: [Generación Estática](https://nextjs.org/learn/foundations/how-nextjs-works/rendering), [Renderizado en el Servidor](https://nextjs.org/learn/foundations/how-nextjs-works/rendering), y [Renderizado en el Cliente](https://nextjs.org/learn/foundations/how-nextjs-works/rendering). Por defecto, las páginas se generan estáticamente a menos que tengan un requerimiento de datos bloqueante (`getServerSideProps`).
+
+[Introduciendo el directorio `app`](#introduciendo-el-directorio-app)
+---------------------------------------------------------------------
+
+Para asegurar que estas mejoras puedan adoptarse incrementalmente y evitar cambios disruptivos, proponemos un nuevo directorio llamado `app`.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/app-folder.png)
+
+El directorio `app` funcionará junto al directorio `pages`. Puedes mover partes de tu aplicación gradualmente al nuevo directorio `app` para aprovechar las nuevas características. Para compatibilidad con versiones anteriores, el comportamiento del directorio `pages` permanecerá igual y seguirá siendo soportado.
+
+[Definiendo rutas](#definiendo-rutas)
+-------------------------------------
+
+Puedes usar la jerarquía de **carpetas** dentro de `app` para definir rutas. Una **ruta** es una única ruta de carpetas anidadas, siguiendo la jerarquía desde la **carpeta raíz** hasta una **carpeta hoja** final.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/routes.png)
+
+Por ejemplo, puedes añadir una nueva ruta `/dashboard/settings` anidando dos carpetas nuevas en el directorio `app`.
+
+> **Nota:**
+> 
+> *   Con este sistema, usarás carpetas para definir rutas y archivos para definir UI (con nuevas convenciones como `layout.js`, `page.js`, y en la segunda parte del RFC `loading.js`).
+> *   Esto permite colocar tus propios archivos de proyecto (componentes UI, archivos de prueba, stories, etc.) dentro del directorio `app`. Actualmente esto solo es posible con la [config pageExtensions](/docs/pages/api-reference/next-config-js/pageExtensions#including-non-page-files-in-the-pages-directory).
+
+### [Segmentos de ruta](#segmentos-de-ruta)
+
+Cada carpeta en el [subárbol](#terminología) representa un **segmento de ruta**. Cada segmento de ruta se mapea a un **segmento** correspondiente en una **[ruta URL](#terminología)**.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-segments.png)
+
+Por ejemplo, la ruta `/dashboard/settings` se compone de 3 segmentos:
+
+*   El segmento raíz `/`
+*   El segmento `dashboard`
+*   El segmento `settings`
+
+> **Nota**: El nombre **segmento de ruta** se eligió para coincidir con la terminología existente sobre [rutas URL](#terminología).
+
+[Layouts](#layouts)
+-------------------
+
+**Nueva convención de archivo:** `layout.js`
+
+Hasta ahora, hemos usado carpetas para definir las rutas de nuestra aplicación. Pero las carpetas vacías no hacen nada por sí mismas. Hablemos sobre cómo puedes definir la UI que se renderizará para estas rutas usando nuevas convenciones de archivos.
+
+Un **layout** es UI compartida entre segmentos de ruta en un [subárbol](#terminología). Los layouts no afectan las [rutas URL](#terminología) y no se vuelven a renderizar (el estado de React se preserva) cuando un usuario navega entre segmentos hermanos.
+
+Un layout puede definirse exportando por defecto un componente React desde un archivo `layout.js`. El componente debe aceptar una prop `children` que se llenará con los segmentos que el layout está envolviendo.
+
+Hay 2 tipos de layouts:
+
+*   **Layout raíz:** Aplica a todas las rutas
+*   **Layout regular:** Aplica a rutas específicas
+
+Puedes anidar dos o más layouts para formar **layouts anidados**.
+
+### [Layout raíz](#layout-raíz)
+
+Puedes crear un layout raíz que aplicará a todas las rutas de tu aplicación añadiendo un archivo `layout.js` dentro de la carpeta `app`.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/root-layout.png)
+
+> **Nota:**
+> 
+> *   El layout raíz reemplaza la necesidad de una [App personalizada (`_app.js`)](/docs/pages/building-your-application/routing/custom-app) y un [Documento personalizado (`_document.js`)](/docs/pages/building-your-application/routing/custom-document) ya que aplica a todas las rutas.
+> *   Podrás usar el layout raíz para personalizar el shell inicial del documento (ej. etiquetas `<html>` y `<body>`).
+> *   Podrás obtener datos dentro del layout raíz (y otros layouts).
+
+### [Layouts regulares](#layouts-regulares)
+
+También puedes crear un layout que solo aplique a parte de tu aplicación añadiendo un archivo `layout.js` dentro de una carpeta específica.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/regular-layouts.png)
+
+Por ejemplo, puedes crear un archivo `layout.js` dentro de la carpeta `dashboard` que solo aplicará a los segmentos de ruta dentro de `dashboard`.
+
+### [Anidando layouts](#anidando-layouts)
+
+Los layouts se **anidan** por defecto.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/nested-layouts.png)
+
+Por ejemplo, si combinamos los dos layouts anteriores. El layout raíz (`app/layout.js`) se aplicaría al layout `dashboard`, que también aplicaría a todos los segmentos de ruta dentro de `dashboard/*`.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/nested-layouts-example.png)
+
+[Páginas](#páginas)
+-------------------
+
+**Nueva convención de archivo:** `page.js`
+
+Una página es UI única para un segmento de ruta. Puedes crear una página añadiendo un archivo `page.js` dentro de una carpeta.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page.png)
+
+Por ejemplo, para crear páginas para las rutas `/dashboard/*`, puedes añadir un archivo `page.js` dentro de cada carpeta. Cuando un usuario visite `/dashboard/settings`, Next.js renderizará el archivo `page.js` para la carpeta `settings` envuelto en cualquier layout que exista más arriba en el [subárbol](#terminología).
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page-example.png)
+
+Puedes crear un archivo `page.js` directamente dentro de la carpeta dashboard para coincidir con la ruta `/dashboard`. El layout dashboard también aplicará a esta página:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/page-nested.png)
+
+Esta ruta se compone de 2 segmentos:
+
+*   El segmento raíz `/`
+*   El segmento `dashboard`
+
+> **Nota:**
+> 
+> *   Para que una ruta sea válida, necesita tener una página en su segmento hoja. Si no lo tiene, la ruta lanzará un error.
+
+### [Comportamiento de Layout y Página](#comportamiento-de-layout-y-página)
+
+*   Las extensiones de archivo `js|jsx|ts|tsx` pueden usarse para Páginas y Layouts.
+*   Los Componentes de Página son la exportación por defecto de `page.js`.
+*   Los Componentes de Layout son la exportación por defecto de `layout.js`.
+*   Los Componentes de Layout **deben** aceptar una prop `children`.
+
+Cuando se renderiza un componente layout, la prop `children` se llenará con un layout hijo (si existe más abajo en el [subárbol](#terminología)) o una página.
+
+Puede ser más fácil visualizarlo como un [árbol](#terminología) de layouts donde el layout padre seleccionará el layout hijo más cercano hasta llegar a una página.
+
+**Ejemplo:**
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/basic-example.png)
+
+```js filename="app/layout.js"
+// Layout raíz
+// - Aplica a todas las rutas
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <Header />
+        {children}
+        <Footer />
+      </body>
+    </html>
+  );
+}
+```
+
+```js filename="app/dashboard/layout.js"
+// Layout regular
+// - Aplica a segmentos de ruta en app/dashboard/*
+export default function DashboardLayout({ children }) {
+  return (
+    <>
+      <DashboardSidebar />
+      {children}
+    </>
+  );
+}
+```
+
+```js filename="app/dashboard/analytics/page.js"
+// Componente de Página
+// - La UI para el segmento `app/dashboard/analytics`
+// - Coincide con la ruta URL `acme.com/dashboard/analytics`
+export default function AnalyticsPage() {
+  return <main>...</main>;
+}
+```
+
+La combinación anterior de layouts y páginas renderizaría la siguiente jerarquía de componentes:
+
+```tsx filename="Jerarquía de componentes"
+<RootLayout>
+  <Header />
+  <DashboardLayout>
+    <DashboardSidebar />
+    <AnalyticsPage>
+      <main>...</main>
+    </AnalyticsPage>
+  </DashboardLayout>
+  <Footer />
+</RootLayout>
+```
+
+[Componentes del Servidor de React](#componentes-del-servidor-de-react)
+----------------------------------------------------------------------
+
+> **Nota:** React introdujo nuevos tipos de componentes: Servidor, Cliente (componentes React tradicionales) y Compartidos. Para aprender más sobre estos nuevos tipos, recomendamos leer el [RFC de Componentes del Servidor](https://reactjs.org/blog/2020/12/21/data-fetching-with-react-server-components.html) de React.
+
+Con este RFC, puedes empezar a usar características de React y adoptar incrementalmente Componentes del Servidor en tu aplicación Next.js.
+
+El sistema interno del nuevo enrutamiento también aprovechará características recientemente lanzadas de React como Streaming, Suspense y Transiciones. Estos son los bloques de construcción para los Componentes del Servidor.
+
+### [Componentes del Servidor como predeterminados](#componentes-del-servidor-como-predeterminados)
+
+Uno de los mayores cambios entre los directorios `pages` y `app` es que, por defecto, **los archivos dentro de `app` se renderizarán en el servidor como Componentes del Servidor de React.**
+
+Esto te permitirá adoptar automáticamente Componentes del Servidor al migrar de `pages` a `app`.
+
+> **Nota:** Los componentes del servidor pueden usarse en la carpeta `app` o tus propias carpetas, pero no pueden usarse en el directorio `pages` por compatibilidad con versiones anteriores.
+
+### [Convención de Componentes de Cliente y Servidor](#client-and-server-components-convention)
+
+La carpeta `app` admitirá componentes de servidor, cliente y compartidos, y podrá [intercalar estos componentes en un árbol](#interleaving-client-and-server-components-in-a-route).
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/server-components.png)
+
+Actualmente hay una [discusión en curso](https://github.com/reactjs/rfcs/pull/189#issuecomment-1116482278) sobre cuál será exactamente la convención para definir Componentes de Cliente y Componentes de Servidor. Seguiremos la resolución de esta discusión.
+
+*   Por ahora, los componentes de servidor pueden definirse añadiendo `.server.js` al nombre del archivo. Ejemplo: `layout.server.js`
+*   Los componentes de cliente pueden definirse añadiendo `.client.js` al nombre del archivo. Ejemplo: `page.client.js`.
+*   Los archivos `.js` se consideran componentes compartidos. Dado que pueden renderizarse tanto en el Servidor como en el Cliente, deben respetar las restricciones de cada contexto.
+
+> **Nota:**
+> 
+> *   Los componentes de Cliente y Servidor tienen [restricciones](https://github.com/josephsavona/rfcs/blob/server-components/text/0000-server-components.md#capabilities--constraints-of-server-and-client-components) que deben respetarse. Al decidir usar un componente de cliente o servidor, recomendamos usar componentes de servidor (por defecto) hasta que necesite usar un componente de cliente.
+
+### [Hooks](#hooks)
+
+Añadiremos hooks para componentes de Cliente y Servidor que le permitirán acceder al objeto de encabezados, cookies, nombres de ruta, parámetros de búsqueda, etc. En el futuro, tendremos documentación con más información.
+
+### [Entornos de Renderizado](#rendering-environments)
+
+Tendrá control granular sobre qué componentes estarán en el paquete de JavaScript del lado del cliente utilizando la convención de Componentes de Cliente y Servidor.
+
+Por defecto, las rutas en `app` usarán Generación Estática y cambiarán a renderizado dinámico cuando un segmento de ruta utilice [hooks del lado del servidor](#hooks) que requieran contexto de solicitud.
+
+### [Intercalar Componentes de Cliente y Servidor en una Ruta](#interleaving-client-and-server-components-in-a-route)
+
+En React, existe una restricción sobre importar Componentes de Servidor dentro de Componentes de Cliente porque los Componentes de Servidor podrían tener código exclusivo del servidor (por ejemplo, utilidades de base de datos o sistema de archivos).
+
+Por ejemplo, importar el Componente de Servidor no funcionaría:
+
+```js filename="ClientComponent.js"
+import ServerComponent from './ServerComponent.js';
+ 
+export default function ClientComponent() {
+  return (
+    <>
+      <ServerComponent />
+    </>
+  );
+}
+```
+
+Sin embargo, un Componente de Servidor puede pasarse como hijo de un Componente de Cliente. Puede hacer esto **envolviéndolos** en otro Componente de Servidor. Por ejemplo:
+
+```js filename="ClientComponent.js"
+export default function ClientComponent({ children }) {
+  return (
+    <>
+      <h1>Componente de Cliente</h1>
+      {children}
+    </>
+  );
+}
+ 
+// ServerComponent.js
+export default function ServerComponent() {
+  return (
+    <>
+      <h1>Componente de Servidor</h1>
+    </>
+  );
+}
+ 
+// page.js
+// Es posible importar Componentes de Cliente y Servidor dentro de Componentes de Servidor
+// porque este componente se renderiza en el servidor
+import ClientComponent from "./ClientComponent.js";
+import ServerComponent from "./ServerComponent.js";
+ 
+export default function ServerComponentPage() {
+  return (
+    <>
+      <ClientComponent>
+        <ServerComponent />
+      </ClientComponent>
+    </>
+  );
+}
+```
+
+Con este patrón, React sabrá que necesita renderizar `ServerComponent` en el servidor antes de enviar el resultado (que no contiene ningún código exclusivo del servidor) al cliente. Desde la perspectiva del Componente de Cliente, su hijo ya estará renderizado.
+
+En diseños (layouts), este patrón se aplica con la prop `children` para que no tenga que crear un componente envoltorio adicional.
+
+Por ejemplo, el componente `ClientLayout` aceptará el componente `ServerPage` como su hijo:
+
+```js filename="app/dashboard/layout.js"
+// El Diseño del Dashboard es un Componente de Cliente
+export default function ClientLayout({ children }) {
+  // Puede usar useState / useEffect aquí
+  return (
+    <>
+      <h1>Diseño</h1>
+      {children}
+    </>
+  );
+}
+ 
+// La Página es un Componente de Servidor que se pasará al Diseño del Dashboard
+// app/dashboard/settings/page.js
+export default function ServerPage() {
+  return (
+    <>
+      <h1>Página</h1>
+    </>
+  );
+}
+```
+
+> **Nota:** Este estilo de composición es un patrón importante para renderizar Componentes de Servidor dentro de Componentes de Cliente. Establece el precedente de un patrón a aprender y es una de las razones por las que hemos decidido usar la prop `children`.
+
+[Obtención de Datos](#data-fetching)
+------------------------------------
+
+Será posible obtener datos dentro de múltiples segmentos en una ruta. Esto es diferente del directorio `pages`, donde la obtención de datos estaba limitada al nivel de página.
+
+### [Obtención de datos en Diseños](#data-fetching-in-layouts)
+
+Puede obtener datos en un archivo `layout.js` usando los métodos de obtención de datos de Next.js `getStaticProps` o `getServerSideProps`.
+
+Por ejemplo, un diseño de blog podría usar `getStaticProps` para obtener categorías de un CMS, que pueden usarse para poblar un componente de barra lateral:
+
+```js filename="app/blog/layout.js"
+export async function getStaticProps() {
+  const categories = await getCategoriesFromCMS();
+ 
+  return {
+    props: { categories },
+  };
+}
+ 
+export default function BlogLayout({ categories, children }) {
+  return (
+    <>
+      <BlogSidebar categories={categories} />
+      {children}
+    </>
+  );
+}
+```
+
+### [Múltiples métodos de obtención de datos en una ruta](#multiple-data-fetching-methods-in-a-route)
+
+También puede obtener datos en múltiples segmentos de una ruta. Por ejemplo, un `layout` que obtiene datos también puede envolver una `page` que obtiene sus propios datos.
+
+Usando el ejemplo del blog anterior, una página de publicación individual puede usar `getStaticProps` y `getStaticPaths` para obtener datos de publicación de un CMS:
+
+```js filename="app/blog/[slug]/page.js"
+export async function getStaticPaths() {
+  const posts = await getPostSlugsFromCMS();
+ 
+  return {
+    paths: posts.map((post) => ({
+      params: { slug: post.slug },
+    })),
+  };
+}
+ 
+export async function getStaticProps({ params }) {
+  const post = await getPostFromCMS(params.slug);
+ 
+  return {
+    props: { post },
+  };
+}
+ 
+export default function BlogPostPage({ post }) {
+  return <Post post={post} />;
+}
+```
+
+Dado que tanto `app/blog/layout.js` como `app/blog/[slug]/page.js` usan `getStaticProps`, Next.js generará estáticamente toda la ruta `/blog/[slug]` como **Componentes de Servidor de React** en tiempo de compilación, lo que resultará en menos JavaScript del lado del cliente y una hidratación más rápida.
+
+Las rutas generadas estáticamente mejoran esto aún más, ya que la navegación del cliente reutiliza la caché (datos de Componentes de Servidor) y no vuelve a calcular el trabajo, lo que lleva a menos tiempo de CPU porque está renderizando una instantánea de los Componentes de Servidor.
+
+### [Comportamiento y prioridad](#behavior-and-priority)
+
+Los métodos de obtención de datos de Next.js (`getServerSideProps` y `getStaticProps`) solo pueden usarse en Componentes de Servidor en la carpeta `app`. Diferentes métodos de obtención de datos en segmentos a través de una sola ruta se afectan entre sí.
+
+Usar `getServerSideProps` en un segmento afectará a `getStaticProps` en otros segmentos. Dado que una solicitud ya tiene que ir a un servidor para el segmento `getServerSideProps`, el servidor también renderizará cualquier segmento `getStaticProps`. Reutilizará las props obtenidas en tiempo de compilación, por lo que los datos seguirán siendo estáticos, el **renderizado** ocurre bajo demanda en cada solicitud con las props generadas durante `next build`.
+
+Usar `getStaticProps` con **revalidación (ISR)** en un segmento afectará a `getStaticProps` con `revalidate` en otros segmentos. Si hay dos períodos de revalidación en una ruta, el período de revalidación más corto tendrá prioridad.
+
+> **Nota:** En el futuro, esto podría optimizarse para permitir una granularidad completa de obtención de datos en una ruta.
+
+### [Obtención de datos con Componentes de Servidor de React](#data-fetching-with-react-server-components)
+
+La combinación de Enrutamiento del Lado del Servidor, Componentes de Servidor de React, Suspense y Streaming tiene algunas implicaciones para la obtención de datos y el renderizado en Next.js:
+
+### [Obtención de datos en paralelo](#parallel-data-fetching)
+
+Next.js iniciará la obtención de datos en paralelo para minimizar las cascadas. Por ejemplo, si la obtención de datos fuera **secuencial**, cada segmento anidado en la ruta no podría comenzar a obtener datos hasta que se completara el segmento anterior. Con la obtención **en paralelo**, sin embargo, cada segmento puede comenzar a obtener datos al mismo tiempo.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel.png)
+
+Dado que el renderizado puede depender del Contexto, el renderizado para cada segmento comenzará una vez que se hayan obtenido sus datos y su padre haya terminado de renderizar.
+
+En el futuro, con Suspense, el renderizado también podría comenzar inmediatamente, incluso si los datos no están completamente cargados. Si los datos se leen antes de que estén disponibles, se activará Suspense. React comenzará a renderizar Componentes de Servidor optimistamente, antes de que se completen las solicitudes, y colocará el resultado a medida que se resuelvan las solicitudes.
+
+### [Obtención y Renderizado Parcial](#partial-fetching-and-rendering)
+
+Al navegar entre segmentos de ruta hermanos, Next.js solo obtendrá y renderizará desde ese segmento hacia abajo. No necesitará volver a obtener ni renderizar nada por encima. Esto significa que en una página que comparte un diseño, el diseño se conservará cuando un usuario navegue entre páginas hermanas, y Next.js solo obtendrá y renderizará desde ese segmento hacia abajo.
+
+Esto es especialmente útil para los Componentes de Servidor de React, ya que de lo contrario cada navegación causaría que la página completa se vuelva a renderizar en el servidor en lugar de renderizar solo la parte cambiada de la página en el servidor. Esto reduce la cantidad de datos transferidos y el tiempo de ejecución, lo que lleva a un mejor rendimiento.
+
+Por ejemplo, si el usuario navega entre las páginas `/analytics` y `/settings`, React volverá a renderizar los segmentos de página pero conservará los diseños:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/partial-example.png)
+
+> **Nota:** Será posible forzar una nueva obtención de datos más arriba en el [árbol](#terminology). Todavía estamos discutiendo los detalles de cómo se verá esto y actualizaremos el RFC.
+
+[Grupos de Rutas](#route-groups)
+-------------------------------
+
+La jerarquía de la carpeta `app` se asigna directamente a las rutas de URL. Pero es posible salir de este patrón creando un grupo de rutas. Los grupos de rutas pueden usarse para:
+
+*   Organizar rutas sin afectar la estructura de URL.
+*   Excluir un segmento de ruta de un diseño.
+*   Crear múltiples diseños raíz dividiendo la aplicación.
+
+### [Convención](#convention)
+
+Un grupo de rutas puede crearse envolviendo el nombre de una carpeta entre paréntesis: `(nombreDeCarpeta)`
+
+> **Nota:** Los nombres de los grupos de rutas son solo para fines organizativos, ya que no afectan la ruta de URL.
+
+**Ejemplo: Excluir una ruta de un diseño**
+
+Para excluir una ruta de un diseño, cree un nuevo grupo de rutas (por ejemplo, `(shop)`) y mueva las rutas que comparten el mismo diseño al grupo (por ejemplo, `account` y `cart`). Las rutas fuera del grupo no compartirán el diseño (por ejemplo, `checkout`).
+
+Antes:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-opt-out-before.png)
+
+Después:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-opt-out-after.png)
+
+**Ejemplo: Organizar rutas sin afectar la ruta de URL**
+
+De manera similar, para organizar rutas, cree un grupo para mantener juntas las rutas relacionadas. Las carpetas entre paréntesis se omitirán de la URL (por ejemplo, `(marketing)` o `(shop)`).
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-organisation.png)
+
+**Ejemplo: Crear múltiples diseños raíz**
+
+Para crear múltiples diseños raíz, cree dos o más grupos de rutas en el nivel superior del directorio `app`. Esto es útil para dividir una aplicación en secciones que tienen una interfaz de usuario o experiencia completamente diferente. Las etiquetas `<html>`, `<body>` y `<head>` de cada diseño raíz pueden personalizarse por separado.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/route-group-multiple-root.png)
+
+[Enrutamiento Centrado en el Servidor](#server-centric-routing)
+-------------------------------------------------------------
+
+Actualmente, Next.js usa enrutamiento del lado del cliente. Después de la carga inicial y en navegaciones posteriores, se realiza una solicitud al servidor para los recursos de la nueva página. Esto incluye el **JavaScript para cada componente** (incluidos los componentes que solo se muestran bajo ciertas condiciones) y sus props (datos JSON de `getServerSideProps` o `getStaticProps`). Una vez que tanto el JavaScript como los datos se cargan desde el servidor, **React renderiza los componentes del lado del cliente.**
+
+En este nuevo modelo, Next.js usará enrutamiento centrado en el servidor mientras mantiene transiciones del lado del cliente. Esto se alinea con los Componentes de Servidor que se evalúan en el servidor.
+
+En la navegación, los datos se obtienen y React renderiza los componentes **del lado del servidor**. La salida del servidor son instrucciones especiales (no HTML ni JSON) para React en el cliente para actualizar el DOM. Estas instrucciones contienen el **resultado** de los Componentes de Servidor renderizados, lo que significa que no es necesario cargar JavaScript para ese componente en el navegador para renderizar el resultado.
+
+Esto contrasta con el valor predeterminado actual de Componentes de Cliente, que envían el JavaScript del componente al navegador para ser renderizado del lado del cliente.
+
+Algunos beneficios del enrutamiento centrado en el servidor con Componentes de Servidor de React incluyen:
+
+*   El enrutamiento utiliza la misma solicitud que se usa para los Componentes de Servidor (no se realizan solicitudes adicionales al servidor).
+*   Se realiza menos trabajo en el servidor porque navegar entre rutas solo obtiene y renderiza los segmentos que cambian.
+*   No se carga JavaScript adicional en el navegador al navegar del lado del cliente cuando no se usan nuevos componentes de cliente.
+*   El enrutador aprovecha un nuevo protocolo de transmisión (streaming) para que el renderizado pueda comenzar antes de que se carguen todos los datos.
+
+A medida que los usuarios navegan por una aplicación, el enrutador almacenará el resultado de la _carga útil_ del Componente de Servidor de React en una caché del lado del cliente en memoria. La caché se divide por segmentos de ruta, lo que permite la invalidación en cualquier nivel y garantiza la coherencia entre renderizados concurrentes. Esto significa que, en ciertos casos, se puede reutilizar la caché de un segmento obtenido previamente.
+
+> **Nota**
+> 
+> *   La Generación Estática y el almacenamiento en caché del lado del servidor pueden usarse para optimizar la obtención de datos.
+> *   La información anterior describe el comportamiento de las navegaciones posteriores. La carga inicial es un proceso diferente que implica Renderizado del Lado del Servidor para generar HTML.
+> *   Si bien el enrutamiento del lado del cliente ha funcionado bien para Next.js, escala mal cuando el número de rutas potenciales es grande porque el cliente tiene que descargar un **mapa de rutas.**
+> *   En general, al usar Componentes de Servidor de React, la navegación del lado del cliente es más rápida porque cargamos y renderizamos menos componentes en el navegador.
+
+[Estados de Carga Instantáneos](#instant-loading-states)
+-------------------------------------------------------
+
+Con el enrutamiento del lado del servidor, la navegación ocurre **después** de la obtención de datos y el renderizado, por lo que es importante mostrar una interfaz de usuario de carga mientras se obtienen los datos; de lo contrario, la aplicación parecerá no responder.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/server-side-routing.png)
+
+El nuevo enrutador usará [Suspense](https://reactjs.org/docs/react-api.html#reactsuspense) para estados de carga instantáneos y esqueletos predeterminados. Esto significa que la interfaz de usuario de carga puede mostrarse inmediatamente mientras se carga el contenido para el nuevo segmento. El nuevo contenido se intercambia una vez que se completa el renderizado en el servidor.
+
+Mientras ocurre el renderizado:
+
+*   La navegación a la nueva ruta será inmediata.
+*   Los diseños compartidos permanecerán interactivos mientras se cargan los nuevos segmentos de ruta.
+*   La navegación será interrumpible, lo que significa que el usuario puede navegar entre rutas mientras se carga el contenido de una ruta.
+
+### [Esqueletos de carga predeterminados](#default-loading-skeletons)
+
+Los límites de Suspense se manejarán automáticamente en segundo plano con una nueva convención de archivo llamada `loading.js`.
+
+**Ejemplo:**
+
+Podrá crear un esqueleto de carga predeterminado añadiendo un archivo `loading.js` dentro de una carpeta.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/loading.png)
+
+El archivo `loading.js` debe exportar un componente de React:
+
+```js filename="loading.js"
+export default function Loading() {
+  return <YourSkeleton />
+}
+ 
+// layout.js
+export default function Layout({children}) {
+  return (
+    <>
+      <Sidebar />
+      {children}
+    </>
+  )
+}
+ 
+// Salida
+<>
+  <Sidebar />
+  <Suspense fallback={<Loading />}>{children}</Suspense>
+</>
+```
+
+Esto hará que todos los segmentos en la carpeta se envuelvan en un límite de suspense. El esqueleto predeterminado se usará cuando el diseño se cargue por primera vez y al navegar entre páginas hermanas.
+
+[Manejo de errores](#error-handling)
+---------------------------------
+
+Los [límites de error](https://reactjs.org/docs/error-boundaries.html) son componentes de React que capturan errores de JavaScript en cualquier parte de su árbol de componentes hijos.
+
+### [Convención](#convention-1)
+
+Podrá crear un Límite de Error que capturará errores dentro de un subárbol añadiendo un archivo `error.js` y exportando por defecto un componente de React.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/error.png)
+
+El componente se mostrará como respaldo si se lanza un error dentro de ese subárbol. Este componente puede usarse para registrar errores, mostrar información útil sobre el error y funcionalidad para intentar recuperarse del error.
+
+Debido a la naturaleza anidada de los segmentos y diseños, crear límites de error permite aislar errores a esas partes de la interfaz de usuario. Durante un error, los diseños por encima del límite permanecerán interactivos y su estado se preservará.
+
+```js filename="error.js"
+export default function Error({ error, reset }) {
+  return (
+    <>
+      Ocurrió un error: {error.message}
+      <button onClick={() => reset()}>Intentar de nuevo</button>
+    </>
+  );
+}
+ 
+// layout.js
+export default function Layout({children}) {
+  return (
+    <>
+      <Sidebar />
+      {children}
+    </>
+  )
+}
+ 
+// Salida
+<>
+  <Sidebar />
+  <ErrorBoundary fallback={<Error />}>{children}</ErrorBoundary>
+</>
+```
+
+> Nota:
+> 
+> *   Los errores dentro de un archivo `layout.js` en el mismo segmento que un `error.js` no se capturarán, ya que el límite de error automático envuelve a los hijos de un diseño y no al diseño en sí.
+
+[Plantillas](#templates)
+-----------------------
+
+Las plantillas son similares a los diseños en que envuelven cada diseño o página hijo.
+
+A diferencia de los diseños que persisten entre rutas y mantienen el estado, las plantillas crean una nueva instancia para cada uno de sus hijos. Esto significa que cuando un usuario navega entre segmentos de ruta que comparten una plantilla, se monta una nueva instancia del componente.
+
+> **Nota:** Recomendamos usar diseños a menos que tenga una razón específica para usar una plantilla.
+
+### [Convención](#convention-2)
+
+Una plantilla puede definirse exportando un componente predeterminado de React desde un archivo `template.js`. El componente debe aceptar una propiedad `children` que se llenará con los segmentos anidados.
+
+### [Ejemplo](#example)
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/template.png)
+
+```js filename="template.js"
+export default function Template({ children }) {
+  return <Container>{children}</Container>;
+}
+```
+
+El resultado renderizado de un segmento de ruta con un Diseño y una Plantilla será así:
+
+```
+<Layout>
+  {/* Note que la plantilla recibe una clave única. */}
+  <Template key={routeParam}>{children}</Template>
+</Layout>
+```
+
+### [Comportamiento](#behavior)
+
+Puede haber casos donde necesite montar y desmontar UI compartida, y las plantillas serían una opción más adecuada. Por ejemplo:
+
+*   Animaciones de entrada/salida usando CSS o bibliotecas de animación
+*   Funcionalidades que dependen de `useEffect` (ej. registro de visitas de página) y `useState` (ej. un formulario de feedback por página)
+*   Para cambiar el comportamiento predeterminado del framework. Ej. los límites de suspense dentro de Diseños solo muestran el respaldo la primera vez que se carga el Diseño y no al cambiar de página. Para plantillas, el respaldo se muestra en cada navegación.
+
+Por ejemplo, considere el diseño de un diseño anidado con un contenedor con borde que debe envolver cada subpágina.
+
+Podría poner el contenedor dentro del diseño padre (`shop/layout.js`):
+
+```js filename="shop/layout.js"
+export default function Layout({ children }) {
+  return <div className="container">{children}</div>;
+}
+ 
+// shop/page.js
+export default function Page() {
+  return <div>...</div>;
+}
+ 
+// shop/categories/layout.js
+export default function CategoryLayout({ children }) {
+  return <div>{children}</div>;
+}
+```
+
+Pero cualquier animación de entrada/salida no se reproduciría al cambiar de página porque el diseño padre compartido no se vuelve a renderizar.
+
+Podría poner el contenedor en cada diseño o página anidada:
+
+```js filename="shop/layout.js"
+export default function Layout({ children }) {
+  return <div>{children}</div>;
+}
+ 
+// shop/page.js
+export default function Page() {
+  return <div className="container">...</div>;
+}
+ 
+// shop/categories/layout.js
+export default function CategoryLayout({ children }) {
+  return <div className="container">{children}</div>;
+}
+```
+
+Pero entonces tendría que ponerlo manualmente en cada diseño o página anidada, lo cual puede ser tedioso y propenso a errores en aplicaciones más complejas.
+
+Con esta convención, puede compartir plantillas entre rutas que crean una nueva instancia en la navegación. Esto significa que los elementos DOM se recrearán, el estado no se preservará y los efectos se resincronizarán.
+
+[Patrones avanzados de enrutamiento](#advanced-routing-patterns)
+-------------------------------------------------------
+
+Planeamos introducir convenciones para cubrir casos extremos y permitirle implementar patrones de enrutamiento más avanzados. A continuación hay algunos ejemplos en los que hemos estado pensando activamente:
+
+### [Rutas interceptadas](#intercepting-routes)
+
+A veces puede ser útil interceptar segmentos de ruta desde otras rutas. En la navegación, la URL se actualizará normalmente, pero el segmento interceptado se mostrará dentro del diseño de la ruta actual.
+
+#### [Ejemplo](#example-1)
+
+**Antes:** Hacer clic en la imagen lleva a una nueva ruta con su propio diseño.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-routes-before.png)
+
+**Después:** Al interceptar la ruta, hacer clic en la imagen ahora carga el segmento dentro del diseño de la ruta actual. Ej. como un modal.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-routes-after.png)
+
+Para interceptar la ruta `/photo/[id]` desde el segmento `/[username]`, cree una carpeta duplicada `/photo/[id]` dentro de la carpeta `/[username]` y prefíjela con la convención `(..)`.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-route.png)
+
+#### [Convención](#convention-3)
+
+*   `(..)` - coincidirá con el segmento de ruta un nivel superior (hermano del directorio padre). Similar a `../` en rutas relativas.
+*   `(..)(..)` - coincidirá con el segmento de ruta dos niveles superiores. Similar a `../../` en rutas relativas.
+*   `(...)` - coincidirá con el segmento de ruta en el directorio raíz.
+
+> **Nota:** Actualizar o compartir la página cargará la ruta con su diseño predeterminado.
+
+### [Rutas paralelas dinámicas](#dynamic-parallel-routes)
+
+A veces puede ser útil mostrar dos o más segmentos hoja (`page.js`) en la misma vista que pueden navegarse independientemente.
+
+Tomemos como ejemplo dos o más grupos de pestañas dentro del mismo panel. Navegar un grupo de pestañas no debería afectar al otro. Las combinaciones de pestañas también deberían restaurarse correctamente al navegar hacia atrás y adelante.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes.png)
+
+#### [Convención](#convention-4)
+
+Por defecto, los diseños aceptan una propiedad llamada `children` que contendrá un diseño anidado o una página. Puede renombrar la propiedad creando un "slot" nombrado (una carpeta que incluya el prefijo `@`) y anidando segmentos dentro de él.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes-children.png)
+
+Después de este cambio, el diseño recibirá una propiedad llamada `customProp` en lugar de `children`.
+
+```js filename="analytics/layout.js"
+export default function Layout({ customProp }) {
+  return <>{customProp}</>;
+}
+```
+
+Puede crear rutas paralelas añadiendo más de un slot nombrado en el mismo nivel. En el ejemplo siguiente, tanto `@views` como `@audience` se pasan como propiedades al diseño de analytics.
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/parallel-routes-complete.png)
+
+Puede usar los slots nombrados para mostrar segmentos hoja simultáneamente.
+
+```js filename="analytics/layout.js"
+export default function Layout({ views, audience }) {
+  return (
+    <>
+      <div>
+        <ViewsNav />
+        {views}
+      </div>
+      <div>
+        <AudienceNav />
+        {audience}
+      </div>
+    </>
+  );
+}
+```
+
+Cuando el usuario navega primero a `/analytics`, se muestra el segmento `page.js` en cada carpeta (`@views` y `@audience`).
+
+Al navegar a `/analytics/subscribers`, solo se actualiza `@audience`. Similarmente, solo `@views` se actualiza al navegar a `/analytics/impressions`.
+
+Navegar hacia atrás y adelante reinstaurará la combinación correcta de rutas paralelas.
+
+[Combinando rutas interceptadas y paralelas](#combining-intercepting-and-parallel-routes)
+-----------------------------------------------------------------------------------------
+
+Puede combinar rutas interceptadas y paralelas para lograr comportamientos de enrutamiento específicos en su aplicación.
+
+**Ejemplo**
+
+Por ejemplo, al crear un modal, a menudo necesita ser consciente de algunos desafíos comunes, como:
+
+*   Los modales no son accesibles a través de una URL.
+*   Los modales se cierran cuando se actualiza la página.
+*   La navegación hacia atrás va a la ruta anterior en lugar de la ruta detrás del modal.
+*   La navegación hacia adelante no reabre el modal.
+
+Puede querer que el modal actualice la URL cuando se abre, y que la navegación hacia atrás/adelante abra y cierre el modal. Adicionalmente, al compartir la URL, puede querer que la página cargue con el modal abierto y el contexto detrás de él o puede querer que la página cargue el contenido sin el modal.
+
+Un buen ejemplo de esto son las fotos en sitios de redes sociales. Usualmente, las fotos son accesibles dentro de un modal desde el feed o perfil del usuario. Pero al compartir la foto, se muestran directamente en su propia página.
+
+Usando convenciones, podemos hacer que el comportamiento del modal se mapee al comportamiento de enrutamiento por defecto.
+
+Considere esta estructura de carpetas:
+
+![](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/layouts-rfc/intercepted-route-modal.png)
+
+Con este patrón:
+
+*   El contenido de `/photo/[id]` es accesible a través de una URL dentro de su propio contexto. También es accesible dentro de un modal desde la ruta `/[username]`.
+*   Navegar hacia atrás y adelante usando navegación del lado del cliente debería cerrar y reabrir el modal.
+*   Actualizar la página (navegación del lado del servidor) debería llevar al usuario a la ruta original `/photo/id` en lugar de mostrar el modal.
+
+En `/@modal/(..)photo/[id]/page.js`, puede devolver el contenido de la página envuelto en un componente modal.
+
+```js filename="/@modal/(..)photo/[id]/page.js"
+export default function PhotoPage() {
+  const router = useRouter();
+ 
+  return (
+    <Modal
+      // el modal siempre debe mostrarse al cargar la página
+      isOpen={true}
+      // cerrar el modal debe llevar al usuario a la página anterior
+      onClose={() => router.back()}
+    >
+      {/* Contenido de la página */}
+    </Modal>
+  );
+}
+```
+
+> **Nota:** Esta solución no es la única forma de crear un modal en Next.js, pero pretende mostrar cómo puede combinar convenciones para lograr comportamientos de enrutamiento más complejos.
+
+[Rutas condicionales](#conditional-routes)
+-----------------------------------------
+
+A veces, puede necesitar información dinámica como datos o contexto para determinar qué ruta mostrar. Puede usar rutas paralelas para cargar condicionalmente una ruta u otra.
+
+**Ejemplo**
+
+```js filename="layout.js"
+export async function getServerSideProps({ params }) {
+  const { accountType } = await fetchAccount(params.slug);
+  return { props: { isUser: accountType === 'user' } };
+}
+ 
+export default function UserOrTeamLayout({ isUser, user, team }) {
+  return <>{isUser ? user : team}</>;
+}
+```
+
+En el ejemplo anterior, puede devolver la ruta `user` o `team` dependiendo del slug. Esto le permite cargar condicionalmente los datos y hacer coincidir las subrutas con una opción u otra.
+
+[Conclusión](#conclusion)
+-------------------------
+
+Estamos emocionados por el futuro de los diseños, enrutamiento y React 18 en Next.js. El trabajo de implementación ha comenzado y anunciaremos las funciones una vez que estén disponibles.
+
+Deje comentarios y [únete a la conversación en GitHub Discussions](https://github.com/vercel/next.js/discussions/37136).
