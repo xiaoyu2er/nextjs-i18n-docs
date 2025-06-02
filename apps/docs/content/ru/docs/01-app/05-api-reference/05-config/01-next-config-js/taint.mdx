@@ -1,0 +1,228 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:13:33.765Z
+title: taint
+description: Включение поддержки экспериментальных API React для пометки объектов и значений.
+version: experimental
+---
+
+## Использование
+
+Опция `taint` включает поддержку экспериментальных API React для пометки объектов и значений. Эта функция помогает предотвратить случайную передачу конфиденциальных данных клиенту. При включении вы можете использовать:
+
+- [`experimental_taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) для пометки ссылок на объекты.
+- [`experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue) для пометки уникальных значений.
+
+> **Полезно знать**: Активация этого флага также включает экспериментальный канал React для директории `app`.
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    taint: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **Предупреждение:** Не полагайтесь на API пометки как на единственный механизм предотвращения утечки конфиденциальных данных клиенту. См. наши [рекомендации по безопасности](/blog/security-nextjs-server-components-actions).
+
+API пометки позволяют быть более защищёнными, декларативно и явно отмечая данные, которые не должны пересекать границу сервер-клиент. Когда объект или значение передаются через эту границу, React выбрасывает ошибку.
+
+Это полезно в случаях, когда:
+
+- Методы чтения данных находятся вне вашего контроля
+- Вам приходится работать с конфиденциальными структурами данных, которые вы не определяли
+- Конфиденциальные данные доступны во время рендеринга серверного компонента
+
+Рекомендуется проектировать ваши данные и API так, чтобы конфиденциальные данные не возвращались в контексты, где они не нужны.
+
+## Ограничения
+
+- Пометка может отслеживать объекты только по ссылке. Копирование объекта создаёт немеченую версию, которая теряет все гарантии API. Вам нужно пометить копию.
+- Пометка не может отслеживать данные, производные от помеченного значения. Вам также нужно пометить производное значение.
+- Значения остаются помеченными, пока их ссылка находится в области видимости. Подробнее см. в [справочнике параметров `experimental_taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue#parameters).
+
+## Примеры
+
+### Пометка ссылки на объект
+
+В этом случае функция `getUserDetails` возвращает данные о пользователе. Мы помечаем ссылку на объект пользователя, чтобы он не мог пересечь границу сервер-клиент. Например, предположим, что `UserCard` — это клиентский компонент.
+
+```ts switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id: string): UserDetails {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'Не используйте весь объект с информацией о пользователе. Вместо этого выбирайте только необходимые поля.',
+    user
+  )
+
+  return user
+}
+```
+
+```js switcher
+import { experimental_taintObjectReference } from 'react'
+
+function getUserDetails(id) {
+  const user = await db.queryUserById(id)
+
+  experimental_taintObjectReference(
+    'Не используйте весь объект с информацией о пользователе. Вместо этого выбирайте только необходимые поля.',
+    user
+  )
+
+  return user
+}
+```
+
+Мы по-прежнему можем обращаться к отдельным полям помеченного объекта `userDetails`.
+
+```tsx filename="app/contact/page.tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+```jsx filename="app/contact/page.js switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  return (
+    <UserCard
+      firstName={userDetails.firstName}
+      lastName={userDetails.lastName}
+    />
+  )
+}
+```
+
+Теперь передача всего объекта в клиентский компонент вызовет ошибку.
+
+```tsx switcher
+export async function ContactPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const userDetails = await getUserDetails(id)
+
+  // Вызывает ошибку
+  return <UserCard user={userDetails} />
+}
+```
+
+```jsx switcher
+export async function ContactPage({ params }) {
+  const { id } = await params
+  const userDetails = await getUserDetails(id)
+
+  // Вызывает ошибку
+  return <UserCard user={userDetails} />
+}
+```
+
+### Пометка уникального значения
+
+В этом случае мы можем получить доступ к конфигурации сервера через вызовы `config.getConfigDetails`. Однако конфигурация системы содержит `SERVICE_API_KEY`, который мы не хотим раскрывать клиентам.
+
+Мы можем пометить значение `config.SERVICE_API_KEY`.
+
+```ts switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig(): SystemConfig {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'Не передавайте токены конфигурации клиенту',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+```js switcher
+import { experimental_taintUniqueValue } from 'react'
+
+function getSystemConfig() {
+  const config = await config.getConfigDetails()
+
+  experimental_taintUniqueValue(
+    'Не передавайте токены конфигурации клиенту',
+    config,
+    config.SERVICE_API_KEY
+  )
+
+  return config
+}
+```
+
+Мы по-прежнему можем обращаться к другим свойствам объекта `systemConfig`.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+
+  return <ClientDashboard version={systemConfig.SERVICE_API_VERSION} />
+}
+```
+
+Однако передача `SERVICE_API_KEY` в `ClientDashboard` вызовет ошибку.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // Кто-то делает ошибку в PR
+  const version = systemConfig.SERVICE_API_KEY
+
+  return <ClientDashboard version={version} />
+}
+```
+
+Обратите внимание, что даже если `systemConfig.SERVICE_API_KEY` переназначен новой переменной, его передача в клиентский компонент всё равно вызовет ошибку.
+
+В то время как значение, производное от помеченного уникального значения, будет раскрыто клиенту.
+
+```tsx
+export async function Dashboard() {
+  const systemConfig = await getSystemConfig()
+  // Кто-то делает ошибку в PR
+  const version = `version::${systemConfig.SERVICE_API_KEY}`
+
+  return <ClientDashboard version={version} />
+}
+```
+
+Лучший подход — удалить `SERVICE_API_KEY` из данных, возвращаемых `getSystemConfig`.

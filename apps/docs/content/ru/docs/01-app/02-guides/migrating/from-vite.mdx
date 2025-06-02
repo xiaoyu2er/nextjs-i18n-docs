@@ -1,0 +1,552 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:14:47.546Z
+title: Миграция с Vite на Next.js
+nav_title: Vite
+description: Узнайте, как перенести существующее React-приложение с Vite на Next.js.
+---
+
+Это руководство поможет вам перенести существующее приложение с Vite на Next.js.
+
+## Почему стоит перейти?
+
+Есть несколько причин, по которым вы можете захотеть перейти с Vite на Next.js:
+
+### Медленная загрузка начальной страницы
+
+Если вы создали приложение с [стандартным плагином Vite для React](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react), ваше приложение является чисто клиентским. Клиентские приложения, также известные как одностраничные приложения (SPA), часто страдают от медленной загрузки начальной страницы. Это происходит по нескольким причинам:
+
+1. Браузеру нужно дождаться загрузки и выполнения кода React и всего бандла приложения, прежде чем ваш код сможет отправить запросы на загрузку данных.
+2. Код приложения растёт с каждым новым функционалом и дополнительной зависимостью.
+
+### Отсутствие автоматического разделения кода
+
+Проблему медленной загрузки можно частично решить с помощью разделения кода. Однако при ручном разделении кода вы можете случайно ухудшить производительность. Легко непреднамеренно создать "водопад" сетевых запросов при ручном разделении кода. Next.js предоставляет автоматическое разделение кода, встроенное в его маршрутизатор.
+
+### "Водопады" сетевых запросов
+
+Распространённой причиной плохой производительности являются последовательные клиент-серверные запросы для получения данных. Типичный шаблон для получения данных в SPA — сначала отрендерить заглушку, а затем загрузить данные после монтирования компонента. К сожалению, это означает, что дочерний компонент, который загружает данные, не может начать загрузку, пока родительский компонент не завершит загрузку своих данных.
+
+Хотя Next.js поддерживает загрузку данных на клиенте, он также предоставляет возможность перенести загрузку данных на сервер, что может устранить "водопады" клиент-серверных запросов.
+
+### Быстрые и контролируемые состояния загрузки
+
+Со встроенной поддержкой [стриминга через React Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense), вы можете более точно контролировать, какие части интерфейса загружать первыми и в каком порядке, не создавая "водопадов" сетевых запросов.
+
+Это позволяет создавать страницы, которые загружаются быстрее, и устранять [сдвиги макета](https://vercel.com/blog/how-core-web-vitals-affect-seo).
+
+### Выбор стратегии загрузки данных
+
+В зависимости от ваших потребностей, Next.js позволяет выбирать стратегию загрузки данных на уровне страниц и компонентов. Вы можете решить загружать данные во время сборки, во время запроса на сервере или на клиенте. Например, вы можете загружать данные из вашей CMS и рендерить блог-посты во время сборки, которые затем можно эффективно кэшировать на CDN.
+
+### Middleware
+
+[Next.js Middleware](/docs/app/building-your-application/routing/middleware) позволяет выполнять код на сервере до завершения запроса. Это особенно полезно для предотвращения появления неаутентифицированного контента, когда пользователь посещает страницу, доступную только для аутентифицированных пользователей, перенаправляя его на страницу входа. Middleware также полезен для экспериментов и [интернационализации](/docs/app/guides/internationalization).
+
+### Встроенные оптимизации
+
+[Изображения](/docs/app/api-reference/components/image), [шрифты](/docs/app/api-reference/components/font) и [сторонние скрипты](/docs/app/guides/scripts) часто оказывают значительное влияние на производительность приложения. Next.js поставляется со встроенными компонентами, которые автоматически оптимизируют их для вас.
+
+## Шаги миграции
+
+Наша цель при миграции — как можно быстрее получить работающее приложение на Next.js, чтобы вы могли затем постепенно внедрять функции Next.js. Для начала мы оставим его как чисто клиентское приложение (SPA) без миграции существующего маршрутизатора. Это помогает минимизировать вероятность возникновения проблем во время процесса миграции и уменьшает количество конфликтов при слиянии.
+
+### Шаг 1: Установка зависимости Next.js
+
+Первое, что нужно сделать, — установить `next` как зависимость:
+
+```bash filename="Terminal"
+npm install next@latest
+```
+
+### Шаг 2: Создание конфигурационного файла Next.js
+
+Создайте файл `next.config.mjs` в корне вашего проекта. Этот файл будет содержать [опции конфигурации Next.js](/docs/app/api-reference/config/next-config-js).
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // Создаёт одностраничное приложение (SPA).
+  distDir: './dist', // Изменяет директорию сборки на `./dist/`.
+}
+
+export default nextConfig
+```
+
+> **Полезно знать:** Вы можете использовать либо `.js`, либо `.mjs` для конфигурационного файла Next.js.
+
+### Шаг 3: Обновление конфигурации TypeScript
+
+Если вы используете TypeScript, вам нужно обновить файл `tsconfig.json` следующими изменениями, чтобы сделать его совместимым с Next.js. Если вы не используете TypeScript, можете пропустить этот шаг.
+
+1. Удалите [ссылку на проект](https://www.typescriptlang.org/tsconfig#references) `tsconfig.node.json`
+2. Добавьте `./dist/types/**/*.ts` и `./next-env.d.ts` в массив [`include`](https://www.typescriptlang.org/tsconfig#include)
+3. Добавьте `./node_modules` в массив [`exclude`](https://www.typescriptlang.org/tsconfig#exclude)
+4. Добавьте `{ "name": "next" }` в массив [`plugins` в `compilerOptions`](https://www.typescriptlang.org/tsconfig#plugins): `"plugins": [{ "name": "next" }]`
+5. Установите [`esModuleInterop`](https://www.typescriptlang.org/tsconfig#esModuleInterop) в `true`: `"esModuleInterop": true`
+6. Установите [`jsx`](https://www.typescriptlang.org/tsconfig#jsx) в `preserve`: `"jsx": "preserve"`
+7. Установите [`allowJs`](https://www.typescriptlang.org/tsconfig#allowJs) в `true`: `"allowJs": true`
+8. Установите [`forceConsistentCasingInFileNames`](https://www.typescriptlang.org/tsconfig#forceConsistentCasingInFileNames) в `true`: `"forceConsistentCasingInFileNames": true`
+9. Установите [`incremental`](https://www.typescriptlang.org/tsconfig#incremental) в `true`: `"incremental": true`
+
+Вот пример рабочего `tsconfig.json` с этими изменениями:
+
+```json filename="tsconfig.json"
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["./src", "./dist/types/**/*.ts", "./next-env.d.ts"],
+  "exclude": ["./node_modules"]
+}
+```
+
+Больше информации о настройке TypeScript можно найти в [документации Next.js](/docs/app/api-reference/config/typescript#ide-plugin).
+
+### Шаг 4: Создание корневого макета
+
+Приложение с [App Router](/docs/app) в Next.js должно включать файл [корневого макета](/docs/app/api-reference/file-conventions/layout#root-layout), который является [React Server Component](/docs/app/getting-started/server-and-client-components), оборачивающим все страницы вашего приложения. Этот файл определяется на верхнем уровне директории `app`.
+
+Ближайшим аналогом файла корневого макета в приложении Vite является файл [`index.html`](https://vitejs.dev/guide/#index-html-and-project-root), который содержит ваши теги `<html>`, `<head>` и `<body>`.
+
+На этом шаге вы преобразуете файл `index.html` в файл корневого макета:
+
+1. Создайте новую директорию `app` в вашей папке `src`.
+2. Создайте новый файл `layout.tsx` внутри этой директории `app`:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return '...'
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return '...'
+}
+```
+
+> **Полезно знать:** Для файлов макета можно использовать расширения `.js`, `.jsx` или `.tsx`.
+
+3. Скопируйте содержимое вашего файла `index.html` в ранее созданный компонент `<RootLayout>`, заменив теги `body.div#root` и `body.script` на `<div id="root">{children}</div>`:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+4. Next.js уже включает по умолчанию теги [meta charset](https://developer.mozilla.org/docs/Web/HTML/Element/meta#charset) и [meta viewport](https://developer.mozilla.org/docs/Web/HTML/Viewport_meta_tag), поэтому вы можете безопасно удалить их из `<head>`:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+5. Любые [файлы метаданных](/docs/app/getting-started/metadata-and-og-images#file-based-metadata), такие как `favicon.ico`, `icon.png`, `robots.txt`, автоматически добавляются в тег `<head>` приложения, если вы разместили их на верхнем уровне директории `app`. После перемещения [всех поддерживаемых файлов](/docs/app/getting-started/metadata-and-og-images#file-based-metadata) в директорию `app` вы можете безопасно удалить их теги `<link>`:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+6. Наконец, Next.js может управлять вашими последними тегами `<head>` с помощью [Metadata API](/docs/app/getting-started/metadata-and-og-images). Перенесите вашу последнюю информацию о метаданных в экспортированный объект [`metadata`](/docs/app/api-reference/functions/generate-metadata#metadata-object):
+
+```tsx filename="app/layout.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My App',
+  description: 'My App is a...',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export const metadata = {
+  title: 'My App',
+  description: 'My App is a...',
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+С этими изменениями вы перешли от объявления всего в вашем `index.html` к использованию основанного на соглашениях подхода Next.js, встроенного в фреймворк ([Metadata API](/docs/app/getting-started/metadata-and-og-images)). Этот подход позволяет вам легче улучшать SEO и возможность совместного использования ваших страниц в интернете.
+
+### Шаг 5: Создание входной страницы
+
+В Next.js вы объявляете входную точку для вашего приложения, создавая файл `page.tsx`. Ближайшим аналогом этого файла в Vite является ваш файл `main.tsx`. На этом шаге вы настроите входную точку вашего приложения.
+
+1. **Создайте директорию `[[...slug]]` в вашей директории `app`.**
+
+Поскольку в этом руководстве мы сначала настраиваем Next.js как SPA (Single Page Application), вам нужно, чтобы входная точка вашей страницы перехватывала все возможные маршруты вашего приложения. Для этого создайте новую директорию `[[...slug]]` в директории `app`.
+
+Эта директория называется [опциональным сегментом маршрута для перехвата всех путей](/docs/app/api-reference/file-conventions/dynamic-routes#optional-catch-all-segments). Next.js использует файловую систему для маршрутизации, где папки определяют маршруты. Эта специальная директория гарантирует, что все маршруты вашего приложения будут направлены в содержащийся в ней файл `page.tsx`.
+
+2. **Создайте новый файл `page.tsx` внутри директории `app/[[...slug]]` со следующим содержимым:**
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // Мы обновим это позже
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // Мы обновим это позже
+}
+```
+
+> **Полезно знать**: Для файлов страниц можно использовать расширения `.js`, `.jsx` или `.tsx`.
+
+Этот файл является [Серверным Компонентом (Server Component)](/docs/app/getting-started/server-and-client-components). Когда вы запускаете `next build`, файл предварительно рендерится в статический ресурс. Он _не_ требует какого-либо динамического кода.
+
+Этот файл импортирует наши глобальные CSS и сообщает [`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params), что мы собираемся сгенерировать только один маршрут — корневой маршрут `/`.
+
+Теперь перенесём остальную часть нашего Vite-приложения, которая будет работать только на клиенте.
+
+```tsx filename="app/[[...slug]]/client.tsx" switcher
+'use client'
+
+import React from 'react'
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+```jsx filename="app/[[...slug]]/client.js" switcher
+'use client'
+
+import React from 'react'
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+Этот файл является [Клиентским Компонентом (Client Component)](/docs/app/getting-started/server-and-client-components), что определяется директивой `'use client'`. Клиентские компоненты всё равно [предварительно рендерятся в HTML](/docs/app/getting-started/server-and-client-components#how-do-server-and-client-components-work-in-nextjs) на сервере перед отправкой клиенту.
+
+Поскольку мы хотим начать с клиентского приложения, мы можем настроить Next.js на отключение предварительного рендеринга для компонента `App` и ниже.
+
+```tsx
+const App = dynamic(() => import('../../App'), { ssr: false })
+```
+
+Теперь обновите входную точку страницы, чтобы использовать новый компонент:
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+### Шаг 6: Обновление статических импортов изображений
+
+Next.js обрабатывает статические импорты изображений немного иначе, чем Vite. В Vite импорт файла изображения возвращает его публичный URL в виде строки:
+
+```tsx filename="App.tsx"
+import image from './img.png' // `image` будет '/assets/img.2d8efhg.png' в продакшене
+
+export default function App() {
+  return <img src={image} />
+}
+```
+
+В Next.js статический импорт изображений возвращает объект. Этот объект можно использовать напрямую с компонентом [`<Image>`](/docs/app/api-reference/components/image) из Next.js, или вы можете использовать свойство `src` объекта с вашим существующим тегом `<img>`.
+
+Компонент `<Image>` имеет дополнительные преимущества, такие как [автоматическая оптимизация изображений](/docs/app/api-reference/components/image). Компонент `<Image>` автоматически устанавливает атрибуты `width` и `height` результирующего тега `<img>` на основе размеров изображения. Это предотвращает сдвиги макета при загрузке изображения. Однако это может вызвать проблемы, если ваше приложение содержит изображения, у которых стилизована только одна из размерностей без указания другой как `auto`. Если размерность не стилизована как `auto`, она будет по умолчанию принимать значение атрибута размерности тега `<img>`, что может привести к искажению изображения.
+
+Использование тега `<img>` уменьшит количество изменений в вашем приложении и предотвратит указанные выше проблемы. Позже вы можете опционально перейти на компонент `<Image>`, чтобы воспользоваться оптимизацией изображений, [настроив загрузчик](/docs/app/api-reference/components/image#loader), или перейдя на стандартный сервер Next.js, который имеет встроенную оптимизацию изображений.
+
+1. **Преобразуйте абсолютные пути импорта для изображений из `/public` в относительные импорты:**
+
+```tsx
+// Было
+import logo from '/logo.png'
+
+// Стало
+import logo from '../public/logo.png'
+```
+
+2. **Передавайте свойство `src` изображения вместо всего объекта изображения в ваш тег `<img>`:**
+
+```tsx
+// Было
+<img src={logo} />
+
+// Стало
+<img src={logo.src} />
+```
+
+Альтернативно, вы можете ссылаться на публичный URL ресурса изображения на основе имени файла. Например, `public/logo.png` будет обслуживать изображение по адресу `/logo.png` для вашего приложения, что и будет значением `src`.
+
+> **Внимание:** Если вы используете TypeScript, вы можете столкнуться с ошибками типов при доступе к свойству `src`. Пока их можно безопасно игнорировать. Они будут исправлены к концу этого руководства.
+
+### Шаг 7: Перенос переменных окружения
+
+Next.js поддерживает `.env` [переменные окружения](/docs/app/guides/environment-variables) аналогично Vite. Основное отличие — это префикс, используемый для экспорта переменных окружения на клиентской стороне.
+
+- Измените все переменные окружения с префиксом `VITE_` на `NEXT_PUBLIC_`.
+
+Vite предоставляет несколько встроенных переменных окружения в специальном объекте `import.meta.env`, которые не поддерживаются Next.js. Вам нужно обновить их использование следующим образом:
+
+- `import.meta.env.MODE` ⇒ `process.env.NODE_ENV`
+- `import.meta.env.PROD` ⇒ `process.env.NODE_ENV === 'production'`
+- `import.meta.env.DEV` ⇒ `process.env.NODE_ENV !== 'production'`
+- `import.meta.env.SSR` ⇒ `typeof window !== 'undefined'`
+
+Next.js также не предоставляет встроенную переменную окружения `BASE_URL`. Однако вы всё равно можете её настроить, если она вам нужна:
+
+1. **Добавьте следующее в ваш файл `.env`:**
+
+```bash filename=".env"
+# ...
+NEXT_PUBLIC_BASE_PATH="/some-base-path"
+```
+
+2. **Установите [`basePath`](/docs/app/api-reference/config/next-config-js/basePath) в значение `process.env.NEXT_PUBLIC_BASE_PATH` в вашем файле `next.config.mjs`:**
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // Выводит Single-Page Application (SPA).
+  distDir: './dist', // Изменяет директорию сборки на `./dist/`.
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH, // Устанавливает базовый путь на `/some-base-path`.
+}
+
+export default nextConfig
+```
+
+3. **Обновите использование `import.meta.env.BASE_URL` на `process.env.NEXT_PUBLIC_BASE_PATH`**
+
+### Шаг 8: Обновление скриптов в `package.json`
+
+Теперь вы должны быть готовы запустить ваше приложение, чтобы проверить, успешно ли вы перенесли его на Next.js. Но перед этим вам нужно обновить `scripts` в вашем `package.json` командами, связанными с Next.js, и добавить `.next` и `next-env.d.ts` в ваш `.gitignore`:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+```txt filename=".gitignore"
+# ...
+.next
+next-env.d.ts
+dist
+```
+
+Теперь запустите `npm run dev` и откройте [`http://localhost:3000`](http://localhost:3000). Вы должны увидеть ваше приложение, работающее на Next.js.
+
+> **Пример:** Ознакомьтесь с [этим pull request](https://github.com/inngest/vite-to-nextjs/pull/1) для рабочего примера приложения Vite, перенесённого на Next.js.
+
+### Шаг 9: Очистка
+
+Теперь вы можете очистить вашу кодовую базу от артефактов, связанных с Vite:
+
+- Удалите `main.tsx`
+- Удалите `index.html`
+- Удалите `vite-env.d.ts`
+- Удалите `tsconfig.node.json`
+- Удалите `vite.config.ts`
+- Удалите зависимости Vite
+
+## Дальнейшие шаги
+
+Если всё прошло по плану, у вас теперь есть работающее приложение Next.js, функционирующее как одностраничное приложение. Однако вы ещё не используете большинство преимуществ Next.js, но теперь вы можете начать вносить постепенные изменения, чтобы получить все преимущества. Вот что вы можете сделать дальше:
+
+- Перейти с React Router на [Next.js App Router](/docs/app/building-your-application/routing), чтобы получить:
+  - Автоматическое разделение кода (Automatic code splitting)
+  - [Потоковый серверный рендеринг (Streaming Server-Rendering)](/docs/app/building-your-application/routing/loading-ui-and-streaming)
+  - [Серверные компоненты React (React Server Components)](/docs/app/getting-started/server-and-client-components)
+- [Оптимизировать изображения с компонентом `<Image>`](/docs/app/api-reference/components/image)
+- [Оптимизировать шрифты с `next/font`](/docs/app/api-reference/components/font)
+- [Оптимизировать сторонние скрипты с компонентом `<Script>`](/docs/app/guides/scripts)
+- [Обновить конфигурацию ESLint для поддержки правил Next.js](/docs/app/api-reference/config/eslint)

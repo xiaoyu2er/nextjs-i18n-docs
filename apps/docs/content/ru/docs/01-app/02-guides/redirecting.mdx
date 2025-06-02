@@ -1,0 +1,649 @@
+---
+source-updated-at: 2025-06-01T01:32:20.000Z
+translation-updated-at: 2025-06-02T20:02:37.217Z
+title: Как обрабатывать редиректы в Next.js
+nav_title: Редиректы
+description: Узнайте о различных способах обработки редиректов в Next.js.
+related:
+  links:
+    - app/api-reference/functions/redirect
+    - app/api-reference/functions/permanentRedirect
+    - app/building-your-application/routing/middleware
+    - app/api-reference/config/next-config-js/redirects
+---
+
+Существует несколько способов обработки редиректов в Next.js. На этой странице рассматриваются все доступные варианты, случаи их использования и управление большим количеством редиректов.
+
+<AppOnly>
+
+| API                                                            | Назначение                                      | Где используется                                   | Код состояния                        |
+| -------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------- | ------------------------------------ |
+| [`redirect`](#redirect-function)                               | Перенаправление пользователя после мутации или события | Серверные компоненты, Серверные действия, Обработчики маршрутов | 307 (Временный) или 303 (Серверное действие) |
+| [`permanentRedirect`](#permanentredirect-function)             | Перенаправление пользователя после мутации или события | Серверные компоненты, Серверные действия, Обработчики маршрутов | 308 (Постоянный)                     |
+| [`useRouter`](#userouter-hook)                                 | Клиентская навигация                            | Обработчики событий в клиентских компонентах      | N/A                                  |
+| [`redirects` в `next.config.js`](#redirects-in-nextconfigjs)   | Перенаправление входящего запроса на основе пути | Файл `next.config.js`                             | 307 (Временный) или 308 (Постоянный) |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | Перенаправление входящего запроса на основе условия | Middleware                                        | Любой                                |
+
+</AppOnly>
+
+<PagesOnly>
+
+| API                                                            | Назначение                                      | Где используется          | Код состояния                        |
+| -------------------------------------------------------------- | ----------------------------------------------- | ------------------------ | ------------------------------------ |
+| [`useRouter`](#userouter-hook)                                 | Клиентская навигация                            | Компоненты               | N/A                                  |
+| [`redirects` в `next.config.js`](#redirects-in-nextconfigjs)   | Перенаправление входящего запроса на основе пути | Файл `next.config.js`    | 307 (Временный) или 308 (Постоянный) |
+| [`NextResponse.redirect`](#nextresponseredirect-in-middleware) | Перенаправление входящего запроса на основе условия | Middleware               | Любой                                |
+
+</PagesOnly>
+
+<AppOnly>
+
+## Функция `redirect`
+
+Функция `redirect` позволяет перенаправить пользователя на другой URL. Её можно вызывать в [Серверных компонентах](/docs/app/getting-started/server-and-client-components), [Обработчиках маршрутов](/docs/app/building-your-application/routing/route-handlers) и [Серверных действиях](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+`redirect` часто используется после мутации или события. Например, при создании поста:
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id: string) {
+  try {
+    // Вызов базы данных
+  } catch (error) {
+    // Обработка ошибок
+  }
+
+  revalidatePath('/posts') // Обновление кэшированных постов
+  redirect(`/post/${id}`) // Переход на страницу нового поста
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id) {
+  try {
+    // Вызов базы данных
+  } catch (error) {
+    // Обработка ошибок
+  }
+
+  revalidatePath('/posts') // Обновление кэшированных постов
+  redirect(`/post/${id}`) // Переход на страницу нового поста
+}
+```
+
+> **Важно знать**:
+>
+> - По умолчанию `redirect` возвращает код состояния 307 (Временное перенаправление). При использовании в Серверном действии возвращается код 303 (Смотреть другое), который обычно применяется для перенаправления на страницу успеха после POST-запроса.
+> - `redirect` внутренне выбрасывает ошибку, поэтому должен вызываться вне блоков `try/catch`.
+> - `redirect` можно вызывать в Клиентских компонентах во время рендеринга, но не в обработчиках событий. Вместо этого используйте хук [`useRouter`](#userouter-hook).
+> - `redirect` также принимает абсолютные URL и может использоваться для перенаправления на внешние ссылки.
+> - Если нужно перенаправить до процесса рендеринга, используйте [`next.config.js`](#redirects-in-nextconfigjs) или [Middleware](#nextresponseredirect-in-middleware).
+
+Подробнее см. в [справочнике API `redirect`](/docs/app/api-reference/functions/redirect).
+
+## Функция `permanentRedirect`
+
+Функция `permanentRedirect` позволяет **постоянно** перенаправить пользователя на другой URL. Её можно вызывать в [Серверных компонентах](/docs/app/getting-started/server-and-client-components), [Обработчиках маршрутов](/docs/app/building-your-application/routing/route-handlers) и [Серверных действиях](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+`permanentRedirect` часто используется после мутации или события, изменяющего канонический URL сущности, например, при обновлении URL профиля пользователя после смены имени:
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username: string, formData: FormData) {
+  try {
+    // Вызов базы данных
+  } catch (error) {
+    // Обработка ошибок
+  }
+
+  revalidateTag('username') // Обновление всех ссылок на имя пользователя
+  permanentRedirect(`/profile/${username}`) // Переход на новый профиль
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username, formData) {
+  try {
+    // Вызов базы данных
+  } catch (error) {
+    // Обработка ошибок
+  }
+
+  revalidateTag('username') // Обновление всех ссылок на имя пользователя
+  permanentRedirect(`/profile/${username}`) // Переход на новый профиль
+}
+```
+
+> **Важно знать**:
+>
+> - `permanentRedirect` возвращает код состояния 308 (Постоянное перенаправление) по умолчанию.
+> - `permanentRedirect` также принимает абсолютные URL и может использоваться для перенаправления на внешние ссылки.
+> - Если нужно перенаправить до процесса рендеринга, используйте [`next.config.js`](#redirects-in-nextconfigjs) или [Middleware](#nextresponseredirect-in-middleware).
+
+Подробнее см. в [справочнике API `permanentRedirect`](/docs/app/api-reference/functions/permanentRedirect).
+
+</AppOnly>
+
+## Хук `useRouter()`
+
+<AppOnly>
+
+Если нужно перенаправить пользователя в обработчике событий Клиентского компонента, можно использовать метод `push` из хука `useRouter`. Например:
+
+```tsx filename="app/page.tsx" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+Если нужно перенаправить пользователя внутри компонента, можно использовать метод `push` из хука `useRouter`. Например:
+
+```tsx filename="app/page.tsx" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+</PagesOnly>
+
+> **Важно знать**:
+>
+> - Если не требуется программная навигация, лучше использовать компонент [`<Link>`](/docs/app/api-reference/components/link).
+
+<AppOnly>
+
+Подробнее см. в [справочнике API `useRouter`](/docs/app/api-reference/functions/use-router).
+
+</AppOnly>
+
+<PagesOnly>
+
+Подробнее см. в [справочнике API `useRouter`](/docs/pages/api-reference/functions/use-router).
+
+</PagesOnly>
+
+## `redirects` в `next.config.js`
+
+Опция `redirects` в файле `next.config.js` позволяет перенаправлять входящие запросы с одного пути на другой. Это полезно при изменении структуры URL страниц или наличии заранее известного списка редиректов.
+
+`redirects` поддерживает [сопоставление путей](/docs/app/api-reference/config/next-config-js/redirects#path-matching), [заголовков, куки и запросов](/docs/app/api-reference/config/next-config-js/redirects#header-cookie-and-query-matching), что даёт гибкость в перенаправлении пользователей на основе входящего запроса.
+
+Чтобы использовать `redirects`, добавьте опцию в файл `next.config.js`:
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      // Простой редирект
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // Сопоставление с подстановочным знаком
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+module.exports = {
+  async redirects() {
+    return [
+      // Простой редирект
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // Сопоставление с подстановочным знаком
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+Подробнее см. в [справочнике API `redirects`](/docs/app/api-reference/config/next-config-js/redirects).
+
+> **Важно знать**:
+>
+> - `redirects` может возвращать код состояния 307 (Временное перенаправление) или 308 (Постоянное перенаправление) с опцией `permanent`.
+> - На некоторых платформах есть ограничения на количество редиректов. Например, на Vercel лимит составляет 1024 редиректа. Для управления большим количеством редиректов (1000+) рассмотрите создание кастомного решения с использованием [Middleware](/docs/app/building-your-application/routing/middleware). Подробнее см. в разделе [управление большим количеством редиректов](#managing-redirects-at-scale-advanced).
+> - `redirects` выполняется **до** Middleware.
+
+## `NextResponse.redirect` в Middleware
+
+Middleware позволяет выполнять код до завершения запроса. Затем, на основе входящего запроса, можно перенаправить пользователя на другой URL с помощью `NextResponse.redirect`. Это полезно для перенаправления пользователей на основе условий (например, аутентификации, управления сессиями) или при [большом количестве редиректов](#managing-redirects-at-scale-advanced).
+
+Например, для перенаправления пользователя на страницу `/login`, если он не аутентифицирован:
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request: NextRequest) {
+  const isAuthenticated = authenticate(request)
+
+  // Если пользователь аутентифицирован, продолжить как обычно
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // Перенаправление на страницу входа, если не аутентифицирован
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request) {
+  const isAuthenticated = authenticate(request)
+
+  // Если пользователь аутентифицирован, продолжить как обычно
+  if (isAuthenticated) {
+    return NextResponse.next()
+  }
+
+  // Перенаправление на страницу входа, если не аутентифицирован
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+> **Важно знать**:
+>
+> - Middleware выполняется **после** `redirects` в `next.config.js` и **до** рендеринга.
+
+Подробнее см. в [документации по Middleware](/docs/app/building-your-application/routing/middleware).
+
+## Управление большим количеством редиректов (продвинутый уровень)
+
+Для управления большим количеством редиректов (1000+) можно создать кастомное решение с использованием Middleware. Это позволяет обрабатывать редиректы программно без необходимости переразвёртывания приложения.
+
+Для этого нужно учитывать:
+
+1. Создание и хранение карты редиректов.
+2. Оптимизацию производительности поиска данных.
+
+> **Пример Next.js**: Смотрите наш пример [Middleware с фильтром Блума](https://redirects-bloom-filter.vercel.app/) для реализации рекомендаций ниже.
+
+### 1. Создание и хранение карты редиректов
+
+Карта редиректов — это список редиректов, который можно хранить в базе данных (обычно key-value хранилище) или JSON-файле.
+
+Рассмотрим следующую структуру данных:
+
+```json
+{
+  "/old": {
+    "destination": "/new",
+    "permanent": true
+  },
+  "/blog/post-old": {
+    "destination": "/blog/post-new",
+    "permanent": true
+  }
+}
+```
+
+В [Middleware](/docs/app/building-your-application/routing/middleware) можно читать из базы данных, например [Edge Config](https://vercel.com/docs/edge-config/get-started) от Vercel или [Redis](https://vercel.com/docs/redis), и перенаправлять пользователя на основе входящего запроса:
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData && typeof redirectData === 'string') {
+    const redirectEntry: RedirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // Редирект не найден, продолжить без перенаправления
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+export async function middleware(request) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData) {
+    const redirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  // Редирект не найден, продолжить без перенаправления
+  return NextResponse.next()
+}
+```
+
+### 2. Оптимизация производительности поиска данных
+
+Чтение большого набора данных для каждого входящего запроса может быть медленным и ресурсоемким. Есть два способа оптимизировать производительность поиска данных:
+
+- Использовать базу данных, оптимизированную для быстрого чтения
+- Использовать стратегию поиска данных, такую как [фильтр Блума (Bloom filter)](https://ru.wikipedia.org/wiki/%D0%A4%D0%B8%D0%BB%D1%8C%D1%82%D1%80_%D0%91%D0%BB%D1%83%D0%BC%D0%B0), чтобы эффективно проверить наличие редиректа **перед** чтением большого файла или базы данных с редиректами.
+
+Рассмотрим предыдущий пример: можно импортировать сгенерированный файл фильтра Блума в Middleware, а затем проверить, существует ли путь входящего запроса в фильтре.
+
+Если путь существует, запрос перенаправляется в <AppOnly>[Обработчик маршрута (Route Handler)](/docs/app/building-your-application/routing/route-handlers)</AppOnly> <PagesOnly>[API-маршруты (API Routes)](/docs/pages/building-your-application/routing/api-routes)</PagesOnly>, который проверит фактический файл и перенаправит пользователя на нужный URL. Это позволяет избежать импорта большого файла редиректов в Middleware, что может замедлить обработку каждого входящего запроса.
+
+```ts filename="middleware.ts" switcher
+import { NextResponse, NextRequest } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+// Инициализация фильтра Блума из сгенерированного JSON-файла
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter as any)
+
+export async function middleware(request: NextRequest) {
+  // Получаем путь входящего запроса
+  const pathname = request.nextUrl.pathname
+
+  // Проверяем, есть ли путь в фильтре Блума
+  if (bloomFilter.has(pathname)) {
+    // Перенаправляем путь в Обработчик маршрута
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // Получаем данные редиректа из Обработчика маршрута
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry: RedirectEntry | undefined =
+          await redirectData.json()
+
+        if (redirectEntry) {
+          // Определяем код статуса
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // Перенаправляем на целевой URL
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // Редирект не найден, продолжаем обработку запроса без перенаправления
+  return NextResponse.next()
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+// Инициализация фильтра Блума из сгенерированного JSON-файла
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter)
+
+export async function middleware(request) {
+  // Получаем путь входящего запроса
+  const pathname = request.nextUrl.pathname
+
+  // Проверяем, есть ли путь в фильтре Блума
+  if (bloomFilter.has(pathname)) {
+    // Перенаправляем путь в Обработчик маршрута
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(request.nextUrl.pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      // Получаем данные редиректа из Обработчика маршрута
+      const redirectData = await fetch(api)
+
+      if (redirectData.ok) {
+        const redirectEntry = await redirectData.json()
+
+        if (redirectEntry) {
+          // Определяем код статуса
+          const statusCode = redirectEntry.permanent ? 308 : 307
+
+          // Перенаправляем на целевой URL
+          return NextResponse.redirect(redirectEntry.destination, statusCode)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  // Редирект не найден, продолжаем обработку запроса без перенаправления
+  return NextResponse.next()
+}
+```
+
+<AppOnly>
+
+Затем в Обработчике маршрута:
+
+```ts filename="app/api/redirects/route.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export function GET(request: NextRequest) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // Получаем запись редиректа из файла redirects.json
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // Учитываем ложные срабатывания фильтра Блума
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // Возвращаем запись редиректа
+  return NextResponse.json(redirect)
+}
+```
+
+```js filename="app/api/redirects/route.js" switcher
+import { NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+export function GET(request) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) {
+    return new Response('Bad Request', { status: 400 })
+  }
+
+  // Получаем запись редиректа из файла redirects.json
+  const redirect = redirects[pathname]
+
+  // Учитываем ложные срабатывания фильтра Блума
+  if (!redirect) {
+    return new Response('No redirect', { status: 400 })
+  }
+
+  // Возвращаем запись редиректа
+  return NextResponse.json(redirect)
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+Затем в API-маршруте:
+
+```ts filename="pages/api/redirects.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // Получаем запись редиректа из файла redirects.json
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+
+  // Учитываем ложные срабатывания фильтра Блума
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // Возвращаем запись редиректа
+  return res.json(redirect)
+}
+```
+
+```js filename="pages/api/redirects.js" switcher
+import redirects from '@/app/redirects/redirects.json'
+
+export default function handler(req, res) {
+  const pathname = req.query.pathname
+  if (!pathname) {
+    return res.status(400).json({ message: 'Bad Request' })
+  }
+
+  // Получаем запись редиректа из файла redirects.json
+  const redirect = redirects[pathname]
+
+  // Учитываем ложные срабатывания фильтра Блума
+  if (!redirect) {
+    return res.status(400).json({ message: 'No redirect' })
+  }
+
+  // Возвращаем запись редиректа
+  return res.json(redirect)
+}
+```
+
+</PagesOnly>
+
+> **Полезно знать:**
+>
+> - Для генерации фильтра Блума можно использовать библиотеку [`bloom-filters`](https://www.npmjs.com/package/bloom-filters).
+> - Следует проверять запросы к вашему Обработчику маршрута, чтобы предотвратить вредоносные запросы.

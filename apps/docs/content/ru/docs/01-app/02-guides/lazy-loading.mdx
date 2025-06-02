@@ -1,0 +1,259 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-02T20:01:20.931Z
+title: Ленивая загрузка клиентских компонентов и библиотек
+nav_title: Ленивая загрузка
+description: Отложенная загрузка импортируемых библиотек и React-компонентов для улучшения производительности приложения.
+---
+
+{/* Содержание этого документа используется как в маршрутизаторе app, так и pages. Вы можете использовать компонент `<PagesOnly>Content</PagesOnly>` для добавления контента, специфичного для маршрутизатора Pages. Общий контент не должен быть обёрнут в компонент. */}
+
+[Ленивая загрузка](https://developer.mozilla.org/docs/Web/Performance/Lazy_loading) в Next.js помогает улучшить начальную производительность приложения за счёт уменьшения количества JavaScript, необходимого для рендеринга маршрута.
+
+Она позволяет отложить загрузку **клиентских компонентов** и импортируемых библиотек, включая их в клиентский бандл только тогда, когда они действительно нужны. Например, вы можете отложить загрузку модального окна до момента, когда пользователь нажмёт кнопку для его открытия.
+
+В Next.js есть два способа реализации ленивой загрузки:
+
+1. Использование [динамических импортов](#nextdynamic) с `next/dynamic`
+2. Использование [`React.lazy()`](https://react.dev/reference/react/lazy) с [Suspense](https://react.dev/reference/react/Suspense)
+
+По умолчанию серверные компоненты автоматически подвергаются [разделению кода](https://developer.mozilla.org/docs/Glossary/Code_splitting), и вы можете использовать [стриминг](/docs/app/building-your-application/routing/loading-ui-and-streaming) для постепенной отправки частей UI с сервера на клиент. Ленивая загрузка применяется к клиентским компонентам.
+
+## `next/dynamic`
+
+`next/dynamic` представляет собой комбинацию [`React.lazy()`](https://react.dev/reference/react/lazy) и [Suspense](https://react.dev/reference/react/Suspense). Он работает одинаково в директориях `app` и `pages`, что позволяет постепенно мигрировать.
+
+## Примеры
+
+<AppOnly>
+### Импорт клиентских компонентов
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
+
+// Клиентские компоненты:
+const ComponentA = dynamic(() => import('../components/A'))
+const ComponentB = dynamic(() => import('../components/B'))
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+
+export default function ClientComponentExample() {
+  const [showMore, setShowMore] = useState(false)
+
+  return (
+    <div>
+      {/* Загружается немедленно, но в отдельном клиентском бандле */}
+      <ComponentA />
+
+      {/* Загружается по требованию, только при выполнении условия */}
+      {showMore && <ComponentB />}
+      <button onClick={() => setShowMore(!showMore)}>Переключить</button>
+
+      {/* Загружается только на стороне клиента */}
+      <ComponentC />
+    </div>
+  )
+}
+```
+
+> **Примечание:** Когда серверный компонент динамически импортирует клиентский компонент, автоматическое [разделение кода](https://developer.mozilla.org/docs/Glossary/Code_splitting) в настоящее время **не** поддерживается.
+
+### Отключение SSR
+
+При использовании `React.lazy()` и Suspense клиентские компоненты по умолчанию будут [пререндериться](https://github.com/reactwg/server-components/discussions/4) (SSR).
+
+> **Примечание:** Опция `ssr: false` работает только для клиентских компонентов. Для корректной работы разделения кода убедитесь, что она используется внутри клиентских компонентов.
+
+Если вы хотите отключить пререндеринг для клиентского компонента, можно использовать опцию `ssr` со значением `false`:
+
+```jsx
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+```
+
+### Импорт серверных компонентов
+
+Если вы динамически импортируете серверный компонент, только дочерние клиентские компоненты будут загружаться лениво — сам серверный компонент нет.
+Это также помогает предзагружать статические ресурсы, такие как CSS, при использовании в серверных компонентах.
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+// Серверный компонент:
+const ServerComponent = dynamic(() => import('../components/ServerComponent'))
+
+export default function ServerComponentExample() {
+  return (
+    <div>
+      <ServerComponent />
+    </div>
+  )
+}
+```
+
+> **Примечание:** Опция `ssr: false` не поддерживается в серверных компонентах. При попытке использовать её в серверных компонентах вы увидите ошибку.
+> `ssr: false` не разрешён с `next/dynamic` в серверных компонентах. Перенесите его в клиентский компонент.
+
+### Загрузка внешних библиотек
+
+Внешние библиотеки можно загружать по требованию с помощью функции [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import). В этом примере используется внешняя библиотека `fuse.js` для нечёткого поиска. Модуль загружается на клиенте только после ввода пользователем поискового запроса.
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Поиск"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // Динамическая загрузка fuse.js
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>Результаты: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+### Добавление кастомного компонента загрузки
+
+```jsx filename="app/page.js"
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const WithCustomLoading = dynamic(
+  () => import('../components/WithCustomLoading'),
+  {
+    loading: () => <p>Загрузка...</p>,
+  }
+)
+
+export default function Page() {
+  return (
+    <div>
+      {/* Компонент загрузки будет отображаться во время загрузки <WithCustomLoading/> */}
+      <WithCustomLoading />
+    </div>
+  )
+}
+```
+
+### Импорт именованных экспортов
+
+Для динамического импорта именованного экспорта вы можете вернуть его из Promise, возвращаемого функцией [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import):
+
+```jsx filename="components/hello.js"
+'use client'
+
+export function Hello() {
+  return <p>Привет!</p>
+}
+```
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+const ClientComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+Используя `next/dynamic`, компонент заголовка не будет включён в начальный JavaScript-бандл страницы. Сначала страница отобразит `fallback` из Suspense, а затем компонент `Header`, когда граница Suspense будет разрешена.
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  loading: () => <p>Загрузка...</p>,
+})
+
+export default function Home() {
+  return <DynamicHeader />
+}
+```
+
+> **Полезно знать:** В `import('path/to/component')` путь должен быть указан явно. Нельзя использовать шаблонные строки или переменные. Кроме того, `import()` должен находиться внутри вызова `dynamic()`, чтобы Next.js мог сопоставить бандлы webpack / идентификаторы модулей с конкретным вызовом `dynamic()` и предзагрузить их перед рендерингом. `dynamic()` нельзя использовать внутри рендеринга React, так как он должен быть помечен на верхнем уровне модуля для работы предзагрузки, аналогично `React.lazy`.
+
+## С именованными экспортами
+
+Для динамического импорта именованного экспорта вы можете вернуть его из [Promise](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise), возвращаемого [`import()`](https://github.com/tc39/proposal-dynamic-import#example):
+
+```jsx filename="components/hello.js"
+export function Hello() {
+  return <p>Привет!</p>
+}
+
+// pages/index.js
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+## Без SSR
+
+Для динамической загрузки компонента на стороне клиента можно использовать опцию `ssr` для отключения серверного рендеринга. Это полезно, если внешняя зависимость или компонент полагается на браузерные API, такие как `window`.
+
+```jsx
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  ssr: false,
+})
+```
+
+## С внешними библиотеками
+
+В этом примере используется внешняя библиотека `fuse.js` для нечёткого поиска. Модуль загружается в браузере только после ввода пользователем поискового запроса.
+
+```jsx
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Поиск"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // Динамическая загрузка fuse.js
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>Результаты: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+</PagesOnly>

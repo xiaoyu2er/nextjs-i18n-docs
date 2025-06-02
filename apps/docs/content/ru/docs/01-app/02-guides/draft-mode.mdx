@@ -1,0 +1,217 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:02:16.800Z
+title: Как предварительно просматривать контент с помощью Draft Mode в Next.js
+nav_title: Draft Mode
+description: Next.js предоставляет режим черновика (Draft Mode) для переключения между статическими и динамическими страницами. Здесь вы узнаете, как это работает с App Router.
+related:
+  title: Дальнейшие шаги
+  description: Ознакомьтесь с API-справочником для получения дополнительной информации об использовании Draft Mode.
+  links:
+    - app/api-reference/functions/draft-mode
+---
+
+**Draft Mode** (режим черновика) позволяет предварительно просматривать черновой контент из вашей headless CMS в приложении Next.js. Это особенно полезно для статических страниц, генерируемых во время сборки, так как позволяет переключиться на [динамический рендеринг (dynamic rendering)](/docs/app/getting-started/partial-prerendering#dynamic-rendering) и увидеть изменения без необходимости пересобирать весь сайт.
+
+На этой странице описано, как включить и использовать Draft Mode.
+
+## Шаг 1: Создание обработчика маршрута (Route Handler)
+
+Создайте [обработчик маршрута (Route Handler)](/docs/app/building-your-application/routing/route-handlers). Он может иметь любое имя, например, `app/api/draft/route.ts`.
+
+```ts filename="app/api/draft/route.ts" switcher
+export async function GET(request: Request) {
+  return new Response('')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+export async function GET() {
+  return new Response('')
+}
+```
+
+Затем импортируйте функцию [`draftMode`](/docs/app/api-reference/functions/draft-mode) и вызовите метод `enable()`.
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+Это установит **cookie** для включения режима черновика. Последующие запросы, содержащие этот cookie, будут активировать Draft Mode и изменять поведение статически сгенерированных страниц.
+
+Вы можете проверить это вручную, посетив `/api/draft` и проверив инструменты разработчика в браузере. Обратите внимание на заголовок ответа `Set-Cookie` с cookie под названием `__prerender_bypass`.
+
+## Шаг 2: Доступ к обработчику маршрута из вашей headless CMS
+
+> Эти шаги предполагают, что ваша headless CMS поддерживает настройку **пользовательских URL для черновиков**. Если нет, вы всё равно можете использовать этот метод для защиты URL черновиков, но вам придётся вручную создавать и открывать URL черновика. Конкретные шаги будут зависеть от используемой headless CMS.
+
+Для безопасного доступа к обработчику маршрута из вашей headless CMS:
+
+1. Создайте **секретный токен** с помощью генератора токенов. Этот секрет должен быть известен только вашему приложению Next.js и headless CMS.
+2. Если ваша headless CMS поддерживает настройку пользовательских URL для черновиков, укажите URL черновика (предполагается, что обработчик маршрута находится в `app/api/draft/route.ts`). Например:
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+> - `<your-site>` — это домен вашего развёртывания.
+> - `<token>` — секретный токен, который вы сгенерировали.
+> - `<path>` — путь к странице, которую вы хотите просмотреть. Например, для просмотра `/posts/one` используйте `&slug=/posts/one`.
+>
+> Ваша headless CMS может позволять включать переменную в URL черновика, чтобы `<path>` мог устанавливаться динамически на основе данных CMS, например: `&slug=/posts/{entry.fields.slug}`
+
+3. В обработчике маршрута проверьте, что секрет совпадает и что параметр `slug` существует (если нет, запрос должен завершиться ошибкой), вызовите `draftMode.enable()` для установки cookie. Затем перенаправьте браузер на путь, указанный в `slug`:
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // Разбор параметров строки запроса
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Проверка секрета и параметров
+  // Этот секрет должен быть известен только этому обработчику маршрута и CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Invalid token', { status: 401 })
+  }
+
+  // Запрос к headless CMS для проверки существования указанного `slug`
+  // getPostBySlug реализует необходимую логику запроса к headless CMS
+  const post = await getPostBySlug(slug)
+
+  // Если slug не существует, предотвращаем включение режима черновика
+  if (!post) {
+    return new Response('Invalid slug', { status: 401 })
+  }
+
+  // Включение Draft Mode путем установки cookie
+  const draft = await draftMode()
+  draft.enable()
+
+  // Перенаправление на путь из полученного поста
+  // Мы не перенаправляем на searchParams.slug, чтобы избежать уязвимостей открытого перенаправления
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // Разбор параметров строки запроса
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Проверка секрета и параметров
+  // Этот секрет должен быть известен только этому обработчику маршрута и CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Invalid token', { status: 401 })
+  }
+
+  // Запрос к headless CMS для проверки существования указанного `slug`
+  // getPostBySlug реализует необходимую логику запроса к headless CMS
+  const post = await getPostBySlug(slug)
+
+  // Если slug не существует, предотвращаем включение режима черновика
+  if (!post) {
+    return new Response('Invalid slug', { status: 401 })
+  }
+
+  // Включение Draft Mode путем установки cookie
+  const draft = await draftMode()
+  draft.enable()
+
+  // Перенаправление на путь из полученного поста
+  // Мы не перенаправляем на searchParams.slug, чтобы избежать уязвимостей открытого перенаправления
+  redirect(post.slug)
+}
+```
+
+Если всё прошло успешно, браузер будет перенаправлен на указанный путь с установленным cookie режима черновика.
+
+## Шаг 3: Просмотр чернового контента
+
+Следующий шаг — обновить вашу страницу для проверки значения `draftMode().isEnabled`.
+
+Если запросить страницу с установленным cookie, данные будут загружаться **во время запроса** (а не во время сборки).
+
+Кроме того, значение `isEnabled` будет равно `true`.
+
+```tsx filename="app/page.tsx" switcher
+// страница, которая загружает данные
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// страница, которая загружает данные
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+Если вы обращаетесь к обработчику черновика (с `secret` и `slug`) из вашей headless CMS или вручную через URL, вы теперь сможете увидеть черновой контент. И если вы обновите черновик без публикации, вы сможете просмотреть изменения.

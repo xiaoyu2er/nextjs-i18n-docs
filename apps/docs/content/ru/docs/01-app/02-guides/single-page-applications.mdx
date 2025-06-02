@@ -1,0 +1,426 @@
+---
+source-updated-at: 2025-05-19T22:31:51.000Z
+translation-updated-at: 2025-06-02T20:01:27.611Z
+title: Как создавать одностраничные приложения с помощью Next.js
+nav_title: SPA
+description: Next.js полностью поддерживает создание одностраничных приложений (SPA).
+---
+
+Next.js полностью поддерживает создание одностраничных приложений (SPA).
+
+Это включает быстрые переходы между маршрутами с предварительной загрузкой, клиентский сбор данных, использование браузерных API, интеграцию со сторонними клиентскими библиотеками, создание статических маршрутов и многое другое.
+
+Если у вас уже есть SPA, вы можете мигрировать на Next.js без значительных изменений кода. Next.js позволяет постепенно добавлять серверные функции по мере необходимости.
+
+## Что такое одностраничное приложение?
+
+Определение SPA может варьироваться. Мы определим "строгое SPA" как:
+
+- **Рендеринг на стороне клиента (CSR)**: Приложение обслуживается одним HTML-файлом (например, `index.html`). Каждый маршрут, переход между страницами и сбор данных обрабатываются JavaScript в браузере.
+- **Без полной перезагрузки страницы**: Вместо запроса нового документа для каждого маршрута клиентский JavaScript изменяет DOM текущей страницы и при необходимости загружает данные.
+
+Строгие SPA часто требуют загрузки большого количества JavaScript перед тем, как страница станет интерактивной. Кроме того, клиентские "водопады" данных могут быть сложными в управлении. Создание SPA с помощью Next.js может решить эти проблемы.
+
+## Почему стоит использовать Next.js для SPA?
+
+Next.js может автоматически разделять ваши JavaScript-бандлы и создавать несколько HTML-точек входа для разных маршрутов. Это позволяет избежать загрузки ненужного JavaScript-кода на стороне клиента, уменьшая размер бандла и ускоряя загрузку страниц.
+
+Компонент [`next/link`](/docs/app/api-reference/components/link) автоматически [предварительно загружает](/docs/app/api-reference/components/link#prefetch) маршруты, обеспечивая быстрые переходы между страницами, как в строгом SPA, но с преимуществом сохранения состояния маршрутизации приложения в URL для ссылок и совместного использования.
+
+Next.js может начинаться как статический сайт или даже строгое SPA, где всё рендерится на стороне клиента. Если ваш проект растёт, Next.js позволяет постепенно добавлять больше серверных функций (например, [React Server Components](/docs/app/getting-started/server-and-client-components), [Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) и другие) по мере необходимости.
+
+## Примеры
+
+Давайте рассмотрим распространённые шаблоны, используемые для создания SPA, и как Next.js решает их.
+
+### Использование React `use` внутри провайдера контекста
+
+Мы рекомендуем собирать данные в родительском компоненте (или макете), возвращать Promise, а затем разворачивать значение в клиентском компоненте с помощью хука React [`use`](https://react.dev/reference/react/use).
+
+Next.js может начать сбор данных на сервере раньше. В этом примере это корневой макет — точка входа в ваше приложение. Сервер может сразу начать потоковую передачу ответа клиенту.
+
+"Поднимая" сбор данных в корневой макет, Next.js начинает указанные запросы на сервере раньше, чем любые другие компоненты вашего приложения. Это устраняет клиентские "водопады" и предотвращает множественные циклы обмена между клиентом и сервером. Это также может значительно улучшить производительность, так как ваш сервер находится ближе (и в идеале размещён рядом) к вашей базе данных.
+
+Например, обновите ваш корневой макет, чтобы вызвать Promise, но _не_ ожидать его.
+
+```tsx filename="app/layout.tsx" switcher
+import { UserProvider } from './user-provider'
+import { getUser } from './user' // какая-то серверная функция
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  let userPromise = getUser() // НЕ ожидаем
+
+  return (
+    <html lang="en">
+      <body>
+        <UserProvider userPromise={userPromise}>{children}</UserProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import { UserProvider } from './user-provider'
+import { getUser } from './user' // какая-то серверная функция
+
+export default function RootLayout({ children }) {
+  let userPromise = getUser() // НЕ ожидаем
+
+  return (
+    <html lang="en">
+      <body>
+        <UserProvider userPromise={userPromise}>{children}</UserProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+Хотя вы можете [отложить и передать один Promise](/docs/app/getting-started/fetching-data#streaming-data-with-the-use-hook) как проп в клиентский компонент, мы обычно видим этот шаблон в паре с провайдером контекста React. Это упрощает доступ из клиентских компонентов с помощью пользовательского хука React.
+
+Вы можете передать Promise в провайдер контекста React:
+
+```ts filename="app/user-provider.ts" switcher
+'use client';
+
+import { createContext, useContext, ReactNode } from 'react';
+
+type User = any;
+type UserContextType = {
+  userPromise: Promise<User | null>;
+};
+
+const UserContext = createContext<UserContextType | null>(null);
+
+export function useUser(): UserContextType {
+  let context = useContext(UserContext);
+  if (context === null) {
+    throw new Error('useUser должен использоваться внутри UserProvider');
+  }
+  return context;
+}
+
+export function UserProvider({
+  children,
+  userPromise
+}: {
+  children: ReactNode;
+  userPromise: Promise<User | null>;
+}) {
+  return (
+    <UserContext.Provider value={{ userPromise }}>
+      {children}
+    </UserContext.Provider>
+  );
+}
+```
+
+```js filename="app/user-provider.js" switcher
+'use client'
+
+import { createContext, useContext, ReactNode } from 'react'
+
+const UserContext = createContext(null)
+
+export function useUser() {
+  let context = useContext(UserContext)
+  if (context === null) {
+    throw new Error('useUser должен использоваться внутри UserProvider')
+  }
+  return context
+}
+
+export function UserProvider({ children, userPromise }) {
+  return (
+    <UserContext.Provider value={{ userPromise }}>
+      {children}
+    </UserContext.Provider>
+  )
+}
+```
+
+Наконец, вы можете вызвать пользовательский хук `useUser()` в любом клиентском компоненте и развернуть Promise:
+
+```tsx filename="app/profile.tsx" switcher
+'use client'
+
+import { use } from 'react'
+import { useUser } from './user-provider'
+
+export function Profile() {
+  const { userPromise } = useUser()
+  const user = use(userPromise)
+
+  return '...'
+}
+```
+
+```jsx filename="app/profile.js" switcher
+'use client'
+
+import { use } from 'react'
+import { useUser } from './user-provider'
+
+export function Profile() {
+  const { userPromise } = useUser()
+  const user = use(userPromise)
+
+  return '...'
+}
+```
+
+Компонент, который использует Promise (например, `Profile` выше), будет приостановлен. Это позволяет частичной гидратации. Вы можете увидеть потоковый и предварительно отрендеренный HTML до завершения загрузки JavaScript.
+
+### SPA с SWR
+
+[SWR](https://swr.vercel.app) — популярная библиотека React для сбора данных.
+
+С SWR 2.3.0 (и React 19+) вы можете постепенно внедрять серверные функции вместе с существующим клиентским кодом сбора данных на основе SWR. Это абстракция описанного выше шаблона `use()`. Это означает, что вы можете перемещать сбор данных между клиентом и сервером или использовать оба:
+
+- **Только клиент:** `useSWR(key, fetcher)`
+- **Только сервер:** `useSWR(key)` + данные, предоставленные RSC
+- **Смешанный:** `useSWR(key, fetcher)` + данные, предоставленные RSC
+
+Например, оберните ваше приложение в `<SWRConfig>` с `fallback`:
+
+```tsx filename="app/layout.tsx" switcher
+import { SWRConfig } from 'swr'
+import { getUser } from './user' // какая-то серверная функция
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <SWRConfig
+      value={{
+        fallback: {
+          // Мы НЕ ожидаем getUser() здесь
+          // Только компоненты, читающие эти данные, будут приостановлены
+          '/api/user': getUser(),
+        },
+      }}
+    >
+      {children}
+    </SWRConfig>
+  )
+}
+```
+
+```js filename="app/layout.js" switcher
+import { SWRConfig } from 'swr'
+import { getUser } from './user' // какая-то серверная функция
+
+export default function RootLayout({ children }) {
+  return (
+    <SWRConfig
+      value={{
+        fallback: {
+          // Мы НЕ ожидаем getUser() здесь
+          // Только компоненты, читающие эти данные, будут приостановлены
+          '/api/user': getUser(),
+        },
+      }}
+    >
+      {children}
+    </SWRConfig>
+  )
+}
+```
+
+Поскольку это серверный компонент, `getUser()` может безопасно читать куки, заголовки или обращаться к вашей базе данных. Не требуется отдельный API-маршрут. Клиентские компоненты ниже `<SWRConfig>` могут вызывать `useSWR()` с тем же ключом для получения данных пользователя. Код компонента с `useSWR` **не требует никаких изменений** по сравнению с вашим существующим клиентским решением для сбора данных.
+
+```tsx filename="app/profile.tsx" switcher
+'use client'
+
+import useSWR from 'swr'
+
+export function Profile() {
+  const fetcher = (url) => fetch(url).then((res) => res.json())
+  // Тот же шаблон SWR, который вы уже знаете
+  const { data, error } = useSWR('/api/user', fetcher)
+
+  return '...'
+}
+```
+
+```jsx filename="app/profile.js" switcher
+'use client'
+
+import useSWR from 'swr'
+
+export function Profile() {
+  const fetcher = (url) => fetch(url).then((res) => res.json())
+  // Тот же шаблон SWR, который вы уже знаете
+  const { data, error } = useSWR('/api/user', fetcher)
+
+  return '...'
+}
+```
+
+Данные `fallback` могут быть предварительно отрендерены и включены в начальный HTML-ответ, затем немедленно прочитаны в дочерних компонентах с помощью `useSWR`. Опрос, ревалидация и кэширование SWR по-прежнему работают **только на стороне клиента**, сохраняя всю интерактивность, необходимую для SPA.
+
+Поскольку начальные данные `fallback` автоматически обрабатываются Next.js, вы можете удалить любую условную логику, ранее необходимую для проверки, является ли `data` `undefined`. Когда данные загружаются, ближайшая граница `<Suspense>` будет приостановлена.
+
+|                      | SWR                 | RSC                 | RSC + SWR           |
+| -------------------- | ------------------- | ------------------- | ------------------- |
+| SSR данные           | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| Потоковая передача при SSR | <Cross size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| Дедупликация запросов | <Check size={18} /> | <Check size={18} /> | <Check size={18} /> |
+| Клиентские функции   | <Check size={18} /> | <Cross size={18} /> | <Check size={18} /> |
+
+### SPA с React Query
+
+Вы можете использовать React Query с Next.js как на клиенте, так и на сервере. Это позволяет создавать как строгие SPA, так и использовать серверные функции Next.js в сочетании с React Query.
+
+Подробнее в [документации React Query](https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr).
+
+### Рендеринг компонентов только в браузере
+
+Клиентские компоненты [предварительно рендерятся](https://github.com/reactwg/server-components/discussions/4) во время `next build`. Если вы хотите отключить предварительный рендеринг для клиентского компонента и загружать его только в браузерной среде, вы можете использовать [`next/dynamic`](/docs/app/guides/lazy-loading#nextdynamic):
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const ClientOnlyComponent = dynamic(() => import('./component'), {
+  ssr: false,
+})
+```
+
+Это может быть полезно для сторонних библиотек, которые зависят от браузерных API, таких как `window` или `document`. Вы также можете добавить `useEffect`, который проверяет наличие этих API, и если они отсутствуют, возвращать `null` или состояние загрузки, которое будет предварительно отрендерено.
+
+### Поверхностная маршрутизация на клиенте
+
+Если вы мигрируете со строгого SPA, такого как [Create React App](/docs/app/guides/migrating/from-create-react-app) или [Vite](/docs/app/guides/migrating/from-vite), у вас может быть существующий код, который поверхностно маршрутизирует для обновления состояния URL. Это может быть полезно для ручных переходов между представлениями в вашем приложении _без_ использования маршрутизации Next.js по файловой системе.
+
+Next.js позволяет использовать нативные методы [`window.history.pushState`](https://developer.mozilla.org/en-US/docs/Web/API/History/pushState) и [`window.history.replaceState`](https://developer.mozilla.org/en-US/docs/Web/API/History/replaceState) для обновления истории браузера без перезагрузки страницы.
+
+Вызовы `pushState` и `replaceState` интегрируются в маршрутизатор Next.js, позволяя синхронизироваться с [`usePathname`](/docs/app/api-reference/functions/use-pathname) и [`useSearchParams`](/docs/app/api-reference/functions/use-search-params).
+
+```tsx fileName="app/ui/sort-products.tsx" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder: string) {
+    const urlSearchParams = new URLSearchParams(searchParams.toString())
+    urlSearchParams.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${urlSearchParams.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Сортировать по возрастанию</button>
+      <button onClick={() => updateSorting('desc')}>Сортировать по убыванию</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/sort-products.js" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder) {
+    const urlSearchParams = new URLSearchParams(searchParams.toString())
+    urlSearchParams.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${urlSearchParams.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Сортировать по возрастанию</button>
+      <button onClick={() => updateSorting('desc')}>Сортировать по убыванию</button>
+    </>
+  )
+}
+```
+
+Узнайте больше о том, как работают [маршрутизация и навигация](/docs/app/building-your-application/routing/linking-and-navigating#how-routing-and-navigation-works) в Next.js.
+
+### Использование серверных действий в клиентских компонентах
+
+Вы можете постепенно внедрять серверные действия, продолжая использовать клиентские компоненты. Это позволяет удалить шаблонный код для вызова API-маршрута и вместо этого использовать функции React, такие как `useActionState`, для обработки состояний загрузки и ошибок.
+
+Например, создайте вашу первую серверную действие:
+
+```tsx filename="app/actions.ts" switcher
+'use server'
+
+export async function create() {}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function create() {}
+```
+
+Вы можете импортировать и использовать серверную действие из клиента, аналогично вызову JavaScript-функции. Вам не нужно вручную создавать API-эндпоинт:
+
+```tsx filename="app/button.tsx" switcher
+'use client'
+
+import { create } from './actions'
+
+export function Button() {
+  return <button onClick={() => create()}>Создать</button>
+}
+```
+
+```jsx filename="app/button.js" switcher
+'use client'
+
+import { create } from './actions'
+
+export function Button() {
+  return <button onClick={() => create()}>Создать</button>
+}
+```
+
+Узнайте больше о [изменении данных с помощью серверных действий](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+## Статический экспорт (опционально)
+
+Next.js также поддерживает генерацию полностью [статического сайта](/docs/app/guides/static-exports). Это имеет некоторые преимущества перед строгими SPA:
+
+- **Автоматическое разделение кода**: Вместо отправки одного `index.html` Next.js сгенерирует HTML-файл для каждого маршрута, поэтому ваши посетители получат контент быстрее, не дожидаясь загрузки клиентского JavaScript-бандла.
+- **Улучшенный пользовательский опыт**: Вместо минимального скелета для всех маршрутов вы получаете полностью отрендеренные страницы для каждого маршрута. Когда пользователи переходят клиентским способом, переходы остаются мгновенными, как в SPA.
+
+Чтобы включить статический экспорт, обновите конфигурацию:
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  output: 'export',
+}
+
+export default nextConfig
+```
+
+После выполнения `next build` Next.js создаст папку `out` с HTML/CSS/JS-ресурсами для вашего приложения.
+
+> **Примечание:** Серверные функции Next.js не поддерживаются при статическом экспорте. [Узнайте больше](/docs/app/guides/static-exports#unsupported-features).
+
+## Миграция существующих проектов на Next.js
+
+Вы можете постепенно мигрировать на Next.js, следуя нашим руководствам:
+
+- [Миграция с Create React App](/docs/app/guides/migrating/from-create-react-app)
+- [Миграция с Vite](/docs/app/guides/migrating/from-vite)
+
+Если вы уже используете SPA с Pages Router, вы можете узнать, как [постепенно внедрять App Router](/docs/app/guides/migrating/app-router-migration).
