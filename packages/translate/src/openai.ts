@@ -67,6 +67,8 @@ async function translateChunk(
             'description: React \\`useState\\` 钩子的使用示例',
             "description: 缓存功能 'use cache' 的 API 设计和优势",
             'description: 组件 "Button" 的使用指南',
+            'title: Next.js 安全性思考原则',
+            'title: Next.js 中的安全最佳实践',
           ],
           incorrect: [
             'title: \\`public\\` 目录中的静态资源',
@@ -75,6 +77,8 @@ async function translateChunk(
             'description: \\`useState\\` 钩子的使用示例',
             "description: 'use cache' 的 API 设计和优势",
             'description: "Button" 组件的使用指南',
+            'title: Next.js 安全性：核心概念',
+            'title: 如何思考 Next.js：安全指南',
           ],
         },
         'zh-hant': {
@@ -121,6 +125,8 @@ async function translateChunk(
             'description: Примеры использования хука \\`useState\\` в React',
             "description: Функциональность кэша 'use cache' и её преимущества API",
             'description: Руководство по использованию компонента "Button"',
+            'title: Принципы безопасности в Next.js',
+            'title: Безопасность Next.js и лучшие практики',
           ],
           incorrect: [
             'title: \\`public\\` директория статических ресурсов',
@@ -129,6 +135,8 @@ async function translateChunk(
             'description: \\`useState\\` примеры использования хука',
             "description: 'use cache' функциональность и преимущества API",
             'description: "Button" руководство по использованию компонента',
+            'title: Безопасность в Next.js: основные принципы',
+            'title: Next.js: руководство по безопасности',
           ],
         },
         de: {
@@ -214,10 +222,12 @@ async function translateChunk(
 • NEVER start a frontmatter value with inline code (text between \`backticks\`)
 • NEVER start a frontmatter value with single quotes ('text')
 • NEVER start a frontmatter value with double quotes ("text")
+• NEVER use colon (:) character in frontmatter values as it conflicts with YAML syntax
 • This applies to ALL inline code including \`<Component>\` tags, \`functions\`, variables, etc.
 • This applies to ALL quoted text including 'use cache', "API design", 'components', etc.
 • In frontmatter (sections between --- marks), ALWAYS rearrange sentences so inline code and quoted text appears AFTER some text
 • If a frontmatter value would start with inline code or quotes after translation, ALWAYS rewrite the sentence so that some descriptive text comes before the inline code or quotes. For example, instead of ${langExamples.incorrect[0]}, use ${langExamples.correct[0]}.
+• If a translation would include a colon (:), ALWAYS rephrase to avoid it (e.g., "Security in Next.js: principles" becomes "Security principles in Next.js" or "Next.js security principles")
 • This rule applies to ALL frontmatter keys (title, description, etc.), not just description.
 • ALWAYS preserve both the opening and closing frontmatter delimiters (---) - never omit the closing delimiter
 • Maintain the exact structure of frontmatter - beginning with ---, followed by key-value pairs, and ending with ---
@@ -244,7 +254,7 @@ ${langExamples.correct.map((ex) => `    ${ex}`).join('\n')}
     ---
 
 These rules apply ONLY to frontmatter (between --- marks) and are CRITICAL for proper document rendering.
-REMEMBER: You must NEVER start with inline code in frontmatter values and ALWAYS include both opening and closing --- delimiters.`;
+REMEMBER: You must NEVER start with inline code in frontmatter values, NEVER use colons (:) in frontmatter values, and ALWAYS include both opening and closing --- delimiters.`;
 
   const prompt = `
 ${context}
