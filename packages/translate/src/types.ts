@@ -1,4 +1,5 @@
 export interface LangConfig {
+  locale: string;
   name: string;
   guide?: string;
   terms?: Record<string, string>;

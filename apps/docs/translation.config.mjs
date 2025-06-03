@@ -1,6 +1,7 @@
 export default {
   langs: {
     'zh-hans': {
+      locale: 'zh-hans',
       name: 'Simplified Chinese',
       // 翻译规则和指南
       guide: `
@@ -14,6 +15,7 @@ export default {
       terms: {},
     },
     'zh-hant': {
+      locale: 'zh-hant',
       name: 'Traditional Chinese',
       // 翻譯規則和指南
       guide: `
@@ -27,6 +29,7 @@ export default {
       terms: {},
     },
     ja: {
+      locale: 'ja',
       name: 'Japanese',
       guide: `
         - For technical terms that should not be fully translated, use the format: "日本語訳 (English term)"
@@ -37,6 +40,7 @@ export default {
       terms: {},
     },
     es: {
+      locale: 'es',
       name: 'Spanish',
       guide: `
         - For technical terms that should not be fully translated, use the format: "Traducción en español (English term)"
@@ -47,6 +51,7 @@ export default {
       terms: {},
     },
     de: {
+      locale: 'de',
       name: 'German',
       guide: `
         - For technical terms that should not be fully translated, use the format: "Deutsche Übersetzung (English term)"
@@ -57,6 +62,7 @@ export default {
       terms: {},
     },
     fr: {
+      locale: 'fr',
       name: 'French',
       guide: `
         - For technical terms that should not be fully translated, use the format: "Traduction française (English term)"
@@ -67,6 +73,7 @@ export default {
       terms: {},
     },
     ru: {
+      locale: 'ru',
       name: 'Russian',
       guide: `
         - For technical terms that should not be fully translated, use the format: "Русский перевод (English term)"
@@ -77,6 +84,7 @@ export default {
       terms: {},
     },
     ar: {
+      locale: 'ar',
       name: 'Arabic',
       guide: `
         - For technical terms that should not be fully translated, use the format: "الترجمة العربية (English term)"
