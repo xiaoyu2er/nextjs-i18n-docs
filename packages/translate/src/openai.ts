@@ -65,12 +65,16 @@ async function translateChunk(
             'description: API \\`getStaticProps\\` 参考文档。了解如何使用 \\`getStaticProps\\`。',
             'description: 关于 \\`<Link>\\` 组件的 API 参考文档。',
             'description: React \\`useState\\` 钩子的使用示例',
+            "description: 缓存功能 'use cache' 的 API 设计和优势",
+            'description: 组件 "Button" 的使用指南',
           ],
           incorrect: [
             'title: \\`public\\` 目录中的静态资源',
             'description: \\`getStaticProps\\` API 参考文档。了解如何使用 \\`getStaticProps\\`。',
             'description: \\`<Link>\\` 组件的 API 参考文档。',
             'description: \\`useState\\` 钩子的使用示例',
+            "description: 'use cache' 的 API 设计和优势",
+            'description: "Button" 组件的使用指南',
           ],
         },
         'zh-hant': {
@@ -79,12 +83,16 @@ async function translateChunk(
             'description: API \\`getStaticProps\\` 參考文檔。了解如何使用 \\`getStaticProps\\`。',
             'description: 關於 \\`<Link>\\` 組件的 API 參考文檔。',
             'description: React \\`useState\\` 鉤子的使用示例',
+            "description: 快取功能 'use cache' 的 API 設計和優勢",
+            'description: 組件 "Button" 的使用指南',
           ],
           incorrect: [
             'title: \\`public\\` 目錄中的靜態資源',
             'description: \\`getStaticProps\\` API 參考文檔。了解如何使用 \\`getStaticProps\\`。',
             'description: \\`<Link>\\` 組件的 API 參考文檔。',
             'description: \\`useState\\` 鉤子的使用示例',
+            "description: 'use cache' 的 API 設計和優勢",
+            'description: "Button" 組件的使用指南',
           ],
         },
         ja: {
@@ -93,12 +101,16 @@ async function translateChunk(
             'description: API \\`getStaticProps\\` のリファレンス。\\`getStaticProps\\` の使用方法を学びます。',
             'description: React \\`<Link>\\` コンポーネントについての API リファレンス。',
             'description: React \\`useState\\` フックの使用例',
+            "description: キャッシュ機能 'use cache' の API 設計と利点について学びます",
+            'description: コンポーネント "Button" の使用方法について説明します',
           ],
           incorrect: [
             'title: \\`public\\` ディレクトリの静的アセット',
             'description: \\`getStaticProps\\` API のリファレンス。\\`getStaticProps\\` の使用方法を学びます。',
             'description: \\`<Link>\\` コンポーネントの API リファレンス。',
             'description: \\`useState\\` フックの使用例',
+            "description: 'use cache' の API 設計と利点について学びます",
+            'description: "Button" コンポーネントの使用方法について説明します',
           ],
         },
         ru: {
@@ -107,12 +119,16 @@ async function translateChunk(
             'description: Справочник API для компонента \\`<Link>\\`.',
             'title: Статические ресурсы (директория \\`public\\`)',
             'description: Примеры использования хука \\`useState\\` в React',
+            "description: Функциональность кэша 'use cache' и её преимущества API",
+            'description: Руководство по использованию компонента "Button"',
           ],
           incorrect: [
             'title: \\`public\\` директория статических ресурсов',
             'description: \\`getStaticProps\\` справочник API. Узнайте, как использовать \\`getStaticProps\\`.',
             'description: \\`<Link>\\` справочник API компонента.',
             'description: \\`useState\\` примеры использования хука',
+            "description: 'use cache' функциональность и преимущества API",
+            'description: "Button" руководство по использованию компонента',
           ],
         },
         de: {
@@ -121,12 +137,16 @@ async function translateChunk(
             'description: API-Referenz für \\`getStaticProps\\`. Erfahren Sie, wie Sie \\`getStaticProps\\` verwenden.',
             'description: API-Referenz für die \\`<Link>\\`-Komponente.',
             'description: React \\`useState\\`-Hook Verwendungsbeispiele',
+            "description: Cache-Funktionalität 'use cache' und ihre API-Vorteile",
+            'description: Verwendungsanleitung für die "Button"-Komponente',
           ],
           incorrect: [
             'title: \\`public\\`-Verzeichnis statische Assets',
             'description: \\`getStaticProps\\` API-Referenz. Erfahren Sie, wie Sie \\`getStaticProps\\` verwenden.',
             'description: \\`<Link>\\`-Komponente API-Referenz.',
             'description: \\`useState\\`-Hook Verwendungsbeispiele',
+            "description: 'use cache' Cache-Funktionalität und API-Vorteile",
+            'description: "Button"-Komponente Verwendungsanleitung',
           ],
         },
         fr: {
@@ -135,12 +155,16 @@ async function translateChunk(
             'description: Référence API pour \\`getStaticProps\\`. Apprenez à utiliser \\`getStaticProps\\`.',
             'description: Référence API pour le composant \\`<Link>\\`.',
             "description: Exemples d'utilisation du hook \\`useState\\` de React",
+            "description: Fonctionnalité de cache 'use cache' et ses avantages API",
+            'description: Guide d\'utilisation du composant "Button"',
           ],
           incorrect: [
             'title: \\`public\\` répertoire des ressources statiques',
             'description: \\`getStaticProps\\` référence API. Apprenez à utiliser \\`getStaticProps\\`.',
             'description: \\`<Link>\\` référence API du composant.',
             "description: \\`useState\\` exemples d'utilisation du hook",
+            "description: 'use cache' fonctionnalité et avantages API",
+            'description: "Button" guide d\'utilisation du composant',
           ],
         },
         es: {
@@ -149,12 +173,16 @@ async function translateChunk(
             'description: Referencia de API para \\`getStaticProps\\`. Aprende a usar \\`getStaticProps\\`.',
             'description: Referencia de API para el componente \\`<Link>\\`.',
             'description: Ejemplos de uso del hook \\`useState\\` de React',
+            "description: Funcionalidad de caché 'use cache' y sus ventajas de API",
+            'description: Guía de uso del componente "Button"',
           ],
           incorrect: [
             'title: \\`public\\` directorio de recursos estáticos',
             'description: \\`getStaticProps\\` referencia de API. Aprende a usar \\`getStaticProps\\`.',
             'description: \\`<Link>\\` referencia de API del componente.',
             'description: \\`useState\\` ejemplos de uso del hook',
+            "description: 'use cache' funcionalidad y ventajas de API",
+            'description: "Button" guía de uso del componente',
           ],
         },
         ar: {
@@ -163,12 +191,16 @@ async function translateChunk(
             'description: مرجع API لـ \\`getStaticProps\\`. تعلم كيفية استخدام \\`getStaticProps\\`.',
             'description: مرجع API لمكون \\`<Link>\\`.',
             'description: أمثلة استخدام خطاف \\`useState\\` في React',
+            "description: وظيفة التخزين المؤقت 'use cache' ومزايا API الخاصة بها",
+            'description: دليل استخدام مكون "Button"',
           ],
           incorrect: [
             'title: \\`public\\` دليل الموارد الثابتة',
             'description: \\`getStaticProps\\` مرجع API. تعلم كيفية استخدام \\`getStaticProps\\`.',
             'description: \\`<Link>\\` مرجع API للمكون.',
             'description: \\`useState\\` أمثلة استخدام الخطاف',
+            "description: 'use cache' وظيفة التخزين المؤقت ومزايا API",
+            'description: "Button" دليل استخدام المكون',
           ],
         },
       };
@@ -178,57 +210,38 @@ async function translateChunk(
 
   const langExamples = getLanguageSpecificExamples(langConfig.locale);
 
-  const frontmatterRules = `⚠️ CRITICAL MDX FRONTMATTER RULES ⚠️
+  const frontmatterRules = `⚠️ CRITICAL MDX FRONT MATTER RULES ⚠️
 • NEVER start a frontmatter value with inline code (text between \`backticks\`)
+• NEVER start a frontmatter value with single quotes ('text')
+• NEVER start a frontmatter value with double quotes ("text")
 • This applies to ALL inline code including \`<Component>\` tags, \`functions\`, variables, etc.
-• In frontmatter (sections between --- marks), ALWAYS rearrange sentences so inline code appears AFTER some text
-• If a frontmatter value would start with inline code after translation, ALWAYS rewrite the sentence so that some descriptive text comes before the inline code. For example, instead of ${langExamples.incorrect[0]}, use ${langExamples.correct[0]}.
+• This applies to ALL quoted text including 'use cache', "API design", 'components', etc.
+• In frontmatter (sections between --- marks), ALWAYS rearrange sentences so inline code and quoted text appears AFTER some text
+• If a frontmatter value would start with inline code or quotes after translation, ALWAYS rewrite the sentence so that some descriptive text comes before the inline code or quotes. For example, instead of ${langExamples.incorrect[0]}, use ${langExamples.correct[0]}.
 • This rule applies to ALL frontmatter keys (title, description, etc.), not just description.
 • ALWAYS preserve both the opening and closing frontmatter delimiters (---) - never omit the closing delimiter
 • Maintain the exact structure of frontmatter - beginning with ---, followed by key-value pairs, and ending with ---
+• ENSURE VALID FRONT MATTER FORMAT: Use proper Front Matter syntax with key: value pairs, proper indentation with spaces (not tabs), and escape special characters when needed
 • These rules are ABSOLUTELY REQUIRED for proper rendering of the documentation
 
 Examples of MDX Frontmatter Translation:
 
-# Example 1: Never start frontmatter values with inline code
-✓ CORRECT (Always do this):
-  Original: 
-    title: \`public\` directory static assets
-    description: API reference for \`getStaticProps\`. Learn how to use \`getStaticProps\`.
-    description: API reference for the \`<Link>\` component.
-    description: \`useState\` hook usage examples
-  Translation:
-${langExamples.correct.map((ex) => `    ${ex}`).join('\n')}
-    
-✗ INCORRECT (Never do this):
-  Original:
-    title: \`public\` directory static assets
-    description: API reference for \`getStaticProps\`. Learn how to use \`getStaticProps\`.
-    description: API reference for the \`<Link>\` component.
-    description: \`useState\` hook usage examples
-  Translation:
+# Example 1: Never start frontmatter values with inline code or quotes
+  INCORRECT Translation (Never do this):
 ${langExamples.incorrect.map((ex) => `    ${ex}`).join('\n')}
+  CORRECT Translation (Always do this):
+${langExamples.correct.map((ex) => `    ${ex}`).join('\n')}
 
 # Example 2: Frontmatter Structure - always include closing delimiter
-✓ CORRECT (Always do this):
-  Original:
-    ---
-    title: \`public\` directory static assets
-    ---
-  Translation:
-    ---
-    ${langExamples.correct[0]}
-    ---
-
-✗ INCORRECT (Never do this):
-  Original:
-    ---
-    title: \`public\` directory static assets
-    ---
-  Translation:
+  INCORRECT Translation (Never do this):
     ---
     ${langExamples.correct[0]}
     (missing closing delimiter)
+
+  CORRECT Translation (Always do this):
+    ---
+    ${langExamples.correct[0]}
+    ---
 
 These rules apply ONLY to frontmatter (between --- marks) and are CRITICAL for proper document rendering.
 REMEMBER: You must NEVER start with inline code in frontmatter values and ALWAYS include both opening and closing --- delimiters.`;
@@ -276,7 +289,7 @@ Output format:
     },
   ];
 
-  // console.log(systemPrompt + prompt);
+  console.log(systemPrompt + prompt);
   // console.log(chunk);
 
   const response = await openai.chat.completions.create({
