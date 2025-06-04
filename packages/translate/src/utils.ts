@@ -11,6 +11,7 @@ interface LangConfig {
   name: string;
   guide?: string;
   terms?: Record<string, string>;
+  locale: string;
 }
 
 interface CheckFileUpdateParams {
