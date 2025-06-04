@@ -222,7 +222,8 @@ async function translateChunk(
 • NEVER start a frontmatter value with inline code (text between \`backticks\`)
 • NEVER start a frontmatter value with single quotes ('text')
 • NEVER start a frontmatter value with double quotes ("text")
-• NEVER use colon (:) character in frontmatter values as it conflicts with YAML syntax
+• NEVER use colon (:) character in frontmatter values as it conflicts with YAML syntax (e.g., \`headline: Fondations React : À propos de React et Next.js\` is NOT allowed)
+• NEVER wrap frontmatter values in single quotes ('') - values should be written directly without quotes (e.g., use \`headline: Fondations React\` instead of \`headline: 'Fondations React'\`)
 • This applies to ALL inline code including \`<Component>\` tags, \`functions\`, variables, etc.
 • This applies to ALL quoted text including 'use cache', "API design", 'components', etc.
 • In frontmatter (sections between --- marks), ALWAYS rearrange sentences so inline code and quoted text appears AFTER some text
