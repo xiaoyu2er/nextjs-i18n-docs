@@ -27,7 +27,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
 
     ...(await Promise.all(
-      [docs.getPages(), learn.getPages(), blog.getPages()]
+      [
+        docs
+          .getPages()
+          // We filter out the pages that start with /docs/13 and /docs/14
+          .filter((page) =>
+            ['/docs/13', '/docs/14'].every(
+              (prefix) => !page.url.startsWith(prefix),
+            ),
+          ),
+        learn.getPages(),
+        blog.getPages(),
+      ]
         .flat()
         .map(async (page) => {
           const { 'translation-updated-at': lastModified } = page.data;
