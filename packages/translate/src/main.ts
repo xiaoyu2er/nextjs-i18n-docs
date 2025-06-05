@@ -158,13 +158,22 @@ export async function main({
         targetPath,
       });
 
-      tableData.push({
-        Source: sourcePath,
-        ...(verbose ? { Target: targetPath } : {}),
-        'Should update?': shouldUpdate ? '✅ Yes' : '❌ No',
-        Chunks: chunks,
-        Reason: reason,
-      });
+      if (verbose) {
+        tableData.push({
+          Source: sourcePath,
+          ...(verbose ? { Target: targetPath } : {}),
+          'Should update?': shouldUpdate ? '✅ Yes' : '❌ No',
+          Chunks: chunks,
+          Reason: reason,
+        });
+      } else if (shouldUpdate) {
+        tableData.push({
+          Source: sourcePath,
+          Target: targetPath,
+          'Should update?': '✅ Yes',
+          Reason: reason,
+        });
+      }
 
       if (shouldUpdate) {
         tasks.push({
