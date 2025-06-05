@@ -8,6 +8,7 @@ This is a monorepo project designed to sync with the official Next.js documentat
 - 🌐 Multilingual support (currently English and Simplified Chinese)
 - 🔍 Full-text search with [Orama](https://orama.com/)
 - 🤖 AI-powered translation using the `@next-i18n/translate` package
+- 🗺️ Automated sitemap submission to Google Search Console
 
 ## Project Structure
 
