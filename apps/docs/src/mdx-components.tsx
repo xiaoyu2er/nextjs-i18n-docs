@@ -11,6 +11,8 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     ...defaultMdxComponents,
     Image,
+    // biome-ignore lint/a11y/useAltText: <explanation>
+    img: (props) => <img {...props} />,
     Cross,
     Check,
     Tab,
