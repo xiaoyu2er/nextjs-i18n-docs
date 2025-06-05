@@ -444,6 +444,9 @@ Examples:
   # Submit specific sitemaps
   tsx submit-sitemap.ts sc-domain:nextjs.im --sitemap-urls "https://nextjs.im/sitemap.xml"
   
+  # Submit multiple sitemaps at once
+  tsx submit-sitemap.ts sc-domain:nextjs.im --sitemap-urls "https://zh-hans.nextjs.im/sitemap.xml,https://fr.nextjs.im/sitemap.xml,https://es.nextjs.im/sitemap.xml"
+  
   # Submit to URL-prefix property
   tsx submit-sitemap.ts https://example.com/
   

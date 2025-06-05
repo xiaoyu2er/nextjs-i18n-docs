@@ -1,0 +1,109 @@
+name: Submit Sitemaps
+
+on:
+  workflow_call:
+    inputs:
+      locales:
+        description: 'Comma-separated list of locales to submit sitemaps for (e.g., en,zh-hans). Leave empty to submit all locales with sitemaps.'
+        required: false
+        type: string
+        default: ''
+      domain:
+        description: 'Domain for Google Search Console (e.g., sc-domain:nextjs.im)'
+        required: false
+        type: string
+        default: 'sc-domain:nextjs.im'
+      dry_run:
+        description: 'Preview what would be submitted without making requests'
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      locales:
+        description: 'Comma-separated list of locales to submit sitemaps for (e.g., en,zh-hans). Leave empty to submit all locales with sitemaps.'
+        required: false
+        type: string
+        default: ''
+      domain:
+        description: 'Domain for Google Search Console (e.g., sc-domain:nextjs.im)'
+        required: false
+        type: string
+        default: 'sc-domain:nextjs.im'
+      dry_run:
+        description: 'Preview what would be submitted without making requests'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  submit-sitemaps:
+    runs-on: ubuntu-latest
+    name: Submit Sitemaps to Google Search Console
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      
+      - name: Setup Tools
+        uses: ./.github/actions/setup
+      
+      - name: Collect and Submit Sitemaps
+        shell: bash
+        env:
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+          GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+        run: |
+          echo "🔍 Collecting sitemap URLs..."
+          
+          # Read locales config
+          LOCALES_CONFIG=$(cat .github/locales-config.json)
+          
+          # Determine which locales to process
+          if [ -n "${{ inputs.locales }}" ]; then
+            # Use specified locales
+            IFS=',' read -ra SELECTED_LOCALES <<< "${{ inputs.locales }}"
+            echo "📝 Processing specified locales: ${{ inputs.locales }}"
+          else
+            # Get all enabled locales with sitemaps
+            SELECTED_LOCALES=($(echo "$LOCALES_CONFIG" | jq -r 'to_entries[] | select(.value.enabled == true and .value.sitemap != null) | .key'))
+            echo "📝 Processing all enabled locales with sitemaps: ${SELECTED_LOCALES[*]}"
+          fi
+          
+          # Collect sitemap URLs
+          SITEMAP_URLS=()
+          
+          for locale in "${SELECTED_LOCALES[@]}"; do
+            # Check if locale has sitemap
+            SITEMAP_URL=$(echo "$LOCALES_CONFIG" | jq -r --arg locale "$locale" '.[$locale].sitemap // empty')
+            
+            if [ -n "$SITEMAP_URL" ]; then
+              SITEMAP_URLS+=("$SITEMAP_URL")
+              echo "✅ Found sitemap for $locale: $SITEMAP_URL"
+            else
+              echo "⚠️ Skipping $locale - no sitemap configured"
+            fi
+          done
+          
+          if [ ${#SITEMAP_URLS[@]} -eq 0 ]; then
+            echo "❌ No sitemaps found to submit"
+            exit 1
+          fi
+          
+          # Join sitemap URLs with commas
+          SITEMAP_URLS_STRING=$(IFS=','; echo "${SITEMAP_URLS[*]}")
+          
+          echo "🚀 Submitting ${#SITEMAP_URLS[@]} sitemaps to Google Search Console"
+          echo "🌐 Domain: ${{ inputs.domain }}"
+          echo "📄 Sitemap URLs: $SITEMAP_URLS_STRING"
+          
+          
+          
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+            echo "🔍 Running in dry-run mode"
+          fi
+          
+          pnpm run docs:submit-sitemap "${{ inputs.domain }}" --sitemap-urls "$SITEMAP_URLS_STRING" $DRY_RUN_FLAG
