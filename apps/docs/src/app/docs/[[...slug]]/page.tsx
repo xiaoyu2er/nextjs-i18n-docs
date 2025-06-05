@@ -24,14 +24,14 @@ export default async function Docs(props: {
   const docId = getDocId(locale, docUrl);
   const page = getPage(docUrl);
   if (!page) notFound();
-  const { isApp, isPages } = parseDocId(docId);
+  const { isApp, isPages, isVLatest, version } = parseDocId(docId);
 
   let { body: MdxContent, toc } = await page.data.load();
 
   // source: app/getting-started/installation
   const ref = page.data.source;
   if (ref) {
-    const refUrl = getDocUrl(ref);
+    const refUrl = getDocUrl(isVLatest ? ref : `${version}/${ref}`);
     const refPage = getPage(refUrl);
     if (!refPage) notFound();
 
