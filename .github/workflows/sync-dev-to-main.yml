@@ -1,0 +1,84 @@
+name: Sync Dev to Main
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+  
+  # Daily schedule at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  sync-branches:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Check if dev branch exists
+        id: check_dev
+        run: |
+          if git show-ref --verify --quiet refs/remotes/origin/dev; then
+            echo "dev_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "dev_exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Exit if dev branch doesn't exist
+        if: steps.check_dev.outputs.dev_exists == 'false'
+        run: |
+          echo "Dev branch does not exist. Skipping sync."
+          exit 0
+      
+      - name: Check for changes between dev and main
+        id: check_changes
+        run: |
+          # Fetch the latest changes from both branches
+          git fetch origin dev
+          git fetch origin main
+          
+          # Check if there are any differences between remote branches
+          if git diff --quiet origin/main origin/dev; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected between dev and main"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected between dev and main"
+          fi
+      
+      - name: Exit if no changes
+        if: steps.check_changes.outputs.has_changes == 'false'
+        run: |
+          echo "No changes to sync. Exiting."
+          exit 0
+      
+      - name: Attempt merge
+        id: merge
+        run: |
+          git checkout main
+          git pull origin main
+          
+          # Try to merge dev into main
+          if git merge origin/dev --no-edit; then
+            echo "merge_success=true" >> $GITHUB_OUTPUT
+            echo "Merge completed successfully"
+          else
+            echo "merge_success=false" >> $GITHUB_OUTPUT
+            echo "Merge failed due to conflicts"
+            git merge --abort
+          fi
+      
+      - name: Push changes if merge succeeded
+        if: steps.merge.outputs.merge_success == 'true'
+        run: |
+          git push origin main
+          echo "Successfully synced dev to main"
