@@ -1,0 +1,405 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:46:44.594Z
+title: Muster und Best Practices
+nav_title: Datenabruf-Muster und Best Practices
+description: Erfahren Sie mehr über gängige Muster für den Datenabruf in React und Next.js.
+---
+
+Es gibt einige empfohlene Muster und Best Practices für den Datenabruf in React und Next.js. Diese Seite behandelt einige der gängigsten Muster und deren Anwendung.
+
+## Datenabruf auf dem Server
+
+Wann immer möglich, empfehlen wir den Datenabruf auf dem Server mit Server Components. Dies ermöglicht Ihnen:
+
+- Direkten Zugriff auf Backend-Datenressourcen (z.B. Datenbanken).
+- Ihre Anwendung sicherer zu halten, indem sensible Informationen wie Zugriffstoken und API-Schlüssel nicht an den Client weitergegeben werden.
+- Datenabruf und Rendering in derselben Umgebung. Dies reduziert sowohl die Kommunikation zwischen Client und Server als auch die [Arbeit im Hauptthread](https://vercel.com/blog/how-react-18-improves-application-performance) auf dem Client.
+- Mehrere Datenabfragen mit einer einzigen Roundtrip-Anfrage statt mehrerer einzelner Anfragen auf dem Client.
+- Reduzierung von Client-Server-[Wasserfällen](#paralleler-und-sequenzieller-datenabruf).
+- Abhängig von Ihrer Region kann der Datenabruf näher an der Datenquelle erfolgen, was Latenz verringert und die Leistung verbessert.
+
+Dann können Sie Daten mit [Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) mutieren oder aktualisieren.
+
+## Datenabruf dort, wo sie benötigt werden
+
+Wenn Sie dieselben Daten (z.B. aktuellen Benutzer) in mehreren Komponenten eines Baums verwenden müssen, müssen Sie die Daten nicht global abrufen oder Props zwischen Komponenten weitergeben. Stattdessen können Sie `fetch` oder React `cache` in der Komponente verwenden, die die Daten benötigt, ohne sich um die Leistungsauswirkungen mehrerer Anfragen für dieselben Daten sorgen zu müssen.
+
+Dies ist möglich, weil `fetch`-Anfragen automatisch memoisiert werden. Erfahren Sie mehr über [Request Memoization](/docs/app/building-your-application/caching#request-memoization)
+
+> **Gut zu wissen**: Dies gilt auch für Layouts, da Daten nicht zwischen einem Eltern-Layout und seinen Kindern weitergegeben werden können.
+
+## Streaming
+
+Streaming und [Suspense](https://react.dev/reference/react/Suspense) sind React-Funktionen, die es ermöglichen, die UI schrittweise zu rendern und gerenderte Einheiten inkrementell an den Client zu streamen.
+
+Mit Server Components und [nested layouts](/docs/app/building-your-application/routing/pages-and-layouts) können Sie Teile der Seite, die keine spezifischen Daten benötigen, sofort rendern und einen [Ladezustand](/docs/app/building-your-application/routing/loading-ui-and-streaming) für Teile anzeigen, die Daten abrufen. Dies bedeutet, dass der Benutzer nicht warten muss, bis die gesamte Seite geladen ist, bevor er mit ihr interagieren kann.
+
+<Image
+  alt="Server Rendering mit Streaming"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+Weitere Informationen zu Streaming und Suspense finden Sie auf den Seiten [Loading UI](/docs/app/building-your-application/routing/loading-ui-and-streaming) und [Streaming und Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense).
+
+## Paralleler und sequenzieller Datenabruf
+
+Beim Datenabruf innerhalb von React-Komponenten müssen Sie zwei Datenabruf-Muster beachten: Parallel und Sequenziell.
+
+<Image
+  alt="Sequenzieller und paralleler Datenabruf"
+  srcLight="/docs/light/sequential-parallel-data-fetching.png"
+  srcDark="/docs/dark/sequential-parallel-data-fetching.png"
+  width="1600"
+  height="525"
+/>
+
+- Beim **sequenziellen Datenabruf** sind Anfragen in einer Route voneinander abhängig und erzeugen somit Wasserfälle. Es gibt Fälle, in denen Sie dieses Muster wünschen, weil eine Abfrage vom Ergebnis einer anderen abhängt oder Sie eine Bedingung erfüllt sehen möchten, bevor die nächste Abfrage Ressourcen spart. Dieses Verhalten kann jedoch auch unbeabsichtigt sein und zu längeren Ladezeiten führen.
+- Beim **parallelen Datenabruf** werden Anfragen in einer Route eifrig initiiert und laden Daten gleichzeitig. Dies reduziert Client-Server-Wasserfälle und die Gesamtzeit für den Datenabruf.
+
+### Sequenzieller Datenabruf
+
+Wenn Sie verschachtelte Komponenten haben und jede Komponente ihre eigenen Daten abruft, erfolgt der Datenabruf sequenziell, wenn diese Datenanfragen unterschiedlich sind (dies gilt nicht für Anfragen nach denselben Daten, da sie automatisch [memoisiert](/docs/app/building-your-application/caching#request-memoization) werden).
+
+Beispielsweise beginnt die `Playlists`-Komponente erst mit dem Datenabruf, wenn die `Artist`-Komponente den Datenabruf abgeschlossen hat, da `Playlists` von der `artistID`-Prop abhängt:
+
+```tsx filename="app/artist/[username]/page.tsx" switcher
+// ...
+
+async function Playlists({ artistID }: { artistID: string }) {
+  // Warten auf die Playlists
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // Warten auf den Künstler
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/[username]/page.js" switcher
+// ...
+
+async function Playlists({ artistID }) {
+  // Warten auf die Playlists
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({ params: { username } }) {
+  // Warten auf den Künstler
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+In solchen Fällen können Sie [`loading.js`](/docs/app/building-your-application/routing/loading-ui-and-streaming) (für Routensegmente) oder [React `<Suspense>`](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense) (für verschachtelte Komponenten) verwenden, um einen sofortigen Ladezustand anzuzeigen, während React das Ergebnis streamt.
+
+Dies verhindert, dass die gesamte Route durch den Datenabruf blockiert wird, und der Benutzer kann mit den nicht blockierten Teilen der Seite interagieren.
+
+> **Blockierende Datenanfragen:**
+>
+> Ein alternativer Ansatz zur Vermeidung von Wasserfällen besteht darin, Daten global am Stamm Ihrer Anwendung abzurufen, aber dies blockiert das Rendering für alle darunter liegenden Routensegmente, bis der Datenabruf abgeschlossen ist. Dies kann als "Alles-oder-nichts"-Datenabruf beschrieben werden. Entweder Sie haben alle Daten für Ihre Seite oder Anwendung oder keine.
+>
+> Alle `await`-Fetch-Anfragen blockieren das Rendering und den Datenabruf für den gesamten darunter liegenden Baum, es sei denn, sie sind in eine `<Suspense>`-Grenze eingeschlossen oder es wird `loading.js` verwendet. Eine weitere Alternative ist der [parallele Datenabruf](#paralleler-datenabruf) oder das [Preload-Muster](#vorab-laden-von-daten).
+
+### Paralleler Datenabruf
+
+Um Daten parallel abzurufen, können Sie Anfragen eifrig initiieren, indem Sie sie außerhalb der Komponenten definieren, die die Daten verwenden, und sie dann innerhalb der Komponente aufrufen. Dies spart Zeit, indem beide Anfragen parallel initiiert werden, aber der Benutzer sieht das gerenderte Ergebnis erst, nachdem beide Promises aufgelöst sind.
+
+Im folgenden Beispiel werden die Funktionen `getArtist` und `getArtistAlbums` außerhalb der `Page`-Komponente definiert, dann innerhalb der Komponente aufgerufen, und wir warten auf die Auflösung beider Promises:
+
+```tsx filename="app/artist/[username]/page.tsx" switcher
+import Albums from './albums'
+
+async function getArtist(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // Beide Anfragen parallel initiieren
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // Warten auf die Auflösung der Promises
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/[username]/page.js" switcher
+import Albums from './albums'
+
+async function getArtist(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({ params: { username } }) {
+  // Beide Anfragen parallel initiieren
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // Warten auf die Auflösung der Promises
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+Um die Benutzererfahrung zu verbessern, können Sie eine [Suspense Boundary](/docs/app/building-your-application/routing/loading-ui-and-streaming) hinzufügen, um die Rendering-Arbeit aufzuteilen und einen Teil des Ergebnisses so schnell wie möglich anzuzeigen.
+
+## Vorab Laden von Daten
+
+Eine weitere Möglichkeit, Wasserfälle zu vermeiden, ist die Verwendung des Preload-Musters. Sie können optional eine `preload`-Funktion erstellen, um den parallelen Datenabruf weiter zu optimieren. Mit diesem Ansatz müssen Sie keine Promises als Props weitergeben. Die `preload`-Funktion kann auch einen beliebigen Namen haben, da es sich um ein Muster und nicht um eine API handelt.
+
+```tsx filename="components/Item.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id: string) => {
+  // void wertet den gegebenen Ausdruck aus und gibt undefined zurück
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }: { id: string }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="components/Item.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id) => {
+  // void wertet den gegebenen Ausdruck aus und gibt undefined zurück
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  // Datenabruf für Item starten
+  preload(id)
+  // Eine weitere asynchrone Aufgabe ausführen
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({ params: { id } }) {
+  // Datenabruf für Item starten
+  preload(id)
+  // Eine weitere asynchrone Aufgabe ausführen
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+### Verwendung von React `cache`, `server-only` und dem Preload-Muster
+
+Sie können die `cache`-Funktion, das `preload`-Muster und das `server-only`-Paket kombinieren, um ein Datenabruf-Hilfsmittel zu erstellen, das in Ihrer gesamten App verwendet werden kann.
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id: string) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id: string) => {
+  // ...
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id) => {
+  // ...
+})
+```
+
+Mit diesem Ansatz können Sie Daten eifrig abrufen, Antworten zwischenspeichern und sicherstellen, dass dieser Datenabruf [nur auf dem Server](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment) erfolgt.
+
+Die `utils/get-item`-Exporte können von Layouts, Pages oder anderen Komponenten verwendet werden, um ihnen die Kontrolle darüber zu geben, wann die Daten eines Items abgerufen werden.
+
+> **Gut zu wissen:**
+>
+> - Wir empfehlen die Verwendung des [`server-only`-Pakets](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment), um sicherzustellen, dass Server-Datenabruffunktionen niemals auf dem Client verwendet werden.
+
+## Verhindern, dass sensible Daten an den Client weitergegeben werden
+
+Wir empfehlen die Verwendung von Reacts Taint-APIs, [`taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) und [`taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue), um zu verhindern, dass ganze Objektinstanzen oder sensible Werte an den Client weitergegeben werden.
+
+Um Tainting in Ihrer Anwendung zu aktivieren, setzen Sie die Next.js Config-Option `experimental.taint` auf `true`:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    taint: true,
+  },
+}
+```
+
+Dann übergeben Sie das Objekt oder den Wert, den Sie tainten möchten, an die Funktionen `experimental_taintObjectReference` oder `experimental_taintUniqueValue`:
+
+```ts filename="app/utils.ts" switcher
+import { queryDataFromDB } from './api'
+import {
+  experimental_taintObjectReference,
+  experimental_taintUniqueValue,
+} from 'react'
+
+export async function getUserData() {
+  const data = await queryDataFromDB()
+  experimental_taintObjectReference(
+    'Das gesamte Benutzerobjekt nicht an den Client weitergeben',
+    data
+  )
+  experimental_taintUniqueValue(
+    "Die Adresse des Benutzers nicht an den Client weitergeben",
+    data,
+    data.address
+  )
+  return data
+}
+```
+
+```js filename="app/utils.js" switcher
+import { queryDataFromDB } from './api'
+import {
+  experimental_taintObjectReference,
+  experimental_taintUniqueValue,
+} from 'react'
+
+export async function getUserData() {
+  const data = await queryDataFromDB()
+  experimental_taintObjectReference(
+    'Das gesamte Benutzerobjekt nicht an den Client weitergeben',
+    data
+  )
+  experimental_taintUniqueValue(
+    "Die Adresse des Benutzers nicht an den Client weitergeben",
+    data,
+    data.address
+  )
+  return data
+}
+```
+
+```tsx filename="app/page.tsx" switcher
+import { getUserData } from './data'
+
+export async function Page() {
+  const userData = getUserData()
+  return (
+    <ClientComponent
+      user={userData} // Dies verursacht einen Fehler wegen taintObjectReference
+      address={userData.address} // Dies verursacht einen Fehler wegen taintUniqueValue
+    />
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { getUserData } from './data'
+
+export async function Page() {
+  const userData = await getUserData()
+  return (
+    <ClientComponent
+      user={userData} // Dies verursacht einen Fehler wegen taintObjectReference
+      address={userData.address} // Dies verursacht einen Fehler wegen taintUniqueValue
+    />
+  )
+}
+```
+
+Erfahren Sie mehr über [Security und Server Actions](https://nextjs.org/blog/security-nextjs-server-components-actions).

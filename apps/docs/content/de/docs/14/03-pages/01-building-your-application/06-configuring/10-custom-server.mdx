@@ -1,0 +1,121 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:23:54.118Z
+title: Benutzerdefinierter Server
+description: Starten einer Next.js-App programmatisch mit einem benutzerdefinierten Server.
+---
+
+<details>
+  <summary>Beispiele</summary>
+
+- [Benutzerdefinierter Server](https://github.com/vercel/next.js/tree/canary/examples/custom-server)
+- [SSR-Caching](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+Standardmäßig enthält Next.js einen eigenen Server mit `next start`. Wenn Sie ein bestehendes Backend haben, können Sie es trotzdem mit Next.js verwenden (dies ist kein benutzerdefinierter Server). Ein benutzerdefinierter Next.js-Server ermöglicht es Ihnen, einen Server zu 100% programmatisch zu starten, um benutzerdefinierte Servermuster zu verwenden. In den meisten Fällen werden Sie dies nicht benötigen - aber es steht für vollständige Anpassungen zur Verfügung.
+
+> **Wichtig zu wissen**:
+>
+> - Bevor Sie sich für einen benutzerdefinierten Server entscheiden, beachten Sie bitte, dass dieser nur verwendet werden sollte, wenn der integrierte Router von Next.js Ihre Anforderungen nicht erfüllen kann. Ein benutzerdefinierter Server entfernt wichtige Leistungsoptimierungen wie **Serverless-Funktionen** und **[Automatische statische Optimierung](/docs/pages/building-your-application/rendering/automatic-static-optimization).**
+> - Ein benutzerdefinierter Server **kann nicht** auf [Vercel](https://vercel.com/solutions/nextjs) deployed werden.
+> - Der Standalone-Ausgabemodus verfolgt benutzerdefinierte Serverdateien nicht und gibt stattdessen eine separate minimale `server.js`-Datei aus.
+
+Hier ein Beispiel für einen benutzerdefinierten Server:
+
+```js filename="server.js"
+const { createServer } = require('http')
+const { parse } = require('url')
+const next = require('next')
+
+const dev = process.env.NODE_ENV !== 'production'
+const hostname = 'localhost'
+const port = 3000
+// Bei Verwendung von Middleware müssen `hostname` und `port` unten angegeben werden
+const app = next({ dev, hostname, port })
+const handle = app.getRequestHandler()
+
+app.prepare().then(() => {
+  createServer(async (req, res) => {
+    try {
+      // Stellen Sie sicher, dass Sie `true` als zweites Argument an `url.parse` übergeben.
+      // Dies weist an, den Abfrageanteil der URL zu parsen.
+      const parsedUrl = parse(req.url, true)
+      const { pathname, query } = parsedUrl
+
+      if (pathname === '/a') {
+        await app.render(req, res, '/a', query)
+      } else if (pathname === '/b') {
+        await app.render(req, res, '/b', query)
+      } else {
+        await handle(req, res, parsedUrl)
+      }
+    } catch (err) {
+      console.error('Fehler beim Bearbeiten von', req.url, err)
+      res.statusCode = 500
+      res.end('interner Serverfehler')
+    }
+  })
+    .once('error', (err) => {
+      console.error(err)
+      process.exit(1)
+    })
+    .listen(port, () => {
+      console.log(`> Bereit auf http://${hostname}:${port}`)
+    })
+})
+```
+
+> `server.js` durchläuft nicht babel oder webpack. Stellen Sie sicher, dass die Syntax und die Quellen, die diese Datei benötigt, mit der aktuellen Node-Version kompatibel sind, die Sie verwenden.
+
+Um den benutzerdefinierten Server zu starten, müssen Sie die `scripts` in `package.json` wie folgt aktualisieren:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "NODE_ENV=production node server.js"
+  }
+}
+```
+
+---
+
+Der benutzerdefinierte Server verwendet den folgenden Import, um den Server mit der Next.js-Anwendung zu verbinden:
+
+```js
+const next = require('next')
+const app = next({})
+```
+
+Der obige `next`-Import ist eine Funktion, die ein Objekt mit den folgenden Optionen empfängt:
+
+| Option         | Typ                | Beschreibung                                                                                                   |
+| -------------- | ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `conf`         | `Object`           | Dasselbe Objekt, das Sie in [next.config.js](/docs/pages/api-reference/next-config-js) verwenden würden. Standardmäßig `{}` |
+| `customServer` | `Boolean`          | (_Optional_) Auf false setzen, wenn der Server von Next.js erstellt wurde                                     |
+| `dev`          | `Boolean`          | (_Optional_) Ob Next.js im Entwicklungsmodus gestartet werden soll. Standardmäßig `false`                     |
+| `dir`          | `String`           | (_Optional_) Speicherort des Next.js-Projekts. Standardmäßig `'.'`                                            |
+| `quiet`        | `Boolean`          | (_Optional_) Fehlermeldungen mit Serverinformationen ausblenden. Standardmäßig `false`                        |
+| `hostname`     | `String`           | (_Optional_) Der Hostname, hinter dem der Server läuft                                                        |
+| `port`         | `Number`           | (_Optional_) Der Port, hinter dem der Server läuft                                                            |
+| `httpServer`   | `node:http#Server` | (_Optional_) Der HTTP-Server, hinter dem Next.js läuft                                                        |
+
+Die zurückgegebene `app` kann dann verwendet werden, um Next.js Anfragen nach Bedarf verarbeiten zu lassen.
+
+## Deaktivierung des Dateisystem-Routings
+
+Standardmäßig serviert `Next` jede Datei im `pages`-Ordner unter einem Pfadnamen, der dem Dateinamen entspricht. Wenn Ihr Projekt einen benutzerdefinierten Server verwendet, kann dieses Verhalten dazu führen, dass derselbe Inhalt von mehreren Pfaden aus serviert wird, was Probleme mit SEO und UX verursachen kann.
+
+Um dieses Verhalten zu deaktivieren und das Routing basierend auf Dateien in `pages` zu verhindern, öffnen Sie `next.config.js` und deaktivieren Sie die `useFileSystemPublicRoutes`-Konfiguration:
+
+```js filename="next.config.js"
+module.exports = {
+  useFileSystemPublicRoutes: false,
+}
+```
+
+> Hinweis: `useFileSystemPublicRoutes` deaktiviert Dateinamen-Routen für SSR; clientseitiges Routing kann weiterhin auf diese Pfade zugreifen. Wenn Sie diese Option verwenden, sollten Sie programmatisch gegen die Navigation zu unerwünschten Routen schützen.
+
+> Möglicherweise möchten Sie auch den clientseitigen Router so konfigurieren, dass clientseitige Weiterleitungen zu Dateinamen-Routen nicht erlaubt sind; siehe dazu [`router.beforePopState`](/docs/pages/api-reference/functions/use-router#routerbeforepopstate).
