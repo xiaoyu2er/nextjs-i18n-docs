@@ -64,51 +64,19 @@ export function getRoutesByType() {
   const allRoutes = getAllStaticRoutes();
 
   return {
-    docs: allRoutes.filter((route) => route.type === 'docs'),
-    blog: allRoutes.filter((route) => route.type === 'blog'),
-    learn: allRoutes.filter((route) => route.type === 'learn'),
-    all: allRoutes,
+    '/docs/13': allRoutes.filter(
+      (route) => route.type === 'docs' && route.url.startsWith('/docs/13'),
+    ),
+    '/docs/14': allRoutes.filter(
+      (route) => route.type === 'docs' && route.url.startsWith('/docs/14'),
+    ),
+    '/docs': allRoutes.filter(
+      (route) =>
+        route.type === 'docs' &&
+        !route.url.startsWith('/docs/13') &&
+        !route.url.startsWith('/docs/14'),
+    ),
+    '/blog': allRoutes.filter((route) => route.type === 'blog'),
+    '/learn': allRoutes.filter((route) => route.type === 'learn'),
   };
-}
-
-/**
- * Get a sample of routes for quick testing
- */
-export function getSampleRoutes(limit = 10): StaticRoute[] {
-  const routes = getAllStaticRoutes();
-
-  // Get a balanced sample from each type
-  const sampleSize = Math.ceil(limit / 3);
-  const routesByType = getRoutesByType();
-
-  return [
-    ...routesByType.docs.slice(0, sampleSize),
-    ...routesByType.blog.slice(0, sampleSize),
-    ...routesByType.learn.slice(0, sampleSize),
-  ].slice(0, limit);
-}
-
-/**
- * Clean URL by removing fragments that might cause navigation issues
- */
-export function cleanUrl(url: string): string {
-  // Remove URL fragments (#) that can cause timeouts in tests
-  return url.split('#')[0];
-}
-
-/**
- * Check if a URL has fragments that might cause navigation issues
- */
-export function hasUrlFragments(url: string): boolean {
-  return url.includes('#');
-}
-
-/**
- * Get routes suitable for e2e testing (clean URLs without fragments)
- */
-export function getTestableRoutes(): StaticRoute[] {
-  return getAllStaticRoutes().map((route) => ({
-    ...route,
-    url: cleanUrl(route.url),
-  }));
 }
