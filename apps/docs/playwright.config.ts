@@ -1,4 +1,6 @@
+import env from '@next/env';
 import { defineConfig, devices } from '@playwright/test';
+env.loadEnvConfig(process.cwd());
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -18,7 +20,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev --port 7878',
+    command: 'pnpm start --port 7878',
     url: 'http://localhost:7878',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

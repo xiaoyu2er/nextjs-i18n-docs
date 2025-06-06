@@ -14,12 +14,24 @@ on:
         default: 3
 
 jobs:
+  prepare-shards:
+    runs-on: ubuntu-latest
+    outputs:
+      shard-array: ${{ steps.generate-shards.outputs.shard-array }}
+    steps:
+      - name: Generate shard array
+        id: generate-shards
+        run: |
+          shards=$(seq 1 ${{ inputs.shard-total }} | jq -s -c 'map(tonumber)')
+          echo "shard-array=$shards" >> $GITHUB_OUTPUT
+
   test:
+    needs: prepare-shards
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include: ${{ fromJson(inputs.matrix-include) }}
-        shard: [1, 2, 3]
+        shard: ${{ fromJson(needs.prepare-shards.outputs.shard-array) }}
     name: Test ${{ matrix.locale }} (Shard ${{ matrix.shard }})
     steps:
       - name: Checkout code
@@ -37,8 +49,19 @@ jobs:
           vercel_org_id: ${{ secrets.VERCEL_ORG_ID }}
           vercel_token: ${{ secrets.VERCEL_TOKEN }}
       
-      - name: Run E2E Tests
+      - uses: ./.github/actions/vercel-build
+        with:
+          environment: production
+          prodFlag: --prod
+          vercel_project_id: ${{ secrets[matrix.secret_project_id] }}
+          vercel_org_id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel_token: ${{ secrets.VERCEL_TOKEN }}
+      
+      - name: Install E2E Dependencies
         run: |
           pnpm --filter @next-i18n/docs playwright:install
+    
+      - name: Run E2E Tests
+        run: |
           echo "Running tests for ${{ matrix.locale }} (Shard ${{ matrix.shard }}/${{ inputs.shard-total }})"
           pnpm --filter @next-i18n/docs test:e2e --shard ${{ matrix.shard }}/${{ inputs.shard-total }}
