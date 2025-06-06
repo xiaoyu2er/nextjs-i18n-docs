@@ -1,0 +1,314 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:35:41.485Z
+title: Паттерны получения данных
+description: Узнайте о распространённых паттернах получения данных в React и Next.js.
+---
+
+Существует несколько рекомендуемых паттернов и лучших практик для получения данных в React и Next.js. На этой странице рассматриваются наиболее распространённые из них и способы их применения.
+
+### Получение данных на сервере
+
+По возможности мы рекомендуем получать данные на сервере. Это позволяет:
+
+- Иметь прямой доступ к серверным ресурсам данных (например, базам данных).
+- Повысить безопасность приложения, предотвращая утечку конфиденциальной информации, такой как токены доступа и API-ключи, на клиент.
+- Получать данные и выполнять рендеринг в одной среде. Это сокращает обмен данными между клиентом и сервером, а также [нагрузку на основной поток](https://vercel.com/blog/how-react-18-improves-application-performance) на клиенте.
+- Выполнять несколько запросов данных за один обход вместо множества отдельных запросов на клиенте.
+- Уменьшать количество [водопадов](#параллельное-и-последовательное-получение-данных) между клиентом и сервером.
+- В зависимости от региона, получение данных может происходить ближе к источнику данных, что снижает задержки и повышает производительность.
+
+Вы можете получать данные на сервере с помощью Серверных Компонентов (Server Components), [Обработчиков Маршрутов (Route Handlers)](/docs/app/building-your-application/routing/route-handlers) и [Серверных Действий (Server Actions)](/docs/app/building-your-application/data-fetching/forms-and-mutations).
+
+### Получение данных там, где они нужны
+
+Если вам нужны одни и те же данные (например, текущий пользователь) в нескольких компонентах дерева, вам не нужно получать данные глобально или передавать пропсы между компонентами. Вместо этого вы можете использовать `fetch` или React `cache` в компоненте, которому нужны данные, не беспокоясь о влиянии на производительность из-за множественных запросов одних и тех же данных.
+
+Это возможно, потому что запросы `fetch` автоматически мемоизируются. Подробнее о [мемоизации запросов](/docs/app/building-your-application/caching#request-memoization)
+
+> **Полезно знать**: Это также применимо к макетам (layouts), так как передача данных между родительским макетом и его дочерними элементами невозможна.
+
+### Потоковая передача (Streaming)
+
+Потоковая передача и [Suspense](https://react.dev/reference/react/Suspense) — это возможности React, которые позволяют постепенно рендерить и инкрементально передавать отрендеренные части интерфейса на клиент.
+
+С Серверными Компонентами и [вложенными макетами](/docs/app/building-your-application/routing/pages-and-layouts) вы можете мгновенно отображать части страницы, не требующие данных, и показывать [состояние загрузки](/docs/app/building-your-application/routing/loading-ui-and-streaming) для частей, которые получают данные. Это означает, что пользователю не нужно ждать загрузки всей страницы, чтобы начать с ней взаимодействовать.
+
+<Image
+  alt="Серверный рендеринг с потоковой передачей"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+Подробнее о потоковой передаче и Suspense читайте на страницах [Интерфейс загрузки](/docs/app/building-your-application/routing/loading-ui-and-streaming) и [Потоковая передача с Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense).
+
+### Параллельное и последовательное получение данных
+
+При получении данных внутри React-компонентов важно учитывать два паттерна: параллельный и последовательный.
+
+<Image
+  alt="Последовательное и параллельное получение данных"
+  srcLight="/docs/light/sequential-parallel-data-fetching.png"
+  srcDark="/docs/dark/sequential-parallel-data-fetching.png"
+  width="1600"
+  height="525"
+/>
+
+- При **последовательном получении данных** запросы в маршруте зависят друг от друга, что создаёт водопады. Иногда этот паттерн полезен, когда один запрос зависит от результата другого или нужно дождаться выполнения условия перед следующим запросом для экономии ресурсов. Однако такое поведение может быть непреднамеренным и приводить к увеличению времени загрузки.
+- При **параллельном получении данных** запросы в маршруте инициируются одновременно, что сокращает водопады между клиентом и сервером и общее время загрузки данных.
+
+#### Последовательное получение данных
+
+Если у вас есть вложенные компоненты, и каждый компонент получает свои данные, то запросы данных будут выполняться последовательно, если эти запросы разные (это не относится к запросам одних и тех же данных, так как они автоматически [мемоизируются](/docs/app/building-your-application/caching#request-memoization)).
+
+Например, компонент `Playlists` начнёт получать данные только после того, как компонент `Artist` завершит их получение, потому что `Playlists` зависит от пропса `artistID`:
+
+```tsx filename="app/artist/page.tsx" switcher
+// ...
+
+async function Playlists({ artistID }: { artistID: string }) {
+  // Ожидаем плейлисты
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // Ожидаем исполнителя
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/page.js" switcher
+// ...
+
+async function Playlists({ artistID }) {
+  // Ожидаем плейлисты
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({ params: { username } }) {
+  // Ожидаем исполнителя
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+В таких случаях можно использовать [`loading.js`](/docs/app/building-your-application/routing/loading-ui-and-streaming) (для сегментов маршрута) или [React `<Suspense>`](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense) (для вложенных компонентов), чтобы показать состояние загрузки, пока React передаёт результат.
+
+Это предотвратит блокировку всего маршрута из-за получения данных, и пользователь сможет взаимодействовать с незаблокированными частями страницы.
+
+> **Блокирующие запросы данных:**
+>
+> Альтернативный подход для предотвращения водопадов — получение данных глобально, в корне приложения, но это заблокирует рендеринг всех сегментов маршрута ниже, пока данные не будут загружены. Это можно описать как получение данных по принципу "всё или ничего". Либо у вас есть все данные для страницы или приложения, либо ничего.
+>
+> Любые запросы с `await` будут блокировать рендеринг и получение данных для всего дерева ниже, если они не обёрнуты в границу `<Suspense>` или не используется `loading.js`. Другой вариант — использовать [параллельное получение данных](#параллельное-получение-данных) или [паттерн предзагрузки](#предзагрузка-данных).
+
+#### Параллельное получение данных
+
+Для параллельного получения данных можно заранее инициировать запросы, определив их вне компонентов, которые используют данные, а затем вызвать их внутри компонента. Это экономит время, запуская оба запроса параллельно, но пользователь не увидит результат рендеринга, пока не будут выполнены оба промиса.
+
+В примере ниже функции `getArtist` и `getArtistAlbums` определены вне компонента `Page`, вызываются внутри компонента, и мы ожидаем выполнения обоих промисов:
+
+```tsx filename="app/artist/[username]/page.tsx" switcher
+import Albums from './albums'
+
+async function getArtist(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // Инициируем оба запроса параллельно
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // Ожидаем выполнения промисов
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/[username]/page.js" switcher
+import Albums from './albums'
+
+async function getArtist(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({ params: { username } }) {
+  // Инициируем оба запроса параллельно
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // Ожидаем выполнения промисов
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+Для улучшения пользовательского опыта можно добавить [Границу Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming), чтобы разделить работу по рендерингу и как можно быстрее показать часть результата.
+
+### Предзагрузка данных
+
+Ещё один способ предотвратить водопады — использовать паттерн предзагрузки. Вы можете создать функцию `preload` для дальнейшей оптимизации параллельного получения данных. При таком подходе не нужно передавать промисы через пропсы. Функция `preload` может иметь любое имя, так как это паттерн, а не API.
+
+```tsx filename="components/Item.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id: string) => {
+  // void вычисляет выражение и возвращает undefined
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }: { id: string }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="components/Item.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id) => {
+  // void вычисляет выражение и возвращает undefined
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  // начинаем загрузку данных элемента
+  preload(id)
+  // выполняем другую асинхронную задачу
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({ params: { id } }) {
+  // начинаем загрузку данных элемента
+  preload(id)
+  // выполняем другую асинхронную задачу
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+### Использование React `cache`, `server-only` и паттерна предзагрузки
+
+Вы можете объединить функцию `cache`, паттерн предзагрузки и пакет `server-only`, чтобы создать утилиту для получения данных, которую можно использовать во всём приложении.
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id: string) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id: string) => {
+  // ...
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id) => {
+  // ...
+})
+```
+
+При таком подходе вы можете заранее получать данные, кэшировать ответы и гарантировать, что получение данных [происходит только на сервере](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment).
+
+Экспорты из `utils/get-item` могут использоваться макетами, страницами или другими компонентами, чтобы контролировать время получения данных элемента.
+
+> **Полезно знать:**
+>
+> - Рекомендуем использовать пакет [`server-only`](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment), чтобы гарантировать, что серверные функции получения данных никогда не используются на клиенте.

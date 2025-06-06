@@ -1,0 +1,401 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:36:25.123Z
+title: Middleware
+description: Узнайте, как использовать Middleware для выполнения кода перед завершением запроса.
+---
+
+{/* Содержание этого документа используется как в маршрутизаторе app, так и pages. Вы можете использовать компонент `<PagesOnly>Content</PagesOnly>` для добавления контента, специфичного для маршрутизатора Pages. Любой общий контент не должен быть обёрнут в компонент. */}
+
+Middleware позволяет выполнять код перед завершением запроса. Затем, на основе входящего запроса, вы можете изменить ответ, переписав его, перенаправив, изменив заголовки запроса или ответа, либо ответив напрямую.
+
+Middleware выполняется до сопоставления кэшированного контента и маршрутов. Подробнее см. в разделе [Сопоставление путей](#matching-paths).
+
+## Конвенция
+
+Используйте файл `middleware.ts` (или `.js`) в корне вашего проекта для определения Middleware. Например, на том же уровне, что `pages` или `app`, или внутри `src`, если применимо.
+
+## Пример
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+// Эта функция может быть помечена как `async`, если внутри используется `await`
+export function middleware(request: NextRequest) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// Подробнее см. в разделе "Сопоставление путей"
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+// Эта функция может быть помечена как `async`, если внутри используется `await`
+export function middleware(request) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// Подробнее см. в разделе "Сопоставление путей"
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+## Сопоставление путей
+
+Middleware будет вызываться для **каждого маршрута в вашем проекте**. Порядок выполнения следующий:
+
+1. `headers` из `next.config.js`
+2. `redirects` из `next.config.js`
+3. Middleware (`rewrites`, `redirects` и т.д.)
+4. `beforeFiles` (`rewrites`) из `next.config.js`
+5. Файловые маршруты (`public/`, `_next/static/`, `pages/`, `app/` и т.д.)
+6. `afterFiles` (`rewrites`) из `next.config.js`
+7. Динамические маршруты (`/blog/[slug]`)
+8. `fallback` (`rewrites`) из `next.config.js`
+
+Есть два способа определить, для каких путей будет выполняться Middleware:
+
+1. [Пользовательская конфигурация matcher](#matcher)
+2. [Условные выражения](#conditional-statements)
+
+### Matcher
+
+`matcher` позволяет фильтровать Middleware для выполнения на определённых путях.
+
+```js filename="middleware.js"
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+Вы можете сопоставить один путь или несколько путей с помощью синтаксиса массива:
+
+```js filename="middleware.js"
+export const config = {
+  matcher: ['/about/:path*', '/dashboard/:path*'],
+}
+```
+
+Конфигурация `matcher` поддерживает полные регулярные выражения, включая негативные просмотры вперёд и сопоставление символов. Пример негативного просмотра вперёд для сопоставления всех путей, кроме определённых:
+
+```js filename="middleware.js"
+export const config = {
+  matcher: [
+    /*
+     * Сопоставить все пути запросов, кроме начинающихся с:
+     * - api (API маршруты)
+     * - _next/static (статические файлы)
+     * - _next/image (файлы оптимизации изображений)
+     * - favicon.ico (файл фавиконки)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
+}
+```
+
+> **Важно**: Значения `matcher` должны быть константами, чтобы их можно было статически проанализировать во время сборки. Динамические значения, такие как переменные, будут проигнорированы.
+
+Настроенные matcher:
+
+1. ДОЛЖНЫ начинаться с `/`
+2. Могут включать именованные параметры: `/about/:path` соответствует `/about/a` и `/about/b`, но не `/about/a/c`
+3. Могут иметь модификаторы для именованных параметров (начинаются с `:`): `/about/:path*` соответствует `/about/a/b/c`, потому что `*` означает _ноль или более_. `?` означает _ноль или один_, а `+` означает _один или более_
+4. Могут использовать регулярные выражения в скобках: `/about/(.*)` эквивалентно `/about/:path*`
+
+Подробнее см. в документации [path-to-regexp](https://github.com/pillarjs/path-to-regexp#path-to-regexp-1).
+
+> **Важно**: Для обратной совместимости Next.js всегда рассматривает `/public` как `/public/index`. Поэтому matcher `/public/:path` будет соответствовать.
+
+### Условные выражения
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+## NextResponse
+
+API `NextResponse` позволяет:
+
+- `redirect` перенаправлять входящий запрос на другой URL
+- `rewrite` переписывать ответ, отображая заданный URL
+- Устанавливать заголовки запросов для API маршрутов, `getServerSideProps` и направлений `rewrite`
+- Устанавливать cookies ответа
+- Устанавливать заголовки ответа
+
+<AppOnly>
+
+Для создания ответа из Middleware вы можете:
+
+1. `rewrite` на маршрут ([Страницу](/docs/app/building-your-application/routing/pages-and-layouts) или [Обработчик маршрута](/docs/app/building-your-application/routing/route-handlers)), который генерирует ответ
+2. Вернуть `NextResponse` напрямую. См. [Создание ответа](#producing-a-response)
+
+</AppOnly>
+
+<PagesOnly>
+
+Для создания ответа из Middleware вы можете:
+
+1. `rewrite` на маршрут ([Страницу](/docs/pages/building-your-application/routing/pages-and-layouts) или [Edge API маршрут](/docs/pages/building-your-application/routing/api-routes)), который генерирует ответ
+2. Вернуть `NextResponse` напрямую. См. [Создание ответа](#producing-a-response)
+
+</PagesOnly>
+
+## Использование Cookies
+
+Cookies — это обычные заголовки. В `Request` они хранятся в заголовке `Cookie`. В `Response` они находятся в заголовке `Set-Cookie`. Next.js предоставляет удобный способ доступа и управления этими cookies через расширение `cookies` в `NextRequest` и `NextResponse`.
+
+1. Для входящих запросов `cookies` имеет следующие методы: `get`, `getAll`, `set` и `delete`. Вы можете проверить наличие cookie с помощью `has` или удалить все cookies с помощью `clear`.
+2. Для исходящих ответов `cookies` имеют методы `get`, `getAll`, `set` и `delete`.
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // Предположим, что во входящем запросе есть заголовок "Cookie:nextjs=fast"
+  // Получение cookies из запроса с помощью API `RequestCookies`
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // Установка cookies в ответе с помощью API `ResponseCookies`
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // Исходящий ответ будет иметь заголовок `Set-Cookie:vercel=fast;path=/test`.
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  // Предположим, что во входящем запросе есть заголовок "Cookie:nextjs=fast"
+  // Получение cookies из запроса с помощью API `RequestCookies`
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // Установка cookies в ответе с помощью API `ResponseCookies`
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // Исходящий ответ будет иметь заголовок `Set-Cookie:vercel=fast;path=/test`.
+
+  return response
+}
+```
+
+## Установка заголовков
+
+Вы можете устанавливать заголовки запроса и ответа с помощью API `NextResponse` (установка заголовков запроса доступна начиная с Next.js v13.0.0).
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // Клонируем заголовки запроса и устанавливаем новый заголовок `x-hello-from-middleware1`
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-middleware1', 'hello')
+
+  // Вы также можете установить заголовки запроса в NextResponse.rewrite
+  const response = NextResponse.next({
+    request: {
+      // Новые заголовки запроса
+      headers: requestHeaders,
+    },
+  })
+
+  // Устанавливаем новый заголовок ответа `x-hello-from-middleware2`
+  response.headers.set('x-hello-from-middleware2', 'hello')
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  // Клонируем заголовки запроса и устанавливаем новый заголовок `x-hello-from-middleware1`
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-middleware1', 'hello')
+
+  // Вы также можете установить заголовки запроса в NextResponse.rewrite
+  const response = NextResponse.next({
+    request: {
+      // Новые заголовки запроса
+      headers: requestHeaders,
+    },
+  })
+
+  // Устанавливаем новый заголовок ответа `x-hello-from-middleware2`
+  response.headers.set('x-hello-from-middleware2', 'hello')
+  return response
+}
+```
+
+> **Важно**: Избегайте установки больших заголовков, так как это может вызвать ошибку [431 Request Header Fields Too Large](https://developer.mozilla.org/docs/Web/HTTP/Status/431) в зависимости от конфигурации вашего сервера.
+
+## Создание ответа
+
+Вы можете отвечать из Middleware напрямую, возвращая экземпляр `Response` или `NextResponse`. (Доступно начиная с [Next.js v13.1.0](https://nextjs.org/blog/next-13-1#nextjs-advanced-middleware))
+
+```ts filename="middleware.ts" switcher
+import { NextRequest } from 'next/server'
+import { isAuthenticated } from '@lib/auth'
+
+// Ограничиваем Middleware путями, начинающимися с `/api/`
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function middleware(request: NextRequest) {
+  // Вызываем нашу функцию аутентификации для проверки запроса
+  if (!isAuthenticated(request)) {
+    // Отвечаем JSON с сообщением об ошибке
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+```js filename="middleware.js" switcher
+import { isAuthenticated } from '@lib/auth'
+
+// Ограничиваем Middleware путями, начинающимися с `/api/`
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function middleware(request) {
+  // Вызываем нашу функцию аутентификации для проверки запроса
+  if (!isAuthenticated(request)) {
+    // Отвечаем JSON с сообщением об ошибке
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+## Расширенные флаги Middleware
+
+В `v13.1` Next.js были добавлены два дополнительных флага для middleware: `skipMiddlewareUrlNormalize` и `skipTrailingSlashRedirect` для обработки сложных случаев использования.
+
+`skipTrailingSlashRedirect` позволяет отключить стандартные перенаправления Next.js для добавления или удаления завершающих слэшей, что позволяет обрабатывать их вручную внутри middleware. Это может быть полезно для поддержки завершающего слэша для некоторых путей, но не для других, что упрощает постепенный переход.
+
+```js filename="next.config.js"
+module.exports = {
+  skipTrailingSlashRedirect: true,
+}
+```
+
+```js filename="middleware.js"
+const legacyPrefixes = ['/docs', '/blog']
+
+export default async function middleware(req) {
+  const { pathname } = req.nextUrl
+
+  if (legacyPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next()
+  }
+
+  // применяем обработку завершающего слэша
+  if (
+    !pathname.endsWith('/') &&
+    !pathname.match(/((?!\.well-known(?:\/.*)?)(?:[^/]+\/)*[^/]+\.\w+)/)
+  ) {
+    req.nextUrl.pathname += '/'
+    return NextResponse.redirect(req.nextUrl)
+  }
+}
+```
+
+`skipMiddlewareUrlNormalize` позволяет отключить нормализацию URL, которую Next.js выполняет для унификации обработки прямых посещений и клиентских переходов. Это полезно в сложных случаях, когда требуется полный контроль с использованием оригинального URL.
+
+```js filename="next.config.js"
+module.exports = {
+  skipMiddlewareUrlNormalize: true,
+}
+```
+
+```js filename="middleware.js"
+export default async function middleware(req) {
+  const { pathname } = req.nextUrl
+
+  // GET /_next/data/build-id/hello.json
+
+  console.log(pathname)
+  // с этим флагом будет /_next/data/build-id/hello.json
+  // без флага это было бы нормализовано в /hello
+}
+```
+
+## История версий
+
+| Версия    | Изменения                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------- |
+| `v13.1.0` | Добавлены расширенные флаги Middleware                                                         |
+| `v13.0.0` | Middleware может изменять заголовки запросов, заголовки ответов и отправлять ответы             |
+| `v12.2.0` | Middleware стабилен, см. [руководство по обновлению](/docs/messages/middleware-upgrade-guide)  |
+| `v12.0.9` | Принудительное использование абсолютных URL в Edge Runtime ([PR](https://github.com/vercel/next.js/pull/33410)) |
+| `v12.0.0` | Добавлен Middleware (Beta)                                                                     |

@@ -1,0 +1,146 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:17:03.021Z
+title: Переход в продакшен
+description: Рекомендации по подготовке Next.js приложения к продакшену для обеспечения наилучшего пользовательского опыта.
+---
+
+Перед переходом вашего Next.js приложения в продакшен, вот несколько рекомендаций для обеспечения наилучшего пользовательского опыта.
+
+## Общие рекомендации
+
+- Используйте [кэширование](#caching) везде, где это возможно.
+- Убедитесь, что ваша база данных и бэкенд развернуты в одном регионе.
+- Стремитесь к минимальному объему отправляемого JavaScript.
+- Откладывайте загрузку тяжелых JavaScript-бандлов до момента их необходимости.
+- Настройте систему [логирования](#logging).
+- Настройте систему [обработки ошибок](#error-handling).
+- Настройте страницы [404](/docs/pages/building-your-application/routing/custom-error#404-page) (Не найдено) и [500](/docs/pages/building-your-application/routing/custom-error#500-page) (Ошибка).
+- Убедитесь, что вы [измеряете производительность](/docs/pages/building-your-application/optimizing/analytics).
+- Запустите [Lighthouse](https://developers.google.com/web/tools/lighthouse) для проверки производительности, лучших практик, доступности и SEO. Для наилучших результатов используйте продакшен-сборку Next.js и режим инкогнито в браузере, чтобы результаты не были искажены расширениями.
+- Ознакомьтесь с [Поддерживаемыми браузерами и функциями](/docs/architecture/supported-browsers).
+- Улучшите производительность с помощью:
+  - [`next/image` и автоматической оптимизации изображений](/docs/pages/building-your-application/optimizing/images)
+  - [Автоматической оптимизации шрифтов](/docs/pages/building-your-application/optimizing/fonts)
+  - [Оптимизации скриптов](/docs/pages/building-your-application/optimizing/scripts)
+- Улучшите [производительность загрузки](#loading-performance)
+- Рассмотрите возможность добавления [Политики безопасности контента (CSP)](/docs/pages/building-your-application/configuring/content-security-policy)
+
+## Кэширование
+
+<details open>
+  <summary>Примеры</summary>
+
+- [ssr-caching](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+Кэширование улучшает время отклика и уменьшает количество запросов к внешним сервисам. Next.js автоматически добавляет заголовки кэширования для неизменяемых ресурсов из `/_next/static`, включая JavaScript, CSS, статические изображения и другие медиафайлы.
+
+```terminal
+Cache-Control: public, max-age=31536000, immutable
+```
+
+Заголовки `Cache-Control`, установленные в `next.config.js`, будут перезаписаны в продакшене для обеспечения эффективного кэширования статических ресурсов. Если вам нужно перепроверить кэш страницы, сгенерированной [статически](/docs/pages/building-your-application/rendering/static-site-generation), вы можете сделать это, установив параметр `revalidate` в функции [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) страницы. Если вы используете `next/image`, вы можете настроить [`minimumCacheTTL`](/docs/pages/api-reference/components/image#minimumcachettl) для стандартного загрузчика оптимизации изображений.
+
+> **Полезно знать**: При локальном запуске приложения с `next dev` ваши заголовки перезаписываются для предотвращения локального кэширования.
+
+```terminal
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+```
+
+Вы также можете использовать заголовки кэширования внутри `getServerSideProps` и API-роутов для динамических ответов. Например, используя [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/).
+
+```jsx
+// Это значение считается свежим в течение десяти секунд (s-maxage=10).
+// Если запрос повторяется в течение следующих 10 секунд, ранее
+// закэшированное значение останется свежим. Если запрос повторяется до 59 секунд,
+// закэшированное значение будет устаревшим, но все равно отобразится (stale-while-revalidate=59).
+//
+// На фоне будет выполнен запрос на перепроверку для обновления кэша
+// новым значением. Если вы обновите страницу, вы увидите новое значение.
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+По умолчанию заголовки `Cache-Control` устанавливаются по-разному в зависимости от того, как ваша страница получает данные.
+
+- Если страница использует `getServerSideProps` или `getInitialProps`, будет использоваться заголовок `Cache-Control` по умолчанию, установленный `next start`, чтобы предотвратить случайное кэширование ответов, которые не могут быть закэшированы. Если вам нужно другое поведение кэширования при использовании `getServerSideProps`, используйте `res.setHeader('Cache-Control', 'предпочитаемое_значение')` внутри функции, как показано выше.
+- Если страница использует `getStaticProps`, у нее будет заголовок `Cache-Control` со значением `s-maxage=REVALIDATE_SECONDS, stale-while-revalidate`, или если `revalidate` не используется, `s-maxage=31536000, stale-while-revalidate` для максимально возможного времени кэширования.
+
+> **Полезно знать**: Ваш провайдер развертывания должен поддерживать кэширование для динамических ответов. Если вы развертываете приложение самостоятельно, вам нужно добавить эту логику самостоятельно, используя хранилище ключ-значение, такое как Redis. Если вы используете Vercel, [Edge Caching работает без дополнительной настройки](https://vercel.com/docs/edge-network/caching?utm_source=next-site&utm_medium=docs&utm_campaign=next-website).
+
+## Уменьшение размера JavaScript
+
+<details open>
+  <summary>Примеры</summary>
+
+- [with-dynamic-import](https://github.com/vercel/next.js/tree/canary/examples/with-dynamic-import)
+
+</details>
+
+Чтобы уменьшить объем JavaScript, отправляемого в браузер, вы можете использовать следующие инструменты для анализа содержимого каждого JavaScript-бандла:
+
+- [Import Cost](https://marketplace.visualstudio.com/items?itemName=wix.vscode-import-cost) – Отображает размер импортируемого пакета в VSCode.
+- [Package Phobia](https://packagephobia.com/) – Показывает стоимость добавления новой dev-зависимости в ваш проект.
+- [Bundle Phobia](https://bundlephobia.com/) - Анализирует, насколько зависимость может увеличить размеры бандлов.
+- [Webpack Bundle Analyzer](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer) – Визуализирует размер выходных файлов webpack с интерактивной, масштабируемой картой.
+- [bundlejs](https://bundlejs.com/) - Онлайн-инструмент для быстрой сборки и минификации проектов с просмотром сжатых размеров бандлов gzip/brotli, работающий локально в вашем браузере.
+
+Каждый файл в вашей директории `pages/` автоматически разделяется на отдельный JavaScript-бандл во время `next build`. Вы также можете использовать [Динамические импорты](/docs/pages/building-your-application/optimizing/lazy-loading) для ленивой загрузки компонентов и библиотек. Например, вы можете отложить загрузку кода модального окна до момента, когда пользователь нажмет кнопку открытия.
+
+## Логирование
+
+<details open>
+  <summary>Примеры</summary>
+
+- [Pino and Logflare Example](https://github.com/Logflare/next-pino-logflare-logging-example)
+
+</details>
+
+Поскольку Next.js работает как на клиенте, так и на сервере, поддерживаются несколько форм логирования:
+
+- `console.log` в браузере
+- `stdout` на сервере
+
+Если вам нужен структурированный пакет для логирования, мы рекомендуем [Pino](https://www.npmjs.com/package/pino). Если вы используете Vercel, есть [предустановленные интеграции для логирования](https://vercel.com/integrations?utm_source=next-site&utm_medium=docs&utm_campaign=next-website#logging), совместимые с Next.js.
+
+## Обработка ошибок
+
+<details open>
+  <summary>Примеры</summary>
+
+- [with-sentry](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)
+
+</details>
+
+При возникновении необработанного исключения вы можете управлять опытом пользователей с помощью [страницы 500](/docs/pages/building-your-application/routing/custom-error#500-page). Мы рекомендуем настроить ее в соответствии с вашим брендом вместо стандартной темы Next.js.
+
+Вы также можете логировать и отслеживать исключения с помощью инструментов вроде Sentry. [Этот пример](https://github.com/vercel/next.js/tree/canary/examples/with-sentry) показывает, как перехватывать и сообщать об ошибках как на клиентской, так и на серверной стороне, используя SDK Sentry для Next.js. Также есть [интеграция Sentry для Vercel](https://vercel.com/integrations/sentry?utm_source=next-site&utm_medium=docs&utm_campaign=next-website).
+
+## Производительность загрузки
+
+Чтобы улучшить производительность загрузки, сначала необходимо определить, что измерять и как это измерять. [Core Web Vitals](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) – это хороший отраслевой стандарт, который измеряется с помощью вашего веб-браузера. Если вы не знакомы с метриками Core Web Vitals, ознакомьтесь с этой [статьей](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) и определите, какие конкретные метрики будут вашими ориентирами для производительности загрузки. В идеале вы должны измерять производительность загрузки в следующих средах:
+
+- В лаборатории, используя ваш собственный компьютер или симулятор.
+- В реальных условиях, используя данные от реальных посетителей.
+- Локально, используя тест, который запускается на вашем устройстве.
+- Удаленно, используя тест, который запускается в облаке.
+
+Как только вы сможете измерять производительность загрузки, используйте следующие стратегии для ее постепенного улучшения: применяйте одну стратегию, измеряйте новую производительность и продолжайте настройку, пока не увидите значительных улучшений. Затем можно переходить к следующей стратегии.
+
+- Используйте регионы кэширования, близкие к регионам, где развернуты ваша база данных или API.
+- Как описано в разделе [кэширование](#caching), используйте значение `stale-while-revalidate`, которое не перегрузит ваш бэкенд.
+- Используйте [Инкрементальную статическую регенерацию](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) для уменьшения количества запросов к вашему бэкенду.
+- Удалите неиспользуемый JavaScript. Ознакомьтесь с этой [статьей](https://calibreapp.com/blog/bundle-size-optimization), чтобы понять, какие метрики Core Web Vitals зависят от размера бандла, и какие стратегии вы можете использовать для его уменьшения, например:
+  - Настройте вашу среду разработки для просмотра стоимости и размеров импортов
+  - Найдите альтернативные, более легкие пакеты
+  - Динамически загружайте компоненты и зависимости

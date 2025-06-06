@@ -1,0 +1,515 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:24:26.439Z
+title: Заголовки
+description: Добавление пользовательских HTTP-заголовков в приложение Next.js.
+---
+
+{/* Содержание этого документа используется как для маршрутизатора приложений (app), так и для страниц (pages). Вы можете использовать компонент `<PagesOnly>Контент</PagesOnly>` для добавления контента, специфичного для маршрутизатора страниц. Общий контент не должен быть обёрнут в компонент. */}
+
+Заголовки позволяют устанавливать пользовательские HTTP-заголовки в ответ на входящий запрос по заданному пути.
+
+Чтобы установить пользовательские HTTP-заголовки, используйте ключ `headers` в `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/about',
+        headers: [
+          {
+            key: 'x-custom-header',
+            value: 'my custom header value',
+          },
+          {
+            key: 'x-another-custom-header',
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+`headers` — это асинхронная функция, которая должна возвращать массив объектов со свойствами `source` и `headers`:
+
+- `source` — шаблон пути входящего запроса.
+- `headers` — массив объектов заголовков ответа с свойствами `key` и `value`.
+- `basePath`: `false` или `undefined` — если false, basePath не будет учитываться при сопоставлении, может использоваться только для внешних перезаписей.
+- `locale`: `false` или `undefined` — указывает, следует ли исключать локаль при сопоставлении.
+- `has` — массив [объектов has](#header-cookie-and-query-matching) со свойствами `type`, `key` и `value`.
+- `missing` — массив [объектов missing](#header-cookie-and-query-matching) со свойствами `type`, `key` и `value`.
+
+Заголовки проверяются до файловой системы, включая страницы и файлы в `/public`.
+
+## Поведение при переопределении заголовков
+
+Если два заголовка соответствуют одному пути и устанавливают одинаковый ключ заголовка, последний ключ заголовка переопределит первый. В приведённом ниже примере для пути `/hello` заголовок `x-hello` будет иметь значение `world`, так как последнее установленное значение — `world`.
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'there',
+          },
+        ],
+      },
+      {
+        source: '/hello',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Сопоставление путей
+
+Допускается сопоставление путей, например `/blog/:slug` будет соответствовать `/blog/hello-world` (без вложенных путей):
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug', // Соответствующие параметры можно использовать в значении
+          },
+          {
+            key: 'x-slug-:slug', // Соответствующие параметры можно использовать в ключе
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Сопоставление путей с подстановочными знаками
+
+Для сопоставления пути с подстановочным знаком можно использовать `*` после параметра, например `/blog/:slug*` будет соответствовать `/blog/a/b/c/d/hello-world`:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug*',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug*', // Соответствующие параметры можно использовать в значении
+          },
+          {
+            key: 'x-slug-:slug*', // Соответствующие параметры можно использовать в ключе
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Сопоставление путей с регулярными выражениями
+
+Для сопоставления пути с регулярным выражением можно заключить регулярное выражение в скобки после параметра, например `/blog/:slug(\\d{1,})` будет соответствовать `/blog/123`, но не `/blog/abc`:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:post(\\d{1,})',
+        headers: [
+          {
+            key: 'x-post',
+            value: ':post',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+Следующие символы `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` используются для сопоставления путей с регулярными выражениями, поэтому при использовании в `source` как обычные значения они должны быть экранированы с помощью `\\`:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        // это будет соответствовать запросу `/english(default)/something`
+        source: '/english\\(default\\)/:slug',
+        headers: [
+          {
+            key: 'x-header',
+            value: 'value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Сопоставление заголовков, куки и запросов
+
+Чтобы применить заголовок только при совпадении значений заголовка, куки или запроса, можно использовать поле `has` или `missing`. Для применения заголовка должны совпадать как `source`, так и все элементы `has`, и не должны совпадать все элементы `missing`.
+
+Элементы `has` и `missing` могут иметь следующие поля:
+
+- `type`: `String` — должно быть `header`, `cookie`, `host` или `query`.
+- `key`: `String` — ключ из выбранного типа для сопоставления.
+- `value`: `String` или `undefined` — значение для проверки, если undefined, будет соответствовать любое значение. Можно использовать строку, подобную регулярному выражению, для захвата определённой части значения, например, если значение `first-(?<paramName>.*)` используется для `first-second`, то `second` можно будет использовать в назначении с `:paramName`.
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      // если присутствует заголовок `x-add-header`,
+      // будет применён заголовок `x-another-header`
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-add-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // если заголовок `x-no-header` отсутствует,
+      // будет применён заголовок `x-another-header`
+      {
+        source: '/:path*',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-no-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // если совпадают источник, запрос и куки,
+      // будет применён заголовок `x-authorized`
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // значение page не будет доступно в ключах/значениях заголовка,
+            // так как значение предоставлено и не использует именованную группу захвата, например (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-authorized',
+            value: ':authorized',
+          },
+        ],
+      },
+      // если заголовок `x-authorized` присутствует и
+      // содержит соответствующее значение, будет применён заголовок `x-another-header`
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+      // если хост — `example.com`,
+      // этот заголовок будет применён
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Заголовки с поддержкой basePath
+
+При использовании [поддержки `basePath`](/docs/app/api-reference/next-config-js/basePath) с заголовками каждый `source` автоматически дополняется `basePath`, если вы не добавите `basePath: false` к заголовку:
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async headers() {
+    return [
+      {
+        source: '/with-basePath', // становится /docs/with-basePath
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        source: '/without-basePath', // не изменяется, так как установлено basePath: false
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+        basePath: false,
+      },
+    ]
+  },
+}
+```
+
+## Заголовки с поддержкой i18n
+
+<AppOnly>
+
+При использовании [поддержки `i18n`](/docs/app/building-your-application/routing/internationalization) с заголовками каждый `source` автоматически дополняется для обработки настроенных `locales`, если вы не добавите `locale: false` к заголовку. Если используется `locale: false`, вы должны добавить локаль в начало `source` для корректного сопоставления.
+
+</AppOnly>
+
+<PagesOnly>
+
+При использовании [поддержки `i18n`](/docs/pages/building-your-application/routing/internationalization) с заголовками каждый `source` автоматически дополняется для обработки настроенных `locales`, если вы не добавите `locale: false` к заголовку. Если используется `locale: false`, вы должны добавить локаль в начало `source` для корректного сопоставления.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async headers() {
+    return [
+      {
+        source: '/with-locale', // автоматически обрабатывает все локали
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // не обрабатывает локали автоматически, так как установлено locale: false
+        source: '/nl/with-locale-manual',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // соответствует '/', так как `en` — defaultLocale
+        source: '/en',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // преобразуется в /(en|fr|de)/(.*), поэтому не будет соответствовать корневому
+        // пути `/` или `/fr`, как это сделал бы /:path*
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Cache-Control
+
+Вы не можете установить заголовки `Cache-Control` в `next.config.js` для страниц или ресурсов, так как эти заголовки будут перезаписаны в production для обеспечения эффективного кэширования ответов и статических ресурсов.
+
+<AppOnly>
+
+Узнайте больше о [кэшировании](/docs/app/building-your-application/caching) с маршрутизатором приложений (App Router).
+
+</AppOnly>
+
+<PagesOnly>
+
+Если вам нужно перепроверить кэш страницы, которая была [статически сгенерирована](/docs/pages/building-your-application/rendering/static-site-generation), вы можете сделать это, установив свойство `revalidate` в функции [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) страницы.
+
+Вы можете установить заголовок `Cache-Control` в своих [API-маршрутах](/docs/pages/building-your-application/routing/api-routes), используя метод `res.setHeader`:
+
+```ts filename="pages/api/hello.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+type ResponseData = {
+  message: string
+}
+
+export default function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ResponseData>
+) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+```js filename="pages/api/hello.js" switcher
+export default function handler(req, res) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+</PagesOnly>
+
+## Опции
+
+### X-DNS-Prefetch-Control
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-DNS-Prefetch-Control) управляет предварительной загрузкой DNS, позволяя браузерам заранее выполнять разрешение доменных имён для внешних ссылок, изображений, CSS, JavaScript и других ресурсов. Эта предварительная загрузка выполняется в фоновом режиме, поэтому [DNS](https://developer.mozilla.org/docs/Glossary/DNS) с большей вероятностью будет разрешён к моменту, когда ресурсы понадобятся. Это уменьшает задержку при переходе пользователя по ссылке.
+
+```js
+{
+  key: 'X-DNS-Prefetch-Control',
+  value: 'on'
+}
+```
+
+### Strict-Transport-Security
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security) сообщает браузерам, что сайт должен быть доступен только через HTTPS, а не через HTTP. При использовании приведённой ниже конфигурации все текущие и будущие поддомены будут использовать HTTPS в течение `max-age` 2 года. Это блокирует доступ к страницам или поддоменам, которые могут быть доступны только через HTTP.
+
+При развёртывании на [Vercel](https://vercel.com/docs/concepts/edge-network/headers#strict-transport-security?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) этот заголовок не требуется, так как он автоматически добавляется ко всем развёртываниям, если вы не объявляете `headers` в своём `next.config.js`.
+
+```js
+{
+  key: 'Strict-Transport-Security',
+  value: 'max-age=63072000; includeSubDomains; preload'
+}
+```
+
+### X-Frame-Options
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Frame-Options) указывает, можно ли отображать сайт внутри `iframe`. Это может предотвратить атаки типа clickjacking.
+
+**Этот заголовок заменён опцией CSP `frame-ancestors`**, которая имеет лучшую поддержку в современных браузерах.
+
+```js
+{
+  key: 'X-Frame-Options',
+  value: 'SAMEORIGIN'
+}
+```
+
+### Permissions-Policy
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/Permissions-Policy) позволяет контролировать, какие функции и API могут использоваться в браузере. Ранее назывался `Feature-Policy`.
+
+```js
+{
+  key: 'Permissions-Policy',
+  value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()'
+}
+```
+
+### X-Content-Type-Options
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Content-Type-Options) предотвращает попытки браузера угадать тип содержимого, если заголовок `Content-Type` не установлен явно. Это может предотвратить XSS-атаки для сайтов, которые позволяют пользователям загружать и делиться файлами.
+
+Например, пользователь пытается загрузить изображение, но оно обрабатывается как другой `Content-Type`, например исполняемый файл, который может быть вредоносным. Этот заголовок также применяется к загрузке расширений браузера. Единственное допустимое значение для этого заголовка — `nosniff`.
+
+```js
+{
+  key: 'X-Content-Type-Options',
+  value: 'nosniff'
+}
+```
+
+### Referrer-Policy
+
+[Этот заголовок](https://developer.mozilla.org/docs/Web/HTTP/Headers/Referrer-Policy) контролирует, сколько информации браузер включает при переходе с текущего сайта (origin) на другой.
+
+```js
+{
+  key: 'Referrer-Policy',
+  value: 'origin-when-cross-origin'
+}
+```
+
+### Content-Security-Policy
+
+Узнайте больше о добавлении [Политики безопасности контента (Content Security Policy)](/docs/app/building-your-application/configuring/content-security-policy) в ваше приложение.
+
+## История версий
+
+| Версия    | Изменения          |
+| --------- | ------------------ |
+| `v13.3.0` | Добавлено `missing`. |
+| `v10.2.0` | Добавлено `has`.     |
+| `v9.5.0`  | Добавлены заголовки. |
