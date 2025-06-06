@@ -1,0 +1,146 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:27:29.318Z
+title: Passage en Production
+description: Avant de mettre en production votre application Next.js, voici quelques recommandations pour garantir la meilleure expérience utilisateur.
+---
+
+Avant de mettre en production votre application Next.js, voici quelques recommandations pour garantir la meilleure expérience utilisateur.
+
+## Recommandations générales
+
+- Utilisez la [mise en cache](#caching) dès que possible.
+- Assurez-vous que votre base de données et votre backend sont déployés dans la même région.
+- Cherchez à envoyer le moins de JavaScript possible.
+- Reportez le chargement des bundles JavaScript lourds jusqu'à ce qu'ils soient nécessaires.
+- Configurez un système de [journalisation](#logging).
+- Configurez un système de [gestion des erreurs](#error-handling).
+- Configurez les pages [404](/docs/pages/building-your-application/routing/custom-error#404-page) (Non trouvé) et [500](/docs/pages/building-your-application/routing/custom-error#500-page) (Erreur).
+- Mesurez les [performances](/docs/pages/building-your-application/optimizing/analytics).
+- Exécutez [Lighthouse](https://developers.google.com/web/tools/lighthouse) pour vérifier les performances, bonnes pratiques, accessibilité et SEO. Pour de meilleurs résultats, utilisez une version de production de Next.js et naviguez en mode incognito pour éviter l'influence des extensions.
+- Consultez les [navigateurs et fonctionnalités pris en charge](/docs/architecture/supported-browsers).
+- Améliorez les performances avec :
+  - [`next/image` et l'optimisation automatique des images](/docs/pages/building-your-application/optimizing/images)
+  - [Optimisation automatique des polices](/docs/pages/building-your-application/optimizing/fonts)
+  - [Optimisation des scripts](/docs/pages/building-your-application/optimizing/scripts)
+- Améliorez les [performances de chargement](#loading-performance)
+- Envisagez d'ajouter une [Politique de sécurité du contenu](/docs/pages/building-your-application/configuring/content-security-policy)
+
+## Mise en cache
+
+<details open>
+  <summary>Exemples</summary>
+
+- [ssr-caching](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+La mise en cache améliore les temps de réponse et réduit le nombre de requêtes vers des services externes. Next.js ajoute automatiquement des en-têtes de cache aux ressources immuables servies depuis `/_next/static`, incluant JavaScript, CSS, images statiques et autres médias.
+
+```terminal
+Cache-Control: public, max-age=31536000, immutable
+```
+
+Les en-têtes `Cache-Control` définis dans `next.config.js` seront écrasés en production pour garantir une mise en cache efficace des ressources statiques. Si vous avez besoin de revalider le cache d'une page générée [statiquement](/docs/pages/building-your-application/rendering/static-site-generation), vous pouvez le faire en définissant `revalidate` dans la fonction [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) de la page. Si vous utilisez `next/image`, vous pouvez configurer [`minimumCacheTTL`](/docs/pages/api-reference/components/image#minimumcachettl) pour le chargeur d'optimisation d'image par défaut.
+
+> **Bon à savoir** : Lorsque vous exécutez votre application localement avec `next dev`, vos en-têtes sont écrasés pour empêcher la mise en cache locale.
+
+```terminal
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+```
+
+Vous pouvez aussi utiliser des en-têtes de cache dans `getServerSideProps` et les Routes API pour les réponses dynamiques. Par exemple, en utilisant [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/).
+
+```jsx
+// Cette valeur est considérée comme fraîche pendant dix secondes (s-maxage=10).
+// Si une requête est répétée dans les 10 secondes suivantes,
+// la valeur précédemment mise en cache sera toujours fraîche. Si la requête est répétée avant 59 secondes,
+// la valeur mise en cache sera périmée mais toujours affichée (stale-while-revalidate=59).
+//
+// En arrière-plan, une requête de revalidation sera faite pour peupler le cache
+// avec une nouvelle valeur. Si vous rafraîchissez la page, vous verrez la nouvelle valeur.
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+Par défaut, les en-têtes `Cache-Control` seront définis différemment selon la façon dont votre page récupère les données.
+
+- Si la page utilise `getServerSideProps` ou `getInitialProps`, elle utilisera l'en-tête `Cache-Control` par défaut défini par `next start` pour empêcher la mise en cache accidentelle de réponses qui ne peuvent pas être mises en cache. Si vous souhaitez un comportement de cache différent avec `getServerSideProps`, utilisez `res.setHeader('Cache-Control', 'valeur_de_votre_choix')` dans la fonction comme montré ci-dessus.
+- Si la page utilise `getStaticProps`, elle aura un en-tête `Cache-Control` de `s-maxage=REVALIDATE_SECONDS, stale-while-revalidate`, ou si `revalidate` n'est _pas_ utilisé, `s-maxage=31536000, stale-while-revalidate` pour une mise en cache maximale.
+
+> **Bon à savoir** : Votre fournisseur de déploiement doit supporter la mise en cache pour les réponses dynamiques. Si vous auto-hébergez, vous devrez ajouter cette logique vous-même en utilisant un système de stockage clé/valeur comme Redis. Si vous utilisez Vercel, [la mise en cache Edge fonctionne sans configuration](https://vercel.com/docs/edge-network/caching?utm_source=next-site&utm_medium=docs&utm_campaign=next-website).
+
+## Réduction de la taille JavaScript
+
+<details open>
+  <summary>Exemples</summary>
+
+- [with-dynamic-import](https://github.com/vercel/next.js/tree/canary/examples/with-dynamic-import)
+
+</details>
+
+Pour réduire la quantité de JavaScript envoyée au navigateur, vous pouvez utiliser les outils suivants pour comprendre ce qui est inclus dans chaque bundle JavaScript :
+
+- [Import Cost](https://marketplace.visualstudio.com/items?itemName=wix.vscode-import-cost) – Affiche la taille des paquets importés dans VSCode.
+- [Package Phobia](https://packagephobia.com/) – Estime le coût d'ajout d'une nouvelle dépendance à votre projet.
+- [Bundle Phobia](https://bundlephobia.com/) – Analyse l'impact d'une dépendance sur la taille des bundles.
+- [Webpack Bundle Analyzer](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer) – Visualise la taille des fichiers de sortie webpack avec une carte interactive et zoomable.
+- [bundlejs](https://bundlejs.com/) – Un outil en ligne pour bundler et minifier rapidement vos projets, tout en visualisant la taille compressée gzip/brotli, exécuté localement dans votre navigateur.
+
+Chaque fichier dans votre répertoire `pages/` sera automatiquement divisé en son propre bundle JavaScript lors de `next build`. Vous pouvez aussi utiliser [l'import dynamique](/docs/pages/building-your-application/optimizing/lazy-loading) pour charger à la demande des composants et bibliothèques. Par exemple, vous pourriez vouloir reporter le chargement du code de votre modal jusqu'à ce qu'un utilisateur clique sur le bouton d'ouverture.
+
+## Journalisation
+
+<details open>
+  <summary>Exemples</summary>
+
+- [Exemple avec Pino et Logflare](https://github.com/Logflare/next-pino-logflare-logging-example)
+
+</details>
+
+Puisque Next.js s'exécute à la fois côté client et serveur, plusieurs formes de journalisation sont supportées :
+
+- `console.log` dans le navigateur
+- `stdout` sur le serveur
+
+Si vous souhaitez un système de journalisation structuré, nous recommandons [Pino](https://www.npmjs.com/package/pino). Si vous utilisez Vercel, il existe des [intégrations de journalisation pré-construites](https://vercel.com/integrations?utm_source=next-site&utm_medium=docs&utm_campaign=next-website#logging) compatibles avec Next.js.
+
+## Gestion des erreurs
+
+<details open>
+  <summary>Exemples</summary>
+
+- [with-sentry](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)
+
+</details>
+
+Lorsqu'une exception non gérée survient, vous pouvez contrôler l'expérience de vos utilisateurs avec la [page 500](/docs/pages/building-your-application/routing/custom-error#500-page). Nous recommandons de la personnaliser selon votre marque plutôt que d'utiliser le thème par défaut de Next.js.
+
+Vous pouvez aussi journaliser et suivre les exceptions avec un outil comme Sentry. [Cet exemple](https://github.com/vercel/next.js/tree/canary/examples/with-sentry) montre comment capturer et reporter des erreurs côté client et serveur, en utilisant le SDK Sentry pour Next.js. Il existe aussi une [intégration Sentry pour Vercel](https://vercel.com/integrations/sentry?utm_source=next-site&utm_medium=docs&utm_campaign=next-website).
+
+## Performances de chargement
+
+Pour améliorer les performances de chargement, vous devez d'abord déterminer quoi mesurer et comment le mesurer. [Core Web Vitals](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) est un bon standard industriel mesurable avec votre propre navigateur. Si vous n'êtes pas familier avec les métriques Core Web Vitals, consultez ce [billet de blog](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) et déterminez quelles métriques spécifiques guideront vos optimisations. Idéalement, vous devriez mesurer les performances de chargement dans les environnements suivants :
+
+- En laboratoire, en utilisant votre propre ordinateur ou un simulateur.
+- Sur le terrain, en utilisant des données réelles de visiteurs.
+- Localement, avec un test exécuté sur votre appareil.
+- À distance, avec un test exécuté dans le cloud.
+
+Une fois capable de mesurer les performances, utilisez les stratégies suivantes pour les améliorer itérativement : appliquez une stratégie, mesurez les nouvelles performances et ajustez jusqu'à ne plus voir d'amélioration significative. Passez ensuite à la stratégie suivante.
+
+- Utilisez des régions de cache proches de celles où votre base de données ou API est déployée.
+- Comme décrit dans la section [mise en cache](#caching), utilisez une valeur `stale-while-revalidate` qui ne surchargera pas votre backend.
+- Utilisez la [régénération statique incrémentale](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) pour réduire le nombre de requêtes vers votre backend.
+- Supprimez le JavaScript inutilisé. Consultez ce [billet de blog](https://calibreapp.com/blog/bundle-size-optimization) pour comprendre quelles métriques Core Web Vitals sont affectées par la taille des bundles et quelles stratégies utiliser pour la réduire, comme :
+  - Configurer votre éditeur de code pour voir les coûts et tailles des imports
+  - Trouver des paquets alternatifs plus légers
+  - Charger dynamiquement les composants et dépendances

@@ -1,0 +1,563 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:10:57.207Z
+title: Migration depuis Vite
+description: Apprenez à migrer votre application React existante de Vite vers Next.js.
+---
+
+Ce guide vous aidera à migrer une application Vite existante vers Next.js.
+
+## Pourquoi effectuer la migration ?
+
+Plusieurs raisons peuvent vous inciter à passer de Vite à Next.js :
+
+### Temps de chargement initial lent
+
+Si vous avez construit votre application avec le [plugin Vite par défaut pour React](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react), votre application est une application purement côté client. Les applications uniquement côté client, aussi appelées applications monopages (SPA), subissent souvent un temps de chargement initial lent. Cela est dû à plusieurs raisons :
+
+1. Le navigateur doit attendre que le code React et l'ensemble de votre bundle d'application soient téléchargés et exécutés avant que votre code ne puisse envoyer des requêtes pour charger des données.
+2. Votre code d'application grossit avec chaque nouvelle fonctionnalité et dépendance supplémentaire que vous ajoutez.
+
+### Pas de découpage de code automatique
+
+Le problème précédent des temps de chargement lents peut être partiellement résolu avec le découpage de code. Cependant, si vous essayez de faire du découpage de code manuellement, vous risquez souvent de dégrader les performances. Il est facile d'introduire involontairement des cascades réseau (network waterfalls) lors d'un découpage manuel. Next.js fournit un découpage de code automatique intégré à son routeur.
+
+### Cascades réseau (Network waterfalls)
+
+Une cause fréquente de mauvaises performances survient lorsque les applications effectuent des requêtes client-serveur séquentielles pour récupérer des données. Un modèle courant pour la récupération de données dans une SPA est de rendre initialement un espace réservé, puis de récupérer les données après que le composant a été monté. Malheureusement, cela signifie qu'un composant enfant qui récupère des données ne peut pas commencer à récupérer avant que le composant parent n'ait fini de charger ses propres données.
+
+Bien que la récupération de données côté client soit supportée avec Next.js, il vous donne également la possibilité de déplacer la récupération de données côté serveur, ce qui peut éliminer les cascades réseau client-serveur.
+
+### États de chargement rapides et intentionnels
+
+Avec le support intégré pour [le streaming via React Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense), vous pouvez être plus intentionnel sur les parties de votre interface que vous souhaitez charger en premier et dans quel ordre, sans introduire de cascades réseau.
+
+Cela vous permet de construire des pages qui se chargent plus rapidement et d'éliminer les [décalages de mise en page (layout shifts)](https://vercel.com/blog/how-core-web-vitals-affect-seo).
+
+### Choisissez votre stratégie de récupération de données
+
+Selon vos besoins, Next.js vous permet de choisir votre stratégie de récupération de données au niveau de la page et du composant. Vous pouvez décider de récupérer au moment de la construction, au moment de la requête côté serveur, ou côté client. Par exemple, vous pouvez récupérer des données depuis votre CMS et rendre vos articles de blog au moment de la construction, qui peuvent ensuite être efficacement mis en cache sur un CDN.
+
+### Middleware
+
+Le [Middleware Next.js](/docs/app/building-your-application/routing/middleware) vous permet d'exécuter du code côté serveur avant qu'une requête ne soit terminée. Ceci est particulièrement utile pour éviter d'afficher brièvement du contenu non authentifié lorsque l'utilisateur visite une page réservée aux utilisateurs authentifiés en redirigeant l'utilisateur vers une page de connexion. Le middleware est également utile pour l'expérimentation et l'[internationalisation](/docs/app/building-your-application/routing/internationalization).
+
+### Optimisations intégrées
+
+Les [images](/docs/app/building-your-application/optimizing/images), [polices](/docs/app/building-your-application/optimizing/fonts) et [scripts tiers](/docs/app/building-your-application/optimizing/scripts) ont souvent un impact significatif sur les performances d'une application. Next.js est livré avec des composants intégrés qui les optimisent automatiquement pour vous.
+
+## Étapes de migration
+
+Notre objectif avec cette migration est d'obtenir une application Next.js fonctionnelle aussi rapidement que possible, afin que vous puissiez ensuite adopter les fonctionnalités de Next.js de manière progressive. Pour commencer, nous la conserverons comme une application purement côté client (SPA) sans migrer votre routeur existant. Cela permet de minimiser les risques de rencontrer des problèmes pendant le processus de migration et de réduire les conflits de fusion.
+
+### Étape 1 : Installer la dépendance Next.js
+
+La première chose à faire est d'installer `next` comme dépendance :
+
+```bash filename="Terminal"
+npm install next@latest
+```
+
+### Étape 2 : Créer le fichier de configuration Next.js
+
+Créez un fichier `next.config.mjs` à la racine de votre projet. Ce fichier contiendra vos [options de configuration Next.js](/docs/app/api-reference/next-config-js).
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // Produit une application monopage (SPA).
+  distDir: './dist', // Change le répertoire de sortie de la construction vers `./dist/`.
+}
+
+export default nextConfig
+```
+
+> **Bon à savoir :** Vous pouvez utiliser soit `.js` soit `.mjs` pour votre fichier de configuration Next.js.
+
+### Étape 3 : Mettre à jour la configuration TypeScript
+
+Si vous utilisez TypeScript, vous devez mettre à jour votre fichier `tsconfig.json` avec les modifications suivantes pour le rendre compatible avec Next.js. Si vous n'utilisez pas TypeScript, vous pouvez ignorer cette étape.
+
+1. Supprimez la [référence de projet](https://www.typescriptlang.org/tsconfig#references) à `tsconfig.node.json`
+2. Ajoutez `./dist/types/**/*.ts` et `./next-env.d.ts` au tableau [`include`](https://www.typescriptlang.org/tsconfig#include)
+3. Ajoutez `./node_modules` au tableau [`exclude`](https://www.typescriptlang.org/tsconfig#exclude)
+4. Ajoutez `{ "name": "next" }` au tableau [`plugins` dans `compilerOptions`](https://www.typescriptlang.org/tsconfig#plugins) : `"plugins": [{ "name": "next" }]`
+5. Définissez [`esModuleInterop`](https://www.typescriptlang.org/tsconfig#esModuleInterop) sur `true` : `"esModuleInterop": true`
+6. Définissez [`jsx`](https://www.typescriptlang.org/tsconfig#jsx) sur `preserve` : `"jsx": "preserve"`
+7. Définissez [`allowJs`](https://www.typescriptlang.org/tsconfig#allowJs) sur `true` : `"allowJs": true`
+8. Définissez [`forceConsistentCasingInFileNames`](https://www.typescriptlang.org/tsconfig#forceConsistentCasingInFileNames) sur `true` : `"forceConsistentCasingInFileNames": true`
+9. Définissez [`incremental`](https://www.typescriptlang.org/tsconfig#incremental) sur `true` : `"incremental": true`
+
+Voici un exemple de fichier `tsconfig.json` fonctionnel avec ces modifications :
+
+```json filename="tsconfig.json"
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["./src", "./dist/types/**/*.ts", "./next-env.d.ts"],
+  "exclude": ["./node_modules"]
+}
+```
+
+Vous pouvez trouver plus d'informations sur la configuration de TypeScript dans la [documentation Next.js](/docs/app/building-your-application/configuring/typescript#typescript-plugin).
+
+### Étape 4 : Créer la mise en page racine
+
+Une application Next.js utilisant le [routeur App](/docs/app) doit inclure un fichier de [mise en page racine](/docs/app/building-your-application/routing/pages-and-layouts#root-layout-required), qui est un [composant serveur React](/docs/app/building-your-application/rendering/server-components) qui englobera toutes les pages de votre application. Ce fichier est défini au niveau supérieur du répertoire `app`.
+
+L'équivalent le plus proche du fichier de mise en page racine dans une application Vite est le fichier [`index.html`](https://vitejs.dev/guide/#index-html-and-project-root), qui contient vos balises `<html>`, `<head>` et `<body>`.
+
+Dans cette étape, vous allez convertir votre fichier `index.html` en un fichier de mise en page racine :
+
+1. Créez un nouveau répertoire `app` dans votre répertoire `src`.
+2. Créez un nouveau fichier `layout.tsx` dans ce répertoire `app` :
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return null
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return null
+}
+```
+
+> **Bon à savoir** : Les extensions `.js`, `.jsx` ou `.tsx` peuvent être utilisées pour les fichiers de mise en page.
+
+3. Copiez le contenu de votre fichier `index.html` dans le composant `<RootLayout>` précédemment créé tout en remplaçant les balises `body.div#root` et `body.script` par `<div id="root">{children}</div>` :
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+4. Next.js inclut déjà par défaut les balises [meta charset](https://developer.mozilla.org/docs/Web/HTML/Element/meta#charset) et [meta viewport](https://developer.mozilla.org/docs/Web/HTML/Viewport_meta_tag), vous pouvez donc les supprimer en toute sécurité de votre `<head>` :
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+5. Tous les [fichiers de métadonnées](/docs/app/building-your-application/optimizing/metadata#file-based-metadata) tels que `favicon.ico`, `icon.png`, `robots.txt` sont automatiquement ajoutés à la balise `<head>` de l'application tant qu'ils sont placés au niveau supérieur du répertoire `app`. Après avoir déplacé [tous les fichiers supportés](/docs/app/building-your-application/optimizing/metadata#file-based-metadata) dans le répertoire `app`, vous pouvez supprimer en toute sécurité leurs balises `<link>` :
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+6. Enfin, Next.js peut gérer vos dernières balises `<head>` avec l'[API Metadata](/docs/app/building-your-application/optimizing/metadata). Déplacez vos dernières informations de métadonnées dans un objet [`metadata` exporté](/docs/app/api-reference/functions/generate-metadata#metadata-object) :
+
+```tsx filename="app/layout.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My App',
+  description: 'My App is a...',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export const metadata = {
+  title: 'My App',
+  description: 'My App is a...',
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+Avec les modifications ci-dessus, vous êtes passé de la déclaration de tout dans votre `index.html` à l'utilisation de l'approche basée sur les conventions de Next.js intégrée au framework ([API Metadata](/docs/app/building-your-application/optimizing/metadata)). Cette approche vous permet d'améliorer plus facilement votre SEO et la partageabilité web de vos pages.
+
+### Étape 5 : Créer la page d'entrée
+
+Dans Next.js, vous déclarez un point d'entrée pour votre application en créant un fichier `page.tsx`. L'équivalent le plus proche de ce fichier dans Vite est votre fichier `main.tsx`. Dans cette étape, vous allez configurer le point d'entrée de votre application.
+
+1. **Créez un répertoire `[[...slug]]` dans votre répertoire `app`.**
+
+Comme dans ce guide nous visons d'abord à configurer notre Next.js comme une SPA (Single Page Application), vous avez besoin que votre point d'entrée de page capture toutes les routes possibles de votre application. Pour cela, créez un nouveau répertoire `[[...slug]]` dans votre répertoire `app`.
+
+Ce répertoire est ce qu'on appelle un
+[segment de route attrape-tout optionnel](/docs/app/building-your-application/routing/dynamic-routes#optional-catch-all-segments).
+Next.js utilise un routeur basé sur le système de fichiers où
+[les répertoires sont utilisés pour définir les routes](/docs/app/building-your-application/routing/defining-routes#creating-routes).
+Ce répertoire spécial garantira que toutes les routes de votre application seront dirigées vers son
+fichier `page.tsx` contenu.
+
+2. **Créez un nouveau fichier `page.tsx` dans le répertoire `app/[[...slug]]` avec le contenu suivant :**
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // Nous mettrons à jour cela
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // Nous mettrons à jour cela
+}
+```
+
+> **Bon à savoir** : Les extensions `.js`, `.jsx` ou `.tsx` peuvent être utilisées pour les fichiers de Page.
+
+Ce fichier est un [Composant Serveur (Server Component)](/docs/app/building-your-application/rendering/server-components). Lorsque vous exécutez `next build`, le fichier est prérendu en un asset statique. Il ne nécessite _aucun_ code dynamique.
+
+Ce fichier importe notre CSS global et indique à [`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params) que nous allons générer une seule route, la route d'index à `/`.
+
+Maintenant, déplaçons le reste de notre application Vite qui s'exécutera uniquement côté client.
+
+```tsx filename="app/[[...slug]]/client.tsx" switcher
+'use client'
+
+import React from 'react'
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+```jsx filename="app/[[...slug]]/client.js" switcher
+'use client'
+
+import React from 'react'
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+Ce fichier est un [Composant Client (Client Component)](/docs/app/building-your-application/rendering/client-components), défini par la directive `'use client'`.
+Les Composants Client sont toujours [prérendus en HTML](/docs/app/building-your-application/rendering/client-components#how-are-client-components-rendered) sur le serveur avant d'être envoyés au client.
+
+Comme nous voulons une application uniquement côté client pour commencer, nous pouvons configurer Next.js pour désactiver le prérendu à partir du composant `App`.
+
+```tsx
+const App = dynamic(() => import('../../App'), { ssr: false })
+```
+
+Maintenant, mettez à jour votre page d'entrée pour utiliser le nouveau composant :
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+### Étape 6 : Mettre à jour les imports d'images statiques
+
+Next.js gère les imports d'images statiques légèrement différemment de Vite. Avec Vite, importer un fichier image retourne son URL publique sous forme de chaîne :
+
+```tsx filename="App.tsx"
+import image from './img.png' // `image` sera '/assets/img.2d8efhg.png' en production
+
+export default function App() {
+  return <img src={image} />
+}
+```
+
+Avec Next.js, les imports d'images statiques retournent un objet. Cet objet peut ensuite être utilisé directement avec le composant [`<Image>`](/docs/app/api-reference/components/image) de Next.js, ou vous pouvez utiliser la propriété `src` de l'objet avec votre balise `<img>` existante.
+
+Le composant `<Image>` offre des avantages supplémentaires comme
+[l'optimisation automatique des images](/docs/app/building-your-application/optimizing/images). Le composant `<Image>`
+définit automatiquement les attributs `width` et `height` de la balise `<img>` résultante en fonction des dimensions de l'image. Cela évite les décalages de mise en page lors du chargement de l'image. Cependant, cela peut causer des problèmes si votre application contient des images avec une seule de leurs dimensions stylisée sans que l'autre ne soit stylisée à `auto`. Lorsqu'elle n'est pas stylisée à `auto`, la dimension prendra par défaut la valeur de l'attribut de dimension de la balise `<img>`, ce qui peut faire apparaître l'image déformée.
+
+Conserver la balise `<img>` réduira le nombre de modifications dans votre application et évitera les problèmes mentionnés ci-dessus. Vous pourrez ensuite éventuellement migrer vers le composant `<Image>` pour profiter de l'optimisation des images en [configurant un loader](/docs/app/building-your-application/optimizing/images#loaders), ou en passant au serveur Next.js par défaut qui offre une optimisation automatique des images.
+
+1. **Convertissez les chemins d'import absolus pour les images importées depuis `/public` en imports relatifs :**
+
+```tsx
+// Avant
+import logo from '/logo.png'
+
+// Après
+import logo from '../public/logo.png'
+```
+
+2. **Passez la propriété `src` de l'image au lieu de l'objet image entier à votre balise `<img>` :**
+
+```tsx
+// Avant
+<img src={logo} />
+
+// Après
+<img src={logo.src} />
+```
+
+Alternativement, vous pouvez référencer l'URL publique de l'asset image basée sur le nom du fichier. Par exemple, `public/logo.png` servira l'image à `/logo.png` pour votre application, qui serait la valeur `src`.
+
+> **Avertissement :** Si vous utilisez TypeScript, vous pourriez rencontrer des erreurs de type lors de l'accès à la propriété `src`.
+> Vous pouvez les ignorer en toute sécurité pour l'instant. Elles seront corrigées à la fin de ce guide.
+
+### Étape 7 : Migrer les variables d'environnement
+
+Next.js prend en charge les
+[variables d'environnement](/docs/app/building-your-application/configuring/environment-variables) `.env`
+de manière similaire à Vite. La principale différence est le préfixe utilisé pour exposer les variables d'environnement côté client.
+
+- Remplacez toutes les variables d'environnement avec le préfixe `VITE_` par `NEXT_PUBLIC_`.
+
+Vite expose quelques variables d'environnement intégrées sur l'objet spécial `import.meta.env` qui ne sont pas prises en charge par Next.js. Vous devez mettre à jour leur utilisation comme suit :
+
+- `import.meta.env.MODE` ⇒ `process.env.NODE_ENV`
+- `import.meta.env.PROD` ⇒ `process.env.NODE_ENV === 'production'`
+- `import.meta.env.DEV` ⇒ `process.env.NODE_ENV !== 'production'`
+- `import.meta.env.SSR` ⇒ `typeof window !== 'undefined'`
+
+Next.js ne fournit pas non plus de variable d'environnement `BASE_URL` intégrée. Cependant, vous pouvez toujours en configurer une, si vous en avez besoin :
+
+1. **Ajoutez ce qui suit à votre fichier `.env` :**
+
+```bash filename=".env"
+# ...
+NEXT_PUBLIC_BASE_PATH="/some-base-path"
+```
+
+2. **Définissez [`basePath`](/docs/app/api-reference/next-config-js/basePath) à `process.env.NEXT_PUBLIC_BASE_PATH` dans votre fichier `next.config.mjs` :**
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // Génère une Single-Page Application (SPA).
+  distDir: './dist', // Change le répertoire de build en `./dist/`.
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH, // Définit le chemin de base à `/some-base-path`.
+}
+
+export default nextConfig
+```
+
+3. **Mettez à jour les utilisations de `import.meta.env.BASE_URL` en `process.env.NEXT_PUBLIC_BASE_PATH`**
+
+### Étape 8 : Mettre à jour les scripts dans `package.json`
+
+Vous devriez maintenant être en mesure d'exécuter votre application pour tester si vous avez migré avec succès vers Next.js. Mais avant cela, vous devez mettre à jour vos `scripts` dans votre `package.json` avec les commandes liées à Next.js, et ajouter `.next` et `next-env.d.ts` à votre `.gitignore` :
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+```txt filename=".gitignore"
+# ...
+.next
+next-env.d.ts
+dist
+```
+
+Maintenant, exécutez `npm run dev`, et ouvrez [`http://localhost:3000`](http://localhost:3000). Vous devriez voir votre application maintenant fonctionnant sur Next.js.
+
+> **Exemple :** Consultez [cette pull request](https://github.com/inngest/vite-to-nextjs/pull/1) pour un
+> exemple fonctionnel d'une application Vite migrée vers Next.js.
+
+### Étape 9 : Nettoyer
+
+Vous pouvez maintenant nettoyer votre base de code des artefacts liés à Vite :
+
+- Supprimez `main.tsx`
+- Supprimez `index.html`
+- Supprimez `vite-env.d.ts`
+- Supprimez `tsconfig.node.json`
+- Supprimez `vite.config.ts`
+- Désinstallez les dépendances Vite
+
+## Prochaines étapes
+
+Si tout s'est déroulé comme prévu, vous avez maintenant une application Next.js fonctionnelle s'exécutant comme une application monopage. Cependant, vous ne profitez pas encore de la plupart des avantages de Next.js, mais vous pouvez maintenant commencer à apporter des modifications incrémentielles pour en tirer tous les bénéfices. Voici ce que vous pourriez vouloir faire ensuite :
+
+- Migrer de React Router vers le [Routeur App de Next.js](/docs/app/building-your-application/routing) pour obtenir :
+  - Le découpage de code automatique
+  - [Le rendu côté serveur en streaming (Streaming Server-Rendering)](/docs/app/building-your-application/routing/loading-ui-and-streaming)
+  - [Les Composants Serveur React (React Server Components)](/docs/app/building-your-application/rendering/server-components)
+- [Optimiser les images avec le composant `<Image>`](/docs/app/building-your-application/optimizing/images)
+- [Optimiser les polices avec `next/font`](/docs/app/building-your-application/optimizing/fonts)
+- [Optimiser les scripts tiers avec le composant `<Script>`](/docs/app/building-your-application/optimizing/scripts)
+- [Mettre à jour votre configuration ESLint pour prendre en charge les règles Next.js](/docs/app/building-your-application/configuring/eslint)

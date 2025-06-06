@@ -1,0 +1,585 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:23:02.840Z
+title: Mise en cache dans Next.js
+nav_title: Mise en cache
+description: Vue d'ensemble des mécanismes de mise en cache dans Next.js.
+---
+
+Next.js améliore les performances de votre application et réduit les coûts en mettant en cache le travail de rendu et les requêtes de données. Cette page offre un aperçu approfondi des mécanismes de mise en cache de Next.js, des API que vous pouvez utiliser pour les configurer et de leur interaction mutuelle.
+
+> **Bon à savoir** : Cette page vous aide à comprendre le fonctionnement interne de Next.js mais n'est **pas** une connaissance essentielle pour être productif avec Next.js. La plupart des heuristiques de mise en cache de Next.js sont déterminées par votre utilisation des API et ont des valeurs par défaut pour les meilleures performances avec une configuration nulle ou minimale.
+
+## Vue d'ensemble
+
+Voici un aperçu de haut niveau des différents mécanismes de mise en cache et leur objectif :
+
+| Mécanisme                                   | Quoi                        | Où     | Objectif                                        | Durée                          |
+| ------------------------------------------- | --------------------------- | ------ | ----------------------------------------------- | ------------------------------ |
+| [Mémorisation des requêtes](#mémorisation-des-requêtes) | Valeurs de retour des fonctions | Serveur | Réutiliser les données dans un arbre de composants React | Cycle de vie par requête       |
+| [Cache de données](#cache-de-données)       | Données                     | Serveur | Stocker des données entre les requêtes utilisateurs et les déploiements | Persistant (peut être revalidé) |
+| [Cache complet de route](#cache-complet-de-route) | HTML et payload RSC         | Serveur | Réduire le coût de rendu et améliorer les performances | Persistant (peut être revalidé) |
+| [Cache du routeur](#cache-du-routeur)       | Payload RSC                 | Client | Réduire les requêtes serveur lors de la navigation | Session utilisateur ou basé sur le temps |
+
+Par défaut, Next.js mettra en cache autant que possible pour améliorer les performances et réduire les coûts. Cela signifie que les routes sont **rendues statiquement** et que les requêtes de données sont **mises en cache** sauf si vous choisissez de ne pas le faire. Le diagramme ci-dessous montre le comportement de mise en cache par défaut : lorsqu'une route est rendue statiquement au moment de la construction et lorsqu'une route statique est visitée pour la première fois.
+
+<Image
+  alt="Diagramme montrant le comportement de mise en cache par défaut dans Next.js pour les quatre mécanismes, avec HIT, MISS et SET au moment de la construction et lors de la première visite d'une route."
+  srcLight="/docs/light/caching-overview.png"
+  srcDark="/docs/dark/caching-overview.png"
+  width="1600"
+  height="1179"
+/>
+
+Le comportement de mise en cache change selon que la route est rendue statiquement ou dynamiquement, que les données sont mises en cache ou non, et si une requête fait partie d'une première visite ou d'une navigation ultérieure. Selon votre cas d'utilisation, vous pouvez configurer le comportement de mise en cache pour des routes et des requêtes de données individuelles.
+
+## Mémorisation des requêtes
+
+React étend l'API [`fetch`](#fetch) pour **mémoriser** automatiquement les requêtes qui ont la même URL et les mêmes options. Cela signifie que vous pouvez appeler une fonction fetch pour les mêmes données à plusieurs endroits dans un arbre de composants React tout en ne l'exécutant qu'une seule fois.
+
+<Image
+  alt="Requêtes Fetch dédupliquées"
+  srcLight="/docs/light/deduplicated-fetch-requests.png"
+  srcDark="/docs/dark/deduplicated-fetch-requests.png"
+  width="1600"
+  height="857"
+/>
+
+Par exemple, si vous avez besoin d'utiliser les mêmes données dans une route (par exemple dans une mise en page, une page et plusieurs composants), vous n'avez pas besoin de récupérer les données en haut de l'arborescence et de transmettre les props entre les composants. Au lieu de cela, vous pouvez récupérer les données dans les composants qui en ont besoin sans vous soucier des implications en termes de performance liées à la réalisation de plusieurs requêtes sur le réseau pour les mêmes données.
+
+```tsx filename="app/example.tsx" switcher
+async function getItem() {
+  // La fonction `fetch` est automatiquement mémorisée et le résultat
+  // est mis en cache
+  const res = await fetch('https://.../item/1')
+  return res.json()
+}
+
+// Cette fonction est appelée deux fois, mais n'est exécutée que la première fois
+const item = await getItem() // cache MISS
+
+// Le deuxième appel peut être n'importe où dans votre route
+const item = await getItem() // cache HIT
+```
+
+```jsx filename="app/example.js" switcher
+async function getItem() {
+  // La fonction `fetch` est automatiquement mémorisée et le résultat
+  // est mis en cache
+  const res = await fetch('https://.../item/1')
+  return res.json()
+}
+
+// Cette fonction est appelée deux fois, mais n'est exécutée que la première fois
+const item = await getItem() // cache MISS
+
+// Le deuxième appel peut être n'importe où dans votre route
+const item = await getItem() // cache HIT
+```
+
+**Fonctionnement de la mémorisation des requêtes**
+
+<Image
+  alt="Diagramme montrant comment fonctionne la mémorisation des requêtes fetch pendant le rendu React."
+  srcLight="/docs/light/request-memoization.png"
+  srcDark="/docs/dark/request-memoization.png"
+  width="1600"
+  height="742"
+/>
+
+- Pendant le rendu d'une route, la première fois qu'une requête spécifique est appelée, son résultat ne sera pas en mémoire et ce sera un cache `MISS`.
+- Par conséquent, la fonction sera exécutée, les données seront récupérées depuis la source externe, et le résultat sera stocké en mémoire.
+- Les appels ultérieurs de la fonction dans la même passe de rendu seront un cache `HIT`, et les données seront retournées depuis la mémoire sans exécuter la fonction.
+- Une fois que la route a été rendue et que la passe de rendu est terminée, la mémoire est "réinitialisée" et toutes les entrées de mémorisation des requêtes sont effacées.
+
+> **Bon à savoir** :
+>
+> - La mémorisation des requêtes est une fonctionnalité de React, pas de Next.js. Elle est incluse ici pour montrer comment elle interagit avec les autres mécanismes de mise en cache.
+> - La mémorisation ne s'applique qu'à la méthode `GET` dans les requêtes `fetch`.
+> - La mémorisation ne s'applique qu'à l'arborescence des composants React, ce qui signifie :
+>   - Elle s'applique aux requêtes `fetch` dans `generateMetadata`, `generateStaticParams`, les mises en page, les pages et d'autres composants serveur.
+>   - Elle ne s'applique pas aux requêtes `fetch` dans les gestionnaires de route car ils ne font pas partie de l'arborescence des composants React.
+> - Pour les cas où `fetch` n'est pas adapté (par exemple certains clients de base de données, CMS ou GraphQL), vous pouvez utiliser la [fonction `cache` de React](#fonction-react-cache) pour mémoriser les fonctions.
+
+### Durée
+
+Le cache dure le temps de vie d'une requête serveur jusqu'à ce que l'arborescence des composants React ait fini de rendre.
+
+### Revalidation
+
+Comme la mémorisation n'est pas partagée entre les requêtes serveur et ne s'applique que pendant le rendu, il n'est pas nécessaire de la revalider.
+
+### Désactivation
+
+La mémorisation ne s'applique qu'à la méthode `GET` dans les requêtes `fetch`, les autres méthodes comme `POST` et `DELETE` ne sont pas mémorisées. Ce comportement par défaut est une optimisation de React et nous ne recommandons pas de le désactiver.
+
+Pour gérer des requêtes individuelles, vous pouvez utiliser la propriété [`signal`](https://developer.mozilla.org/fr/docs/Web/API/AbortController/signal) de [`AbortController`](https://developer.mozilla.org/fr/docs/Web/API/AbortController). Cependant, cela ne désactivera pas la mémorisation des requêtes, mais annulera les requêtes en cours.
+
+```js filename="app/example.js"
+const { signal } = new AbortController()
+fetch(url, { signal })
+```
+
+## Cache de données
+
+Next.js dispose d'un cache de données intégré qui **persiste** le résultat des récupérations de données entre les **requêtes serveur** entrantes et les **déploiements**. Cela est possible car Next.js étend l'API native `fetch` pour permettre à chaque requête sur le serveur de définir sa propre sémantique de mise en cache persistante.
+
+> **Bon à savoir** : Dans le navigateur, l'option `cache` de `fetch` indique comment une requête interagira avec le cache HTTP du navigateur, dans Next.js, l'option `cache` indique comment une requête côté serveur interagira avec le cache de données du serveur.
+
+Par défaut, les requêtes de données utilisant `fetch` sont **mises en cache**. Vous pouvez utiliser les options [`cache`](#fetch-optionscache) et [`next.revalidate`](#fetch-optionsnextrevalidate) de `fetch` pour configurer le comportement de mise en cache.
+
+**Fonctionnement du cache de données**
+
+<Image
+  alt="Diagramme montrant comment les requêtes fetch mises en cache et non mises en cache interagissent avec le cache de données. Les requêtes mises en cache sont stockées dans le cache de données et mémorisées, les requêtes non mises en cache sont récupérées depuis la source de données, non stockées dans le cache de données et mémorisées."
+  srcLight="/docs/light/data-cache.png"
+  srcDark="/docs/dark/data-cache.png"
+  width="1600"
+  height="661"
+/>
+
+- La première fois qu'une requête `fetch` est appelée pendant le rendu, Next.js vérifie le cache de données pour une réponse mise en cache.
+- Si une réponse mise en cache est trouvée, elle est retournée immédiatement et [mémorisée](#mémorisation-des-requêtes).
+- Si aucune réponse mise en cache n'est trouvée, la requête est faite vers la source de données, le résultat est stocké dans le cache de données et mémorisé.
+- Pour les données non mises en cache (par exemple `{ cache: 'no-store' }`), le résultat est toujours récupéré depuis la source de données et mémorisé.
+- Que les données soient mises en cache ou non, les requêtes sont toujours mémorisées pour éviter de faire des requêtes en double pour les mêmes données pendant une passe de rendu React.
+
+> **Différences entre le cache de données et la mémorisation des requêtes**
+>
+> Bien que les deux mécanismes de mise en cache aident à améliorer les performances en réutilisant les données mises en cache, le cache de données est persistant entre les requêtes entrantes et les déploiements, alors que la mémorisation ne dure que le temps de vie d'une requête.
+>
+> Avec la mémorisation, nous réduisons le nombre de requêtes **en double** dans la même passe de rendu qui doivent traverser la frontière réseau du serveur de rendu vers le serveur de cache de données (par exemple un CDN ou un réseau Edge) ou la source de données (par exemple une base de données ou un CMS). Avec le cache de données, nous réduisons le nombre de requêtes faites vers notre source de données d'origine.
+
+### Durée
+
+Le cache de données est persistant entre les requêtes entrantes et les déploiements à moins que vous ne le revalidiez ou ne le désactiviez.
+
+### Revalidation
+
+Les données mises en cache peuvent être revalidées de deux manières, avec :
+
+- **Revalidation basée sur le temps** : Revalider les données après un certain temps écoulé et une nouvelle requête faite. C'est utile pour les données qui changent rarement et où la fraîcheur n'est pas critique.
+- **Revalidation à la demande** : Revalider les données en fonction d'un événement (par exemple la soumission d'un formulaire). La revalidation à la demande peut utiliser une approche basée sur des tags ou des chemins pour revalider des groupes de données à la fois. C'est utile lorsque vous voulez vous assurer que les données les plus récentes sont affichées dès que possible (par exemple lorsque le contenu de votre CMS headless est mis à jour).
+
+#### Revalidation basée sur le temps
+
+Pour revalider les données à intervalles réguliers, vous pouvez utiliser l'option `next.revalidate` de `fetch` pour définir la durée de vie du cache d'une ressource (en secondes).
+
+```js
+// Revalider au maximum toutes les heures
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+Alternativement, vous pouvez utiliser les [options de configuration de segment de route](#options-de-configuration-de-segment) pour configurer toutes les requêtes `fetch` dans un segment ou pour les cas où vous ne pouvez pas utiliser `fetch`.
+
+**Fonctionnement de la revalidation basée sur le temps**
+
+<Image
+  alt="Diagramme montrant comment fonctionne la revalidation basée sur le temps, après la période de revalidation, les données périmées sont retournées pour la première requête, puis les données sont revalidées."
+  srcLight="/docs/light/time-based-revalidation.png"
+  srcDark="/docs/dark/time-based-revalidation.png"
+  width="1600"
+  height="1252"
+/>
+
+- La première fois qu'une requête fetch avec `revalidate` est appelée, les données seront récupérées depuis la source de données externe et stockées dans le cache de données.
+- Toutes les requêtes appelées dans l'intervalle spécifié (par exemple 60 secondes) retourneront les données mises en cache.
+- Après l'intervalle, la prochaine requête retournera toujours les données mises en cache (maintenant périmées).
+  - Next.js déclenchera une revalidation des données en arrière-plan.
+  - Une fois les données récupérées avec succès, Next.js mettra à jour le cache de données avec les nouvelles données.
+  - Si la revalidation en arrière-plan échoue, les données précédentes seront conservées inchangées.
+
+Ce comportement est similaire à [**stale-while-revalidate**](https://web.dev/stale-while-revalidate/).
+
+#### Revalidation à la demande
+
+Les données peuvent être revalidées à la demande par chemin ([`revalidatePath`](#revalidatepath)) ou par tag de cache ([`revalidateTag`](#fetch-optionsnexttags-et-revalidatetag)).
+
+**Fonctionnement de la revalidation à la demande**
+
+<Image
+  alt="Diagramme montrant comment fonctionne la revalidation à la demande, le cache de données est mis à jour avec des données fraîches après une requête de revalidation."
+  srcLight="/docs/light/on-demand-revalidation.png"
+  srcDark="/docs/dark/on-demand-revalidation.png"
+  width="1600"
+  height="1082"
+/>
+
+- La première fois qu'une requête `fetch` est appelée, les données seront récupérées depuis la source de données externe et stockées dans le cache de données.
+- Lorsqu'une revalidation à la demande est déclenchée, les entrées de cache appropriées seront purgées du cache.
+  - Ceci est différent de la revalidation basée sur le temps, qui conserve les données périmées dans le cache jusqu'à ce que les nouvelles données soient récupérées.
+- La prochaine fois qu'une requête est faite, ce sera à nouveau un cache `MISS`, et les données seront récupérées depuis la source de données externe et stockées dans le cache de données.
+
+### Désactivation
+
+Pour des récupérations de données individuelles, vous pouvez désactiver la mise en cache en définissant l'option [`cache`](#fetch-optionscache) à `no-store`. Cela signifie que les données seront récupérées à chaque appel de `fetch`.
+
+```jsx
+// Désactiver la mise en cache pour une requête `fetch` individuelle
+fetch(`https://...`, { cache: 'no-store' })
+```
+
+Alternativement, vous pouvez aussi utiliser les [options de configuration de segment de route](#options-de-configuration-de-segment) pour désactiver la mise en cache pour un segment de route spécifique. Cela affectera toutes les requêtes de données dans le segment de route, y compris les bibliothèques tierces.
+
+```jsx
+// Désactiver la mise en cache pour toutes les requêtes de données dans le segment de route
+export const dynamic = 'force-dynamic'
+```
+
+> **Note** : Le cache de données est actuellement disponible uniquement dans les pages/routes, pas dans le middleware. Toutes les requêtes fetch faites dans votre middleware ne seront pas mises en cache par défaut.
+
+> **Cache de données Vercel**
+>
+> Si votre application Next.js est déployée sur Vercel, nous vous recommandons de lire la documentation du [cache de données Vercel](https://vercel.com/docs/infrastructure/data-cache) pour mieux comprendre les fonctionnalités spécifiques à Vercel.
+
+## Cache complet de route
+
+> **Termes connexes** :
+>
+> Vous pouvez voir les termes **Optimisation statique automatique**, **Génération de site statique** ou **Rendu statique** utilisés de manière interchangeable pour désigner le processus de rendu et de mise en cache des routes de votre application au moment de la construction.
+
+Next.js rend et met en cache automatiquement les routes au moment de la construction. Il s'agit d'une optimisation qui permet de servir la route mise en cache au lieu de la rendre sur le serveur pour chaque requête, ce qui entraîne des chargements de page plus rapides.
+
+Pour comprendre comment fonctionne le cache complet de route, il est utile de regarder comment React gère le rendu et comment Next.js met en cache le résultat :
+
+### 1. Rendu React sur le serveur
+
+Sur le serveur, Next.js utilise les API de React pour orchestrer le rendu. Le travail de rendu est divisé en morceaux : par segments de route individuels et limites Suspense.
+
+Chaque morceau est rendu en deux étapes :
+
+1. React rend les composants serveur dans un format de données spécial, optimisé pour le streaming, appelé **React Server Component Payload**.
+2. Next.js utilise le React Server Component Payload et les instructions JavaScript des composants client pour rendre le **HTML** sur le serveur.
+
+Cela signifie que nous n'avons pas besoin d'attendre que tout soit rendu avant de mettre en cache le travail ou d'envoyer une réponse. Au lieu de cela, nous pouvons diffuser une réponse au fur et à mesure que le travail est terminé.
+
+> **Qu'est-ce que le React Server Component Payload ?**
+>
+> Le React Server Component Payload est une représentation binaire compacte de l'arborescence des composants serveur rendus. Il est utilisé par React côté client pour mettre à jour le DOM du navigateur. Le React Server Component Payload contient :
+>
+> - Le résultat rendu des composants serveur
+> - Des espaces réservés pour les composants client qui doivent être rendus et des références à leurs fichiers JavaScript
+> - Toutes les props passées d'un composant serveur à un composant client
+>
+> Pour en savoir plus, consultez la documentation des [composants serveur](/docs/app/building-your-application/rendering/server-components).
+
+### 2. Mise en cache par Next.js sur le serveur (Cache complet de route)
+
+<Image
+  alt="Comportement par défaut du cache complet de route, montrant comment le React Server Component Payload et le HTML sont mis en cache sur le serveur pour les routes rendues statiquement."
+  srcLight="/docs/light/full-route-cache.png"
+  srcDark="/docs/dark/full-route-cache.png"
+  width="1600"
+  height="888"
+/>
+
+Le comportement par défaut de Next.js est de mettre en cache le résultat rendu (React Server Component Payload et HTML) d'une route sur le serveur. Cela s'applique aux routes rendues statiquement au moment de la construction, ou pendant la revalidation.
+
+### 3. Hydratation (Hydration) et Réconciliation de React côté client
+
+Au moment de la requête, côté client :
+
+1. Le HTML est utilisé pour afficher immédiatement un aperçu rapide et non interactif des composants Client et Serveur.
+2. Le Payload des composants Serveur React est utilisé pour réconcilier les arbres des composants Client et des composants Serveur rendus, et mettre à jour le DOM.
+3. Les instructions JavaScript sont utilisées pour [hydrater](https://react.dev/reference/react-dom/client/hydrateRoot) les composants Client et rendre l'application interactive.
+
+### 4. Mise en cache côté client dans Next.js (Cache du Routeur)
+
+Le Payload des composants Serveur React est stocké dans le [Cache du Routeur](#router-cache) côté client - un cache en mémoire séparé, divisé par segment de route individuel. Ce Cache du Routeur est utilisé pour améliorer l'expérience de navigation en stockant les routes précédemment visitées et en préchargeant les routes futures.
+
+### 5. Navigations ultérieures
+
+Lors des navigations ultérieures ou pendant le préchargement, Next.js vérifie si le Payload des composants Serveur React est stocké dans le Cache du Routeur. Si c'est le cas, il évitera d'envoyer une nouvelle requête au serveur.
+
+Si les segments de route ne sont pas dans le cache, Next.js récupérera le Payload des composants Serveur React depuis le serveur et remplira le Cache du Routeur côté client.
+
+### Rendu statique et dynamique
+
+Le fait qu'une route soit mise en cache ou non au moment de la construction dépend de son rendu statique ou dynamique. Les routes statiques sont mises en cache par défaut, tandis que les routes dynamiques sont rendues au moment de la requête et ne sont pas mises en cache.
+
+Ce diagramme illustre la différence entre les routes rendues statiquement et dynamiquement, avec des données mises en cache ou non :
+
+<Image
+  alt="Comment le rendu statique et dynamique affecte le Cache de Route Complet. Les routes statiques sont mises en cache au moment de la construction ou après une revalidation des données, tandis que les routes dynamiques ne sont jamais mises en cache"
+  srcLight="/docs/light/static-and-dynamic-routes.png"
+  srcDark="/docs/dark/static-and-dynamic-routes.png"
+  width="1600"
+  height="1314"
+/>
+
+En savoir plus sur le [rendu statique et dynamique](/docs/app/building-your-application/rendering/server-components#server-rendering-strategies).
+
+### Durée
+
+Par défaut, le Cache de Route Complet est persistant. Cela signifie que le résultat du rendu est mis en cache entre les requêtes des utilisateurs.
+
+### Invalidation
+
+Il existe deux façons d'invalider le Cache de Route Complet :
+
+- **[Revalidation des données](/docs/app/building-your-application/caching#revalidating)** : Revalider le [Cache de Données](#data-cache) invalidera également le Cache du Routeur en re-rendant les composants sur le serveur et en mettant en cache le nouveau résultat de rendu.
+- **Redéploiement** : Contrairement au Cache de Données, qui persiste entre les déploiements, le Cache de Route Complet est vidé lors des nouveaux déploiements.
+
+### Désactivation
+
+Vous pouvez désactiver le Cache de Route Complet, c'est-à-dire rendre dynamiquement les composants pour chaque requête entrante, en :
+
+- **Utilisant une [Fonction Dynamique](#dynamic-functions)** : Cela exclura la route du Cache de Route Complet et la rendra dynamiquement au moment de la requête. Le Cache de Données peut toujours être utilisé.
+- **Utilisant les options de configuration de segment de route `dynamic = 'force-dynamic'` ou `revalidate = 0`** : Cela contournera le Cache de Route Complet et le Cache de Données. Les composants seront rendus et les données récupérées à chaque requête entrante vers le serveur. Le Cache du Routeur s'appliquera toujours car il s'agit d'un cache côté client.
+- **Désactivant le [Cache de Données](#data-cache)** : Si une route contient une requête `fetch` non mise en cache, cela exclura la route du Cache de Route Complet. Les données pour cette requête `fetch` spécifique seront récupérées à chaque requête entrante. Les autres requêtes `fetch` qui ne désactivent pas la mise en cache seront toujours mises en cache dans le Cache de Données. Cela permet un mélange de données mises en cache et non mises en cache.
+
+## Cache du Routeur
+
+> **Termes associés :**
+>
+> Le Cache du Routeur peut être appelé **Cache côté client** ou **Cache de préchargement**. Alors que **Cache de préchargement** fait référence aux segments de route préchargés, **Cache côté client** fait référence à l'ensemble du Cache du Routeur, qui inclut à la fois les segments visités et préchargés.
+> Ce cache s'applique spécifiquement à Next.js et aux composants Serveur, et est différent du [bfcache](https://web.dev/bfcache/) du navigateur, bien qu'il ait un résultat similaire.
+
+Next.js dispose d'un cache en mémoire côté client qui stocke le Payload des composants Serveur React, divisé par segments de route individuels, pour la durée d'une session utilisateur. C'est ce qu'on appelle le Cache du Routeur.
+
+**Fonctionnement du Cache du Routeur**
+
+<Image
+  alt="Comment fonctionne le Cache du Routeur pour les routes statiques et dynamiques, montrant MISS et HIT pour les navigations initiales et ultérieures."
+  srcLight="/docs/light/router-cache.png"
+  srcDark="/docs/dark/router-cache.png"
+  width="1600"
+  height="1375"
+/>
+
+Lorsqu'un utilisateur navigue entre les routes, Next.js met en cache les segments de route visités et [précharge](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching) les routes vers lesquelles l'utilisateur est susceptible de naviguer (en fonction des composants `<Link>` dans son champ de vision).
+
+Cela améliore l'expérience de navigation pour l'utilisateur :
+
+- Navigation instantanée en arrière/en avant car les routes visitées sont mises en cache, et navigation rapide vers de nouvelles routes grâce au préchargement et au [rendu partiel](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering).
+- Pas de rechargement complet de la page entre les navigations, et l'état React et l'état du navigateur sont préservés.
+
+> **Différence entre le Cache du Routeur et le Cache de Route Complet :**
+>
+> Le Cache du Routeur stocke temporairement le Payload des composants Serveur React dans le navigateur pour la durée d'une session utilisateur, tandis que le Cache de Route Complet stocke de manière persistante le Payload des composants Serveur React et le HTML sur le serveur entre plusieurs requêtes utilisateur.
+>
+> Alors que le Cache de Route Complet ne met en cache que les routes rendues statiquement, le Cache du Routeur s'applique à la fois aux routes rendues statiquement et dynamiquement.
+
+### Durée
+
+Le cache est stocké dans la mémoire temporaire du navigateur. Deux facteurs déterminent la durée du cache du routeur :
+
+- **Session** : Le cache persiste entre les navigations. Cependant, il est vidé lors d'un rafraîchissement de la page.
+- **Période d'invalidation automatique** : Le cache des layouts et des états de chargement est automatiquement invalidé après un certain temps. La durée dépend de la façon dont la ressource a été [préchargée](/docs/app/api-reference/components/link#prefetch), et si la ressource a été [générée statiquement](/docs/app/building-your-application/rendering/server-components#static-rendering-default) :
+  - **Préchargement par défaut** (`prefetch={null}` ou non spécifié) : non mis en cache pour les pages dynamiques, 5 minutes pour les pages statiques.
+  - **Préchargement complet** (`prefetch={true}` ou `router.prefetch`) : 5 minutes pour les pages statiques et dynamiques.
+
+Bien qu'un rafraîchissement de la page vide **tous** les segments mis en cache, la période d'invalidation automatique n'affecte que le segment individuel à partir du moment où il a été préchargé.
+
+> **Bon à savoir** : L'option expérimentale [`staleTimes`](/docs/app/api-reference/next-config-js/staleTimes) peut être utilisée pour ajuster les délais d'invalidation automatique mentionnés ci-dessus.
+
+### Invalidation
+
+Il existe deux façons d'invalider le Cache du Routeur :
+
+- Dans une **Action Serveur** :
+  - Revalider les données à la demande par chemin avec ([`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)) ou par tag de cache avec ([`revalidateTag`](/docs/app/api-reference/functions/revalidateTag))
+  - Utiliser [`cookies.set`](/docs/app/api-reference/functions/cookies#cookiessetname-value-options) ou [`cookies.delete`](/docs/app/api-reference/functions/cookies#deleting-cookies) invalide le Cache du Routeur pour éviter que les routes utilisant des cookies ne deviennent obsolètes (par exemple, l'authentification).
+- Appeler [`router.refresh`](/docs/app/api-reference/functions/use-router) invalidera le Cache du Routeur et fera une nouvelle requête au serveur pour la route actuelle.
+
+### Désactivation
+
+Il n'est pas possible de désactiver complètement le Cache du Routeur. Cependant, vous pouvez l'invalider en appelant [`router.refresh`](/docs/app/api-reference/functions/use-router), [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath), ou [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) (voir ci-dessus). Cela videra le cache et fera une nouvelle requête au serveur, garantissant que les données les plus récentes sont affichées.
+
+Vous pouvez également désactiver le **préchargement** en définissant la prop `prefetch` du composant `<Link>` sur `false`. Cependant, cela stockera temporairement les segments de route pendant 30s pour permettre une navigation instantanée entre les segments imbriqués, comme les barres d'onglets, ou les navigations avant et arrière. Les routes visitées seront toujours mises en cache.
+
+## Interactions entre les caches
+
+Lors de la configuration des différents mécanismes de cache, il est important de comprendre comment ils interagissent entre eux :
+
+### Cache de Données et Cache de Route Complet
+
+- Revalider ou désactiver le Cache de Données **invalidera** le Cache de Route Complet, car le résultat du rendu dépend des données.
+- Invalider ou désactiver le Cache de Route Complet **n'affecte pas** le Cache de Données. Vous pouvez rendre dynamiquement une route qui a à la fois des données mises en cache et non mises en cache. C'est utile lorsque la plupart de votre page utilise des données mises en cache, mais que vous avez quelques composants qui dépendent de données devant être récupérées au moment de la requête. Vous pouvez effectuer un rendu dynamique sans vous soucier de l'impact sur les performances de la récupération de toutes les données.
+
+### Cache de Données et Cache du Routeur côté client
+
+- Revalider le Cache de Données dans un [Gestionnaire de Route](/docs/app/building-your-application/routing/route-handlers) **n'invalidera pas** immédiatement le Cache du Routeur car le Gestionnaire de Route n'est pas lié à une route spécifique. Cela signifie que le Cache du Routeur continuera à servir le payload précédent jusqu'à un rafraîchissement complet, ou jusqu'à l'expiration de la période d'invalidation automatique.
+- Pour invalider immédiatement le Cache de Données et le Cache du Routeur, vous pouvez utiliser [`revalidatePath`](#revalidatepath) ou [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag) dans une [Action Serveur](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+## APIs
+
+Le tableau suivant fournit un aperçu de l'impact des différentes APIs Next.js sur la mise en cache :
+
+| API                                                                     | Cache du Routeur           | Cache de Route Complet | Cache de Données      | Cache React |
+| ----------------------------------------------------------------------- | -------------------------- | --------------------- | --------------------- | ----------- |
+| [`<Link prefetch>`](#link)                                              | Cache                      |                       |                       |             |
+| [`router.prefetch`](#routerprefetch)                                    | Cache                      |                       |                       |             |
+| [`router.refresh`](#routerrefresh)                                      | Revalider                  |                       |                       |             |
+| [`fetch`](#fetch)                                                       |                            |                       | Cache                 | Cache       |
+| [`fetch` `options.cache`](#fetch-optionscache)                          |                            |                       | Cache ou Désactivation|             |
+| [`fetch` `options.next.revalidate`](#fetch-optionsnextrevalidate)       |                            | Revalider             | Revalider             |             |
+| [`fetch` `options.next.tags`](#fetch-optionsnexttags-and-revalidatetag) |                            | Cache                 | Cache                 |             |
+| [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag)             | Revalider (Action Serveur) | Revalider             | Revalider             |             |
+| [`revalidatePath`](#revalidatepath)                                     | Revalider (Action Serveur) | Revalider             | Revalider             |             |
+| [`const revalidate`](#segment-config-options)                           |                            | Revalider ou Désactiver| Revalider ou Désactiver|             |
+| [`const dynamic`](#segment-config-options)                              |                            | Cache ou Désactiver   | Cache ou Désactiver   |             |
+| [`cookies`](#cookies)                                                   | Revalider (Action Serveur) | Désactiver            |                       |             |
+| [`headers`, `searchParams`](#dynamic-functions)                         |                            | Désactiver            |                       |             |
+| [`generateStaticParams`](#generatestaticparams)                         |                            | Cache                 |                       |             |
+| [`React.cache`](#react-cache-function)                                  |                            |                       |                       | Cache       |
+| [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache)    |                            |                       |                       |             |
+
+### `<Link>`
+
+Par défaut, le composant `<Link>` précharge automatiquement les routes depuis le Cache de Route Complet et ajoute le Payload des composants Serveur React au Cache du Routeur.
+
+Pour désactiver le préchargement, vous pouvez définir la prop `prefetch` sur `false`. Mais cela ne désactivera pas le cache de manière permanente, le segment de route sera toujours mis en cache côté client lorsque l'utilisateur visitera la route.
+
+En savoir plus sur le [composant `<Link>`](/docs/app/api-reference/components/link).
+
+### `router.prefetch`
+
+L'option `prefetch` du hook `useRouter` peut être utilisée pour précharger manuellement une route. Cela ajoute le Payload des composants Serveur React au Cache du Routeur.
+
+Voir la référence de l'API du [hook `useRouter`](/docs/app/api-reference/functions/use-router).
+
+### `router.refresh`
+
+L'option `refresh` du hook `useRouter` peut être utilisée pour rafraîchir manuellement une route. Cela vide complètement le Cache du Routeur et effectue une nouvelle requête au serveur pour la route actuelle. `refresh` n'affecte pas le Cache de Données ou le Cache de Route Complet.
+
+Le résultat rendu sera réconcilié côté client tout en préservant l'état React et l'état du navigateur.
+
+Voir la référence de l'API du [hook `useRouter`](/docs/app/api-reference/functions/use-router).
+
+### `fetch`
+
+Les données retournées par `fetch` sont automatiquement mises en cache dans le Cache de Données.
+
+```jsx
+// Mis en cache par défaut. `force-cache` est l'option par défaut et peut être omise.
+fetch(`https://...`, { cache: 'force-cache' })
+```
+
+Voir la [référence de l'API `fetch`](/docs/app/api-reference/functions/fetch) pour plus d'options.
+
+### `fetch options.cache`
+
+Vous pouvez désactiver la mise en cache pour des requêtes `fetch` individuelles en définissant l'option `cache` sur `no-store` :
+
+```jsx
+// Désactiver la mise en cache
+fetch(`https://...`, { cache: 'no-store' })
+```
+
+Comme le résultat du rendu dépend des données, utiliser `cache: 'no-store'` contournera également le Cache de Route Complet pour la route où la requête `fetch` est utilisée. Autrement dit, la route sera rendue dynamiquement à chaque requête, mais vous pouvez toujours avoir d'autres requêtes de données mises en cache dans la même route.
+
+Voir la [référence de l'API `fetch`](/docs/app/api-reference/functions/fetch) pour plus d'options.
+
+### `fetch options.next.revalidate`
+
+Vous pouvez utiliser l'option `next.revalidate` de `fetch` pour définir la période de revalidation (en secondes) d'une requête `fetch` individuelle. Cela revalidera le Cache de Données, ce qui revalidera à son tour le Cache de Route Complet. Les données fraîches seront récupérées et les composants seront re-rendus sur le serveur.
+
+```jsx
+// Revalider au maximum après 1 heure
+fetch(`https://...`, { next: { revalidate: 3600 } })
+```
+
+Voir la [référence de l'API `fetch`](/docs/app/api-reference/functions/fetch) pour plus d'options.
+
+### `fetch options.next.tags` et `revalidateTag`
+
+Next.js dispose d'un système d'étiquetage (tags) du cache pour une mise en cache et une revalidation des données plus précises.
+
+1. Lorsque vous utilisez `fetch` ou [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache), vous avez la possibilité d'étiqueter les entrées du cache avec une ou plusieurs étiquettes (tags).
+2. Ensuite, vous pouvez appeler `revalidateTag` pour purger les entrées du cache associées à cette étiquette.
+
+Par exemple, vous pouvez définir une étiquette lors de la récupération de données :
+
+```jsx
+// Mettre en cache des données avec une étiquette
+fetch(`https://...`, { next: { tags: ['a', 'b', 'c'] } })
+```
+
+Puis, appeler `revalidateTag` avec une étiquette pour purger l'entrée du cache :
+
+```jsx
+// Revalider les entrées avec une étiquette spécifique
+revalidateTag('a')
+```
+
+Il existe deux endroits où vous pouvez utiliser `revalidateTag`, selon ce que vous souhaitez accomplir :
+
+1. [Gestionnaires de route (Route Handlers)](/docs/app/building-your-application/routing/route-handlers) - pour revalider des données en réponse à un événement tiers (par exemple, un webhook). Cela n'invalidera pas immédiatement le cache du routeur (Router Cache) car le gestionnaire de route n'est pas lié à une route spécifique.
+2. [Actions serveur (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) - pour revalider des données après une action utilisateur (par exemple, la soumission d'un formulaire). Cela invalidera le cache du routeur (Router Cache) pour la route associée.
+
+### `revalidatePath`
+
+`revalidatePath` vous permet de revalider manuellement les données **et** de re-rendre les segments de route sous un chemin spécifique en une seule opération. L'appel de la méthode `revalidatePath` revalide le cache de données (Data Cache), ce qui invalide à son tour le cache de route complet (Full Route Cache).
+
+```jsx
+revalidatePath('/')
+```
+
+Il existe deux endroits où vous pouvez utiliser `revalidatePath`, selon ce que vous souhaitez accomplir :
+
+1. [Gestionnaires de route (Route Handlers)](/docs/app/building-your-application/routing/route-handlers) - pour revalider des données en réponse à un événement tiers (par exemple, un webhook).
+2. [Actions serveur (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) - pour revalider des données après une interaction utilisateur (par exemple, la soumission d'un formulaire, un clic sur un bouton).
+
+Consultez la [référence API de `revalidatePath`](/docs/app/api-reference/functions/revalidatePath) pour plus d'informations.
+
+> **`revalidatePath`** vs. **`router.refresh`** :
+>
+> L'appel de `router.refresh` effacera le cache du routeur (Router Cache) et re-rendra les segments de route sur le serveur sans invalider le cache de données (Data Cache) ni le cache de route complet (Full Route Cache).
+>
+> La différence est que `revalidatePath` purge le cache de données (Data Cache) et le cache de route complet (Full Route Cache), tandis que `router.refresh()` ne modifie pas ces caches, car il s'agit d'une API côté client.
+
+### Fonctions dynamiques
+
+Les fonctions dynamiques comme `cookies` et `headers`, ainsi que la prop `searchParams` dans les Pages, dépendent des informations de requête entrantes au moment de l'exécution. Leur utilisation exclura une route du cache de route complet (Full Route Cache), c'est-à-dire que la route sera rendue dynamiquement.
+
+#### `cookies`
+
+L'utilisation de `cookies.set` ou `cookies.delete` dans une action serveur (Server Action) invalide le cache du routeur (Router Cache) pour éviter que les routes utilisant des cookies ne deviennent obsolètes (par exemple, pour refléter les changements d'authentification).
+
+Consultez la [référence API des `cookies`](/docs/app/api-reference/functions/cookies).
+
+### Options de configuration des segments
+
+Les options de configuration des segments de route (Route Segment Config) peuvent être utilisées pour remplacer les valeurs par défaut d'un segment de route ou lorsque vous ne pouvez pas utiliser l'API `fetch` (par exemple, avec un client de base de données ou des bibliothèques tierces).
+
+Les options de configuration de segment de route suivantes excluront les données du cache de données (Data Cache) et du cache de route complet (Full Route Cache) :
+
+- `const dynamic = 'force-dynamic'`
+- `const revalidate = 0`
+
+Consultez la [documentation sur la configuration des segments de route (Route Segment Config)](/docs/app/api-reference/file-conventions/route-segment-config) pour plus d'options.
+
+### `generateStaticParams`
+
+Pour les [segments dynamiques](/docs/app/building-your-application/routing/dynamic-routes) (par exemple, `app/blog/[slug]/page.js`), les chemins fournis par `generateStaticParams` sont mis en cache dans le cache de route complet (Full Route Cache) au moment de la construction. Au moment de la requête, Next.js mettra également en cache les chemins qui n'étaient pas connus lors de la construction lors de leur première visite.
+
+Vous pouvez désactiver la mise en cache au moment de la requête en utilisant l'option `export const dynamicParams = false` dans un segment de route. Lorsque cette option est utilisée, seuls les chemins fournis par `generateStaticParams` seront servis, et les autres routes renverront une erreur 404 ou correspondront (dans le cas des [routes attrape-tout (catch-all routes)](/docs/app/building-your-application/routing/dynamic-routes#catch-all-segments)).
+
+Consultez la [référence API de `generateStaticParams`](/docs/app/api-reference/functions/generate-static-params).
+
+### Fonction React `cache`
+
+La fonction React `cache` vous permet de mémoriser la valeur de retour d'une fonction, vous permettant d'appeler la même fonction plusieurs fois tout en ne l'exécutant qu'une seule fois.
+
+Comme les requêtes `fetch` sont automatiquement mémorisées, vous n'avez pas besoin de les encapsuler dans React `cache`. Cependant, vous pouvez utiliser `cache` pour mémoriser manuellement des requêtes de données dans les cas où l'API `fetch` n'est pas adaptée. Par exemple, avec certains clients de base de données, clients CMS ou clients GraphQL.
+
+```tsx filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import db from '@/lib/db'
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```jsx filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import db from '@/lib/db'
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```

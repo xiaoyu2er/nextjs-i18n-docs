@@ -1,0 +1,155 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:19:09.468Z
+title: Internationalisation
+description: Ajoutez la prise en charge de plusieurs langues avec un routage internationalisé et un contenu localisé.
+---
+
+Next.js vous permet de configurer le routage et le rendu du contenu pour prendre en charge plusieurs langues. Adapter votre site à différentes locales inclut du contenu traduit (localisation) et des routes internationalisées.
+
+## Terminologie
+
+- **Locale :** Un identifiant pour un ensemble de préférences linguistiques et de formatage. Cela inclut généralement la langue préférée de l'utilisateur et éventuellement sa région géographique.
+  - `en-US` : Anglais tel que parlé aux États-Unis
+  - `nl-NL` : Néerlandais tel que parlé aux Pays-Bas
+  - `nl` : Néerlandais, sans région spécifique
+
+## Aperçu du routage
+
+Il est recommandé d'utiliser les préférences linguistiques du navigateur pour sélectionner la locale à utiliser. Changer votre langue préférée modifiera l'en-tête `Accept-Language` envoyé à votre application.
+
+Par exemple, en utilisant les bibliothèques suivantes, vous pouvez examiner une `Request` entrante pour déterminer quelle locale sélectionner, en fonction des `Headers`, des locales que vous prévoyez de supporter et de la locale par défaut.
+
+```js filename="middleware.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+Le routage peut être internationalisé soit par sous-chemin (`/fr/products`), soit par domaine (`my-site.fr/products`). Avec ces informations, vous pouvez maintenant rediriger l'utilisateur en fonction de la locale dans le [Middleware](/docs/app/building-your-application/routing/middleware).
+
+```js filename="middleware.js"
+import { NextResponse } from "next/server";
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// Obtenir la locale préférée, similaire à l'exemple ci-dessus ou en utilisant une bibliothèque
+function getLocale(request) { ... }
+
+export function middleware(request) {
+  // Vérifier s'il y a une locale supportée dans le chemin
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  // Rediriger s'il n'y a pas de locale
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // Par exemple, une requête entrante est /products
+  // La nouvelle URL est maintenant /en-US/products
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // Ignorer tous les chemins internes (_next)
+    '/((?!_next).*)',
+    // Optionnel : ne s'exécuter que sur l'URL racine (/)
+    // '/'
+  ],
+}
+```
+
+Enfin, assurez-vous que tous les fichiers spéciaux dans `app/` sont imbriqués sous `app/[lang]`. Cela permet au routeur Next.js de gérer dynamiquement différentes locales dans la route et de transmettre le paramètre `lang` à chaque layout et page. Par exemple :
+
+```jsx filename="app/[lang]/page.js"
+// Vous avez maintenant accès à la locale actuelle
+// Par exemple, /en-US/products -> `lang` est "en-US"
+export default async function Page({ params: { lang } }) {
+  return ...
+}
+```
+
+Le layout racine peut également être imbriqué dans le nouveau dossier (par exemple `app/[lang]/layout.js`).
+
+## Localisation
+
+Changer le contenu affiché en fonction de la locale préférée de l'utilisateur, ou localisation, n'est pas spécifique à Next.js. Les modèles décrits ci-dessous fonctionneraient de la même manière avec n'importe quelle application web.
+
+Supposons que nous voulions prendre en charge à la fois du contenu en anglais et en néerlandais dans notre application. Nous pourrions maintenir deux "dictionnaires" différents, qui sont des objets nous fournissant une correspondance entre une clé et une chaîne localisée. Par exemple :
+
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+Nous pouvons ensuite créer une fonction `getDictionary` pour charger les traductions pour la locale demandée :
+
+```jsx filename="app/[lang]/dictionaries.js"
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale) => dictionaries[locale]()
+```
+
+Étant donné la langue actuellement sélectionnée, nous pouvons récupérer le dictionnaire dans un layout ou une page.
+
+```jsx filename="app/[lang]/page.js"
+import { getDictionary } from './dictionaries'
+
+export default async function Page({ params: { lang } }) {
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+Comme tous les layouts et pages dans le répertoire `app/` sont par défaut des [Composants Serveur](/docs/app/building-your-application/rendering/server-components), nous n'avons pas à nous soucier de la taille des fichiers de traduction affectant la taille de notre bundle JavaScript côté client. Ce code ne s'exécutera **que sur le serveur**, et seul le HTML résultant sera envoyé au navigateur.
+
+## Génération statique
+
+Pour générer des routes statiques pour un ensemble donné de locales, nous pouvons utiliser `generateStaticParams` avec n'importe quelle page ou layout. Cela peut être global, par exemple, dans le layout racine :
+
+```jsx filename="app/[lang]/layout.js"
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default function Root({ children, params }) {
+  return (
+    <html lang={params.lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## Ressources
+
+- [Routage i18n minimal et traductions](https://github.com/vercel/next.js/tree/canary/examples/app-dir-i18n-routing)
+- [`next-intl`](https://next-intl-docs.vercel.app/docs/next-13)
+- [`next-international`](https://github.com/QuiiBz/next-international)
+- [`next-i18n-router`](https://github.com/i18nexus/next-i18n-router)
