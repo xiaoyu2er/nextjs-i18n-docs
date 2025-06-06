@@ -1,0 +1,560 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:47:08.106Z
+title: أنماط تكوين المكونات من جانب الخادم والعميل
+nav_title: أنماط التكوين
+description: أنماط موصى بها لاستخدام مكونات الخادم والعميل.
+---
+
+عند بناء تطبيقات React، ستحتاج إلى التفكير في الأجزاء التي يجب أن تُعرض على الخادم أو العميل. هذه الصفحة تغطي بعض أنماط التكوين الموصى بها عند استخدام مكونات الخادم والعميل.
+
+## متى تستخدم مكونات الخادم والعميل؟
+
+إليك ملخص سريع لحالات الاستخدام المختلفة لمكونات الخادم والعميل:
+
+| ما الذي تريد فعله؟                                                                 | مكون الخادم         | مكون العميل         |
+| ---------------------------------------------------------------------------------- | ------------------- | ------------------- |
+| جلب البيانات                                                                       | <Check size={18} /> | <Cross size={18} /> |
+| الوصول إلى موارد الخلفية (مباشرة)                                                  | <Check size={18} /> | <Cross size={18} /> |
+| الاحتفاظ بمعلومات حساسة على الخادم (رموز الوصول، مفاتيح API، إلخ)                  | <Check size={18} /> | <Cross size={18} /> |
+| الاحتفاظ بتبعيات كبيرة على الخادم / تقليل جافاسكريبت من جانب العميل                | <Check size={18} /> | <Cross size={18} /> |
+| إضافة تفاعلات ومستمعي الأحداث (`onClick()`, `onChange()`, إلخ)                      | <Cross size={18} /> | <Check size={18} /> |
+| استخدام الحالة وتأثيرات دورة الحياة (`useState()`, `useReducer()`, `useEffect()`, إلخ) | <Cross size={18} /> | <Check size={18} /> |
+| استخدام واجهات برمجة التطبيقات الخاصة بالمتصفح فقط                                   | <Cross size={18} /> | <Check size={18} /> |
+| استخدام خطافات مخصصة تعتمد على الحالة، التأثيرات، أو واجهات برمجة التطبيقات الخاصة بالمتصفح | <Cross size={18} /> | <Check size={18} /> |
+| استخدام [مكونات React الكلاسيكية](https://react.dev/reference/react/Component)      | <Cross size={18} /> | <Check size={18} /> |
+
+## أنماط مكونات الخادم
+
+قبل اختيار العرض من جانب العميل، قد ترغب في القيام ببعض الأعمال على الخادم مثل جلب البيانات، أو الوصول إلى قاعدة البيانات أو خدمات الخلفية.
+
+إليك بعض الأنماط الشائعة عند العمل مع مكونات الخادم:
+
+### مشاركة البيانات بين المكونات
+
+عند جلب البيانات على الخادم، قد تكون هناك حالات تحتاج فيها إلى مشاركة البيانات بين مكونات مختلفة. على سبيل المثال، قد يكون لديك تخطيط وصفحة يعتمدان على نفس البيانات.
+
+بدلاً من استخدام [سياق React](https://react.dev/learn/passing-data-deeply-with-context) (غير متاح على الخادم) أو تمرير البيانات كخصائص، يمكنك استخدام [`fetch`](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#fetching-data-on-the-server-with-fetch) أو دالة `cache` في React لجلب نفس البيانات في المكونات التي تحتاجها، دون القلق بشأن تكرار طلبات البيانات نفسها. هذا لأن React يوسع `fetch` لتخزين طلبات البيانات تلقائيًا، ويمكن استخدام دالة `cache` عندما لا يكون `fetch` متاحًا.
+
+تعلم المزيد عن [التخزين المؤقت](/docs/app/building-your-application/caching#request-memoization) في React.
+
+### إبقاء كود الخادم فقط خارج بيئة العميل
+
+نظرًا لأن وحدات جافاسكريبت يمكن مشاركتها بين مكونات الخادم والعميل، فمن الممكن أن يتسلل الكود المخصص للخادم فقط إلى العميل.
+
+على سبيل المثال، خذ دالة جلب البيانات التالية:
+
+```ts filename="lib/data.ts" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+```js filename="lib/data.js" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+للوهلة الأولى، يبدو أن `getData` تعمل على كل من الخادم والعميل. ومع ذلك، تحتوي هذه الدالة على `API_KEY`، المكتوبة بنية أن يتم تنفيذها على الخادم فقط.
+
+نظرًا لأن متغير البيئة `API_KEY` ليس مسبوقًا بـ `NEXT_PUBLIC`، فهو متغير خاص يمكن الوصول إليه فقط على الخادم. لمنع تسرب متغيرات البيئة إلى العميل، يستبدل Next.js متغيرات البيئة الخاصة بسلسلة فارغة.
+
+نتيجة لذلك، على الرغم من أنه يمكن استيراد وتنفيذ `getData()` على العميل، إلا أنها لن تعمل كما هو متوقع. وفي حين أن جعل المتغير عامًا سيجعل الدالة تعمل على العميل، قد لا ترغب في الكشف عن معلومات حساسة للعميل.
+
+لمنع هذا النوع من الاستخدام غير المقصود لكود الخادم على العميل، يمكننا استخدام حزمة `server-only` لإعطاء مطورين آخرين خطأ في وقت البناء إذا قاموا بالصدفة باستيراد إحدى هذه الوحدات إلى مكون عميل.
+
+لاستخدام `server-only`، قم أولاً بتثبيت الحزمة:
+
+```bash filename="Terminal"
+npm install server-only
+```
+
+ثم استورد الحزمة في أي وحدة تحتوي على كود خاص بالخادم فقط:
+
+```js filename="lib/data.js"
+import 'server-only'
+
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+الآن، أي مكون عميل يستورد `getData()` سيتلقى خطأ في وقت البناء يوضح أن هذه الوحدة يمكن استخدامها فقط على الخادم.
+
+يمكن استخدام الحزمة المقابلة `client-only` لوضع علامة على الوحدات التي تحتوي على كود خاص بالعميل فقط - على سبيل المثال، الكود الذي يصل إلى كائن `window`.
+
+### استخدام الحزم والموفّرين من طرف ثالث
+
+نظرًا لأن مكونات الخادم هي ميزة جديدة في React، فإن الحزم والموفّرين من طرف ثالث في النظام البيئي بدأوا للتو في إضافة توجيه `"use client"` إلى المكونات التي تستخدم ميزات خاصة بالعميل مثل `useState`، `useEffect`، و `createContext`.
+
+اليوم، العديد من المكونات من حزم `npm` التي تستخدم ميزات خاصة بالعميل لا تحتوي بعد على التوجيه. هذه المكونات من طرف ثالث ستعمل كما هو متوقع داخل مكونات العميل لأن لديها توجيه `"use client"`، لكنها لن تعمل داخل مكونات الخادم.
+
+على سبيل المثال، لنفترض أنك قمت بتثبيت حزمة افتراضية `acme-carousel` التي تحتوي على مكون `<Carousel />`. يستخدم هذا المكون `useState`، لكنه لا يحتوي بعد على توجيه `"use client"`.
+
+إذا استخدمت `<Carousel />` داخل مكون عميل، فسيعمل كما هو متوقع:
+
+```tsx filename="app/gallery.tsx" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  let [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>عرض الصور</button>
+
+      {/* يعمل، لأن Carousel مستخدم داخل مكون عميل */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/gallery.js" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  let [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>عرض الصور</button>
+
+      {/* يعمل، لأن Carousel مستخدم داخل مكون عميل */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+ومع ذلك، إذا حاولت استخدامه مباشرة داخل مكون خادم، فسترى خطأ:
+
+```tsx filename="app/page.tsx" switcher
+import { Carousel } from 'acme-carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>عرض الصور</p>
+
+      {/* خطأ: لا يمكن استخدام `useState` داخل مكونات الخادم */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Carousel } from 'acme-carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>عرض الصور</p>
+
+      {/* خطأ: لا يمكن استخدام `useState` داخل مكونات الخادم */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+هذا لأن Next.js لا يعرف أن `<Carousel />` يستخدم ميزات خاصة بالعميل.
+
+لإصلاح هذا، يمكنك تغليف المكونات من طرف ثالث التي تعتمد على ميزات خاصة بالعميل داخل مكونات العميل الخاصة بك:
+
+```tsx filename="app/carousel.tsx" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+```jsx filename="app/carousel.js" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+الآن، يمكنك استخدام `<Carousel />` مباشرة داخل مكون خادم:
+
+```tsx filename="app/page.tsx" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>عرض الصور</p>
+
+      {/* يعمل، لأن Carousel هو مكون عميل */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>عرض الصور</p>
+
+      {/* يعمل، لأن Carousel هو مكون عميل */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+لا نتوقع أن تحتاج إلى تغليف معظم المكونات من طرف ثالث لأنك على الأرجح ستستخدمها داخل مكونات العميل. ومع ذلك، أحد الاستثناءات هو الموفّرين، لأنهم يعتمدون على حالة وسياق React، وعادة ما تكون هناك حاجة إليهم في جذر التطبيق. [تعلم المزيد عن موفّري السياق من طرف ثالث أدناه](#using-context-providers).
+
+#### استخدام موفّري السياق
+
+عادةً ما يتم عرض موفّري السياق بالقرب من جذر التطبيق لمشاركة اهتمامات عامة، مثل السمة الحالية. نظرًا لأن [سياق React](https://react.dev/learn/passing-data-deeply-with-context) غير مدعوم في مكونات الخادم، فإن محاولة إنشاء سياق في جذر تطبيقك ستؤدي إلى حدوث خطأ:
+
+```tsx filename="app/layout.tsx" switcher
+import { createContext } from 'react'
+
+// createContext غير مدعوم في مكونات الخادم
+export const ThemeContext = createContext({})
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import { createContext } from 'react'
+
+// createContext غير مدعوم في مكونات الخادم
+export const ThemeContext = createContext({})
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+      </body>
+    </html>
+  )
+}
+```
+
+لإصلاح هذا، قم بإنشاء سياقك وعرض موفّره داخل مكون عميل:
+
+```tsx filename="app/theme-provider.tsx" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+```jsx filename="app/theme-provider.js" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({ children }) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+سيتمكن مكون الخادم الخاص بك الآن من عرض موفّرك مباشرة لأنه تم وضع علامة عليه كمكون عميل:
+
+```tsx filename="app/layout.tsx" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+مع عرض الموفّر في الجذر، ستتمكن جميع مكونات العميل الأخرى في تطبيقك من استهلاك هذا السياق.
+
+> **ملاحظة جيدة**: يجب عليك عرض الموفّرين في أعمق نقطة ممكنة في الشجرة - لاحظ كيف أن `ThemeProvider` يلف فقط `{children}` بدلاً من مستند `<html>` بأكمله. هذا يجعل من الأسهل لـ Next.js تحسين الأجزاء الثابتة من مكونات الخادم الخاصة بك.
+
+#### نصائح لمؤلفي المكتبات
+
+بطريقة مماثلة، يمكن لمؤلفي المكتبات الذين ينشئون حزمًا ليستخدمها مطورون آخرون استخدام توجيه `"use client"` لوضع علامة على نقاط دخول العميل في حزمتهم. هذا يسمح لمستخدمي الحزمة باستيراد مكونات الحزمة مباشرة إلى مكونات الخادم الخاصة بهم دون الحاجة إلى إنشاء حد تغليف.
+
+يمكنك تحسين حزمتك باستخدام ['use client' أعمق في الشجرة](#moving-client-components-down-the-tree)، مما يسمح للوحدات المستوردة بأن تكون جزءًا من الرسم البياني لوحدة مكون الخادم.
+
+من الجدير بالذكر أن بعض أدوات الحزم قد تزيل توجيهات `"use client"`. يمكنك العثور على مثال لكيفية تكوين esbuild لتضمين توجيه `"use client"` في مستودعات [React Wrap Balancer](https://github.com/shuding/react-wrap-balancer/blob/main/tsup.config.ts#L10-L13) و [Vercel Analytics](https://github.com/vercel/analytics/blob/main/packages/web/tsup.config.js#L26-L30).
+
+## مكونات العميل
+
+### نقل مكونات العميل لأسفل الشجرة
+
+لتقليل حجم حزمة جافاسكريبت للعميل، نوصي بنقل مكونات العميل لأسفل شجرة المكونات الخاصة بك.
+
+على سبيل المثال، قد يكون لديك تخطيط يحتوي على عناصر ثابتة (مثل الشعار، الروابط، إلخ) وشريط بحث تفاعلي يستخدم الحالة.
+
+بدلاً من جعل التخطيط بأكمله مكون عميل، انقل المنطق التفاعلي إلى مكون عميل (مثل `<SearchBar />`) واحتفظ بتخطيطك كمكون خادم. هذا يعني أنك لست مضطرًا لإرسال جميع جافاسكريبت المكون للتخطيط إلى العميل.
+
+```tsx filename="app/layout.tsx" switcher
+// SearchBar هو مكون عميل
+import SearchBar from './searchbar'
+// Logo هو مكون خادم
+import Logo from './logo'
+
+// التخطيط هو مكون خادم افتراضيًا
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+// SearchBar هو مكون عميل
+import SearchBar from './searchbar'
+// Logo هو مكون خادم
+import Logo from './logo'
+
+// التخطيط هو مكون خادم افتراضيًا
+export default function Layout({ children }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+### تمرير الخصائص من الخادم إلى مكونات العميل (التسلسل)
+
+إذا قمت بجلب البيانات في مكون خادم، فقد ترغب في تمرير البيانات كخصائص إلى مكونات العميل. يجب أن تكون الخصائص الممررة من الخادم إلى مكونات العميل [قابلة للتسلسل](https://react.dev/reference/react/use-server#serializable-parameters-and-return-values) بواسطة React.
+
+إذا كانت مكونات العميل الخاصة بك تعتمد على بيانات غير قابلة للتسلسل، يمكنك [جلب البيانات على العميل باستخدام مكتبة طرف ثالث](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#fetching-data-on-the-client-with-third-party-libraries) أو على الخادم عبر [معالج المسار](/docs/app/building-your-application/routing/route-handlers).
+
+## تداخل مكونات الخادم والعميل
+
+عند تداخل مكونات الخادم (Server Components) ومكونات العميل (Client Components)، قد يكون من المفيد تصوير واجهة المستخدم الخاصة بك كشجرة من المكونات. بدءًا من [تخطيط الجذر](/docs/app/building-your-application/routing/pages-and-layouts#root-layout-required) (root layout) والذي هو مكون خادم، يمكنك بعد ذلك عرض بعض الأشجار الفرعية للمكونات على جانب العميل عن طريق إضافة التوجيه `"use client"`.
+
+{/* رسم بياني - تداخل */}
+
+داخل أشجار العميل الفرعية هذه، لا يزال بإمكانك تضمين مكونات الخادم أو استدعاء إجراءات الخادم (Server Actions)، ولكن هناك بعض الأشياء التي يجب وضعها في الاعتبار:
+
+- خلال دورة حياة الطلب والاستجابة، ينتقل الكود الخاص بك من الخادم إلى العميل. إذا كنت بحاجة إلى الوصول إلى بيانات أو موارد على الخادم أثناء وجودك على العميل، فستقوم بعمل طلب **جديد** إلى الخادم - وليس التبديل ذهابًا وإيابًا.
+- عند إجراء طلب جديد إلى الخادم، يتم عرض جميع مكونات الخادم أولاً، بما في ذلك تلك المتداخلة داخل مكونات العميل. ستشكل نتيجة العرض (RSC Payload) مراجعًا لمواقع مكونات العميل. بعد ذلك، على العميل، يستخدم React حمولة RSC لتنسيق مكونات الخادم والعميل في شجرة واحدة.
+
+{/* رسم بياني */}
+
+- نظرًا لأن مكونات العميل يتم عرضها بعد مكونات الخادم، لا يمكنك استيراد مكون خادم إلى وحدة مكون عميل (لأن ذلك سيتطلب طلبًا جديدًا إلى الخادم). بدلاً من ذلك، يمكنك تمرير مكون خادم كـ `props` إلى مكون عميل. راجع الأقسام [النمط غير المدعوم](#unsupported-pattern-importing-server-components-into-client-components) و[النمط المدعوم](#supported-pattern-passing-server-components-to-client-components-as-props) أدناه.
+
+### النمط غير المدعوم: استيراد مكونات الخادم إلى مكونات العميل
+
+النمط التالي غير مدعوم. لا يمكنك استيراد مكون خادم إلى مكون عميل:
+
+```tsx filename="app/client-component.tsx" switcher highlight={4,17}
+'use client'
+
+// لا يمكنك استيراد مكون خادم إلى مكون عميل.
+import ServerComponent from './Server-Component'
+
+export default function ClientComponent({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      <ServerComponent />
+    </>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" switcher highlight={3,13}
+'use client'
+
+// لا يمكنك استيراد مكون خادم إلى مكون عميل.
+import ServerComponent from './Server-Component'
+
+export default function ClientComponent({ children }) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      <ServerComponent />
+    </>
+  )
+}
+```
+
+### النمط المدعوم: تمرير مكونات الخادم إلى مكونات العميل كـ Props
+
+النمط التالي مدعوم. يمكنك تمرير مكونات الخادم كـ prop إلى مكون عميل.
+
+النمط الشائع هو استخدام خاصية React `children` لإنشاء "فتحة" (slot) في مكون العميل الخاص بك.
+
+في المثال أدناه، `<ClientComponent>` يقبل خاصية `children`:
+
+```tsx filename="app/client-component.tsx" switcher highlight={6,15}
+'use client'
+
+import { useState } from 'react'
+
+export default function ClientComponent({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+      {children}
+    </>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" switcher highlight={5,12}
+'use client'
+
+import { useState } from 'react'
+
+export default function ClientComponent({ children }) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      {children}
+    </>
+  )
+}
+```
+
+`<ClientComponent>` لا يعرف أن `children` سيتم ملؤها لاحقًا بنتيجة مكون خادم. المسؤولية الوحيدة لـ `<ClientComponent>` هي تحديد **مكان** وضع `children` في النهاية.
+
+في مكون خادم أب، يمكنك استيراد كل من `<ClientComponent>` و `<ServerComponent>` وتمرير `<ServerComponent>` كـ child لـ `<ClientComponent>`:
+
+```tsx filename="app/page.tsx"  highlight={11} switcher
+// هذا النمط يعمل:
+// يمكنك تمرير مكون خادم كـ child أو prop لمكون عميل.
+import ClientComponent from './client-component'
+import ServerComponent from './server-component'
+
+// الصفحات في Next.js هي مكونات خادم افتراضيًا
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent />
+    </ClientComponent>
+  )
+}
+```
+
+```jsx filename="app/page.js" highlight={11} switcher
+// هذا النمط يعمل:
+// يمكنك تمرير مكون خادم كـ child أو prop لمكون عميل.
+import ClientComponent from './client-component'
+import ServerComponent from './server-component'
+
+// الصفحات في Next.js هي مكونات خادم افتراضيًا
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent />
+    </ClientComponent>
+  )
+}
+```
+
+بهذه الطريقة، يتم فصل `<ClientComponent>` و `<ServerComponent>` ويمكن عرضهما بشكل مستقل. في هذه الحالة، يمكن عرض child `<ServerComponent>` على الخادم، قبل وقت طويل من عرض `<ClientComponent>` على العميل.
+
+> **جيد أن تعرف:**
+>
+> - تم استخدام نمط "رفع المحتوى لأعلى" (lifting content up) لتجنب إعادة عرض مكون child متداخل عند إعادة عرض مكون parent.
+> - لا تقتصر على خاصية `children`. يمكنك استخدام أي prop لتمرير JSX.

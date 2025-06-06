@@ -1,0 +1,145 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:53:32.309Z
+title: الانتقال إلى مرحلة الإنتاج
+description: قبل نشر تطبيق Next.js الخاص بك في مرحلة الإنتاج، إليك بعض التوصيات لضمان أفضل تجربة للمستخدم.
+---
+
+قبل نشر تطبيق Next.js الخاص بك في مرحلة الإنتاج، إليك بعض التوصيات لضمان أفضل تجربة للمستخدم.
+
+## بشكل عام
+
+- استخدم [التخزين المؤقت](#caching) حيثما أمكن.
+- تأكد من نشر قاعدة البيانات والخلفية في نفس المنطقة الجغرافية.
+- اسعَ لإرسال أقل كمية ممكنة من JavaScript.
+- أخرِج تحميل حزم JavaScript الثقيلة حتى الحاجة إليها.
+- تأكد من إعداد [تسجيل الأحداث (logging)](#logging).
+- تأكد من إعداد [معالجة الأخطاء](#error-handling).
+- اضبط صفحات [404](/docs/pages/building-your-application/routing/custom-error#404-page) (غير موجود) و [500](/docs/pages/building-your-application/routing/custom-error#500-page) (خطأ).
+- تأكد من [قياس الأداء](/docs/pages/building-your-application/optimizing/analytics).
+- شغّل [Lighthouse](https://developers.google.com/web/tools/lighthouse) للتحقق من الأداء، أفضل الممارسات، إمكانية الوصول، وتحسين محركات البحث (SEO). للحصول على أفضل النتائج، استخدم نسخة إنتاج من Next.js واستخدم وضع التصفح المتخفي في متصفحك حتى لا تتأثر النتائج بالملحقات.
+- راجع [المتصفحات والميزات المدعومة](/docs/architecture/supported-browsers).
+- حسّن الأداء باستخدام:
+  - [`next/image` وتحسين الصور التلقائي](/docs/pages/building-your-application/optimizing/images)
+  - [تحسين الخطوط التلقائي](/docs/pages/building-your-application/optimizing/fonts)
+  - [تحسين النصوص البرمجية (Scripts)](/docs/pages/building-your-application/optimizing/scripts)
+- حسّن [أداء التحميل](#loading-performance)
+- فكر في إضافة [سياسة أمان المحتوى (Content Security Policy)](/docs/pages/building-your-application/configuring/content-security-policy)
+
+## التخزين المؤقت (Caching)
+
+<details open>
+  <summary>أمثلة</summary>
+
+- [ssr-caching](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+يحسن التخزين المؤقت أوقات الاستجابة ويقلل عدد الطلبات إلى الخدمات الخارجية. يقوم Next.js تلقائيًا بإضافة رؤوس تخزين مؤقت للأصول الثابتة التي يتم تقديمها من `/_next/static` بما في ذلك JavaScript، CSS، الصور الثابتة، ووسائط أخرى.
+
+```terminal
+Cache-Control: public, max-age=31536000, immutable
+```
+
+سيتم استبدال رؤوس `Cache-Control` المحددة في `next.config.js` في بيئة الإنتاج لضمان إمكانية تخزين الأصول الثابتة بشكل فعال. إذا كنت بحاجة إلى إعادة التحقق من صحة التخزين المؤقت لصفحة تم [إنشاؤها بشكل ثابت](/docs/pages/building-your-application/rendering/static-site-generation)، يمكنك فعل ذلك عن طريق تعيين `revalidate` في دالة [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) الخاصة بالصفحة. إذا كنت تستخدم `next/image`، يمكنك ضبط [`minimumCacheTTL`](/docs/pages/api-reference/components/image#minimumcachettl) لمحمل تحسين الصور الافتراضي.
+
+> **معلومة مفيدة**: عند تشغيل التطبيق محليًا باستخدام `next dev`، يتم استبدال الرؤوس لمنع التخزين المؤقت محليًا.
+
+```terminal
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+```
+
+يمكنك أيضًا استخدام رؤوس التخزين المؤقت داخل `getServerSideProps` ومسارات API للاستجابات الديناميكية. على سبيل المثال، باستخدام [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/).
+
+```jsx
+// تعتبر هذه القيمة طازجة لمدة عشر ثوانٍ (s-maxage=10).
+// إذا تم تكرار الطلب خلال الثواني العشر التالية، ستظل القيمة المخزنة مؤقتًا طازجة. إذا تم تكرار الطلب قبل 59 ثانية،
+// ستكون القيمة المخزنة مؤقتًا قديمة ولكنها ستظل تُعرض (stale-while-revalidate=59).
+//
+// في الخلفية، سيتم إرسال طلب إعادة تحقق لتعبئة التخزين المؤقت
+// بقيمة طازجة. إذا قمت بتحديث الصفحة، سترى القيمة الجديدة.
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+بشكل افتراضي، سيتم تعيين رؤوس `Cache-Control` بشكل مختلف اعتمادًا على كيفية جلب البيانات في صفحتك.
+
+- إذا كانت الصفحة تستخدم `getServerSideProps` أو `getInitialProps`، فستستخدم رأس `Cache-Control` الافتراضي المعين بواسطة `next start` لمنع التخزين المؤقت العرضي للاستجابات التي لا يمكن تخزينها مؤقتًا. إذا كنت تريد سلوك تخزين مؤقت مختلف أثناء استخدام `getServerSideProps`، استخدم `res.setHeader('Cache-Control', 'value_you_prefer')` داخل الدالة كما هو موضح أعلاه.
+- إذا كانت الصفحة تستخدم `getStaticProps`، فسيكون لها رأس `Cache-Control` بقيمة `s-maxage=REVALIDATE_SECONDS, stale-while-revalidate`، أو إذا لم يتم استخدام `revalidate`، `s-maxage=31536000, stale-while-revalidate` للتخزين المؤقت لأقصى مدة ممكنة.
+
+> **معلومة مفيدة**: يجب أن يدعم موفر النشر الخاص بك التخزين المؤقت للاستجابات الديناميكية. إذا كنت تستضيف التطبيق بنفسك، فستحتاج إلى إضافة هذا المنطق بنفسك باستخدام مخزن مفتاح/قيمة مثل Redis. إذا كنت تستخدم Vercel، [يعمل تخزين الحافة (Edge Caching) دون الحاجة إلى تكوين](https://vercel.com/docs/edge-network/caching?utm_source=next-site&utm_medium=docs&utm_campaign=next-website).
+
+## تقليل حجم JavaScript
+
+<details open>
+  <summary>أمثلة</summary>
+
+- [with-dynamic-import](https://github.com/vercel/next.js/tree/canary/examples/with-dynamic-import)
+
+</details>
+
+لتقليل كمية JavaScript المرسلة إلى المتصفح، يمكنك استخدام الأدوات التالية لفهم ما يتم تضمينه داخل كل حزمة JavaScript:
+
+- [Import Cost](https://marketplace.visualstudio.com/items?itemName=wix.vscode-import-cost) – عرض حجم الحزمة المستوردة داخل VSCode.
+- [Package Phobia](https://packagephobia.com/) – اكتشف تكلفة إضافة تبعية تطوير جديدة إلى مشروعك.
+- [Bundle Phobia](https://bundlephobia.com/) - حلل كيف يمكن لتبعية ما أن تزيد أحجام الحزم.
+- [Webpack Bundle Analyzer](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer) – تصور حجم ملفات إخراج webpack مع خريطة شجرية تفاعلية قابلة للتكبير.
+- [bundlejs](https://bundlejs.com/) - أداة عبر الإنترنت لحزم وضغط مشاريعك بسرعة، مع عرض حجم الحزمة المضغوطة gzip/brotli، كل ذلك يعمل محليًا في متصفحك.
+
+سيتم تقسيم كل ملف داخل دليل `pages/` تلقائيًا إلى حزمة JavaScript الخاصة به أثناء `next build`. يمكنك أيضًا استخدام [الاستيراد الديناميكي](/docs/pages/building-your-application/optimizing/lazy-loading) لتحميل المكونات والمكتبات عند الحاجة. على سبيل المثال، قد ترغب في تأخير تحميل كود النافذة المنبثقة حتى ينقر المستخدم على زر الفتح.
+
+## تسجيل الأحداث (Logging)
+
+<details open>
+  <summary>أمثلة</summary>
+
+- [Pino and Logflare Example](https://github.com/Logflare/next-pino-logflare-logging-example)
+
+</details>
+
+بما أن Next.js يعمل على كل من العميل والخادم، فهناك أشكال متعددة من تسجيل الأحداث المدعومة:
+
+- `console.log` في المتصفح
+- `stdout` على الخادم
+
+إذا كنت تريد حزمة تسجيل منظمة، نوصي بـ [Pino](https://www.npmjs.com/package/pino). إذا كنت تستخدم Vercel، فهناك [تكاملات تسجيل جاهزة](https://vercel.com/integrations?utm_source=next-site&utm_medium=docs&utm_campaign=next-website#logging) متوافقة مع Next.js.
+
+## معالجة الأخطاء (Error Handling)
+
+<details open>
+  <summary>أمثلة</summary>
+
+- [with-sentry](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)
+
+</details>
+
+عند حدوث استثناء غير معالج، يمكنك التحكم في تجربة المستخدمين باستخدام [صفحة 500](/docs/pages/building-your-application/routing/custom-error#500-page). نوصي بتخصيص هذه الصفحة لتناسب علامتك التجارية بدلاً من سمة Next.js الافتراضية.
+
+يمكنك أيضًا تسجيل وتتبع الاستثناءات باستخدام أداة مثل Sentry. [يُظهر هذا المثال](https://github.com/vercel/next.js/tree/canary/examples/with-sentry) كيفية التقاط وإبلاغ الأخطاء على كل من جانب العميل والخادم، باستخدام SDK Sentry لـ Next.js. هناك أيضًا [تكامل Sentry لـ Vercel](https://vercel.com/integrations/sentry?utm_source=next-site&utm_medium=docs&utm_campaign=next-website).
+
+## أداء التحميل (Loading Performance)
+
+لتحسين أداء التحميل، تحتاج أولاً إلى تحديد ما يجب قياسه وكيفية قياسه. [مؤشرات الويب الأساسية (Core Web Vitals)](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) هي معيار صناعي جيد يتم قياسه باستخدام متصفح الويب الخاص بك. إذا لم تكن على دراية بمقاييس Core Web Vitals، راجع [هذه المقالة](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website) وحدد المقاييس المحددة التي ستكون محركًا لأداء التحميل لديك. من الناحية المثالية، سترغب في قياس أداء التحميل في البيئات التالية:
+
+- في المختبر، باستخدام جهازك الخاص أو محاكي.
+- في الميدان، باستخدام بيانات من العالم الحقيقي من الزوار الفعليين.
+- محليًا، باستخدام اختبار يعمل على جهازك.
+- عن بُعد، باستخدام اختبار يعمل في السحابة.
+
+بمجرد أن تتمكن من قياس أداء التحميل، استخدم الاستراتيجيات التالية لتحسينه تدريجيًا بحيث تطبق استراتيجية واحدة، تقيس الأداء الجديد وتستمر في الضبط حتى لا ترى تحسنًا كبيرًا. ثم يمكنك الانتقال إلى الاستراتيجية التالية.
+
+- استخدم مناطق التخزين المؤقت القريبة من المناطق التي يتم فيها نشر قاعدة البيانات أو API.
+- كما هو موضح في قسم [التخزين المؤقت](#caching)، استخدم قيمة `stale-while-revalidate` التي لن تثقل كاهل خلفيتك.
+- استخدم [التجديد الثابت التدريجي (Incremental Static Regeneration)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) لتقليل عدد الطلبات إلى خلفيتك.
+- احذف JavaScript غير المستخدم. راجع [هذه المقالة](https://calibreapp.com/blog/bundle-size-optimization) لفهم مقاييس Core Web Vitals التي يؤثر عليها حجم الحزمة وما هي الاستراتيجيات التي يمكنك استخدامها لتقليلها، مثل:
+  - إعداد محرر الأكواد لعرض تكاليف وأحجام الاستيراد
+  - البحث عن حزم بديلة أصغر حجمًا
+  - تحميل المكونات والتبعيات بشكل ديناميكي

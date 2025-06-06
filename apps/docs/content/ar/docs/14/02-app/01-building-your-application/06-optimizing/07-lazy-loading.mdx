@@ -1,0 +1,246 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:42:51.899Z
+title: التحميل المتأخر (Lazy Loading)
+description: تأجيل تحميل المكتبات المستوردة ومكونات React لتحسين أداء تحميل التطبيق.
+---
+
+{/* يتم مشاركة محتوى هذا المستند بين موجه التطبيق وموجه الصفحات. يمكنك استخدام مكون `<PagesOnly>المحتوى</PagesOnly>` لإضافة محتوى خاص بموجه الصفحات. أي محتوى مشترك يجب ألا يكون مغلفًا في مكون. */}
+
+يساعد [التحميل المتأخر](https://developer.mozilla.org/docs/Web/Performance/Lazy_loading) في Next.js على تحسين أداء التحميل الأولي للتطبيق عن طريق تقليل كمية JavaScript المطلوبة لعرض مسار.
+
+يسمح لك بتأجيل تحميل **مكونات العميل (Client Components)** والمكتبات المستوردة، وإدراجها في حزمة العميل فقط عند الحاجة إليها. على سبيل المثال، قد ترغب في تأجيل تحميل نافذة مشروطة حتى ينقر المستخدم لفتحها.
+
+هناك طريقتان لتنفيذ التحميل المتأخر في Next.js:
+
+1. استخدام [الاستيراد الديناميكي](#nextdynamic) مع `next/dynamic`
+2. استخدام [`React.lazy()`](https://react.dev/reference/react/lazy) مع [Suspense](https://react.dev/reference/react/Suspense)
+
+بشكل افتراضي، يتم [تقسيم الشفرة (Code Splitting)](https://developer.mozilla.org/docs/Glossary/Code_splitting) تلقائيًا لمكونات الخادم (Server Components)، ويمكنك استخدام [البث (Streaming)](/docs/app/building-your-application/routing/loading-ui-and-streaming) لإرسال أجزاء واجهة المستخدم تدريجيًا من الخادم إلى العميل. ينطبق التحميل المتأخر على مكونات العميل.
+
+## `next/dynamic`
+
+`next/dynamic` هو مزيج من [`React.lazy()`](https://react.dev/reference/react/lazy) و [Suspense](https://react.dev/reference/react/Suspense). يعمل بنفس الطريقة في كل من دليل `app` و `pages` للسماح بالهجرة التدريجية.
+
+## أمثلة
+
+<AppOnly>
+### استيراد مكونات العميل
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
+
+// مكونات العميل:
+const ComponentA = dynamic(() => import('../components/A'))
+const ComponentB = dynamic(() => import('../components/B'))
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+
+export default function ClientComponentExample() {
+  const [showMore, setShowMore] = useState(false)
+
+  return (
+    <div>
+      {/* يتم التحميل فورًا، ولكن في حزمة عميل منفصلة */}
+      <ComponentA />
+
+      {/* يتم التحميل عند الطلب، فقط عند تحقيق الشرط */}
+      {showMore && <ComponentB />}
+      <button onClick={() => setShowMore(!showMore)}>تبديل</button>
+
+      {/* يتم التحميل فقط على جانب العميل */}
+      <ComponentC />
+    </div>
+  )
+}
+```
+
+### تخطي العرض من جانب الخادم (SSR)
+
+عند استخدام `React.lazy()` و Suspense، سيتم عرض مكونات العميل مسبقًا (SSR) بشكل افتراضي.
+
+إذا كنت تريد تعطيل العرض المسبق لمكون عميل، يمكنك استخدام خيار `ssr` بقيمة `false`:
+
+```jsx
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+```
+
+### استيراد مكونات الخادم
+
+إذا قمت باستيراد مكون خادم (Server Component) بشكل ديناميكي، فسيتم تأجيل تحميل مكونات العميل الفرعية فقط - وليس مكون الخادم نفسه.
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+// مكون الخادم:
+const ServerComponent = dynamic(() => import('../components/ServerComponent'))
+
+export default function ServerComponentExample() {
+  return (
+    <div>
+      <ServerComponent />
+    </div>
+  )
+}
+```
+
+### تحميل المكتبات الخارجية
+
+يمكن تحميل المكتبات الخارجية عند الطلب باستخدام دالة [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import). هذا المثال يستخدم المكتبة الخارجية `fuse.js` للبحث الضبابي. يتم تحميل الوحدة فقط على العميل بعد إدخال المستخدم في حقل البحث.
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Search"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // تحميل fuse.js ديناميكيًا
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>Results: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+### إضافة مكون تحميل مخصص
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+const WithCustomLoading = dynamic(
+  () => import('../components/WithCustomLoading'),
+  {
+    loading: () => <p>جار التحميل...</p>,
+  }
+)
+
+export default function Page() {
+  return (
+    <div>
+      {/* سيتم عرض مكون التحميل أثناء تحميل <WithCustomLoading/> */}
+      <WithCustomLoading />
+    </div>
+  )
+}
+```
+
+### استيراد التصديرات المسماة
+
+لاستيراد تصدير مسماة ديناميكيًا، يمكنك إعادته من الـ Promise الذي تُرجعه دالة [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import):
+
+```jsx filename="components/hello.js"
+'use client'
+
+export function Hello() {
+  return <p>مرحبًا!</p>
+}
+```
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+const ClientComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+باستخدام `next/dynamic`، لن يتم تضمين مكون الرأس في حزمة JavaScript الأولية للصفحة. ستقوم الصفحة بعرض `fallback` الخاص بـ Suspense أولاً، ثم مكون `Header` عند حل حدود `Suspense`.
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  loading: () => <p>جار التحميل...</p>,
+})
+
+export default function Home() {
+  return <DynamicHeader />
+}
+```
+
+> **ملاحظة مهمة**: في `import('مسار/إلى/المكون')`، يجب كتابة المسار بشكل صريح. لا يمكن أن يكون سلسلة قالب ولا متغيرًا. بالإضافة إلى ذلك، يجب أن تكون `import()` داخل استدعاء `dynamic()` لكي يتمكن Next.js من مطابقة حزم webpack / معرّفات الوحدات مع استدعاء `dynamic()` المحدد وتحميلها مسبقًا قبل العرض. لا يمكن استخدام `dynamic()` داخل عرض React لأنه يجب وضع علامة عليها في المستوى الأعلى للوحدة لكي يعمل التحميل المسبق، مشابهًا لـ `React.lazy`.
+
+## مع التصديرات المسماة
+
+لاستيراد تصدير مسماة ديناميكيًا، يمكنك إعادته من [الـ Promise](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise) الذي تُرجعه [`import()`](https://github.com/tc39/proposal-dynamic-import#example):
+
+```jsx filename="components/hello.js"
+export function Hello() {
+  return <p>مرحبًا!</p>
+}
+
+// pages/index.js
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+## بدون عرض من جانب الخادم (SSR)
+
+لتحميل مكون ديناميكيًا على جانب العميل فقط، يمكنك استخدام خيار `ssr` لتعطيل العرض من جانب الخادم. هذا مفيد إذا كانت تبعية خارجية أو مكون يعتمد على واجهات برمجة المتصفح مثل `window`.
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  ssr: false,
+})
+```
+
+## مع المكتبات الخارجية
+
+هذا المثال يستخدم المكتبة الخارجية `fuse.js` للبحث الضبابي. يتم تحميل الوحدة فقط في المتصفح بعد إدخال المستخدم في حقل البحث.
+
+```jsx
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Search"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // تحميل fuse.js ديناميكيًا
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>Results: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+</PagesOnly>

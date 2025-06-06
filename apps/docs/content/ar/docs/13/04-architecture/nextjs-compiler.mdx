@@ -1,0 +1,313 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:17:40.247Z
+title: مترجم Next.js
+description: مترجم Next.js، مكتوب بلغة Rust، يقوم بتحويل وتصغير تطبيق Next.js الخاص بك.
+---
+
+مترجم Next.js، المكتوب بلغة Rust باستخدام [SWC](http://swc.rs/)، يسمح لـ Next.js بتحويل وتصغير كود JavaScript الخاص بك للإنتاج. هذا يحل محل Babel للملفات الفردية و Terser لتصغير حزم الإخراج.
+
+التجميع باستخدام مترجم Next.js أسرع بـ 17 مرة من Babel ومفعل افتراضيًا منذ إصدار Next.js 12. إذا كان لديك تكوين Babel موجود أو تستخدم [ميزات غير مدعومة](#unsupported-features)، فسيتم استثناء تطبيقك من مترجم Next.js والاستمرار في استخدام Babel.
+
+## لماذا SWC؟
+
+[SWC](http://swc.rs/) هو منصة قابلة للتوسيع مبنية على Rust لأدوات المطورين السريعة من الجيل التالي.
+
+يمكن استخدام SWC للتجميع والتصغير والتعبئة وغير ذلك - وهو مصمم ليكون قابلاً للتوسيع. إنه شيء يمكنك استدعاؤه لتنفيذ تحويلات الأكواد (سواء كانت مدمجة أو مخصصة). يتم تنفيذ هذه التحويلات من خلال أدوات عالية المستوى مثل Next.js.
+
+اخترنا البناء على SWC لعدة أسباب:
+
+- **القابلية للتوسيع:** يمكن استخدام SWC كـ Crate داخل Next.js، دون الحاجة إلى تفرع المكتبة أو الالتفاف حول قيود التصميم.
+- **الأداء:** تمكنا من تحقيق تحديث أسرع بـ ~3 مرات وبناء أسرع بـ ~5 مرات في Next.js عن طريق التحول إلى SWC، مع وجود مجال لمزيد من التحسينات قيد التقدم.
+- **WebAssembly:** دعم Rust لـ WASM ضروري لدعم جميع المنصات الممكنة وأخذ تطوير Next.js في كل مكان.
+- **المجتمع:** مجتمع Rust والنظام البيئي مذهلان وما زالا ينموان.
+
+## الميزات المدعومة
+
+### المكونات ذات الأنماط (Styled Components)
+
+نعمل على نقل `babel-plugin-styled-components` إلى مترجم Next.js.
+
+أولاً، قم بالتحديث إلى أحدث إصدار من Next.js: `npm install next@latest`. ثم قم بتحديث ملف `next.config.js` الخاص بك:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // انظر https://styled-components.com/docs/tooling#babel-plugin لمزيد من المعلومات حول الخيارات.
+    styledComponents: boolean | {
+      // مفعل افتراضيًا في وضع التطوير، معطل في الإنتاج لتقليل حجم الملف،
+      // تعيين هذا سيتجاوز الافتراضي لجميع البيئات.
+      displayName?: boolean,
+      // مفعل افتراضيًا.
+      ssr?: boolean,
+      // مفعل افتراضيًا.
+      fileName?: boolean,
+      // فارغ افتراضيًا.
+      topLevelImportPaths?: string[],
+      // الافتراضي هو ["index"].
+      meaninglessFileNames?: string[],
+      // مفعل افتراضيًا.
+      cssProp?: boolean,
+      // فارغ افتراضيًا.
+      namespace?: string,
+      // غير مدعوم بعد.
+      minify?: boolean,
+      // غير مدعوم بعد.
+      transpileTemplateLiterals?: boolean,
+      // غير مدعوم بعد.
+      pure?: boolean,
+    },
+  },
+}
+```
+
+`minify`، `transpileTemplateLiterals` و `pure` لم يتم تنفيذها بعد. يمكنك متابعة التقدم [هنا](https://github.com/vercel/next.js/issues/30802). تحويلات `ssr` و `displayName` هي المتطلبات الرئيسية لاستخدام `styled-components` في Next.js.
+
+### Jest
+
+يقوم مترجم Next.js بتحويل اختباراتك وتبسيط تكوين Jest مع Next.js بما في ذلك:
+
+- المحاكاة التلقائية لاستيرادات `.css`، `.module.css` (والمتغيرات `.scss` الخاصة بها)، واستيرادات الصور
+- إعداد `transform` تلقائيًا باستخدام SWC
+- تحميل `.env` (وجميع المتغيرات) إلى `process.env`
+- تجاهل `node_modules` من تحويل الاختبارات والتحويلات
+- تجاهل `.next` من تحويل الاختبارات
+- تحميل `next.config.js` للعلامات التي تمكن تحويلات SWC التجريبية
+
+أولاً، قم بالتحديث إلى أحدث إصدار من Next.js: `npm install next@latest`. ثم قم بتحديث ملف `jest.config.js` الخاص بك:
+
+```js filename="jest.config.js"
+const nextJest = require('next/jest')
+
+// توفير المسار إلى تطبيق Next.js الخاص بك مما سيمكن تحميل next.config.js وملفات .env
+const createJestConfig = nextJest({ dir: './' })
+
+// أي تكوين مخصص تريد تمريره إلى Jest
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+}
+
+// يتم تصدير createJestConfig بهذه الطريقة لضمان أن next/jest يمكنه تحميل تكوين Next.js، وهو غير متزامن
+module.exports = createJestConfig(customJestConfig)
+```
+
+### Relay
+
+لتمكين دعم [Relay](https://relay.dev/):
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    relay: {
+      // يجب أن يتطابق هذا مع relay.config.js
+      src: './',
+      artifactDirectory: './__generated__',
+      language: 'typescript',
+      eagerEsModules: false,
+    },
+  },
+}
+```
+
+> **جيد للمعرفة**: في Next.js، جميع ملفات JavaScript في دليل `pages` تعتبر مسارات. لذا، بالنسبة لـ `relay-compiler` ستحتاج إلى تحديد إعدادات تكوين `artifactDirectory` خارج `pages`، وإلا فإن `relay-compiler` سينشئ ملفات بجانب الملف المصدر في دليل `__generated__`، وسيعتبر هذا الملف مسارًا، مما سيكسر بناء الإنتاج.
+
+### إزالة خصائص React
+
+يسمح بإزالة خصائص JSX. يستخدم هذا غالبًا للاختبار. مشابه لـ `babel-plugin-react-remove-properties`.
+
+لإزالة الخصائص التي تطابق التعبير العادي الافتراضي `^data-test`:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    reactRemoveProperties: true,
+  },
+}
+```
+
+لإزالة الخصائص المخصصة:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // التعبيرات العادية المعرفة هنا تتم معالجتها في Rust لذا فإن التركيب مختلف عن
+    // JavaScript `RegExp`s. انظر https://docs.rs/regex.
+    reactRemoveProperties: { properties: ['^data-custom$'] },
+  },
+}
+```
+
+### إزالة Console
+
+يسمح هذا التحويل بإزالة جميع استدعاءات `console.*` في كود التطبيق (وليس `node_modules`). مشابه لـ `babel-plugin-transform-remove-console`.
+
+إزالة جميع استدعاءات `console.*`:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: true,
+  },
+}
+```
+
+إزالة إخراج `console.*` باستثناء `console.error`:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: {
+      exclude: ['error'],
+    },
+  },
+}
+```
+
+### المُزخرفات القديمة (Legacy Decorators)
+
+سيكتشف Next.js تلقائيًا `experimentalDecorators` في `jsconfig.json` أو `tsconfig.json`. تُستخدم المُزخرفات القديمة عادةً مع إصدارات أقدم من مكتبات مثل `mobx`.
+
+هذه العلامة مدعومة فقط لتوافق مع التطبيقات الموجودة. لا نوصي باستخدام المُزخرفات القديمة في التطبيقات الجديدة.
+
+أولاً، قم بالتحديث إلى أحدث إصدار من Next.js: `npm install next@latest`. ثم قم بتحديث ملف `jsconfig.json` أو `tsconfig.json` الخاص بك:
+
+```js
+{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}
+```
+
+### مصدر الاستيراد (importSource)
+
+سيكتشف Next.js تلقائيًا `jsxImportSource` في `jsconfig.json` أو `tsconfig.json` وسيطبق ذلك. يستخدم هذا عادةً مع مكتبات مثل [Theme UI](https://theme-ui.com).
+
+أولاً، قم بالتحديث إلى أحدث إصدار من Next.js: `npm install next@latest`. ثم قم بتحديث ملف `jsconfig.json` أو `tsconfig.json` الخاص بك:
+
+```js
+{
+  "compilerOptions": {
+    "jsxImportSource": "theme-ui"
+  }
+}
+```
+
+### Emotion
+
+نعمل على نقل `@emotion/babel-plugin` إلى مترجم Next.js.
+
+أولاً، قم بالتحديث إلى أحدث إصدار من Next.js: `npm install next@latest`. ثم قم بتحديث ملف `next.config.js` الخاص بك:
+
+```js filename="next.config.js"
+
+module.exports = {
+  compiler: {
+    emotion: boolean | {
+      // الافتراضي هو true. سيتم تعطيله عندما يكون نوع البناء هو الإنتاج.
+      sourceMap?: boolean,
+      // الافتراضي هو 'dev-only'.
+      autoLabel?: 'never' | 'dev-only' | 'always',
+      // الافتراضي هو '[local]'.
+      // القيم المسموح بها: `[local]` `[filename]` و `[dirname]`
+      // يعمل هذا الخيار فقط عندما يكون autoLabel مضبوطًا على 'dev-only' أو 'always'.
+      // يسمح لك بتحديد تنسيق التسمية الناتجة.
+      // يتم تعريف التنسيق عبر سلسلة حيث يتم إحاطة الأجزاء المتغيرة بأقواس مربعة [].
+      // على سبيل المثال labelFormat: "my-classname--[local]"، حيث سيتم استبدال [local] باسم المتغير الذي يتم تعيين النتيجة له.
+      labelFormat?: string,
+      // الافتراضي هو undefined.
+      // يسمح لك هذا الخيار بإخبار المترجم بالاستيرادات التي يجب
+      // أن ينظر إليها لتحديد ما يجب تحويله حتى إذا كنت تعيد تصدير
+      // صادرات Emotion، فلا يزال بإمكانك استخدام التحويلات.
+      importMap?: {
+        [packageName: string]: {
+          [exportName: string]: {
+            canonicalImport?: [string, string],
+            styledBaseImport?: [string, string],
+          }
+        }
+      },
+    },
+  },
+}
+```
+
+### التصغير (Minification)
+
+يتم استخدام مترجم swc الخاص بـ Next.js للتصغير افتراضيًا منذ الإصدار v13. هذا أسرع بـ 7 مرات من Terser.
+
+إذا كان Terser لا يزال مطلوبًا لأي سبب يمكن تكوين ذلك.
+
+```js filename="next.config.js"
+module.exports = {
+  swcMinify: false,
+}
+```
+
+### تحويل الوحدات (Module Transpilation)
+
+يمكن لـ Next.js تحويل وتعبئة التبعيات تلقائيًا من الحزم المحلية (مثل monorepos) أو من التبعيات الخارجية (`node_modules`). هذا يحل محل حزمة `next-transpile-modules`.
+
+```js filename="next.config.js"
+module.exports = {
+  transpilePackages: ['@acme/ui', 'lodash-es'],
+}
+```
+
+### تنظيم الاستيرادات (Modularize Imports)
+
+تم استبدال هذا الخيار بـ [`optimizePackageImports`](/docs/app/api-reference/next-config-js/optimizePackageImports) في Next.js 13.5. نوصي بالترقية لاستخدام الخيار الجديد الذي لا يتطلب تكوينًا يدويًا لمسارات الاستيراد.
+
+## الميزات التجريبية
+
+### تتبع أداء SWC (SWC Trace profiling)
+
+يمكنك إنشاء تتبع التحويلات الداخلية لـ SWC كتنسيق [trace event](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview?mode=html#%21=) الخاص بـ chromium.
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcTraceProfiling: true,
+  },
+}
+```
+
+بمجرد التمكين، سينشئ swc تتبعًا باسم `swc-trace-profile-${timestamp}.json` تحت `.next/`. يمكن لمشاهد تتبع chromium (chrome://tracing/، https://ui.perfetto.dev/)، أو مشاهد flamegraph المتوافقة (https://www.speedscope.app/) تحميل وتصور التتبعات المُنشأة.
+
+### إضافات SWC (تجريبي) (SWC Plugins)
+
+يمكنك تكوين تحويل swc لاستخدام دعم الإضافات التجريبي لـ SWC المكتوب بـ wasm لتخصيص سلوك التحويل.
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcPlugins: [
+      [
+        'plugin',
+        {
+          ...pluginOptions,
+        },
+      ],
+    ],
+  },
+}
+```
+
+يقبل `swcPlugins` مصفوفة من tuples لتكوين الإضافات. يحتوي tuple للإضافة على مسار الإضافة وكائن لتكوين الإضافة. يمكن أن يكون مسار الإضافة اسم حزمة npm أو مسارًا مطلقًا إلى ملف `.wasm` نفسه.
+
+## الميزات غير المدعومة
+
+عندما يحتوي تطبيقك على ملف `.babelrc`، سيعود Next.js تلقائيًا إلى استخدام Babel لتحويل الملفات الفردية. يضمن هذا التوافق مع الإصدارات السابقة للتطبيقات الحالية التي تستخدم إضافات Babel المخصصة.
+
+إذا كنت تستخدم إعداد Babel مخصصًا، [يرجى مشاركة تكوينك](https://github.com/vercel/next.js/discussions/30174). نحن نعمل على نقل أكبر عدد ممكن من تحويلات Babel الشائعة الاستخدام، وكذلك دعم الإضافات في المستقبل.
+
+## سجل الإصدارات
+
+| الإصدار   | التغييرات                                                                                                                                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.1.0` | [تحويل الوحدات](https://nextjs.org/blog/next-13-1#built-in-module-transpilation-stable) و [تنظيم الاستيرادات](https://nextjs.org/blog/next-13-1#import-resolution-for-smaller-bundles) أصبحا مستقرين. |
+| `v13.0.0` | تمكين مصغر SWC افتراضيًا.                                                                                                                                                                         |
+| `v12.3.0` | أصبح مصغر SWC [مستقرًا](https://nextjs.org/blog/next-12-3#swc-minifier-stable).                                                                                                                            |
+| `v12.2.0` | تمت إضافة دعم تجريبي لـ [إضافات SWC](#swc-plugins-experimental).                                                                                                                                     |
+| `v12.1.0` | تمت إضافة دعم لـ المكونات ذات الأنماط، Jest، Relay، إزالة خصائص React، المُزخرفات القديمة، إزالة Console، و jsxImportSource.                                                                       |
+| `v12.0.0` | تم [إدخال](https://nextjs.org/blog/next-12) مترجم Next.js.                                                                                                                                          |

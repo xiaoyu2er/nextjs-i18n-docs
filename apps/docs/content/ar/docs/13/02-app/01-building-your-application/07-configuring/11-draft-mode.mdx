@@ -1,0 +1,246 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T18:04:44.486Z
+title: وضع المسودة (Draft Mode)
+description: يوفر Next.js وضع المسودة للتبديل بين الصفحات الثابتة والديناميكية. يمكنك تعلم كيفية عمله مع App Router هنا.
+---
+
+يكون التصيير الثابت مفيدًا عندما تحصل صفحاتك على البيانات من نظام إدارة المحتوى (CMS). ومع ذلك، فهو ليس مثاليًا عندما تكتب مسودة على نظام إدارة المحتوى الخاص بك وتريد عرض المسودة فورًا على صفحتك. سترغب في أن يقوم Next.js بعرض هذه الصفحات في **وقت الطلب** بدلاً من وقت البناء وجلب محتوى المسودة بدلاً من المحتوى المنشور. سترغب في أن يتحول Next.js إلى [التصيير الديناميكي](/docs/app/building-your-application/rendering/server-components#dynamic-rendering) فقط لهذه الحالة المحددة.
+
+يحتوي Next.js على ميزة تسمى **وضع المسودة (Draft Mode)** التي تحل هذه المشكلة. فيما يلي إرشادات حول كيفية استخدامها.
+
+## الخطوة 1: إنشاء معالج المسار والوصول إليه
+
+أولاً، قم بإنشاء [معالج المسار (Route Handler)](/docs/app/building-your-application/routing/route-handlers). يمكن أن يكون له أي اسم - مثلاً `app/api/draft/route.ts`
+
+ثم، استورد `draftMode` من `next/headers` واستدعِ طريقة `enable()`.
+
+```ts filename="app/api/draft/route.ts" switcher
+// معالج المسار لتمكين وضع المسودة
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  draftMode().enable()
+  return new Response('تم تمكين وضع المسودة')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+// معالج المسار لتمكين وضع المسودة
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  draftMode().enable()
+  return new Response('تم تمكين وضع المسودة')
+}
+```
+
+سيؤدي هذا إلى تعيين **كوكي** لتمكين وضع المسودة. الطلبات اللاحقة التي تحتوي على هذا الكوكي ستؤدي إلى تفعيل **وضع المسودة** مما يغير سلوك الصفحات المولدة بشكل ثابت (المزيد عن هذا لاحقًا).
+
+يمكنك اختبار هذا يدويًا بزيارة `/api/draft` والنظر في أدوات المطور في متصفحك. لاحظ رأس الاستجابة `Set-Cookie` مع كوكي باسم `__prerender_bypass`.
+
+### الوصول الآمن من نظام إدارة المحتوى الخاص بك
+
+عمليًا، سترغب في استدعاء معالج المسار هذا _بشكل آمن_ من نظام إدارة المحتوى الخاص بك. الخطوات المحددة ستختلف اعتمادًا على نظام إدارة المحتوى الذي تستخدمه، ولكن إليك بعض الخطوات الشائعة التي يمكنك اتخاذها.
+
+تفترض هذه الخطوات أن نظام إدارة المحتوى الذي تستخدمه يدعم تعيين **عنوان URL مخصص للمسودات**. إذا لم يكن كذلك، فلا يزال بإمكانك استخدام هذه الطريقة لتأمين عناوين URL للمسودات، ولكنك ستحتاج إلى إنشاء عنوان URL للمسودة والوصول إليه يدويًا.
+
+**أولاً**، يجب إنشاء **رمز سري (secret token)** باستخدام أداة توليد الرموز التي تختارها. سيعرف هذا السر فقط تطبيق Next.js الخاص بك ونظام إدارة المحتوى الخاص بك. يمنع هذا السر الأشخاص الذين لا يمكنهم الوصول إلى نظام إدارة المحتوى الخاص بك من الوصول إلى عناوين URL للمسودات.
+
+**ثانيًا**، إذا كان نظام إدارة المحتوى الخاص بك يدعم تعيين عناوين URL مخصصة للمسودات، فحدد ما يلي كعنوان URL للمسودة. يفترض هذا أن معالج المسار موجود في `app/api/draft/route.ts`
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+- `<your-site>` يجب أن يكون نطاق النشر الخاص بك.
+- `<token>` يجب استبداله بالرمز السري الذي أنشأته.
+- `<path>` يجب أن يكون المسار للصفحة التي تريد عرضها. إذا كنت تريد عرض `/posts/foo`، فيجب استخدام `&slug=/posts/foo`.
+
+قد يسمح لك نظام إدارة المحتوى الخاص بك بتضمين متغير في عنوان URL للمسودة بحيث يمكن تعيين `<path>` ديناميكيًا بناءً على بيانات نظام إدارة المحتوى مثل: `&slug=/posts/{entry.fields.slug}`
+
+**أخيرًا**، في معالج المسار:
+
+- تحقق من تطابق السر وأن معلمة `slug` موجودة (إذا لم تكن كذلك، يجب أن يفشل الطلب).
+- استدعِ `draftMode.enable()` لتعيين الكوكي.
+- ثم أعد توجيه المتصفح إلى المسار المحدد بواسطة `slug`.
+
+```ts filename="app/api/draft/route.ts" switcher
+// معالج المسار مع السر و slug
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // تحليل معلمات سلسلة الاستعلام
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // تحقق من السر والمعلمات التالية
+  // يجب أن يعرف هذا السر فقط معالج المسار هذا ونظام إدارة المحتوى
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('رمز غير صالح', { status: 401 })
+  }
+
+  // جلب نظام إدارة المحتوى للتحقق مما إذا كان slug المقدم موجودًا
+  // ستنفذ getPostBySlug منطق الجلب المطلوب لنظام إدارة المحتوى
+  const post = await getPostBySlug(slug)
+
+  // إذا لم يكن slug موجودًا، امنع تمكين وضع المسودة
+  if (!post) {
+    return new Response('slug غير صالح', { status: 401 })
+  }
+
+  // تمكين وضع المسودة عن طريق تعيين الكوكي
+  draftMode().enable()
+
+  // إعادة التوجيه إلى المسار من المنشور الذي تم جلبه
+  // لا نعيد التوجيه إلى searchParams.slug لأن ذلك قد يؤدي إلى ثغرات إعادة توجيه مفتوحة
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+// معالج المسار مع السر و slug
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // تحليل معلمات سلسلة الاستعلام
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // تحقق من السر والمعلمات التالية
+  // يجب أن يعرف هذا السر فقط معالج المسار هذا ونظام إدارة المحتوى
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('رمز غير صالح', { status: 401 })
+  }
+
+  // جلب نظام إدارة المحتوى للتحقق مما إذا كان slug المقدم موجودًا
+  // ستنفذ getPostBySlug منطق الجلب المطلوب لنظام إدارة المحتوى
+  const post = await getPostBySlug(slug)
+
+  // إذا لم يكن slug موجودًا، امنع تمكين وضع المسودة
+  if (!post) {
+    return new Response('slug غير صالح', { status: 401 })
+  }
+
+  // تمكين وضع المسودة عن طريق تعيين الكوكي
+  draftMode().enable()
+
+  // إعادة التوجيه إلى المسار من المنشور الذي تم جلبه
+  // لا نعيد التوجيه إلى searchParams.slug لأن ذلك قد يؤدي إلى ثغرات إعادة توجيه مفتوحة
+  redirect(post.slug)
+}
+```
+
+إذا نجح ذلك، فسيتم إعادة توجيه المتصفح إلى المسار الذي تريد عرضه مع كوكي وضع المسودة.
+
+## الخطوة 2: تحديث الصفحة
+
+الخطوة التالية هي تحديث صفحتك للتحقق من قيمة `draftMode().isEnabled`.
+
+إذا طلبت صفحة تحتوي على الكوكي المعين، فسيتم جلب البيانات في **وقت الطلب** (بدلاً من وقت البناء).
+
+علاوة على ذلك، ستكون قيمة `isEnabled` `true`.
+
+```tsx filename="app/page.tsx" switcher
+// صفحة تجلب البيانات
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// صفحة تجلب البيانات
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+هذا كل شيء! إذا قمت بالوصول إلى معالج مسار المسودة (مع `secret` و `slug`) من نظام إدارة المحتوى الخاص بك أو يدويًا، فيجب أن تكون قادرًا الآن على رؤية محتوى المسودة. وإذا قمت بتحديث مسودتك دون نشر، فيجب أن تكون قادرًا على عرض المسودة.
+
+قم بتعيين هذا كعنوان URL للمسودة على نظام إدارة المحتوى الخاص بك أو قم بالوصول يدويًا، ويجب أن تكون قادرًا على رؤية المسودة.
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+## المزيد من التفاصيل
+
+### مسح كوكي وضع المسودة
+
+افتراضيًا، تنتهي جلسة وضع المسودة عند إغلاق المتصفح.
+
+لمسح كوكي وضع المسودة يدويًا، أنشئ معالج مسار يستدعي `draftMode().disable()`:
+
+```ts filename="app/api/disable-draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  draftMode().disable()
+  return new Response('تم تعطيل وضع المسودة')
+}
+```
+
+```js filename="app/api/disable-draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  draftMode().disable()
+  return new Response('تم تعطيل وضع المسودة')
+}
+```
+
+ثم، أرسل طلبًا إلى `/api/disable-draft` لاستدعاء معالج المسار. إذا كنت تستدعي هذا المسار باستخدام [`next/link`](/docs/app/api-reference/components/link)، فيجب عليك تمرير `prefetch={false}` لمنع حذف الكوكي عن طريق الخطأ أثناء الجلب المسبق.
+
+### فريد لكل `next build`
+
+سيتم إنشاء قيمة جديدة لكوكي الالتفاف في كل مرة تقوم فيها بتشغيل `next build`.
+
+يضمن ذلك عدم إمكانية تخمين كوكي الالتفاف.
+
+> **معلومة مفيدة**: لاختبار وضع المسودة محليًا عبر HTTP، سيحتاج متصفحك إلى السماح بملفات تعريف الارتباط من طرف ثالث والوصول إلى التخزين المحلي.
