@@ -169,7 +169,7 @@ export async function main({
       } else if (shouldUpdate) {
         tableData.push({
           Source: sourcePath,
-          Target: targetPath,
+          ...(verbose ? { Target: targetPath } : {}),
           'Should update?': '✅ Yes',
           Reason: reason,
         });
