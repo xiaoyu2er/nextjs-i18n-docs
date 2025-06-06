@@ -1,0 +1,246 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:58:32.602Z
+title: Carga diferida (Lazy Loading)
+description: Carga diferida de bibliotecas importadas y componentes de React para mejorar el rendimiento de carga de su aplicación.
+---
+
+{/* El contenido de este documento se comparte entre el enrutador de la aplicación y el de páginas. Puede usar el componente `<PagesOnly>Contenido</PagesOnly>` para agregar contenido específico del Enrutador de Páginas. Cualquier contenido compartido no debe estar envuelto en un componente. */}
+
+La [carga diferida](https://developer.mozilla.org/docs/Web/Performance/Lazy_loading) en Next.js ayuda a mejorar el rendimiento de carga inicial de una aplicación al reducir la cantidad de JavaScript necesaria para renderizar una ruta.
+
+Le permite diferir la carga de **Componentes del Cliente** y bibliotecas importadas, incluyéndolos en el paquete del cliente solo cuando son necesarios. Por ejemplo, puede diferir la carga de un modal hasta que un usuario haga clic para abrirlo.
+
+Hay dos formas de implementar la carga diferida en Next.js:
+
+1. Usando [Importaciones dinámicas](#nextdynamic) con `next/dynamic`
+2. Usando [`React.lazy()`](https://react.dev/reference/react/lazy) con [Suspense](https://react.dev/reference/react/Suspense)
+
+Por defecto, los Componentes del Servidor se dividen automáticamente en [código (code splitting)](https://developer.mozilla.org/docs/Glossary/Code_splitting), y puede usar [streaming](/docs/app/building-your-application/routing/loading-ui-and-streaming) para enviar progresivamente partes de la interfaz de usuario desde el servidor al cliente. La carga diferida aplica a Componentes del Cliente.
+
+## `next/dynamic`
+
+`next/dynamic` es una combinación de [`React.lazy()`](https://react.dev/reference/react/lazy) y [Suspense](https://react.dev/reference/react/Suspense). Se comporta de la misma manera en los directorios `app` y `pages` para permitir una migración incremental.
+
+## Ejemplos
+
+<AppOnly>
+### Importar Componentes del Cliente
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
+
+// Componentes del Cliente:
+const ComponentA = dynamic(() => import('../components/A'))
+const ComponentB = dynamic(() => import('../components/B'))
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+
+export default function ClientComponentExample() {
+  const [showMore, setShowMore] = useState(false)
+
+  return (
+    <div>
+      {/* Carga inmediata, pero en un paquete separado del cliente */}
+      <ComponentA />
+
+      {/* Carga bajo demanda, solo cuando se cumple la condición */}
+      {showMore && <ComponentB />}
+      <button onClick={() => setShowMore(!showMore)}>Alternar</button>
+
+      {/* Carga solo en el lado del cliente */}
+      <ComponentC />
+    </div>
+  )
+}
+```
+
+### Omitir SSR
+
+Cuando se usa `React.lazy()` y Suspense, los Componentes del Cliente se pre-renderizarán (SSR) por defecto.
+
+Si desea desactivar el pre-renderizado para un Componente del Cliente, puede usar la opción `ssr` establecida en `false`:
+
+```jsx
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+```
+
+### Importar Componentes del Servidor
+
+Si importa dinámicamente un Componente del Servidor, solo los Componentes del Cliente que son hijos del Componente del Servidor se cargarán de forma diferida, no el Componente del Servidor en sí.
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+// Componente del Servidor:
+const ServerComponent = dynamic(() => import('../components/ServerComponent'))
+
+export default function ServerComponentExample() {
+  return (
+    <div>
+      <ServerComponent />
+    </div>
+  )
+}
+```
+
+### Cargar bibliotecas externas
+
+Las bibliotecas externas se pueden cargar bajo demanda usando la función [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import). Este ejemplo usa la biblioteca externa `fuse.js` para búsqueda difusa. El módulo solo se carga en el cliente después de que el usuario escribe en el campo de búsqueda.
+
+```jsx filename="app/page.js"
+'use client'
+
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Buscar"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // Carga dinámica de fuse.js
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>Resultados: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+### Agregar un componente de carga personalizado
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+const WithCustomLoading = dynamic(
+  () => import('../components/WithCustomLoading'),
+  {
+    loading: () => <p>Cargando...</p>,
+  }
+)
+
+export default function Page() {
+  return (
+    <div>
+      {/* El componente de carga se mostrará mientras <WithCustomLoading/> está cargando */}
+      <WithCustomLoading />
+    </div>
+  )
+}
+```
+
+### Importar exportaciones con nombre
+
+Para importar dinámicamente una exportación con nombre, puede devolverla desde la Promesa retornada por la función [`import()`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/import):
+
+```jsx filename="components/hello.js"
+'use client'
+
+export function Hello() {
+  return <p>¡Hola!</p>
+}
+```
+
+```jsx filename="app/page.js"
+import dynamic from 'next/dynamic'
+
+const ClientComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+Al usar `next/dynamic`, el componente de encabezado no se incluirá en el paquete inicial de JavaScript de la página. La página renderizará primero el `fallback` de Suspense, seguido del componente `Header` cuando se resuelva el límite de `Suspense`.
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  loading: () => <p>Cargando...</p>,
+})
+
+export default function Home() {
+  return <DynamicHeader />
+}
+```
+
+> **Nota importante**: En `import('ruta/al/componente')`, la ruta debe escribirse explícitamente. No puede ser una plantilla de cadena ni una variable. Además, el `import()` debe estar dentro de la llamada `dynamic()` para que Next.js pueda hacer coincidir los paquetes de webpack / ids de módulo con la llamada `dynamic()` específica y precargarlos antes del renderizado. `dynamic()` no se puede usar dentro del renderizado de React ya que debe marcarse en el nivel superior del módulo para que funcione la precarga, similar a `React.lazy`.
+
+## Con exportaciones con nombre
+
+Para importar dinámicamente una exportación con nombre, puede devolverla desde la [Promesa](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise) retornada por [`import()`](https://github.com/tc39/proposal-dynamic-import#example):
+
+```jsx filename="components/hello.js"
+export function Hello() {
+  return <p>¡Hola!</p>
+}
+
+// pages/index.js
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```
+
+## Sin SSR
+
+Para cargar dinámicamente un componente en el lado del cliente, puede usar la opción `ssr` para desactivar el renderizado en el servidor. Esto es útil si una dependencia externa o componente depende de APIs del navegador como `window`.
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const DynamicHeader = dynamic(() => import('../components/header'), {
+  ssr: false,
+})
+```
+
+## Con bibliotecas externas
+
+Este ejemplo usa la biblioteca externa `fuse.js` para búsqueda difusa. El módulo solo se carga en el navegador después de que el usuario escribe en el campo de búsqueda.
+
+```jsx
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Buscar"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          // Carga dinámica de fuse.js
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>Resultados: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+</PagesOnly>

@@ -1,0 +1,184 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:44:38.223Z
+title: Regeneración Estática Incremental (ISR)
+description: Aprenda a crear o actualizar páginas estáticas en tiempo de ejecución con Regeneración Estática Incremental.
+---
+
+<details>
+  <summary>Ejemplos</summary>
+
+- [Next.js Commerce](https://nextjs.org/commerce)
+- [GitHub Reactions Demo](https://reactions-demo.vercel.app/)
+- [Static Tweet Demo](https://static-tweet.vercel.app/)
+
+</details>
+
+Next.js le permite crear o actualizar páginas estáticas _después_ de haber construido su sitio. La Regeneración Estática Incremental (ISR) le permite usar generación estática por página, **sin necesidad de reconstruir todo el sitio**. Con ISR, puede mantener los beneficios de lo estático mientras escala a millones de páginas.
+
+> **Nota importante**: El entorno de ejecución [`edge`](/docs/pages/api-reference/edge) actualmente no es compatible con ISR, aunque puede aprovechar `stale-while-revalidate` configurando manualmente el encabezado `cache-control`.
+
+Para usar ISR, agregue la propiedad `revalidate` a `getStaticProps`:
+
+```jsx
+function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+// Esta función se llama en el momento de construcción en el servidor.
+// Puede volver a llamarse en una función serverless si
+// la revalidación está activada y llega una nueva solicitud
+export async function getStaticProps() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  return {
+    props: {
+      posts,
+    },
+    // Next.js intentará regenerar la página:
+    // - Cuando llegue una solicitud
+    // - Como máximo una vez cada 10 segundos
+    revalidate: 10, // En segundos
+  }
+}
+
+// Esta función se llama en el momento de construcción en el servidor.
+// Puede volver a llamarse en una función serverless si
+// la ruta no ha sido generada.
+export async function getStaticPaths() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // Obtener las rutas que queremos pre-renderizar basadas en posts
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // Pre-renderizaremos solo estas rutas en el momento de construcción.
+  // { fallback: 'blocking' } renderizará páginas en el servidor
+  // bajo demanda si la ruta no existe.
+  return { paths, fallback: 'blocking' }
+}
+
+export default Blog
+```
+
+Cuando se hace una solicitud a una página pre-renderizada en el momento de construcción, inicialmente se mostrará la página en caché.
+
+- Cualquier solicitud a la página después de la inicial y antes de 10 segundos también se almacena en caché y es instantánea.
+- Pasada la ventana de 10 segundos, la siguiente solicitud seguirá mostrando la página en caché (obsoleta)
+- Next.js activa una regeneración de la página en segundo plano.
+- Una vez que la página se genera con éxito, Next.js invalidará la caché y mostrará la página actualizada. Si la regeneración falla, la página antigua permanecerá sin cambios.
+
+Cuando se solicita una ruta que no ha sido generada, Next.js renderizará la página en el servidor en la primera solicitud. Las solicitudes futuras servirán el archivo estático desde la caché. ISR en Vercel [persiste la caché globalmente y maneja reversiones](https://vercel.com/docs/concepts/next.js/incremental-static-regeneration?utm_source=next-site&utm_medium=docs&utm_campaign=next-website).
+
+> **Nota importante**: Verifique si su proveedor de datos upstream tiene caché habilitada por defecto. Es posible que necesite desactivarla (ej. `useCdn: false`), de lo contrario una revalidación no podrá obtener datos frescos para actualizar la caché ISR. El almacenamiento en caché puede ocurrir en un CDN (para un endpoint solicitado) cuando devuelve el encabezado `Cache-Control`.
+
+## Revalidación bajo demanda
+
+Si configura un tiempo de `revalidate` de `60`, todos los visitantes verán la misma versión generada de su sitio durante un minuto. La única forma de invalidar la caché es que alguien visite esa página después de que haya pasado el minuto.
+
+A partir de `v12.2.0`, Next.js soporta Regeneración Estática Incremental bajo demanda para purgar manualmente la caché de Next.js para una página específica. Esto facilita la actualización de su sitio cuando:
+
+- Se crea o actualiza contenido desde su CMS headless
+- Cambian metadatos de ecommerce (precio, descripción, categoría, reseñas, etc.)
+
+Dentro de `getStaticProps`, no necesita especificar `revalidate` para usar revalidación bajo demanda. Si `revalidate` se omite, Next.js usará el valor por defecto `false` (sin revalidación) y solo revalidará la página bajo demanda cuando se llame a `revalidate()`.
+
+> **Nota importante**: El [Middleware](/docs/pages/building-your-application/routing/middleware) no se ejecutará para solicitudes ISR bajo demanda. En su lugar, llame a `revalidate()` en la ruta _exacta_ que desea revalidar. Por ejemplo, si tiene `pages/blog/[slug].js` y un rewrite de `/post-1` -> `/blog/post-1`, necesitará llamar a `res.revalidate('/blog/post-1')`.
+
+### Usando revalidación bajo demanda
+
+Primero, cree un token secreto conocido solo por su aplicación Next.js. Este secreto se usará para prevenir acceso no autorizado a la ruta API de revalidación. Puede acceder a la ruta (manualmente o con un webhook) con la siguiente estructura de URL:
+
+```bash filename="Terminal"
+https://<your-site.com>/api/revalidate?secret=<token>
+```
+
+Luego, agregue el secreto como una [Variable de Entorno](/docs/pages/building-your-application/configuring/environment-variables) a su aplicación. Finalmente, cree la ruta API de revalidación:
+
+```js filename="pages/api/revalidate.js"
+export default async function handler(req, res) {
+  // Verificar el secreto para confirmar que es una solicitud válida
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: 'Token inválido' })
+  }
+
+  try {
+    // esto debe ser la ruta real, no una ruta reescrita
+    // ej. para "/blog/[slug]" debe ser "/blog/post-1"
+    await res.revalidate('/path-to-revalidate')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // Si hay un error, Next.js continuará
+    // mostrando la última página generada exitosamente
+    return res.status(500).send('Error al revalidar')
+  }
+}
+```
+
+[Vea nuestro demo](https://on-demand-isr.vercel.app) para ver la revalidación bajo demanda en acción y enviar comentarios.
+
+### Probando ISR bajo demanda durante desarrollo
+
+Cuando ejecuta localmente con `next dev`, `getStaticProps` se invoca en cada solicitud. Para verificar que su configuración ISR bajo demanda es correcta, necesitará crear una [compilación de producción](/docs/pages/api-reference/cli/next#next-build-options) e iniciar el [servidor de producción](/docs/pages/api-reference/cli/next#next-start-options):
+
+```bash filename="Terminal"
+$ next build
+$ next start
+```
+
+Luego, puede confirmar que las páginas estáticas se han revalidado exitosamente.
+
+## Manejo de errores y revalidación
+
+Si hay un error dentro de `getStaticProps` durante la regeneración en segundo plano, o si lanza un error manualmente, se seguirá mostrando la última página generada exitosamente. En la siguiente solicitud, Next.js reintentará llamar a `getStaticProps`.
+
+```jsx
+export async function getStaticProps() {
+  // Si esta solicitud lanza un error no capturado, Next.js no
+  // invalidará la página actualmente mostrada y
+  // reintentará getStaticProps en la siguiente solicitud.
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  if (!res.ok) {
+    // Si hay un error del servidor, puede que desee
+    // lanzar un error en lugar de devolver para que la caché no se actualice
+    // hasta la siguiente solicitud exitosa.
+    throw new Error(`Error al obtener posts, estado recibido ${res.status}`)
+  }
+
+  // Si la solicitud fue exitosa, devuelva los posts
+  // y revalide cada 10 segundos.
+  return {
+    props: {
+      posts,
+    },
+    revalidate: 10,
+  }
+}
+```
+
+## Auto-hospedaje de ISR
+
+La Regeneración Estática Incremental (ISR) funciona en [sitios Next.js auto-hospedados](/docs/pages/building-your-application/deploying#self-hosting) de forma nativa cuando usa `next start`.
+
+Aprenda más sobre [auto-hospedaje de Next.js](/docs/pages/building-your-application/deploying#self-hosting).
+
+## Historial de versiones
+
+| Versión   | Cambios                                                                                 |
+| --------- | --------------------------------------------------------------------------------------- |
+| `v14.1.0` | `cacheHandler` personalizado es estable.                                                |
+| `v12.2.0` | ISR bajo demanda es estable                                                             |
+| `v12.1.0` | ISR bajo demanda añadido (beta).                                                       |
+| `v12.0.0` | [Fallback ISR consciente de bots](https://nextjs.org/blog/next-12#bot-aware-isr-fallback) añadido. |
+| `v9.5.0`  | Ruta base añadida.                                                                      |

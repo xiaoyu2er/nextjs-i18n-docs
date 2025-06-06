@@ -1,0 +1,182 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:43:16.932Z
+title: Modo borrador (Draft Mode)
+description: Next.js incluye un modo borrador para alternar entre páginas estáticas y dinámicas. Aprenda cómo funciona con el enrutador de páginas (Pages Router).
+---
+
+En la [documentación de páginas](/docs/pages/building-your-application/routing/pages-and-layouts) y la [documentación de obtención de datos](/docs/pages/building-your-application/data-fetching), explicamos cómo prerrenderizar una página en el momento de construcción (**Generación estática**) usando `getStaticProps` y `getStaticPaths`.
+
+La generación estática es útil cuando tus páginas obtienen datos de un CMS sin cabeza (headless CMS). Sin embargo, no es ideal cuando estás escribiendo un borrador en tu CMS y quieres verlo inmediatamente en tu página. En este caso, necesitarías que Next.js renderice estas páginas en **tiempo de solicitud** en lugar de en tiempo de construcción, y que obtenga el contenido del borrador en vez del contenido publicado. Querrías que Next.js evite la generación estática solo para este caso específico.
+
+Next.js tiene una función llamada **Modo borrador (Draft Mode)** que resuelve este problema. A continuación, se explican las instrucciones para usarlo.
+
+## Paso 1: Crear y acceder a la ruta API
+
+> Consulte primero la [documentación de rutas API](/docs/pages/building-your-application/routing/api-routes) si no está familiarizado con las rutas API de Next.js.
+
+Primero, cree la **ruta API**. Puede tener cualquier nombre, por ejemplo `pages/api/draft.ts`.
+
+En esta ruta API, debe llamar a `setDraftMode` en el objeto de respuesta.
+
+```js
+export default function handler(req, res) {
+  // ...
+  res.setDraftMode({ enable: true })
+  // ...
+}
+```
+
+Esto establecerá una **cookie** para activar el modo borrador. Las solicitudes posteriores que incluyan esta cookie activarán el **Modo borrador**, cambiando el comportamiento para las páginas generadas estáticamente (más detalles más adelante).
+
+Puede probar esto manualmente creando una ruta API como la siguiente y accediendo a ella manualmente desde su navegador:
+
+```ts filename="pages/api/draft.ts"
+// Ejemplo simple para probarlo manualmente desde su navegador.
+export default function handler(req, res) {
+  res.setDraftMode({ enable: true })
+  res.end('El modo borrador está activado')
+}
+```
+
+Si abre las herramientas de desarrollo de su navegador y visita `/api/draft`, notará un encabezado de respuesta `Set-Cookie` con una cookie llamada `__prerender_bypass`.
+
+### Acceso seguro desde su CMS sin cabeza
+
+En la práctica, querrá llamar a esta ruta API de forma _segura_ desde su CMS sin cabeza. Los pasos específicos variarán según el CMS que esté usando, pero aquí hay algunos pasos comunes que podría seguir.
+
+Estos pasos asumen que su CMS sin cabeza admite la configuración de **URLs de borrador personalizadas**. Si no es así, aún puede usar este método para proteger sus URLs de borrador, pero tendrá que construir y acceder a la URL manualmente.
+
+**Primero**, debe crear una **cadena de token secreto** usando un generador de tokens de su elección. Este secreto solo lo conocerán su aplicación Next.js y su CMS sin cabeza. Esto evita que personas sin acceso al CMS accedan a las URLs de borrador.
+
+**Segundo**, si su CMS admite URLs de borrador personalizadas, especifique lo siguiente como la URL de borrador. Esto asume que su ruta API de borrador está en `pages/api/draft.ts`.
+
+```bash filename="Terminal"
+https://<su-sitio>/api/draft?secret=<token>&slug=<ruta>
+```
+
+- `<su-sitio>` debe ser su dominio de despliegue.
+- `<token>` debe reemplazarse con el token secreto que generó.
+- `<ruta>` debe ser la ruta de la página que desea ver. Si quiere ver `/posts/foo`, entonces debe usar `&slug=/posts/foo`.
+
+Su CMS podría permitirle incluir una variable en la URL de borrador para que `<ruta>` se establezca dinámicamente según los datos del CMS, como: `&slug=/posts/{entry.fields.slug}`
+
+**Finalmente**, en la ruta API de borrador:
+
+- Verifique que el secreto coincida y que el parámetro `slug` exista (si no, la solicitud debe fallar).
+- Llame a `res.setDraftMode`.
+- Luego redirija el navegador a la ruta especificada por `slug`. (El siguiente ejemplo usa una [redirección 307](https://developer.mozilla.org/docs/Web/HTTP/Status/307)).
+
+```js
+export default async (req, res) => {
+  // Verifique el secreto y los parámetros
+  // Este secreto solo debe ser conocido por esta ruta API y el CMS
+  if (req.query.secret !== 'MI_TOKEN_SECRETO' || !req.query.slug) {
+    return res.status(401).json({ message: 'Token inválido' })
+  }
+
+  // Consulte el CMS sin cabeza para verificar si el `slug` proporcionado existe
+  // getPostBySlug implementaría la lógica necesaria para consultar el CMS
+  const post = await getPostBySlug(req.query.slug)
+
+  // Si el slug no existe, evite activar el modo borrador
+  if (!post) {
+    return res.status(401).json({ message: 'Slug inválido' })
+  }
+
+  // Active el Modo borrador estableciendo la cookie
+  res.setDraftMode({ enable: true })
+
+  // Redirija a la ruta del post obtenido
+  // No redirigimos a req.query.slug para evitar vulnerabilidades de redirección abierta
+  res.redirect(post.slug)
+}
+```
+
+Si tiene éxito, el navegador será redirigido a la ruta que desea ver con la cookie de modo borrador.
+
+## Paso 2: Actualizar `getStaticProps`
+
+El siguiente paso es actualizar `getStaticProps` para que admita el modo borrador.
+
+Si solicita una página que tiene `getStaticProps` con la cookie establecida (a través de `res.setDraftMode`), entonces `getStaticProps` se llamará en **tiempo de solicitud** (en lugar de en tiempo de construcción).
+
+Además, se llamará con un objeto `context` donde `context.draftMode` será `true`.
+
+```js
+export async function getStaticProps(context) {
+  if (context.draftMode) {
+    // datos dinámicos
+  }
+}
+```
+
+Usamos `res.setDraftMode` en la ruta API de borrador, por lo que `context.draftMode` será `true`.
+
+Si también está usando `getStaticPaths`, entonces `context.params` también estará disponible.
+
+### Obtener datos de borrador
+
+Puede actualizar `getStaticProps` para obtener datos diferentes según `context.draftMode`.
+
+Por ejemplo, su CMS sin cabeza podría tener un endpoint API diferente para posts en borrador. Si es así, puede modificar la URL del endpoint así:
+
+```js
+export async function getStaticProps(context) {
+  const url = context.draftMode
+    ? 'https://borrador.ejemplo.com'
+    : 'https://produccion.ejemplo.com'
+  const res = await fetch(url)
+  // ...
+}
+```
+
+¡Eso es todo! Si accede a la ruta API de borrador (con `secret` y `slug`) desde su CMS o manualmente, ahora debería poder ver el contenido en borrador. Y si actualiza su borrador sin publicarlo, podrá ver los cambios.
+
+Establezca esto como la URL de borrador en su CMS o acceda manualmente, y debería poder ver el borrador.
+
+```bash filename="Terminal"
+https://<su-sitio>/api/draft?secret=<token>&slug=<ruta>
+```
+
+## Más detalles
+
+### Limpiar la cookie de Modo borrador
+
+Por defecto, la sesión de Modo borrador termina cuando se cierra el navegador.
+
+Para limpiar la cookie manualmente, cree una ruta API que llame a `setDraftMode({ enable: false })`:
+
+```ts filename="pages/api/disable-draft.ts"
+export default function handler(req, res) {
+  res.setDraftMode({ enable: false })
+}
+```
+
+Luego, envíe una solicitud a `/api/disable-draft` para invocar la ruta API. Si usa [`next/link`](/docs/pages/api-reference/components/link) para llamar a esta ruta, debe pasar `prefetch={false}` para evitar eliminar accidentalmente la cookie durante el prefetch.
+
+### Funciona con `getServerSideProps`
+
+El Modo borrador funciona con `getServerSideProps`, y está disponible como una clave `draftMode` en el objeto [`context`](/docs/pages/api-reference/functions/get-server-side-props#context-parameter).
+
+> **Nota importante**: No debe establecer el encabezado `Cache-Control` cuando use el Modo borrador, ya que no se puede omitir. En su lugar, recomendamos usar [ISR](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration).
+
+### Funciona con rutas API
+
+Las rutas API tendrán acceso a `draftMode` en el objeto de solicitud. Por ejemplo:
+
+```js
+export default function myApiRoute(req, res) {
+  if (req.draftMode) {
+    // obtener datos de borrador
+  }
+}
+```
+
+### Único por cada `next build`
+
+Se generará un nuevo valor de cookie de bypass cada vez que ejecute `next build`.
+
+Esto asegura que la cookie de bypass no pueda ser adivinada.
+
+> **Nota importante**: Para probar el Modo borrador localmente sobre HTTP, su navegador deberá permitir cookies de terceros y acceso al almacenamiento local.

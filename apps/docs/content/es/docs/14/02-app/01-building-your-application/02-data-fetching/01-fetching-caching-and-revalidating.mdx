@@ -1,0 +1,310 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:02:56.014Z
+title: Obtención, almacenamiento en caché y revalidación de datos
+nav_title: Obtención, caché y revalidación
+description: Aprende a obtener, almacenar en caché y revalidar datos en tu aplicación Next.js.
+---
+
+La obtención de datos es una parte fundamental de cualquier aplicación. Esta página explica cómo puedes obtener, almacenar en caché y revalidar datos en React y Next.js.
+
+Existen cuatro formas de obtener datos:
+
+1. [En el servidor, con `fetch`](#obtención-de-datos-en-el-servidor-con-fetch)
+2. [En el servidor, con bibliotecas de terceros](#obtención-de-datos-en-el-servidor-con-bibliotecas-de-terceros)
+3. [En el cliente, mediante un Route Handler](#obtención-de-datos-en-el-cliente-con-route-handlers)
+4. [En el cliente, con bibliotecas de terceros](#obtención-de-datos-en-el-cliente-con-route-handlers).
+
+## Obtención de datos en el servidor con `fetch`
+
+Next.js extiende la [API nativa `fetch` de Web](https://developer.mozilla.org/docs/Web/API/Fetch_API) para permitirte configurar el comportamiento de [almacenamiento en caché](#almacenamiento-en-caché-de-datos) y [revalidación](#revalidación-de-datos) para cada solicitud fetch en el servidor. React extiende `fetch` para [memorizar automáticamente](/docs/app/building-your-application/data-fetching/patterns#fetching-data-where-its-needed) las solicitudes fetch al renderizar un árbol de componentes de React.
+
+Puedes usar `fetch` con `async`/`await` en Componentes de Servidor, en [Route Handlers](/docs/app/building-your-application/routing/route-handlers) y en [Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+Por ejemplo:
+
+```tsx filename="app/page.tsx" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // El valor devuelto *no* está serializado
+  // Puedes devolver Date, Map, Set, etc.
+
+  if (!res.ok) {
+    // Esto activará el límite de error más cercano `error.js`
+    throw new Error('Error al obtener los datos')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+```jsx filename="app/page.js" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // El valor devuelto *no* está serializado
+  // Puedes devolver Date, Map, Set, etc.
+
+  if (!res.ok) {
+    // Esto activará el límite de error más cercano `error.js`
+    throw new Error('Error al obtener los datos')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+> **Nota importante**:
+>
+> - Next.js proporciona funciones útiles que puedes necesitar al obtener datos en Componentes de Servidor, como [`cookies`](/docs/app/api-reference/functions/cookies) y [`headers`](/docs/app/api-reference/functions/headers). Estas harán que la ruta se renderice dinámicamente ya que dependen de información en tiempo de solicitud.
+> - En Route Handlers, las solicitudes fetch no se memorizan ya que los Route Handlers no forman parte del árbol de componentes de React.
+> - En [Server Actions](/docs/app/building-your-application/data-fetching/server-actions-and-mutations), las solicitudes fetch no se almacenan en caché (valor predeterminado `cache: no-store`).
+> - Para usar `async`/`await` en un Componente de Servidor con TypeScript, necesitarás TypeScript `5.1.3` o superior y `@types/react` `18.2.8` o superior.
+
+### Almacenamiento en caché de datos
+
+El almacenamiento en caché guarda datos para que no sea necesario volver a obtenerlos de tu fuente de datos en cada solicitud.
+
+Por defecto, Next.js almacena automáticamente en caché los valores devueltos por `fetch` en la [Caché de Datos](/docs/app/building-your-application/caching#data-cache) del servidor. Esto significa que los datos se pueden obtener en tiempo de compilación o solicitud, almacenar en caché y reutilizar en cada solicitud de datos.
+
+```js
+// 'force-cache' es el valor predeterminado y se puede omitir
+fetch('https://...', { cache: 'force-cache' })
+```
+
+Sin embargo, hay excepciones: las solicitudes fetch no se almacenan en caché cuando:
+
+- Se usan dentro de una [Server Action](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+- Se usan dentro de un [Route Handler](/docs/app/building-your-application/routing/route-handlers) que utiliza el método `POST`.
+
+> **¿Qué es la Caché de Datos?**
+>
+> La Caché de Datos es una [caché HTTP](https://developer.mozilla.org/docs/Web/HTTP/Caching) persistente. Dependiendo de tu plataforma, la caché puede escalar automáticamente y [compartirse entre múltiples regiones](https://vercel.com/docs/infrastructure/data-cache).
+>
+> Aprende más sobre la [Caché de Datos](/docs/app/building-your-application/caching#data-cache).
+
+### Revalidación de datos
+
+La revalidación es el proceso de purgar la Caché de Datos y volver a obtener los datos más recientes. Esto es útil cuando tus datos cambian y quieres asegurarte de mostrar la información más actualizada.
+
+Los datos en caché se pueden revalidar de dos formas:
+
+- **Revalidación basada en tiempo**: Revalida automáticamente los datos después de que haya pasado una cierta cantidad de tiempo. Esto es útil para datos que cambian con poca frecuencia y la frescura no es tan crítica.
+- **Revalidación bajo demanda**: Revalida manualmente los datos basándose en un evento (por ejemplo, el envío de un formulario). La revalidación bajo demanda puede usar un enfoque basado en etiquetas o rutas para revalidar grupos de datos a la vez. Esto es útil cuando quieres asegurarte de que se muestren los datos más recientes lo antes posible (por ejemplo, cuando se actualiza contenido desde tu CMS headless).
+
+#### Revalidación basada en tiempo
+
+Para revalidar datos en intervalos de tiempo, puedes usar la opción `next.revalidate` de `fetch` para establecer el tiempo de vida en caché de un recurso (en segundos).
+
+```js
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+Alternativamente, para revalidar todas las solicitudes `fetch` en un segmento de ruta, puedes usar las [Opciones de Configuración de Segmento](/docs/app/api-reference/file-conventions/route-segment-config).
+
+```jsx filename="layout.js | page.js"
+export const revalidate = 3600 // revalida como máximo cada hora
+```
+
+Si tienes múltiples solicitudes fetch en una ruta renderizada estáticamente, y cada una tiene una frecuencia de revalidación diferente, se usará el tiempo más bajo para todas las solicitudes. Para rutas renderizadas dinámicamente, cada solicitud `fetch` se revalidará de forma independiente.
+
+Aprende más sobre la [revalidación basada en tiempo](/docs/app/building-your-application/caching#time-based-revalidation).
+
+#### Revalidación bajo demanda
+
+Los datos se pueden revalidar bajo demanda por ruta ([`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)) o por etiqueta de caché ([`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)) dentro de una [Server Action](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) o [Route Handler](/docs/app/building-your-application/routing/route-handlers).
+
+Next.js tiene un sistema de etiquetado de caché para invalidar solicitudes `fetch` a través de rutas.
+
+1. Al usar `fetch`, tienes la opción de etiquetar entradas de caché con una o más etiquetas.
+2. Luego, puedes llamar a `revalidateTag` para revalidar todas las entradas asociadas con esa etiqueta.
+
+Por ejemplo, la siguiente solicitud `fetch` agrega la etiqueta de caché `collection`:
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+Luego puedes revalidar esta llamada `fetch` etiquetada con `collection` llamando a `revalidateTag` en una Server Action:
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export default async function action() {
+  revalidateTag('collection')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export default async function action() {
+  revalidateTag('collection')
+}
+```
+
+Aprende más sobre la [revalidación bajo demanda](/docs/app/building-your-application/caching#on-demand-revalidation).
+
+#### Manejo de errores y revalidación
+
+Si ocurre un error al intentar revalidar datos, se seguirán sirviendo los últimos datos generados exitosamente desde la caché. En la siguiente solicitud, Next.js intentará revalidar los datos nuevamente.
+
+### Exclusión del almacenamiento en caché de datos
+
+Las solicitudes `fetch` **no** se almacenan en caché si:
+
+- Se agrega `cache: 'no-store'` a las solicitudes `fetch`.
+- Se agrega la opción `revalidate: 0` a solicitudes `fetch` individuales.
+- La solicitud `fetch` está dentro de un Route Handler que usa el método `POST`.
+- La solicitud `fetch` ocurre después del uso de `headers` o `cookies`.
+- Se usa la opción de segmento de ruta `const dynamic = 'force-dynamic'`.
+- La opción de segmento de ruta `fetchCache` está configurada para omitir la caché por defecto.
+- La solicitud `fetch` usa encabezados `Authorization` o `Cookie` y hay una solicitud no almacenada en caché arriba en el árbol de componentes.
+
+#### Solicitudes `fetch` individuales
+
+Para excluir el almacenamiento en caché para solicitudes `fetch` individuales, puedes establecer la opción `cache` en `fetch` como `'no-store'`. Esto obtendrá los datos dinámicamente en cada solicitud.
+
+```js filename="layout.js | page.js"
+fetch('https://...', { cache: 'no-store' })
+```
+
+Consulta todas las opciones disponibles de `cache` en la [referencia de la API `fetch`](/docs/app/api-reference/functions/fetch).
+
+#### Múltiples solicitudes `fetch`
+
+Si tienes múltiples solicitudes `fetch` en un segmento de ruta (por ejemplo, un Layout o Page), puedes configurar el comportamiento de almacenamiento en caché de todas las solicitudes de datos en el segmento usando las [Opciones de Configuración de Segmento](/docs/app/api-reference/file-conventions/route-segment-config).
+
+Sin embargo, recomendamos configurar el comportamiento de almacenamiento en caché de cada solicitud `fetch` individualmente. Esto te da un control más granular sobre el comportamiento de almacenamiento en caché.
+
+## Obtención de datos en el servidor con bibliotecas de terceros
+
+En casos donde uses una biblioteca de terceros que no soporte o exponga `fetch` (por ejemplo, un cliente de base de datos, CMS u ORM), puedes configurar el comportamiento de almacenamiento en caché y revalidación de esas solicitudes usando la [Opción de Configuración de Segmento de Ruta](/docs/app/api-reference/file-conventions/route-segment-config) y la función `cache` de React.
+
+Si los datos se almacenan en caché o no dependerá de si el segmento de ruta se [renderiza estática o dinámicamente](/docs/app/building-your-application/rendering/server-components#server-rendering-strategies). Si el segmento es estático (predeterminado), la salida de la solicitud se almacenará en caché y se revalidará como parte del segmento de ruta. Si el segmento es dinámico, la salida de la solicitud _no_ se almacenará en caché y se volverá a obtener en cada solicitud cuando se renderice el segmento.
+
+También puedes usar la API experimental [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache).
+
+### Ejemplo
+
+En el siguiente ejemplo:
+
+- La función `cache` de React se usa para [memorizar](/docs/app/building-your-application/caching#request-memoization) solicitudes de datos.
+- La opción `revalidate` se establece en `3600` en los segmentos Layout y Page, lo que significa que los datos se almacenarán en caché y se revalidarán como máximo cada hora.
+
+```ts filename="app/utils.ts" switcher
+import { cache } from 'react'
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```js filename="app/utils.js" switcher
+import { cache } from 'react'
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+Aunque la función `getItem` se llama dos veces, solo se hará una consulta a la base de datos.
+
+```tsx filename="app/item/[id]/layout.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export const revalidate = 3600 // revalida los datos como máximo cada hora
+
+export default async function Layout({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/layout.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export const revalidate = 3600 // revalida los datos como máximo cada hora
+
+export default async function Layout({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export const revalidate = 3600 // revalida los datos como máximo cada hora
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export const revalidate = 3600 // revalida los datos como máximo cada hora
+
+export default async function Page({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+## Obtención de datos en el cliente con Route Handlers
+
+Si necesitas obtener datos en un componente cliente, puedes llamar a un [Route Handler](/docs/app/building-your-application/routing/route-handlers) desde el cliente. Los Route Handlers se ejecutan en el servidor y devuelven los datos al cliente. Esto es útil cuando no quieres exponer información sensible al cliente, como tokens de API.
+
+Consulta la documentación de [Route Handler](/docs/app/building-your-application/routing/route-handlers) para ver ejemplos.
+
+> **Componentes de Servidor y Route Handlers**
+>
+> Dado que los Componentes de Servidor se renderizan en el servidor, no necesitas llamar a un Route Handler desde un Componente de Servidor para obtener datos. En su lugar, puedes obtener los datos directamente dentro del Componente de Servidor.
+
+## Obtención de datos en el cliente con bibliotecas de terceros
+
+También puedes obtener datos en el cliente usando una biblioteca de terceros como [SWR](https://swr.vercel.app/) o [TanStack Query](https://tanstack.com/query/latest). Estas bibliotecas proporcionan sus propias APIs para memorizar solicitudes, almacenar en caché, revalidar y mutar datos.
+
+> **Futuras APIs**:
+>
+> `use` es una función de React que **acepta y maneja una promesa** devuelta por una función. Envolver `fetch` en `use` actualmente **no** se recomienda en Componentes Cliente y puede desencadenar múltiples re-renderizados. Aprende más sobre `use` en la [documentación de React](https://react.dev/reference/react/use).
