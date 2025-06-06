@@ -1,0 +1,261 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:40:50.771Z
+title: getStaticPaths
+description: Referencia de API para `getStaticPaths`. Aprende a obtener datos y generar páginas estáticas con `getStaticPaths`.
+---
+
+Cuando exportas una función llamada `getStaticPaths` desde una página que utiliza [Rutas Dinámicas](/docs/pages/building-your-application/routing/dynamic-routes), Next.js pre-renderizará estáticamente todas las rutas especificadas por `getStaticPaths`.
+
+```tsx filename="pages/repo/[name].tsx" switcher
+import type {
+  InferGetStaticPropsType,
+  GetStaticProps,
+  GetStaticPaths,
+} from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getStaticPaths = (async () => {
+  return {
+    paths: [
+      {
+        params: {
+          name: 'next.js',
+        },
+      }, // Ver la sección "paths" más abajo
+    ],
+    fallback: true, // false o "blocking"
+  }
+}) satisfies GetStaticPaths
+
+export const getStaticProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetStaticProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/repo/[name].js" switcher
+export async function getStaticPaths() {
+  return {
+    paths: [
+      {
+        params: {
+          name: 'next.js',
+        },
+      }, // Ver la sección "paths" más abajo
+    ],
+    fallback: true, // false o "blocking"
+  }
+}
+
+export async function getStaticProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+## Valores de retorno de getStaticPaths
+
+La función `getStaticPaths` debe retornar un objeto con las siguientes propiedades **requeridas**:
+
+### `paths`
+
+La clave `paths` determina qué rutas serán pre-renderizadas. Por ejemplo, supongamos que tienes una página que usa [Rutas Dinámicas](/docs/pages/building-your-application/routing/dynamic-routes) llamada `pages/posts/[id].js`. Si exportas `getStaticPaths` desde esta página y retornas lo siguiente para `paths`:
+
+```js
+return {
+  paths: [
+    { params: { id: '1' }},
+    {
+      params: { id: '2' },
+      // con i18n configurado, también se puede retornar el locale para la ruta
+      locale: "en",
+    },
+  ],
+  fallback: ...
+}
+```
+
+Entonces, Next.js generará estáticamente `/posts/1` y `/posts/2` durante `next build` usando el componente de página en `pages/posts/[id].js`.
+
+El valor para cada objeto `params` debe coincidir con los parámetros usados en el nombre de la página:
+
+- Si el nombre de la página es `pages/posts/[postId]/[commentId]`, entonces `params` debe contener `postId` y `commentId`.
+- Si la página usa [rutas catch-all](/docs/pages/building-your-application/routing/dynamic-routes#catch-all-segments) como `pages/[...slug]`, entonces `params` debe contener `slug` (que es un array). Si este array es `['hello', 'world']`, entonces Next.js generará estáticamente la página en `/hello/world`.
+- Si la página usa una [ruta opcional catch-all](/docs/pages/building-your-application/routing/dynamic-routes#optional-catch-all-segments), usa `null`, `[]`, `undefined` o `false` para renderizar la ruta raíz. Por ejemplo, si proporcionas `slug: false` para `pages/[[...slug]]`, Next.js generará estáticamente la página `/`.
+
+Las cadenas `params` son **sensibles a mayúsculas/minúsculas** y idealmente deben normalizarse para asegurar que las rutas se generen correctamente. Por ejemplo, si se retorna `WoRLD` para un parámetro, solo coincidirá si `WoRLD` es la ruta visitada, no `world` o `World`.
+
+Además del objeto `params`, se puede retornar un campo `locale` cuando [i18n está configurado](/docs/pages/building-your-application/routing/internationalization), que configura el locale para la ruta que se está generando.
+
+### `fallback: false`
+
+Si `fallback` es `false`, cualquier ruta no retornada por `getStaticPaths` resultará en una **página 404**.
+
+Cuando se ejecuta `next build`, Next.js verificará si `getStaticPaths` retornó `fallback: false`, luego construirá **solo** las rutas retornadas por `getStaticPaths`. Esta opción es útil si tienes un número pequeño de rutas para crear, o si los datos de página no se añaden frecuentemente. Si necesitas añadir más rutas y tienes `fallback: false`, deberás ejecutar `next build` nuevamente para que las nuevas rutas puedan generarse.
+
+El siguiente ejemplo pre-renderiza un post de blog por página llamado `pages/posts/[id].js`. La lista de posts se obtendrá de un CMS y será retornada por `getStaticPaths`. Luego, para cada página, obtiene los datos del post desde un CMS usando [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props).
+
+```jsx filename="pages/posts/[id].js"
+function Post({ post }) {
+  // Renderizar post...
+}
+
+// Esta función se llama en tiempo de construcción
+export async function getStaticPaths() {
+  // Llama a un endpoint API externo para obtener los posts
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // Obtiene las rutas que queremos pre-renderizar basadas en los posts
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // Pre-renderizaremos solo estas rutas en tiempo de construcción.
+  // { fallback: false } significa que otras rutas deberían devolver 404.
+  return { paths, fallback: false }
+}
+
+// Esto también se llama en tiempo de construcción
+export async function getStaticProps({ params }) {
+  // params contiene el `id` del post.
+  // Si la ruta es /posts/1, entonces params.id es 1
+  const res = await fetch(`https://.../posts/${params.id}`)
+  const post = await res.json()
+
+  // Pasa los datos del post a la página via props
+  return { props: { post } }
+}
+
+export default Post
+```
+
+### `fallback: true`
+
+<details>
+  <summary>Ejemplos</summary>
+
+- [Generación estática de un gran número de páginas](https://static-tweet.vercel.app)
+
+</details>
+
+Si `fallback` es `true`, el comportamiento de `getStaticProps` cambia de la siguiente manera:
+
+- Las rutas retornadas por `getStaticPaths` serán renderizadas a `HTML` en tiempo de construcción por `getStaticProps`.
+- Las rutas que no han sido generadas en tiempo de construcción **no** resultarán en una página 404. En su lugar, Next.js servirá una versión ["fallback"](#fallback-pages) de la página en la primera solicitud a dicha ruta. Los rastreadores web, como Google, no recibirán un fallback y en su lugar la ruta se comportará como en [`fallback: 'blocking'`](#fallback-blocking).
+- Cuando se navega a una página con `fallback: true` a través de `next/link` o `next/router` (del lado del cliente), Next.js _no_ servirá un fallback y en su lugar la página se comportará como [`fallback: 'blocking'`](#fallback-blocking).
+- En segundo plano, Next.js generará estáticamente el `HTML` y `JSON` de la ruta solicitada. Esto incluye ejecutar `getStaticProps`.
+- Cuando se complete, el navegador recibirá el `JSON` para la ruta generada. Esto se usará para renderizar automáticamente la página con los props requeridos. Desde la perspectiva del usuario, la página cambiará de la versión fallback a la página completa.
+- Al mismo tiempo, Next.js añade esta ruta a la lista de páginas pre-renderizadas. Solicitudes posteriores a la misma ruta servirán la página generada, como otras páginas pre-renderizadas en tiempo de construcción.
+
+> **Nota importante**: `fallback: true` no es compatible cuando se usa [`output: 'export'`](/docs/pages/building-your-application/deploying/static-exports).
+
+#### ¿Cuándo es útil `fallback: true`?
+
+`fallback: true` es útil si tu aplicación tiene un número muy grande de páginas estáticas que dependen de datos (como un sitio de e-commerce muy grande). Si quisieras pre-renderizar todas las páginas de productos, las construcciones tomarían mucho tiempo.
+
+En su lugar, puedes generar estáticamente un subconjunto pequeño de páginas y usar `fallback: true` para el resto. Cuando alguien solicite una página que no ha sido generada aún, el usuario verá la página con un indicador de carga o un componente esqueleto.
+
+Poco después, `getStaticProps` terminará y la página se renderizará con los datos solicitados. A partir de ahora, todos los que soliciten la misma página obtendrán la página pre-renderizada estáticamente.
+
+Esto asegura que los usuarios siempre tengan una experiencia rápida mientras se preservan construcciones rápidas y los beneficios de la Generación Estática.
+
+`fallback: true` no _actualizará_ las páginas generadas, para eso mira [Regeneración Estática Incremental](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration).
+
+### `fallback: 'blocking'`
+
+Si `fallback` es `'blocking'`, las nuevas rutas no retornadas por `getStaticPaths` esperarán a que se genere el `HTML`, idéntico a SSR (de ahí el nombre _blocking_), y luego se almacenarán en caché para solicitudes futuras, por lo que solo ocurrirá una vez por ruta.
+
+`getStaticProps` se comportará de la siguiente manera:
+
+- Las rutas retornadas por `getStaticPaths` serán renderizadas a `HTML` en tiempo de construcción por `getStaticProps`.
+- Las rutas que no han sido generadas en tiempo de construcción **no** resultarán en una página 404. En su lugar, Next.js hará SSR en la primera solicitud y retornará el `HTML` generado.
+- Cuando se complete, el navegador recibirá el `HTML` para la ruta generada. Desde la perspectiva del usuario, pasará de "el navegador está solicitando la página" a "la página completa está cargada". No hay parpadeo de estado de carga/fallback.
+- Al mismo tiempo, Next.js añade esta ruta a la lista de páginas pre-renderizadas. Solicitudes posteriores a la misma ruta servirán la página generada, como otras páginas pre-renderizadas en tiempo de construcción.
+
+`fallback: 'blocking'` no _actualizará_ las páginas generadas por defecto. Para actualizar páginas generadas, usa [Regeneración Estática Incremental](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) junto con `fallback: 'blocking'`.
+
+> **Nota importante**: `fallback: 'blocking'` no es compatible cuando se usa [`output: 'export'`](/docs/pages/building-your-application/deploying/static-exports).
+
+### Páginas fallback
+
+En la versión "fallback" de una página:
+
+- Los props de la página estarán vacíos.
+- Usando el [router](/docs/pages/api-reference/functions/use-router), puedes detectar si se está renderizando el fallback, `router.isFallback` será `true`.
+
+El siguiente ejemplo muestra el uso de `isFallback`:
+
+```jsx filename="pages/posts/[id].js"
+import { useRouter } from 'next/router'
+
+function Post({ post }) {
+  const router = useRouter()
+
+  // Si la página no ha sido generada aún, esto se mostrará
+  // inicialmente hasta que getStaticProps() termine de ejecutarse
+  if (router.isFallback) {
+    return <div>Cargando...</div>
+  }
+
+  // Renderizar post...
+}
+
+// Esta función se llama en tiempo de construcción
+export async function getStaticPaths() {
+  return {
+    // Solo `/posts/1` y `/posts/2` son generadas en tiempo de construcción
+    paths: [{ params: { id: '1' } }, { params: { id: '2' } }],
+    // Habilita la generación estática de páginas adicionales
+    // Por ejemplo: `/posts/3`
+    fallback: true,
+  }
+}
+
+// Esto también se llama en tiempo de construcción
+export async function getStaticProps({ params }) {
+  // params contiene el `id` del post.
+  // Si la ruta es /posts/1, entonces params.id es 1
+  const res = await fetch(`https://.../posts/${params.id}`)
+  const post = await res.json()
+
+  // Pasa los datos del post a la página via props
+  return {
+    props: { post },
+    // Re-genera el post como máximo una vez por segundo
+    // si llega una solicitud
+    revalidate: 1,
+  }
+}
+
+export default Post
+```
+
+## Historial de versiones
+
+| Versión   | Cambios                                                                                                                                                                                                     |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v13.4.0` | [App Router](/docs/app/building-your-application/data-fetching) ahora es estable con una obtención de datos simplificada, incluyendo [`generateStaticParams()`](/docs/app/api-reference/functions/generate-static-params) |
+| `v12.2.0` | [Regeneración Estática Incremental bajo demanda](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration#on-demand-revalidation) es estable.                                          |
+| `v12.1.0` | [Regeneración Estática Incremental bajo demanda](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration#on-demand-revalidation) añadida (beta).                                       |
+| `v9.5.0`  | Estable [Regeneración Estática Incremental](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)                                                                               |
+| `v9.3.0`  | `getStaticPaths` introducido.                                                                                                                                                                                |

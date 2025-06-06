@@ -1,0 +1,143 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:47:43.877Z
+title: output
+description: Next.js rastrea automáticamente los archivos necesarios para cada página, facilitando el despliegue de tu aplicación. Aprende cómo funciona aquí.
+---
+
+{/* El contenido de este documento es compartido entre el enrutador de aplicaciones y páginas. Puedes usar el componente `<PagesOnly>Contenido</PagesOnly>` para agregar contenido específico del Enrutador de Páginas. Cualquier contenido compartido no debe estar envuelto en un componente. */}
+
+Durante una compilación, Next.js rastreará automáticamente cada página y sus dependencias para determinar todos los archivos necesarios para desplegar una versión en producción de tu aplicación.
+
+Esta característica ayuda a reducir drásticamente el tamaño de los despliegues. Anteriormente, al desplegar con Docker, necesitabas tener todos los archivos de las `dependencies` de tu paquete instalados para ejecutar `next start`. A partir de Next.js 12, puedes aprovechar el Rastreo de Archivos de Salida (Output File Tracing) en el directorio `.next/` para incluir solo los archivos necesarios.
+
+Además, esto elimina la necesidad del objetivo obsoleto `serverless`, que puede causar varios problemas y también crea duplicación innecesaria.
+
+## Cómo Funciona
+
+Durante `next build`, Next.js usará [`@vercel/nft`](https://github.com/vercel/nft) para analizar estáticamente los usos de `import`, `require` y `fs` para determinar todos los archivos que una página podría cargar.
+
+El servidor de producción de Next.js también es rastreado para sus archivos necesarios y se genera en `.next/next-server.js.nft.json`, que puede ser aprovechado en producción.
+
+Para aprovechar los archivos `.nft.json` generados en el directorio de salida `.next`, puedes leer la lista de archivos en cada rastreo que son relativos al archivo `.nft.json` y luego copiarlos a tu ubicación de despliegue.
+
+## Copia Automática de Archivos Rastreados
+
+Next.js puede crear automáticamente una carpeta `standalone` que copia solo los archivos necesarios para un despliegue en producción, incluyendo archivos seleccionados en `node_modules`.
+
+Para aprovechar esta copia automática, puedes habilitarla en tu `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  output: 'standalone',
+}
+```
+
+Esto creará una carpeta en `.next/standalone` que luego puede ser desplegada por sí sola sin instalar `node_modules`.
+
+Adicionalmente, también se genera un archivo mínimo `server.js` que puede usarse en lugar de `next start`. Este servidor mínimo no copia las carpetas `public` o `.next/static` por defecto, ya que idealmente deberían ser manejadas por un CDN, aunque estas carpetas pueden copiarse manualmente a `standalone/public` y `standalone/.next/static`, después de lo cual el archivo `server.js` las servirá automáticamente.
+
+<AppOnly>
+
+> **Es bueno saber**:
+>
+> - Si tu proyecto necesita escuchar en un puerto o nombre de host específico, puedes definir las variables de entorno `PORT` o `HOSTNAME` antes de ejecutar `server.js`. Por ejemplo, ejecuta `PORT=8080 HOSTNAME=0.0.0.0 node server.js` para iniciar el servidor en `http://0.0.0.0:8080`.
+> - Si tu proyecto usa [Optimización de Imágenes](/docs/app/building-your-application/optimizing/images) con el `loader` predeterminado, debes instalar `sharp` como dependencia:
+
+</AppOnly>
+
+<PagesOnly>
+
+> **Es bueno saber**:
+>
+> - `next.config.js` se lee durante `next build` y se serializa en el archivo de salida `server.js`. Si se usan las opciones obsoletas [`serverRuntimeConfig` o `publicRuntimeConfig`](/docs/pages/api-reference/next-config-js/runtime-configuration), los valores serán específicos a los valores en el momento de la compilación.
+> - Si tu proyecto necesita escuchar en un puerto o nombre de host específico, puedes definir las variables de entorno `PORT` o `HOSTNAME` antes de ejecutar `server.js`. Por ejemplo, ejecuta `PORT=8080 HOSTNAME=0.0.0.0 node server.js` para iniciar el servidor en `http://0.0.0.0:8080`.
+> - Si tu proyecto usa [Optimización de Imágenes](/docs/pages/building-your-application/optimizing/images) con el `loader` predeterminado, debes instalar `sharp` como dependencia:
+
+</PagesOnly>
+
+```bash filename="Terminal"
+npm i sharp
+```
+
+```bash filename="Terminal"
+yarn add sharp
+```
+
+```bash filename="Terminal"
+pnpm add sharp
+```
+
+```bash filename="Terminal"
+bun add sharp
+```
+
+## Consideraciones
+
+- En configuraciones de monorepositorio, el directorio del proyecto se usa para el rastreo por defecto. Para `next build packages/web-app`, `packages/web-app` sería la raíz del rastreo y cualquier archivo fuera de esa carpeta no se incluirá. Para incluir archivos fuera de esta carpeta, puedes configurar `experimental.outputFileTracingRoot` en tu `next.config.js`.
+
+```js filename="packages/web-app/next.config.js"
+module.exports = {
+  experimental: {
+    // esto incluye archivos desde la base del monorepositorio dos directorios arriba
+    outputFileTracingRoot: path.join(__dirname, '../../'),
+  },
+}
+```
+
+- Hay casos en los que Next.js podría fallar al incluir archivos necesarios, o incluir incorrectamente archivos no utilizados. En esos casos, puedes usar `experimental.outputFileTracingExcludes` y `experimental.outputFileTracingIncludes` respectivamente en `next.config.js`. Cada configuración acepta un objeto con [globs minimatch](https://www.npmjs.com/package/minimatch) como clave para coincidir con páginas específicas y un valor de un array con globs relativos a la raíz del proyecto para incluir o excluir en el rastreo.
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    outputFileTracingExcludes: {
+      '/api/hello': ['./un-necessary-folder/**/*'],
+    },
+    outputFileTracingIncludes: {
+      '/api/another': ['./necessary-folder/**/*'],
+    },
+  },
+}
+```
+
+- Actualmente, Next.js no hace nada con los archivos `.nft.json` generados. Los archivos deben ser leídos por tu plataforma de despliegue, por ejemplo [Vercel](https://vercel.com), para crear un despliegue mínimo. En una futura versión, se planea un nuevo comando para utilizar estos archivos `.nft.json`.
+
+## Experimental `turbotrace`
+
+El rastreo de dependencias puede ser lento porque requiere cálculos y análisis muy complejos. Creamos `turbotrace` en Rust como una alternativa más rápida e inteligente a la implementación en JavaScript.
+
+Para habilitarlo, puedes agregar la siguiente configuración a tu `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    turbotrace: {
+      // controla el nivel de registro de turbotrace, el predeterminado es `error`
+      logLevel?:
+      | 'bug'
+      | 'fatal'
+      | 'error'
+      | 'warning'
+      | 'hint'
+      | 'note'
+      | 'suggestions'
+      | 'info',
+      // controla si el registro de turbotrace debe contener detalles del análisis, el predeterminado es `false`
+      logDetail?: boolean
+      // muestra todos los mensajes de registro sin límite
+      // turbotrace solo muestra 1 mensaje por categoría por defecto
+      logAll?: boolean
+      // controla el directorio de contexto de turbotrace
+      // los archivos fuera del directorio de contexto no serán rastreados
+      // configurar `experimental.outputFileTracingRoot` tiene el mismo efecto
+      // si ambos `experimental.outputFileTracingRoot` y esta opción están configurados, se usará `experimental.turbotrace.contextDirectory`
+      contextDirectory?: string
+      // si hay una expresión `process.cwd()` en tu código, puedes configurar esta opción para indicarle a `turbotrace` el valor de `process.cwd()` durante el rastreo.
+      // por ejemplo, el require(process.cwd() + '/package.json') será rastreado como require('/path/to/cwd/package.json')
+      processCwd?: string
+      // controla el uso máximo de memoria de `turbotrace`, en `MB`, el predeterminado es `6000`.
+      memoryLimit?: number
+    },
+  },
+}
+```

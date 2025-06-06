@@ -1,0 +1,585 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:05:46.051Z
+title: Caché en Next.js
+nav_title: Caché
+description: Una visión general de los mecanismos de caché en Next.js.
+---
+
+Next.js mejora el rendimiento de tu aplicación y reduce costos almacenando en caché el trabajo de renderizado y las solicitudes de datos. Esta página ofrece un análisis detallado de los mecanismos de caché de Next.js, las APIs que puedes usar para configurarlos y cómo interactúan entre sí.
+
+> **Es bueno saberlo**: Esta página te ayuda a entender cómo funciona Next.js internamente, pero **no** es conocimiento esencial para ser productivo con Next.js. La mayoría de las heurísticas de caché de Next.js están determinadas por tu uso de API y tienen configuraciones predeterminadas para el mejor rendimiento con cero o mínima configuración.
+
+## Visión general
+
+Aquí tienes una visión general de alto nivel de los diferentes mecanismos de caché y su propósito:
+
+| Mecanismo                                   | Qué almacena              | Dónde | Propósito                                       | Duración                        |
+| ------------------------------------------- | ------------------------- | ----- | ----------------------------------------------- | ------------------------------- |
+| [Memoización de solicitudes](#memoización-de-solicitudes) | Valores de retorno de funciones | Servidor | Reutilizar datos en un árbol de componentes React | Ciclo de vida por solicitud     |
+| [Caché de datos](#caché-de-datos)           | Datos                     | Servidor | Almacenar datos entre solicitudes de usuarios y despliegues | Persistente (puede revalidarse) |
+| [Caché de ruta completa](#caché-de-ruta-completa) | HTML y carga útil RSC     | Servidor | Reducir costos de renderizado y mejorar rendimiento | Persistente (puede revalidarse) |
+| [Caché del enrutador](#caché-del-enrutador) | Carga útil RSC            | Cliente | Reducir solicitudes al servidor en navegaciones | Sesión del usuario o por tiempo |
+
+Por defecto, Next.js almacenará en caché tanto como sea posible para mejorar el rendimiento y reducir costos. Esto significa que las rutas se renderizan **estáticamente** y las solicitudes de datos se **almacenan en caché** a menos que decidas lo contrario. El diagrama a continuación muestra el comportamiento predeterminado de caché: cuando una ruta se renderiza estáticamente en el momento de construcción y cuando se visita por primera vez una ruta estática.
+
+<Image
+  alt="Diagrama que muestra el comportamiento predeterminado de caché en Next.js para los cuatro mecanismos, con HIT, MISS y SET en el momento de construcción y cuando una ruta se visita por primera vez."
+  srcLight="/docs/light/caching-overview.png"
+  srcDark="/docs/dark/caching-overview.png"
+  width="1600"
+  height="1179"
+/>
+
+El comportamiento de caché cambia dependiendo de si la ruta se renderiza estática o dinámicamente, si los datos están en caché o no, y si una solicitud es parte de una visita inicial o una navegación posterior. Dependiendo de tu caso de uso, puedes configurar el comportamiento de caché para rutas individuales y solicitudes de datos.
+
+## Memoización de solicitudes
+
+React extiende la API [`fetch`](#fetch) para **memorizar** automáticamente solicitudes que tienen la misma URL y opciones. Esto significa que puedes llamar a una función fetch para los mismos datos en múltiples lugares de un árbol de componentes React mientras solo se ejecuta una vez.
+
+<Image
+  alt="Solicitudes Fetch deduplicadas"
+  srcLight="/docs/light/deduplicated-fetch-requests.png"
+  srcDark="/docs/dark/deduplicated-fetch-requests.png"
+  width="1600"
+  height="857"
+/>
+
+Por ejemplo, si necesitas usar los mismos datos a lo largo de una ruta (ej. en un Layout, Página y múltiples componentes), no tienes que obtener los datos en la parte superior del árbol y pasar props entre componentes. En su lugar, puedes obtener datos en los componentes que los necesitan sin preocuparte por las implicaciones de rendimiento de hacer múltiples solicitudes a través de la red para los mismos datos.
+
+```tsx filename="app/example.tsx" switcher
+async function getItem() {
+  // La función `fetch` se memoriza automáticamente y el resultado
+  // se almacena en caché
+  const res = await fetch('https://.../item/1')
+  return res.json()
+}
+
+// Esta función se llama dos veces, pero solo se ejecuta la primera vez
+const item = await getItem() // cache MISS
+
+// La segunda llamada podría estar en cualquier parte de tu ruta
+const item = await getItem() // cache HIT
+```
+
+```jsx filename="app/example.js" switcher
+async function getItem() {
+  // La función `fetch` se memoriza automáticamente y el resultado
+  // se almacena en caché
+  const res = await fetch('https://.../item/1')
+  return res.json()
+}
+
+// Esta función se llama dos veces, pero solo se ejecuta la primera vez
+const item = await getItem() // cache MISS
+
+// La segunda llamada podría estar en cualquier parte de tu ruta
+const item = await getItem() // cache HIT
+```
+
+**Cómo funciona la Memoización de Solicitudes**
+
+<Image
+  alt="Diagrama que muestra cómo funciona la memoización de fetch durante el renderizado de React."
+  srcLight="/docs/light/request-memoization.png"
+  srcDark="/docs/dark/request-memoization.png"
+  width="1600"
+  height="742"
+/>
+
+- Mientras se renderiza una ruta, la primera vez que se llama a una solicitud particular, su resultado no estará en memoria y será un `MISS` de caché.
+- Por lo tanto, la función se ejecutará y los datos se obtendrán de la fuente externa, y el resultado se almacenará en memoria.
+- Las llamadas posteriores a la función de la misma solicitud en el mismo pase de renderizado serán un `HIT` de caché, y los datos se devolverán de memoria sin ejecutar la función.
+- Una vez que la ruta se ha renderizado y el pase de renderizado ha terminado, la memoria se "reinicia" y todas las entradas de memoización de solicitudes se borran.
+
+> **Es bueno saberlo**:
+>
+> - La memoización de solicitudes es una característica de React, no de Next.js. Se incluye aquí para mostrar cómo interactúa con otros mecanismos de caché.
+> - La memoización solo se aplica al método `GET` en solicitudes `fetch`.
+> - La memoización solo se aplica al árbol de componentes React, esto significa:
+>   - Se aplica a solicitudes `fetch` en `generateMetadata`, `generateStaticParams`, Layouts, Pages y otros Server Components.
+>   - No se aplica a solicitudes `fetch` en Route Handlers ya que no son parte del árbol de componentes React.
+> - Para casos donde `fetch` no es adecuado (ej. algunos clientes de base de datos, CMS o GraphQL), puedes usar la [función `cache` de React](#función-cache-de-react) para memorizar funciones.
+
+### Duración
+
+La caché dura el tiempo de vida de una solicitud del servidor hasta que el árbol de componentes React ha terminado de renderizarse.
+
+### Revalidación
+
+Dado que la memoización no se comparte entre solicitudes del servidor y solo se aplica durante el renderizado, no es necesario revalidarla.
+
+### Optar por no usarla
+
+La memoización solo se aplica al método `GET` en solicitudes `fetch`, otros métodos como `POST` y `DELETE` no se memorizan. Este comportamiento predeterminado es una optimización de React y no recomendamos optar por no usarlo.
+
+Para gestionar solicitudes individuales, puedes usar la propiedad [`signal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController/signal) de [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController). Sin embargo, esto no hará que las solicitudes no se memoricen, sino que abortará las solicitudes en curso.
+
+```js filename="app/example.js"
+const { signal } = new AbortController()
+fetch(url, { signal })
+```
+
+## Caché de datos
+
+Next.js tiene una Caché de datos integrada que **persiste** el resultado de las obtenciones de datos entre **solicitudes del servidor** y **despliegues**. Esto es posible porque Next.js extiende la API nativa `fetch` para permitir que cada solicitud en el servidor establezca su propia semántica de caché persistente.
+
+> **Es bueno saberlo**: En el navegador, la opción `cache` de `fetch` indica cómo una solicitud interactuará con la caché HTTP del navegador, en Next.js, la opción `cache` indica cómo una solicitud del lado del servidor interactuará con la Caché de datos del servidor.
+
+Por defecto, las solicitudes de datos que usan `fetch` se **almacenan en caché**. Puedes usar las opciones [`cache`](#opciones-de-fetchcache) y [`next.revalidate`](#opciones-de-fetchnextrevalidate) de `fetch` para configurar el comportamiento de caché.
+
+**Cómo funciona la Caché de datos**
+
+<Image
+  alt="Diagrama que muestra cómo las solicitudes fetch en caché y sin caché interactúan con la Caché de datos. Las solicitudes en caché se almacenan en la Caché de datos y se memorizan, las solicitudes sin caché se obtienen de la fuente de datos, no se almacenan en la Caché de datos y se memorizan."
+  srcLight="/docs/light/data-cache.png"
+  srcDark="/docs/dark/data-cache.png"
+  width="1600"
+  height="661"
+/>
+
+- La primera vez que se llama a una solicitud `fetch` durante el renderizado, Next.js verifica la Caché de datos para una respuesta almacenada en caché.
+- Si se encuentra una respuesta en caché, se devuelve inmediatamente y se [memoriza](#memoización-de-solicitudes).
+- Si no se encuentra una respuesta en caché, se realiza la solicitud a la fuente de datos, el resultado se almacena en la Caché de datos y se memoriza.
+- Para datos sin caché (ej. `{ cache: 'no-store' }`), el resultado siempre se obtiene de la fuente de datos y se memoriza.
+- Ya sea que los datos estén en caché o no, las solicitudes siempre se memorizan para evitar hacer solicitudes duplicadas para los mismos datos durante un pase de renderizado de React.
+
+> **Diferencias entre la Caché de datos y la Memoización de solicitudes**
+>
+> Aunque ambos mecanismos de caché ayudan a mejorar el rendimiento reutilizando datos en caché, la Caché de datos es persistente entre solicitudes entrantes y despliegues, mientras que la memoización solo dura el tiempo de vida de una solicitud.
+>
+> Con la memoización, reducimos el número de solicitudes **duplicadas** en el mismo pase de renderizado que tienen que cruzar el límite de red desde el servidor de renderizado al servidor de Caché de datos (ej. una CDN o Edge Network) o fuente de datos (ej. una base de datos o CMS). Con la Caché de datos, reducimos el número de solicitudes hechas a nuestra fuente de datos original.
+
+### Duración
+
+La Caché de datos es persistente entre solicitudes entrantes y despliegues a menos que la revalides o optes por no usarla.
+
+### Revalidación
+
+Los datos en caché se pueden revalidar de dos maneras, con:
+
+- **Revalidación basada en tiempo**: Revalida datos después de que ha pasado cierta cantidad de tiempo y se hace una nueva solicitud. Esto es útil para datos que cambian con poca frecuencia y la frescura no es tan crítica.
+- **Revalidación bajo demanda**: Revalida datos basados en un evento (ej. envío de un formulario). La revalidación bajo demanda puede usar un enfoque basado en etiquetas o rutas para revalidar grupos de datos a la vez. Esto es útil cuando quieres asegurarte de que se muestren los datos más recientes lo antes posible (ej. cuando se actualiza contenido de tu CMS headless).
+
+#### Revalidación basada en tiempo
+
+Para revalidar datos en intervalos de tiempo, puedes usar la opción `next.revalidate` de `fetch` para establecer el tiempo de vida de la caché de un recurso (en segundos).
+
+```js
+// Revalida como máximo cada hora
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+Alternativamente, puedes usar [opciones de configuración de segmentos de ruta](#opciones-de-configuración-de-segmentos) para configurar todas las solicitudes `fetch` en un segmento o para casos donde no puedas usar `fetch`.
+
+**Cómo funciona la Revalidación basada en tiempo**
+
+<Image
+  alt="Diagrama que muestra cómo funciona la revalidación basada en tiempo, después del período de revalidación, se devuelven datos obsoletos para la primera solicitud, luego los datos se revalidan."
+  srcLight="/docs/light/time-based-revalidation.png"
+  srcDark="/docs/dark/time-based-revalidation.png"
+  width="1600"
+  height="1252"
+/>
+
+- La primera vez que se llama a una solicitud fetch con `revalidate`, los datos se obtendrán de la fuente de datos externa y se almacenarán en la Caché de datos.
+- Cualquier solicitud que se llame dentro del período de tiempo especificado (ej. 60 segundos) devolverá los datos en caché.
+- Después del período de tiempo, la siguiente solicitud aún devolverá los datos en caché (ahora obsoletos).
+  - Next.js activará una revalidación de los datos en segundo plano.
+  - Una vez que los datos se obtengan con éxito, Next.js actualizará la Caché de datos con los datos frescos.
+  - Si la revalidación en segundo plano falla, los datos anteriores se mantendrán sin cambios.
+
+Esto es similar al comportamiento [**stale-while-revalidate**](https://web.dev/stale-while-revalidate/).
+
+#### Revalidación bajo demanda
+
+Los datos se pueden revalidar bajo demanda por ruta ([`revalidatePath`](#revalidatepath)) o por etiqueta de caché ([`revalidateTag`](#opciones-de-fetchnexttags-y-revalidatetag)).
+
+**Cómo funciona la Revalidación bajo demanda**
+
+<Image
+  alt="Diagrama que muestra cómo funciona la revalidación bajo demanda, la Caché de datos se actualiza con datos frescos después de una solicitud de revalidación."
+  srcLight="/docs/light/on-demand-revalidation.png"
+  srcDark="/docs/dark/on-demand-revalidation.png"
+  width="1600"
+  height="1082"
+/>
+
+- La primera vez que se llama a una solicitud `fetch`, los datos se obtendrán de la fuente de datos externa y se almacenarán en la Caché de datos.
+- Cuando se activa una revalidación bajo demanda, las entradas de caché apropiadas se purgarán de la caché.
+  - Esto es diferente de la revalidación basada en tiempo, que mantiene los datos obsoletos en la caché hasta que se obtienen los datos frescos.
+- La próxima vez que se haga una solicitud, será un `MISS` de caché nuevamente, y los datos se obtendrán de la fuente de datos externa y se almacenarán en la Caché de datos.
+
+### Optar por no usarla
+
+Para obtenciones de datos individuales, puedes optar por no usar la caché estableciendo la opción [`cache`](#opciones-de-fetchcache) en `no-store`. Esto significa que los datos se obtendrán cada vez que se llame a `fetch`.
+
+```jsx
+// Optar por no usar caché para una solicitud `fetch` individual
+fetch(`https://...`, { cache: 'no-store' })
+```
+
+Alternativamente, también puedes usar las [opciones de configuración de segmentos de ruta](#opciones-de-configuración-de-segmentos) para optar por no usar caché para un segmento de ruta específico. Esto afectará a todas las solicitudes de datos en el segmento de ruta, incluyendo bibliotecas de terceros.
+
+```jsx
+// Optar por no usar caché para todas las solicitudes de datos en el segmento de ruta
+export const dynamic = 'force-dynamic'
+```
+
+> **Nota**: La Caché de datos actualmente solo está disponible en páginas/rutas, no en middleware. Cualquier fetch hecho dentro de tu middleware no estará en caché por defecto.
+
+> **Caché de datos de Vercel**
+>
+> Si tu aplicación Next.js está desplegada en Vercel, recomendamos leer la documentación de [Caché de datos de Vercel](https://vercel.com/docs/infrastructure/data-cache) para un mejor entendimiento de las características específicas de Vercel.
+
+## Caché de ruta completa
+
+> **Términos relacionados**:
+>
+> Puedes ver los términos **Optimización estática automática**, **Generación de sitios estáticos** o **Renderizado estático** usados indistintamente para referirse al proceso de renderizar y almacenar en caché rutas de tu aplicación en el momento de construcción.
+
+Next.js renderiza y almacena en caché rutas automáticamente en el momento de construcción. Esta es una optimización que te permite servir la ruta en caché en lugar de renderizar en el servidor para cada solicitud, resultando en cargas de página más rápidas.
+
+Para entender cómo funciona la Caché de ruta completa, es útil ver cómo React maneja el renderizado y cómo Next.js almacena en caché el resultado:
+
+### 1. Renderizado de React en el servidor
+
+En el servidor, Next.js usa las APIs de React para orquestar el renderizado. El trabajo de renderizado se divide en fragmentos: por segmentos de ruta individuales y límites de Suspense.
+
+Cada fragmento se renderiza en dos pasos:
+
+1. React renderiza Server Components en un formato de datos especial optimizado para streaming, llamado **React Server Component Payload**.
+2. Next.js usa el React Server Component Payload y las instrucciones JavaScript de Client Components para renderizar **HTML** en el servidor.
+
+Esto significa que no tenemos que esperar a que todo se renderice antes de almacenar en caché el trabajo o enviar una respuesta. En su lugar, podemos transmitir una respuesta a medida que se completa el trabajo.
+
+> **¿Qué es el React Server Component Payload?**
+>
+> El React Server Component Payload es una representación binaria compacta del árbol de React Server Components renderizado. Lo usa React en el cliente para actualizar el DOM del navegador. El React Server Component Payload contiene:
+>
+> - El resultado renderizado de Server Components
+> - Marcadores de posición donde se deben renderizar Client Components y referencias a sus archivos JavaScript
+> - Cualquier prop pasado de un Server Component a un Client Component
+>
+> Para aprender más, consulta la documentación de [Server Components](/docs/app/building-your-application/rendering/server-components).
+
+### 2. Almacenamiento en caché en Next.js en el servidor (Caché de ruta completa)
+
+<Image
+  alt="Comportamiento predeterminado de la Caché de ruta completa, mostrando cómo el React Server Component Payload y el HTML se almacenan en caché en el servidor para rutas renderizadas estáticamente."
+  srcLight="/docs/light/full-route-cache.png"
+  srcDark="/docs/dark/full-route-cache.png"
+  width="1600"
+  height="888"
+/>
+
+El comportamiento predeterminado de Next.js es almacenar en caché el resultado renderizado (React Server Component Payload y HTML) de una ruta en el servidor. Esto se aplica a rutas renderizadas estáticamente en el momento de construcción o durante la revalidación.
+
+### 3. Hidratación (Hydration) y Reconciliación de React en el Cliente
+
+En el momento de la solicitud, en el cliente:
+
+1. El HTML se utiliza para mostrar inmediatamente una vista previa rápida no interactiva de los Componentes del Cliente y del Servidor.
+2. La Carga Útil (Payload) de los Componentes del Servidor de React se utiliza para reconciliar los árboles de los Componentes del Cliente y los Componentes del Servidor renderizados, y actualizar el DOM.
+3. Las instrucciones de JavaScript se utilizan para [hidratar](https://react.dev/reference/react-dom/client/hydrateRoot) los Componentes del Cliente y hacer que la aplicación sea interactiva.
+
+### 4. Almacenamiento en Caché (Caching) de Next.js en el Cliente (Caché del Enrutador)
+
+La Carga Útil (Payload) de los Componentes del Servidor de React se almacena en la [Caché del Enrutador](#router-cache) del lado del cliente, una caché en memoria separada, dividida por segmentos de ruta individuales. Esta Caché del Enrutador se utiliza para mejorar la experiencia de navegación almacenando rutas visitadas previamente y prefetching (precarga) de rutas futuras.
+
+### 5. Navegaciones Posteriores
+
+En navegaciones posteriores o durante el prefetching, Next.js verificará si la Carga Útil (Payload) de los Componentes del Servidor de React está almacenada en la Caché del Enrutador. Si es así, omitirá enviar una nueva solicitud al servidor.
+
+Si los segmentos de la ruta no están en la caché, Next.js obtendrá la Carga Útil (Payload) de los Componentes del Servidor de React desde el servidor y poblará la Caché del Enrutador en el cliente.
+
+### Renderizado Estático y Dinámico
+
+Si una ruta se almacena en caché o no en el momento de la compilación depende de si se renderiza estática o dinámicamente. Las rutas estáticas se almacenan en caché por defecto, mientras que las rutas dinámicas se renderizan en el momento de la solicitud y no se almacenan en caché.
+
+Este diagrama muestra la diferencia entre rutas renderizadas estática y dinámicamente, con datos almacenados en caché y no almacenados:
+
+<Image
+  alt="Cómo el renderizado estático y dinámico afecta a la Caché Completa de Ruta. Las rutas estáticas se almacenan en caché en el momento de la compilación o después de la revalidación de datos, mientras que las rutas dinámicas nunca se almacenan en caché"
+  srcLight="/docs/light/static-and-dynamic-routes.png"
+  srcDark="/docs/dark/static-and-dynamic-routes.png"
+  width="1600"
+  height="1314"
+/>
+
+Aprende más sobre [renderizado estático y dinámico](/docs/app/building-your-application/rendering/server-components#server-rendering-strategies).
+
+### Duración
+
+Por defecto, la Caché Completa de Ruta es persistente. Esto significa que el resultado del renderizado se almacena en caché entre solicitudes de usuarios.
+
+### Invalidación
+
+Hay dos formas de invalidar la Caché Completa de Ruta:
+
+- **[Revalidación de Datos](/docs/app/building-your-application/caching#revalidating)**: Revalidar la [Caché de Datos](#data-cache) invalidará a su vez la Caché del Enrutador al volver a renderizar los componentes en el servidor y almacenar en caché el nuevo resultado del renderizado.
+- **Nuevo Despliegue**: A diferencia de la Caché de Datos, que persiste entre despliegues, la Caché Completa de Ruta se borra en nuevos despliegues.
+
+### Exclusión
+
+Puedes excluirte de la Caché Completa de Ruta, o en otras palabras, renderizar dinámicamente componentes para cada solicitud entrante, mediante:
+
+- **Uso de una [Función Dinámica](#dynamic-functions)**: Esto excluirá la ruta de la Caché Completa de Ruta y la renderizará dinámicamente en el momento de la solicitud. La Caché de Datos aún puede utilizarse.
+- **Uso de las opciones de configuración de segmento de ruta `dynamic = 'force-dynamic'` o `revalidate = 0`**: Esto omitirá la Caché Completa de Ruta y la Caché de Datos. Es decir, los componentes se renderizarán y los datos se obtendrán en cada solicitud entrante al servidor. La Caché del Enrutador seguirá aplicándose ya que es una caché del lado del cliente.
+- **Exclusión de la [Caché de Datos](#data-cache)**: Si una ruta tiene una solicitud `fetch` que no se almacena en caché, esto excluirá la ruta de la Caché Completa de Ruta. Los datos para la solicitud `fetch` específica se obtendrán para cada solicitud entrante. Otras solicitudes `fetch` que no se excluyan del almacenamiento en caché seguirán almacenadas en la Caché de Datos. Esto permite un híbrido de datos almacenados en caché y no almacenados.
+
+## Caché del Enrutador
+
+> **Términos Relacionados:**
+>
+> Puedes ver que la Caché del Enrutador se denomina **Caché del Lado del Cliente** o **Caché de Prefetching**. Mientras que **Caché de Prefetching** se refiere a los segmentos de ruta precargados, **Caché del Lado del Cliente** se refiere a toda la Caché del Enrutador, que incluye tanto segmentos visitados como precargados.
+> Esta caché se aplica específicamente a Next.js y a los Componentes del Servidor, y es diferente al [bfcache](https://web.dev/bfcache/) del navegador, aunque tiene un resultado similar.
+
+Next.js tiene una caché en memoria del lado del cliente que almacena la Carga Útil (Payload) de los Componentes del Servidor de React, dividida por segmentos de ruta individuales, durante la duración de una sesión de usuario. Esto se llama Caché del Enrutador.
+
+**Cómo Funciona la Caché del Enrutador**
+
+<Image
+  alt="Cómo funciona la Caché del Enrutador para rutas estáticas y dinámicas, mostrando MISS y HIT para navegaciones iniciales y posteriores."
+  srcLight="/docs/light/router-cache.png"
+  srcDark="/docs/dark/router-cache.png"
+  width="1600"
+  height="1375"
+/>
+
+A medida que un usuario navega entre rutas, Next.js almacena en caché los segmentos de ruta visitados y [precarga](/docs/app/building-your-application/routing/linking-and-navigating#2-prefetching) las rutas a las que es probable que el usuario navegue (basándose en componentes `<Link>` en su viewport).
+
+Esto resulta en una experiencia de navegación mejorada para el usuario:
+
+- Navegación instantánea hacia atrás/adelante porque las rutas visitadas están almacenadas en caché y navegación rápida a nuevas rutas debido al prefetching y al [renderizado parcial](/docs/app/building-your-application/routing/linking-and-navigating#4-partial-rendering).
+- No hay recarga completa de la página entre navegaciones, y se conservan el estado de React y el estado del navegador.
+
+> **Diferencia entre la Caché del Enrutador y la Caché Completa de Ruta**:
+>
+> La Caché del Enrutador almacena temporalmente la Carga Útil (Payload) de los Componentes del Servidor de React en el navegador durante la duración de una sesión de usuario, mientras que la Caché Completa de Ruta almacena persistentemente la Carga Útil (Payload) de los Componentes del Servidor de React y el HTML en el servidor a través de múltiples solicitudes de usuarios.
+>
+> Mientras que la Caché Completa de Ruta solo almacena en caché rutas renderizadas estáticamente, la Caché del Enrutador se aplica tanto a rutas renderizadas estática como dinámicamente.
+
+### Duración
+
+La caché se almacena en la memoria temporal del navegador. Dos factores determinan cuánto dura la caché del enrutador:
+
+- **Sesión**: La caché persiste a través de la navegación. Sin embargo, se borra al actualizar la página.
+- **Período de Invalidación Automática**: La caché de diseños (layouts) y estados de carga se invalida automáticamente después de un tiempo específico. La duración depende de cómo se [precargó](/docs/app/api-reference/components/link#prefetch) el recurso y si el recurso fue [generado estáticamente](/docs/app/building-your-application/rendering/server-components#static-rendering-default):
+  - **Precarga Predeterminada** (`prefetch={null}` o no especificado): no se almacena en caché para páginas dinámicas, 5 minutos para páginas estáticas.
+  - **Precarga Completa** (`prefetch={true}` o `router.prefetch`): 5 minutos tanto para páginas estáticas como dinámicas.
+
+Mientras que una actualización de página borrará **todos** los segmentos almacenados en caché, el período de invalidación automática solo afecta al segmento individual desde el momento en que se precargó.
+
+> **Bueno saber**: La opción experimental [`staleTimes`](/docs/app/api-reference/next-config-js/staleTimes) se puede utilizar para ajustar los tiempos de invalidación automática mencionados anteriormente.
+
+### Invalidación
+
+Hay dos formas de invalidar la Caché del Enrutador:
+
+- En una **Acción del Servidor**:
+  - Revalidar datos bajo demanda por ruta con ([`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)) o por etiqueta de caché con ([`revalidateTag`](/docs/app/api-reference/functions/revalidateTag))
+  - Usar [`cookies.set`](/docs/app/api-reference/functions/cookies#cookiessetname-value-options) o [`cookies.delete`](/docs/app/api-reference/functions/cookies#deleting-cookies) invalida la Caché del Enrutador para evitar que las rutas que usan cookies se vuelvan obsoletas (por ejemplo, autenticación).
+- Llamar a [`router.refresh`](/docs/app/api-reference/functions/use-router) invalidará la Caché del Enrutador y hará una nueva solicitud al servidor para la ruta actual.
+
+### Exclusión
+
+No es posible excluirse de la Caché del Enrutador. Sin embargo, puedes invalidarla llamando a [`router.refresh`](/docs/app/api-reference/functions/use-router), [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) o [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) (ver arriba). Esto borrará la caché y hará una nueva solicitud al servidor, asegurando que se muestren los datos más recientes.
+
+También puedes excluirte del **prefetching** estableciendo la propiedad `prefetch` del componente `<Link>` en `false`. Sin embargo, esto seguirá almacenando temporalmente los segmentos de ruta durante 30s para permitir una navegación instantánea entre segmentos anidados, como barras de pestañas, o navegación hacia atrás y adelante. Las rutas visitadas seguirán almacenadas en caché.
+
+## Interacciones de la Caché
+
+Al configurar los diferentes mecanismos de caché, es importante entender cómo interactúan entre sí:
+
+### Caché de Datos y Caché Completa de Ruta
+
+- Revalidar o excluirse de la Caché de Datos **invalidará** la Caché Completa de Ruta, ya que el resultado del renderizado depende de los datos.
+- Invalidar o excluirse de la Caché Completa de Ruta **no afecta** la Caché de Datos. Puedes renderizar dinámicamente una ruta que tenga tanto datos almacenados en caché como no almacenados. Esto es útil cuando la mayor parte de tu página usa datos almacenados en caché, pero tienes algunos componentes que dependen de datos que deben obtenerse en el momento de la solicitud. Puedes renderizar dinámicamente sin preocuparte por el impacto en el rendimiento de volver a obtener todos los datos.
+
+### Caché de Datos y Caché del Enrutador del Lado del Cliente
+
+- Revalidar la Caché de Datos en un [Manejador de Ruta (Route Handler)](/docs/app/building-your-application/routing/route-handlers) **no invalidará** inmediatamente la Caché del Enrutador, ya que el Manejador de Ruta no está vinculado a una ruta específica. Esto significa que la Caché del Enrutador seguirá sirviendo la carga útil anterior hasta que se realice una actualización dura o haya transcurrido el período de invalidación automática.
+- Para invalidar inmediatamente la Caché de Datos y la Caché del Enrutador, puedes usar [`revalidatePath`](#revalidatepath) o [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag) en una [Acción del Servidor](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+## APIs
+
+La siguiente tabla proporciona una visión general de cómo diferentes APIs de Next.js afectan al almacenamiento en caché:
+
+| API                                                                     | Caché del Enrutador       | Caché Completa de Ruta | Caché de Datos        | Caché de React |
+| ----------------------------------------------------------------------- | ------------------------- | ---------------------- | --------------------- | -------------- |
+| [`<Link prefetch>`](#link)                                              | Almacenar                 |                        |                       |                |
+| [`router.prefetch`](#routerprefetch)                                    | Almacenar                 |                        |                       |                |
+| [`router.refresh`](#routerrefresh)                                      | Revalidar                 |                        |                       |                |
+| [`fetch`](#fetch)                                                       |                           |                        | Almacenar             | Almacenar      |
+| [`fetch` `options.cache`](#fetch-optionscache)                          |                           |                        | Almacenar o Excluir   |                |
+| [`fetch` `options.next.revalidate`](#fetch-optionsnextrevalidate)       |                           | Revalidar              | Revalidar             |                |
+| [`fetch` `options.next.tags`](#fetch-optionsnexttags-and-revalidatetag) |                           | Almacenar              | Almacenar             |                |
+| [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag)             | Revalidar (Acción Servidor)| Revalidar              | Revalidar             |                |
+| [`revalidatePath`](#revalidatepath)                                     | Revalidar (Acción Servidor)| Revalidar              | Revalidar             |                |
+| [`const revalidate`](#segment-config-options)                           |                           | Revalidar o Excluir    | Revalidar o Excluir   |                |
+| [`const dynamic`](#segment-config-options)                              |                           | Almacenar o Excluir    | Almacenar o Excluir   |                |
+| [`cookies`](#cookies)                                                   | Revalidar (Acción Servidor)| Excluir                |                       |                |
+| [`headers`, `searchParams`](#dynamic-functions)                         |                           | Excluir                |                       |                |
+| [`generateStaticParams`](#generatestaticparams)                         |                           | Almacenar              |                       |                |
+| [`React.cache`](#react-cache-function)                                  |                           |                        |                       | Almacenar      |
+| [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache)    |                           |                        |                       |                |
+
+### `<Link>`
+
+Por defecto, el componente `<Link>` precarga automáticamente rutas de la Caché Completa de Ruta y agrega la Carga Útil (Payload) de los Componentes del Servidor de React a la Caché del Enrutador.
+
+Para desactivar el prefetching, puedes establecer la propiedad `prefetch` en `false`. Pero esto no omitirá la caché permanentemente, el segmento de ruta seguirá almacenándose en caché del lado del cliente cuando el usuario visite la ruta.
+
+Aprende más sobre el [componente `<Link>`](/docs/app/api-reference/components/link).
+
+### `router.prefetch`
+
+La opción `prefetch` del hook `useRouter` se puede usar para precargar manualmente una ruta. Esto agrega la Carga Útil (Payload) de los Componentes del Servidor de React a la Caché del Enrutador.
+
+Consulta la referencia de la API del [hook `useRouter`](/docs/app/api-reference/functions/use-router).
+
+### `router.refresh`
+
+La opción `refresh` del hook `useRouter` se puede usar para actualizar manualmente una ruta. Esto borra completamente la Caché del Enrutador y hace una nueva solicitud al servidor para la ruta actual. `refresh` no afecta a la Caché de Datos o a la Caché Completa de Ruta.
+
+El resultado renderizado se reconciliará en el cliente mientras se preserva el estado de React y el estado del navegador.
+
+Consulta la referencia de la API del [hook `useRouter`](/docs/app/api-reference/functions/use-router).
+
+### `fetch`
+
+Los datos devueltos por `fetch` se almacenan automáticamente en la Caché de Datos.
+
+```jsx
+// Almacenado en caché por defecto. `force-cache` es la opción predeterminada y se puede omitir.
+fetch(`https://...`, { cache: 'force-cache' })
+```
+
+Consulta la [Referencia de la API de `fetch`](/docs/app/api-reference/functions/fetch) para más opciones.
+
+### `fetch options.cache`
+
+Puedes excluir solicitudes `fetch` individuales del almacenamiento en caché de datos estableciendo la opción `cache` en `no-store`:
+
+```jsx
+// Excluir del almacenamiento en caché
+fetch(`https://...`, { cache: 'no-store' })
+```
+
+Dado que el resultado del renderizado depende de los datos, usar `cache: 'no-store'` también omitirá la Caché Completa de Ruta para la ruta donde se usa la solicitud `fetch`. Es decir, la ruta se renderizará dinámicamente en cada solicitud, pero aún puedes tener otras solicitudes de datos almacenadas en caché en la misma ruta.
+
+Consulta la [Referencia de la API de `fetch`](/docs/app/api-reference/functions/fetch) para más opciones.
+
+### `fetch options.next.revalidate`
+
+Puedes usar la opción `next.revalidate` de `fetch` para establecer el período de revalidación (en segundos) de una solicitud `fetch` individual. Esto revalidará la Caché de Datos, que a su vez revalidará la Caché Completa de Ruta. Se obtendrán datos frescos y los componentes se volverán a renderizar en el servidor.
+
+```jsx
+// Revalidar como máximo después de 1 hora
+fetch(`https://...`, { next: { revalidate: 3600 } })
+```
+
+Consulta la [referencia de la API de `fetch`](/docs/app/api-reference/functions/fetch) para más opciones.
+
+### `fetch options.next.tags` y `revalidateTag`
+
+Next.js tiene un sistema de etiquetado de caché para un control granular del almacenamiento en caché y la revalidación de datos.
+
+1. Al usar `fetch` o [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache), tiene la opción de etiquetar entradas de caché con una o más etiquetas.
+2. Luego, puede llamar a `revalidateTag` para purgar las entradas de caché asociadas con esa etiqueta.
+
+Por ejemplo, puede establecer una etiqueta al obtener datos:
+
+```jsx
+// Almacenar datos en caché con una etiqueta
+fetch(`https://...`, { next: { tags: ['a', 'b', 'c'] } })
+```
+
+Luego, llame a `revalidateTag` con una etiqueta para purgar la entrada de caché:
+
+```jsx
+// Revalidar entradas con una etiqueta específica
+revalidateTag('a')
+```
+
+Hay dos lugares donde puede usar `revalidateTag`, dependiendo de lo que desee lograr:
+
+1. [Manejadores de ruta (Route Handlers)](/docs/app/building-your-application/routing/route-handlers) - para revalidar datos en respuesta a un evento de terceros (ej. un webhook). Esto no invalidará la caché del enrutador (Router Cache) inmediatamente ya que el Manejador de Ruta no está vinculado a una ruta específica.
+2. [Acciones de servidor (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) - para revalidar datos después de una acción del usuario (ej. envío de un formulario). Esto invalidará la caché del enrutador (Router Cache) para la ruta asociada.
+
+### `revalidatePath`
+
+`revalidatePath` le permite revalidar manualmente los datos **y** volver a renderizar los segmentos de ruta debajo de una ruta específica en una sola operación. Llamar al método `revalidatePath` revalida la caché de datos (Data Cache), lo que a su vez invalida la caché de ruta completa (Full Route Cache).
+
+```jsx
+revalidatePath('/')
+```
+
+Hay dos lugares donde puede usar `revalidatePath`, dependiendo de lo que desee lograr:
+
+1. [Manejadores de ruta (Route Handlers)](/docs/app/building-your-application/routing/route-handlers) - para revalidar datos en respuesta a un evento de terceros (ej. un webhook).
+2. [Acciones de servidor (Server Actions)](/docs/app/building-your-application/data-fetching/server-actions-and-mutations) - para revalidar datos después de una interacción del usuario (ej. envío de un formulario, clic en un botón).
+
+Consulte la [referencia de la API `revalidatePath`](/docs/app/api-reference/functions/revalidatePath) para obtener más información.
+
+> **`revalidatePath`** vs. **`router.refresh`**:
+>
+> Llamar a `router.refresh` limpiará la caché del enrutador (Router Cache) y volverá a renderizar los segmentos de ruta en el servidor sin invalidar la caché de datos (Data Cache) ni la caché de ruta completa (Full Route Cache).
+>
+> La diferencia es que `revalidatePath` purga la caché de datos (Data Cache) y la caché de ruta completa (Full Route Cache), mientras que `router.refresh()` no modifica la caché de datos (Data Cache) ni la caché de ruta completa (Full Route Cache), ya que es una API del lado del cliente.
+
+### Funciones dinámicas
+
+Las funciones dinámicas como `cookies` y `headers`, y la propiedad `searchParams` en Páginas (Pages), dependen de información de solicitud entrante en tiempo de ejecución. Usarlas hará que una ruta no utilice la caché de ruta completa (Full Route Cache), es decir, la ruta se renderizará dinámicamente.
+
+#### `cookies`
+
+Usar `cookies.set` o `cookies.delete` en una Acción de Servidor (Server Action) invalida la caché del enrutador (Router Cache) para evitar que las rutas que usan cookies queden obsoletas (ej. para reflejar cambios de autenticación).
+
+Consulte la referencia de la API [`cookies`](/docs/app/api-reference/functions/cookies).
+
+### Opciones de configuración de segmento
+
+Las opciones de configuración de segmento de ruta (Route Segment Config) se pueden usar para anular los valores predeterminados del segmento de ruta o cuando no puede usar la API `fetch` (ej. cliente de base de datos o bibliotecas de terceros).
+
+Las siguientes opciones de configuración de segmento de ruta harán que no se use la caché de datos (Data Cache) ni la caché de ruta completa (Full Route Cache):
+
+- `const dynamic = 'force-dynamic'`
+- `const revalidate = 0`
+
+Consulte la documentación de [Configuración de segmento de ruta (Route Segment Config)](/docs/app/api-reference/file-conventions/route-segment-config) para ver más opciones.
+
+### `generateStaticParams`
+
+Para [segmentos dinámicos](/docs/app/building-your-application/routing/dynamic-routes) (ej. `app/blog/[slug]/page.js`), las rutas proporcionadas por `generateStaticParams` se almacenan en la caché de ruta completa (Full Route Cache) en tiempo de compilación. En tiempo de solicitud, Next.js también almacenará en caché las rutas que no se conocían en tiempo de compilación la primera vez que se visitan.
+
+Puede deshabilitar el almacenamiento en caché en tiempo de solicitud usando la opción `export const dynamicParams = false` en un segmento de ruta. Cuando se usa esta opción de configuración, solo se servirán las rutas proporcionadas por `generateStaticParams`, y otras rutas devolverán un error 404 o coincidirán (en el caso de [rutas comodín (catch-all routes)](/docs/app/building-your-application/routing/dynamic-routes#catch-all-segments)).
+
+Consulte la [referencia de la API `generateStaticParams`](/docs/app/api-reference/functions/generate-static-params).
+
+### Función `cache` de React
+
+La función `cache` de React le permite memorizar el valor de retorno de una función, permitiéndole llamar a la misma función múltiples veces mientras solo se ejecuta una vez.
+
+Dado que las solicitudes `fetch` se memorizan automáticamente, no necesita envolverlas en `cache` de React. Sin embargo, puede usar `cache` para memorizar manualmente solicitudes de datos en casos de uso donde la API `fetch` no sea adecuada. Por ejemplo, algunos clientes de bases de datos, clientes de CMS o clientes de GraphQL.
+
+```tsx filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import db from '@/lib/db'
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```jsx filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import db from '@/lib/db'
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```

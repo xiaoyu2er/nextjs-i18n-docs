@@ -1,0 +1,322 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:15:20.464Z
+title: redirecciones
+description: Agrega redirecciones a tu aplicación Next.js.
+---
+
+{/* El contenido de este documento se comparte entre el enrutador de app y pages. Puedes usar el componente `<PagesOnly>Contenido</PagesOnly>` para agregar contenido específico del enrutador Pages. Cualquier contenido compartido no debe estar envuelto en un componente. */}
+
+Las redirecciones permiten redirigir una ruta de solicitud entrante a un destino diferente.
+
+Para usar redirecciones puedes utilizar la clave `redirects` en `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+`redirects` es una función asíncrona que espera un array de objetos con las propiedades `source`, `destination` y `permanent`:
+
+- `source`: patrón de la ruta de solicitud entrante.
+- `destination`: ruta a la que deseas redirigir.
+- `permanent`: `true` o `false` - si es `true` usará el código de estado 308 que indica a los clientes/motores de búsqueda que almacenen en caché la redirección permanentemente. Si es `false` usará el código 307 que es temporal y no se almacena en caché.
+
+> **¿Por qué Next.js usa 307 y 308?** Tradicionalmente se usaba 302 para redirecciones temporales y 301 para permanentes, pero muchos navegadores cambiaban el método de solicitud a `GET` independientemente del método original. Por ejemplo, si el navegador hacía una solicitud `POST /v1/users` que devolvía código 302 con ubicación `/v2/users`, la siguiente solicitud podría ser `GET /v2/users` en lugar del esperado `POST /v2/users`. Next.js usa los códigos 307 (temporal) y 308 (permanente) para preservar explícitamente el método de solicitud usado.
+
+- `basePath`: `false` o `undefined` - si es false el `basePath` no se incluirá al hacer coincidencias, solo para redirecciones externas.
+- `locale`: `false` o `undefined` - si no debe incluirse la configuración regional al hacer coincidencias.
+- `has`: array de [objetos has](#coincidencia-de-cabeceras-cookies-y-consultas) con propiedades `type`, `key` y `value`.
+- `missing`: array de [objetos missing](#coincidencia-de-cabeceras-cookies-y-consultas) con propiedades `type`, `key` y `value`.
+
+Las redirecciones se verifican antes del sistema de archivos, que incluye páginas y archivos `/public`.
+
+Las redirecciones no se aplican al enrutamiento del lado del cliente (`Link`, `router.push`), a menos que haya [Middleware](/docs/app/building-your-application/routing/middleware) que coincida con la ruta.
+
+Cuando se aplica una redirección, cualquier valor de consulta proporcionado en la solicitud se pasará al destino de la redirección. Por ejemplo:
+
+```js
+{
+  source: '/old-blog/:path*',
+  destination: '/blog/:path*',
+  permanent: false
+}
+```
+
+Cuando se solicita `/old-blog/post-1?hello=world`, el cliente será redirigido a `/blog/post-1?hello=world`.
+
+## Coincidencia de rutas
+
+Se permiten coincidencias de rutas, por ejemplo `/old-blog/:slug` coincidirá con `/old-blog/hello-world` (sin rutas anidadas):
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/old-blog/:slug',
+        destination: '/news/:slug', // Los parámetros coincidentes pueden usarse en el destino
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### Coincidencia con comodín
+
+Para coincidir con un comodín puedes usar `*` después de un parámetro, por ejemplo `/blog/:slug*` coincidirá con `/blog/a/b/c/d/hello-world`:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/blog/:slug*',
+        destination: '/news/:slug*', // Los parámetros coincidentes pueden usarse en el destino
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### Coincidencia con regex
+
+Para coincidir con una expresión regular puedes envolverla en paréntesis después de un parámetro, por ejemplo `/post/:slug(\\d{1,})` coincidirá con `/post/123` pero no con `/post/abc`:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/post/:slug(\\d{1,})',
+        destination: '/news/:slug', // Los parámetros coincidentes pueden usarse en el destino
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+Los caracteres `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` se usan para coincidencias regex, por lo que cuando se usan en `source` como valores no especiales deben escaparse con `\\`:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        // coincidirá con solicitudes a `/english(default)/something`
+        source: '/english\\(default\\)/:slug',
+        destination: '/en-us/:slug',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+## Coincidencia de cabeceras, cookies y consultas
+
+Para que una redirección coincida solo cuando los valores de cabecera, cookie o consulta también coincidan, se puede usar el campo `has` o `missing`. Tanto `source` como todos los items `has` deben coincidir, y todos los items `missing` no deben coincidir para aplicar la redirección.
+
+Los items `has` y `missing` pueden tener estos campos:
+
+- `type`: `String` - debe ser `header`, `cookie`, `host` o `query`.
+- `key`: `String` - clave del tipo seleccionado para coincidir.
+- `value`: `String` o `undefined` - valor a verificar. Si es undefined cualquier valor coincidirá. Se puede usar un string tipo regex para capturar parte del valor, ej. si el valor es `first-(?<paramName>.*)` para `first-second`, entonces `second` podrá usarse en el destino como `:paramName`.
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      // si está presente la cabecera `x-redirect-me`,
+      // se aplicará esta redirección
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'header',
+            key: 'x-redirect-me',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // si está presente la cabecera `x-dont-redirect`,
+      // NO se aplicará esta redirección
+      {
+        source: '/:path((?!another-page$).*)',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-do-not-redirect',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // si coinciden source, query y cookie,
+      // se aplicará esta redirección
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // el valor page no estará disponible en el destino
+            // porque value no usa un grupo de captura nombrado
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        permanent: false,
+        destination: '/another/:path*',
+      },
+      // si la cabecera `x-authorized` está presente
+      // y contiene un valor coincidente, se aplicará esta redirección
+      {
+        source: '/',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        permanent: false,
+        destination: '/home?authorized=:authorized',
+      },
+      // si el host es `example.com`,
+      // se aplicará esta redirección
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+    ]
+  },
+}
+```
+
+### Redirecciones con soporte basePath
+
+Al usar [`basePath`](/docs/app/api-reference/next-config-js/basePath) con redirecciones, cada `source` y `destination` se prefija automáticamente con el `basePath` a menos que agregues `basePath: false`:
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async redirects() {
+    return [
+      {
+        source: '/with-basePath', // automáticamente se convierte en /docs/with-basePath
+        destination: '/another', // automáticamente se convierte en /docs/another
+        permanent: false,
+      },
+      {
+        // no agrega /docs porque basePath: false está establecido
+        source: '/without-basePath',
+        destination: 'https://example.com',
+        basePath: false,
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+### Redirecciones con soporte i18n
+
+<AppOnly>
+
+Al usar [`i18n`](/docs/app/building-your-application/routing/internationalization) con redirecciones, cada `source` y `destination` se prefija automáticamente para manejar los `locales` configurados, a menos que agregues `locale: false`. Si usas `locale: false`, debes prefijar `source` y `destination` con un locale para que coincidan correctamente.
+
+</AppOnly>
+
+<PagesOnly>
+
+Al usar [`i18n`](/docs/pages/building-your-application/routing/internationalization) con redirecciones, cada `source` y `destination` se prefija automáticamente para manejar los `locales` configurados, a menos que agregues `locale: false`. Si usas `locale: false`, debes prefijar `source` y `destination` con un locale para que coincidan correctamente.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/with-locale', // maneja todos los locales automáticamente
+        destination: '/another', // pasa el locale automáticamente
+        permanent: false,
+      },
+      {
+        // no maneja locales automáticamente porque locale: false está establecido
+        source: '/nl/with-locale-manual',
+        destination: '/nl/another',
+        locale: false,
+        permanent: false,
+      },
+      {
+        // coincide con '/' porque `en` es el defaultLocale
+        source: '/en',
+        destination: '/en/another',
+        locale: false,
+        permanent: false,
+      },
+      // es posible hacer coincidir todos los locales incluso con locale: false
+      {
+        source: '/:locale/page',
+        destination: '/en/newpage',
+        permanent: false,
+        locale: false,
+      },
+      {
+        // se convierte a /(en|fr|de)/(.*) por lo que no coincidirá con
+        // `/` o `/fr` como lo haría /:path*
+        source: '/(.*)',
+        destination: '/another',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+En casos raros, podrías necesitar asignar un código de estado personalizado para que clientes HTTP antiguos redirijan correctamente. En estos casos, puedes usar `statusCode` en lugar de `permanent`, pero no ambos. Para compatibilidad con IE11, se agrega automáticamente una cabecera `Refresh` para el código 308.
+
+## Otras redirecciones
+
+- En [API Routes](/docs/pages/api-reference/functions/next-server), puedes usar `res.redirect()`.
+- En [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) y [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props), puedes redirigir páginas específicas en tiempo de solicitud.
+
+## Historial de versiones
+
+| Versión   | Cambios            |
+| --------- | ------------------ |
+| `v13.3.0` | Se agregó `missing`. |
+| `v10.2.0` | Se agregó `has`.    |
+| `v9.5.0`  | Se agregó `redirects`. |

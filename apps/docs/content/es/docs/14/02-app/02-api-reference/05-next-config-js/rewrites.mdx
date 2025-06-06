@@ -1,0 +1,479 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:48:40.540Z
+title: rewrites
+description: Agregar rewrites a tu aplicación Next.js.
+---
+
+{/* El contenido de este documento se comparte entre el enrutador de app y pages. Puedes usar el componente `<PagesOnly>Contenido</PagesOnly>` para agregar contenido específico del enrutador Pages. Cualquier contenido compartido no debe estar envuelto en un componente. */}
+
+Los rewrites te permiten mapear una ruta de solicitud entrante a una ruta de destino diferente.
+
+<AppOnly>
+
+Los rewrites actúan como un proxy de URL y enmascaran la ruta de destino, haciendo parecer que el usuario no ha cambiado su ubicación en el sitio. En contraste, los [redirects](/docs/app/api-reference/next-config-js/redirects) redirigirán a una nueva página y mostrarán los cambios en la URL.
+
+</AppOnly>
+
+<PagesOnly>
+
+Los rewrites actúan como un proxy de URL y enmascaran la ruta de destino, haciendo parecer que el usuario no ha cambiado su ubicación en el sitio. En contraste, los [redirects](/docs/pages/api-reference/next-config-js/redirects) redirigirán a una nueva página y mostrarán los cambios en la URL.
+
+</PagesOnly>
+
+Para usar rewrites puedes utilizar la clave `rewrites` en `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+      },
+    ]
+  },
+}
+```
+
+Los rewrites se aplican al enrutamiento del lado del cliente (client-side routing), un `<Link href="/about">` tendrá el rewrite aplicado en el ejemplo anterior.
+
+`rewrites` es una función asíncrona que espera devolver un arreglo o un objeto de arreglos (ver abajo) que contengan objetos con las propiedades `source` y `destination`:
+
+- `source`: `String` - es el patrón de ruta de la solicitud entrante.
+- `destination`: `String` - es la ruta a la que deseas redirigir.
+- `basePath`: `false` o `undefined` - si es false, el basePath no se incluirá al hacer coincidencias, solo se puede usar para rewrites externos.
+- `locale`: `false` o `undefined` - indica si la configuración regional (locale) no debe incluirse al hacer coincidencias.
+- `has` es un arreglo de [objetos has](#coincidencia-de-cabeceras-cookies-y-queries) con las propiedades `type`, `key` y `value`.
+- `missing` es un arreglo de [objetos missing](#coincidencia-de-cabeceras-cookies-y-queries) con las propiedades `type`, `key` y `value`.
+
+Cuando la función `rewrites` devuelve un arreglo, los rewrites se aplican después de verificar el sistema de archivos (páginas y archivos `/public`) y antes de las rutas dinámicas. Cuando la función `rewrites` devuelve un objeto de arreglos con una forma específica, este comportamiento puede cambiarse y controlarse con mayor precisión, a partir de `v10.1` de Next.js:
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // Estos rewrites se verifican después de headers/redirects
+        // y antes de todos los archivos, incluyendo archivos _next/public,
+        // lo que permite sobrescribir archivos de página
+        {
+          source: '/some-page',
+          destination: '/somewhere-else',
+          has: [{ type: 'query', key: 'overrideMe' }],
+        },
+      ],
+      afterFiles: [
+        // Estos rewrites se verifican después de páginas/archivos públicos
+        // pero antes de rutas dinámicas
+        {
+          source: '/non-existent',
+          destination: '/somewhere-else',
+        },
+      ],
+      fallback: [
+        // Estos rewrites se verifican después de páginas/archivos públicos
+        // y rutas dinámicas
+        {
+          source: '/:path*',
+          destination: `https://my-old-site.com/:path*`,
+        },
+      ],
+    }
+  },
+}
+```
+
+> **Bueno saber**: los rewrites en `beforeFiles` no verifican el sistema de archivos/rutas dinámicas inmediatamente después de coincidir con un source, continúan hasta que todos los `beforeFiles` hayan sido verificados.
+
+El orden en que Next.js verifica las rutas es:
+
+<AppOnly>
+
+1. Se verifican/aplican los [headers](/docs/app/api-reference/next-config-js/headers)
+2. Se verifican/aplican los [redirects](/docs/app/api-reference/next-config-js/redirects)
+3. Se verifican/aplican los rewrites `beforeFiles`
+4. Se verifican/sirven archivos estáticos del [directorio public](/docs/app/building-your-application/optimizing/static-assets), archivos `_next/static` y páginas no dinámicas
+5. Se verifican/aplican los rewrites `afterFiles`, si uno de estos rewrites coincide, verificamos rutas dinámicas/archivos estáticos después de cada coincidencia
+6. Se verifican/aplican los rewrites `fallback`, estos se aplican antes de renderizar la página 404 y después de verificar rutas dinámicas/todos los recursos estáticos. Si usas [fallback: true/'blocking'](/docs/pages/api-reference/functions/get-static-paths#fallback-true) en `getStaticPaths`, los rewrites `fallback` definidos en tu `next.config.js` _no_ se ejecutarán.
+
+</AppOnly>
+
+<PagesOnly>
+
+1. Se verifican/aplican los [headers](/docs/pages/api-reference/next-config-js/headers)
+2. Se verifican/aplican los [redirects](/docs/pages/api-reference/next-config-js/redirects)
+3. Se verifican/aplican los rewrites `beforeFiles`
+4. Se verifican/sirven archivos estáticos del [directorio public](/docs/pages/building-your-application/optimizing/static-assets), archivos `_next/static` y páginas no dinámicas
+5. Se verifican/aplican los rewrites `afterFiles`, si uno de estos rewrites coincide, verificamos rutas dinámicas/archivos estáticos después de cada coincidencia
+6. Se verifican/aplican los rewrites `fallback`, estos se aplican antes de renderizar la página 404 y después de verificar rutas dinámicas/todos los recursos estáticos. Si usas [fallback: true/'blocking'](/docs/pages/api-reference/functions/get-static-paths#fallback-true) en `getStaticPaths`, los rewrites `fallback` definidos en tu `next.config.js` _no_ se ejecutarán.
+
+</PagesOnly>
+
+## Parámetros en rewrites
+
+Cuando usas parámetros en un rewrite, los parámetros se pasarán en la query por defecto cuando ninguno de los parámetros se use en el `destination`.
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/old-about/:path*',
+        destination: '/about', // El parámetro :path no se usa aquí, por lo que se pasará automáticamente en la query
+      },
+    ]
+  },
+}
+```
+
+Si un parámetro se usa en el destination, ninguno de los parámetros se pasará automáticamente en la query.
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/docs/:path*',
+        destination: '/:path*', // El parámetro :path se usa aquí, por lo que no se pasará automáticamente en la query
+      },
+    ]
+  },
+}
+```
+
+Aún puedes pasar los parámetros manualmente en la query si uno ya se usa en el destination especificando la query en el `destination`.
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/:first/:second',
+        destination: '/:first?second=:second',
+        // Como el parámetro :first se usa en el destination, el parámetro :second
+        // no se agregará automáticamente en la query, aunque podemos agregarlo manualmente
+        // como se muestra arriba
+      },
+    ]
+  },
+}
+```
+
+> **Bueno saber**: Las páginas estáticas de [Optimización Estática Automática](/docs/pages/building-your-application/rendering/automatic-static-optimization) o [prerenderizado](/docs/pages/building-your-application/data-fetching/get-static-props) con parámetros de rewrites se analizarán en el cliente después de la hidratación y se proporcionarán en la query.
+
+## Coincidencia de rutas
+
+Se permiten coincidencias de rutas, por ejemplo `/blog/:slug` coincidirá con `/blog/hello-world` (sin rutas anidadas):
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug', // Los parámetros coincidentes pueden usarse en el destination
+      },
+    ]
+  },
+}
+```
+
+### Coincidencia de rutas con comodín
+
+Para coincidir con una ruta comodín puedes usar `*` después de un parámetro, por ejemplo `/blog/:slug*` coincidirá con `/blog/a/b/c/d/hello-world`:
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/blog/:slug*',
+        destination: '/news/:slug*', // Los parámetros coincidentes pueden usarse en el destination
+      },
+    ]
+  },
+}
+```
+
+### Coincidencia de rutas con regex
+
+Para coincidir con una ruta regex puedes envolver la regex entre paréntesis después de un parámetro, por ejemplo `/blog/:slug(\\d{1,})` coincidirá con `/blog/123` pero no con `/blog/abc`:
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/old-blog/:post(\\d{1,})',
+        destination: '/blog/:post', // Los parámetros coincidentes pueden usarse en el destination
+      },
+    ]
+  },
+}
+```
+
+Los siguientes caracteres `(`, `)`, `{`, `}`, `[`, `]`, `|`, `\`, `^`, `.`, `:`, `*`, `+`, `-`, `?`, `$` se usan para coincidencia de rutas regex, por lo que cuando se usan en el `source` como valores no especiales deben escaparse agregando `\\` antes de ellos:
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        // esto coincidirá con `/english(default)/something` al ser solicitado
+        source: '/english\\(default\\)/:slug',
+        destination: '/en-us/:slug',
+      },
+    ]
+  },
+}
+```
+
+## Coincidencia de cabeceras, cookies y queries
+
+Para que un rewrite solo coincida cuando los valores de cabecera, cookie o query también coincidan, se puede usar el campo `has` o no coincidan con el campo `missing`. Tanto el `source` como todos los elementos `has` deben coincidir, y todos los elementos `missing` no deben coincidir para que el rewrite se aplique.
+
+Los elementos `has` y `missing` pueden tener los siguientes campos:
+
+- `type`: `String` - debe ser `header`, `cookie`, `host` o `query`.
+- `key`: `String` - la clave del tipo seleccionado para coincidir.
+- `value`: `String` o `undefined` - el valor a verificar, si es undefined cualquier valor coincidirá. Se puede usar un string tipo regex para capturar una parte específica del valor, por ejemplo si el valor `first-(?<paramName>.*)` se usa para `first-second`, entonces `second` se podrá usar en el destination con `:paramName`.
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      // si la cabecera `x-rewrite-me` está presente,
+      // este rewrite se aplicará
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-rewrite-me',
+          },
+        ],
+        destination: '/another-page',
+      },
+      // si la cabecera `x-rewrite-me` no está presente,
+      // este rewrite se aplicará
+      {
+        source: '/:path*',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-rewrite-me',
+          },
+        ],
+        destination: '/another-page',
+      },
+      // si el source, query y cookie coinciden,
+      // este rewrite se aplicará
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // el valor page no estará disponible en el
+            // destination ya que se proporciona value y no
+            // usa un grupo de captura nombrado, ej. (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        destination: '/:path*/home',
+      },
+      // si la cabecera `x-authorized` está presente y
+      // contiene un valor coincidente, este rewrite se aplicará
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        destination: '/home?authorized=:authorized',
+      },
+      // si el host es `example.com`,
+      // este rewrite se aplicará
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        destination: '/another-page',
+      },
+    ]
+  },
+}
+```
+
+## Rewrites a una URL externa
+
+<details>
+  <summary>Ejemplos</summary>
+
+- [Adopción incremental de Next.js](https://github.com/vercel/next.js/tree/canary/examples/custom-routes-proxying)
+- [Uso de múltiples zonas](https://github.com/vercel/next.js/tree/canary/examples/with-zones)
+
+</details>
+
+Los rewrites permiten redirigir a una URL externa. Esto es especialmente útil para la adopción incremental de Next.js. El siguiente es un ejemplo de rewrite para redirigir la ruta `/blog` de tu aplicación principal a un sitio externo.
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/blog',
+        destination: 'https://example.com/blog',
+      },
+      {
+        source: '/blog/:slug',
+        destination: 'https://example.com/blog/:slug', // Los parámetros coincidentes pueden usarse en el destination
+      },
+    ]
+  },
+}
+```
+
+Si estás usando `trailingSlash: true`, también necesitas insertar una barra diagonal final en el parámetro `source`. Si el servidor de destino también espera una barra diagonal final, debe incluirse en el parámetro `destination` también.
+
+```js filename="next.config.js"
+module.exports = {
+  trailingSlash: true,
+  async rewrites() {
+    return [
+      {
+        source: '/blog/',
+        destination: 'https://example.com/blog/',
+      },
+      {
+        source: '/blog/:path*/',
+        destination: 'https://example.com/blog/:path*/',
+      },
+    ]
+  },
+}
+```
+
+### Adopción incremental de Next.js
+
+También puedes hacer que Next.js recurra a proxy a un sitio web existente después de verificar todas las rutas de Next.js.
+
+De esta manera no tienes que cambiar la configuración de rewrites cuando migres más páginas a Next.js
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return {
+      fallback: [
+        {
+          source: '/:path*',
+          destination: `https://custom-routes-proxying-endpoint.vercel.app/:path*`,
+        },
+      ],
+    }
+  },
+}
+```
+
+### Rewrites con soporte para basePath
+
+Cuando aprovechas el soporte de [`basePath`](/docs/app/api-reference/next-config-js/basePath) con rewrites, cada `source` y `destination` se prefija automáticamente con el `basePath` a menos que agregues `basePath: false` al rewrite:
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async rewrites() {
+    return [
+      {
+        source: '/with-basePath', // automáticamente se convierte en /docs/with-basePath
+        destination: '/another', // automáticamente se convierte en /docs/another
+      },
+      {
+        // no agrega /docs a /without-basePath ya que basePath: false está configurado
+        // Nota: esto no puede usarse para rewrites internos, ej. `destination: '/another'`
+        source: '/without-basePath',
+        destination: 'https://example.com',
+        basePath: false,
+      },
+    ]
+  },
+}
+```
+
+### Rewrites con soporte para i18n
+
+<AppOnly>
+
+Cuando aprovechas el soporte de [`i18n`](/docs/app/building-your-application/routing/internationalization) con rewrites, cada `source` y `destination` se prefija automáticamente para manejar los `locales` configurados a menos que agregues `locale: false` al rewrite. Si usas `locale: false`, debes prefijar el `source` y `destination` con un locale para que coincida correctamente.
+
+</AppOnly>
+
+<PagesOnly>
+
+Cuando aprovechas el soporte de [`i18n`](/docs/pages/building-your-application/routing/internationalization) con rewrites, cada `source` y `destination` se prefija automáticamente para manejar los `locales` configurados a menos que agregues `locale: false` al rewrite. Si usas `locale: false`, debes prefijar el `source` y `destination` con un locale para que coincida correctamente.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async rewrites() {
+    return [
+      {
+        source: '/with-locale', // maneja automáticamente todos los locales
+        destination: '/another', // pasa automáticamente el locale
+      },
+      {
+        // no maneja locales automáticamente ya que locale: false está configurado
+        source: '/nl/with-locale-manual',
+        destination: '/nl/another',
+        locale: false,
+      },
+      {
+        // esto coincide con '/' ya que `en` es el defaultLocale
+        source: '/en',
+        destination: '/en/another',
+        locale: false,
+      },
+      {
+        // es posible coincidir con todos los locales incluso cuando locale: false está configurado
+        source: '/:locale/api-alias/:path*',
+        destination: '/api/:path*',
+        locale: false,
+      },
+      {
+        // esto se convierte a /(en|fr|de)/(.*) por lo que no coincidirá con las rutas
+        // de nivel superior `/` o `/fr` como lo haría /:path*
+        source: '/(.*)',
+        destination: '/another',
+      },
+    ]
+  },
+}
+```
+
+## Historial de versiones
+
+| Versión   | Cambios          |
+| --------- | ---------------- |
+| `v13.3.0` | Se agregó `missing`. |
+| `v10.2.0` | Se agregó `has`.     |
+| `v9.5.0`  | Se agregaron encabezados.   |

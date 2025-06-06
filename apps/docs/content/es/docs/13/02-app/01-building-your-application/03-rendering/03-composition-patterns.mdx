@@ -1,0 +1,558 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:28:48.954Z
+title: Patrones de Composición para Servidor y Cliente
+nav_title: Patrones de Composición
+description: Patrones recomendados para usar Componentes de Servidor y Cliente.
+---
+
+Al construir aplicaciones con React, deberás considerar qué partes de tu aplicación deben renderizarse en el servidor o en el cliente. Esta página cubre algunos patrones de composición recomendados al usar Componentes de Servidor y Cliente.
+
+## ¿Cuándo usar Componentes de Servidor y Cliente?
+
+Aquí hay un resumen rápido de los diferentes casos de uso para Componentes de Servidor y Cliente:
+
+| ¿Qué necesitas hacer?                                                                 | Componente Servidor  | Componente Cliente  |
+| ------------------------------------------------------------------------------------ | -------------------- | ------------------- |
+| Obtener datos                                                                        | <Check size={18} />  | <Cross size={18} /> |
+| Acceder a recursos del backend (directamente)                                        | <Check size={18} />  | <Cross size={18} /> |
+| Mantener información sensible en el servidor (tokens de acceso, claves API, etc)     | <Check size={18} />  | <Cross size={18} /> |
+| Mantener dependencias grandes en el servidor / Reducir JavaScript del lado del cliente | <Check size={18} />  | <Cross size={18} /> |
+| Añadir interactividad y manejadores de eventos (`onClick()`, `onChange()`, etc)      | <Cross size={18} />  | <Check size={18} /> |
+| Usar Estado y Efectos de Ciclo de Vida (`useState()`, `useReducer()`, `useEffect()`, etc) | <Cross size={18} /> | <Check size={18} /> |
+| Usar APIs exclusivas del navegador                                                   | <Cross size={18} />  | <Check size={18} /> |
+| Usar hooks personalizados que dependen de estado, efectos o APIs exclusivas del navegador | <Cross size={18} /> | <Check size={18} /> |
+| Usar [Componentes de Clase de React](https://react.dev/reference/react/Component)    | <Cross size={18} />  | <Check size={18} /> |
+
+## Patrones para Componentes de Servidor
+
+Antes de optar por el renderizado del lado del cliente, es posible que desees realizar algún trabajo en el servidor como obtener datos o acceder a tu base de datos o servicios de backend.
+
+Aquí hay algunos patrones comunes al trabajar con Componentes de Servidor:
+
+### Compartir datos entre componentes
+
+Al obtener datos en el servidor, puede haber casos donde necesites compartir datos entre diferentes componentes. Por ejemplo, puedes tener un diseño (layout) y una página que dependen de los mismos datos.
+
+En lugar de usar [Contexto de React](https://react.dev/learn/passing-data-deeply-with-context) (que no está disponible en el servidor) o pasar datos como props, puedes usar [`fetch`](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#fetching-data-on-the-server-with-fetch) o la función `cache` de React para obtener los mismos datos en los componentes que los necesitan, sin preocuparte por hacer solicitudes duplicadas para los mismos datos. Esto se debe a que React extiende `fetch` para memorizar automáticamente las solicitudes de datos, y la función `cache` puede usarse cuando `fetch` no está disponible.
+
+Aprende más sobre [memorización](/docs/app/building-your-application/caching#request-memoization) en React.
+
+### Mantener código exclusivo del Servidor fuera del Entorno del Cliente
+
+Dado que los módulos de JavaScript pueden compartirse entre módulos de Componentes de Servidor y Cliente, es posible que código que solo estaba destinado a ejecutarse en el servidor se filtre al cliente.
+
+Por ejemplo, toma la siguiente función de obtención de datos:
+
+```ts filename="lib/data.ts" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+```js filename="lib/data.js" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+A primera vista, parece que `getData` funciona tanto en el servidor como en el cliente. Sin embargo, esta función contiene una `API_KEY`, escrita con la intención de que solo se ejecute en el servidor.
+
+Dado que la variable de entorno `API_KEY` no tiene el prefijo `NEXT_PUBLIC`, es una variable privada que solo puede accederse en el servidor. Para evitar que tus variables de entorno se filtren al cliente, Next.js reemplaza las variables de entorno privadas con una cadena vacía.
+
+Como resultado, aunque `getData()` puede importarse y ejecutarse en el cliente, no funcionará como se espera. Y aunque hacer pública la variable haría que la función funcione en el cliente, es posible que no desees exponer información sensible al cliente.
+
+Para evitar este tipo de uso no intencionado de código del servidor en el cliente, podemos usar el paquete `server-only` para mostrar un error en tiempo de compilación si otros desarrolladores importan accidentalmente uno de estos módulos en un Componente Cliente.
+
+Para usar `server-only`, primero instala el paquete:
+
+```bash filename="Terminal"
+npm install server-only
+```
+
+Luego importa el paquete en cualquier módulo que contenga código exclusivo del servidor:
+
+```js filename="lib/data.js"
+import 'server-only'
+
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+Ahora, cualquier Componente Cliente que importe `getData()` recibirá un error en tiempo de compilación que explica que este módulo solo puede usarse en el servidor.
+
+El paquete correspondiente `client-only` puede usarse para marcar módulos que contienen código exclusivo del cliente, por ejemplo, código que accede al objeto `window`.
+
+### Usando Paquetes y Proveedores de Terceros
+
+Dado que los Componentes de Servidor son una nueva característica de React, los paquetes y proveedores de terceros en el ecosistema están comenzando a añadir la directiva `"use client"` a componentes que usan características exclusivas del cliente como `useState`, `useEffect` y `createContext`.
+
+Hoy en día, muchos componentes de paquetes `npm` que usan características exclusivas del cliente aún no tienen la directiva. Estos componentes de terceros funcionarán como se espera dentro de Componentes Cliente ya que tienen la directiva `"use client"`, pero no funcionarán dentro de Componentes de Servidor.
+
+Por ejemplo, supongamos que has instalado el paquete hipotético `acme-carousel` que tiene un componente `<Carousel />`. Este componente usa `useState`, pero aún no tiene la directiva `"use client"`.
+
+Si usas `<Carousel />` dentro de un Componente Cliente, funcionará como se espera:
+
+```tsx filename="app/gallery.tsx" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  let [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>Ver imágenes</button>
+
+      {/* Funciona, ya que Carousel se usa dentro de un Componente Cliente */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/gallery.js" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  let [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>Ver imágenes</button>
+
+      {/*  Funciona, ya que Carousel se usa dentro de un Componente Cliente */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+Sin embargo, si intentas usarlo directamente dentro de un Componente de Servidor, verás un error:
+
+```tsx filename="app/page.tsx" switcher
+import { Carousel } from 'acme-carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>Ver imágenes</p>
+
+      {/* Error: `useState` no puede usarse dentro de Componentes de Servidor */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Carousel } from 'acme-carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>Ver imágenes</p>
+
+      {/*  Error: `useState` no puede usarse dentro de Componentes de Servidor */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+Esto se debe a que Next.js no sabe que `<Carousel />` está usando características exclusivas del cliente.
+
+Para solucionar esto, puedes envolver componentes de terceros que dependan de características exclusivas del cliente en tus propios Componentes Cliente:
+
+```tsx filename="app/carousel.tsx" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+```jsx filename="app/carousel.js" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+Ahora, puedes usar `<Carousel />` directamente dentro de un Componente de Servidor:
+
+```tsx filename="app/page.tsx" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>Ver imágenes</p>
+
+      {/*  Funciona, ya que Carousel es un Componente Cliente */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>Ver imágenes</p>
+
+      {/*  Funciona, ya que Carousel es un Componente Cliente */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+No esperamos que necesites envolver la mayoría de componentes de terceros, ya que es probable que los uses dentro de Componentes Cliente. Sin embargo, una excepción son los proveedores (providers), ya que dependen del estado y contexto de React, y típicamente son necesarios en la raíz de una aplicación. [Aprende más sobre proveedores de contexto de terceros a continuación](#using-context-providers).
+
+#### Usando Proveedores de Contexto
+
+Los proveedores de contexto típicamente se renderizan cerca de la raíz de una aplicación para compartir preocupaciones globales, como el tema actual. Dado que el [contexto de React](https://react.dev/learn/passing-data-deeply-with-context) no es compatible con Componentes de Servidor, intentar crear un contexto en la raíz de tu aplicación causará un error:
+
+```tsx filename="app/layout.tsx" switcher
+import { createContext } from 'react'
+
+//  createContext no es compatible con Componentes de Servidor
+export const ThemeContext = createContext({})
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import { createContext } from 'react'
+
+//  createContext no es compatible con Componentes de Servidor
+export const ThemeContext = createContext({})
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+      </body>
+    </html>
+  )
+}
+```
+
+Para solucionar esto, crea tu contexto y renderiza su proveedor dentro de un Componente Cliente:
+
+```tsx filename="app/theme-provider.tsx" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({ children }) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+```jsx filename="app/theme-provider.js" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({ children }) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+Ahora tu Componente de Servidor podrá renderizar directamente tu proveedor ya que ha sido marcado como un Componente Cliente:
+
+```tsx filename="app/layout.tsx" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+Con el proveedor renderizado en la raíz, todos los demás Componentes Cliente en tu aplicación podrán consumir este contexto.
+
+> **Nota importante**: Debes renderizar proveedores lo más profundo posible en el árbol – observa cómo `ThemeProvider` solo envuelve `{children}` en lugar de todo el documento `<html>`. Esto facilita que Next.js optimice las partes estáticas de tus Componentes de Servidor.
+
+#### Consejos para Autores de Bibliotecas
+
+De manera similar, los autores de bibliotecas que crean paquetes para que otros desarrolladores los consuman pueden usar la directiva `"use client"` para marcar puntos de entrada del cliente de su paquete. Esto permite que los usuarios del paquete importen componentes del paquete directamente en sus Componentes de Servidor sin tener que crear un límite de envoltura.
+
+Puedes optimizar tu paquete usando ['use client' más profundo en el árbol](#moving-client-components-down-the-tree), permitiendo que los módulos importados sean parte del gráfico de módulos del Componente de Servidor.
+
+Vale la pena mencionar que algunos empaquetadores podrían eliminar las directivas `"use client"`. Puedes encontrar un ejemplo de cómo configurar esbuild para incluir la directiva `"use client"` en los repositorios [React Wrap Balancer](https://github.com/shuding/react-wrap-balancer/blob/main/tsup.config.ts#L10-L13) y [Vercel Analytics](https://github.com/vercel/analytics/blob/main/packages/web/tsup.config.js#L26-L30).
+
+## Componentes Cliente
+
+### Mover Componentes Cliente hacia Abajo en el Árbol
+
+Para reducir el tamaño del paquete de JavaScript del Cliente, recomendamos mover Componentes Cliente hacia abajo en tu árbol de componentes.
+
+Por ejemplo, puedes tener un Diseño (Layout) que tiene elementos estáticos (ej. logo, enlaces, etc) y una barra de búsqueda interactiva que usa estado.
+
+En lugar de hacer todo el diseño un Componente Cliente, mueve la lógica interactiva a un Componente Cliente (ej. `<SearchBar />`) y mantén tu diseño como un Componente de Servidor. Esto significa que no tienes que enviar todo el JavaScript del componente del diseño al cliente.
+
+```tsx filename="app/layout.tsx" switcher
+// SearchBar es un Componente Cliente
+import SearchBar from './searchbar'
+// Logo es un Componente de Servidor
+import Logo from './logo'
+
+// Layout es un Componente de Servidor por defecto
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+// SearchBar es un Componente Cliente
+import SearchBar from './searchbar'
+// Logo es un Componente de Servidor
+import Logo from './logo'
+
+// Layout es un Componente de Servidor por defecto
+export default function Layout({ children }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+### Pasar props de Servidor a Componentes Cliente (Serialización)
+
+Si obtienes datos en un Componente de Servidor, es posible que desees pasar datos como props a Componentes Cliente. Las props pasadas desde el Servidor a Componentes Cliente necesitan ser [serializables](https://developer.mozilla.org/docs/Glossary/Serialization) por React.
+
+Si tus Componentes Cliente dependen de datos que no son serializables, puedes [obtener datos en el cliente con una biblioteca de terceros](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#fetching-data-on-the-client-with-third-party-libraries) o en el servidor a través de un [Manejador de Ruta (Route Handler)](/docs/app/building-your-application/routing/route-handlers).
+
+## Intercalación de Componentes de Servidor y Cliente
+
+Al intercalar Componentes de Cliente y Servidor, puede ser útil visualizar su interfaz de usuario como un árbol de componentes. Comenzando con el [layout raíz](/docs/app/building-your-application/routing/pages-and-layouts#root-layout-required), que es un Componente de Servidor, puede luego renderizar ciertos subárboles de componentes en el cliente añadiendo la directiva `"use client"`.
+
+{/* Diagrama - intercalación */}
+
+Dentro de esos subárboles de cliente, aún puede anidar Componentes de Servidor o llamar a Acciones de Servidor, sin embargo hay algunas cosas a tener en cuenta:
+
+- Durante un ciclo de vida de solicitud-respuesta, su código se mueve del servidor al cliente. Si necesita acceder a datos o recursos en el servidor mientras está en el cliente, estará haciendo una **nueva** solicitud al servidor - no alternando entre ellos.
+- Cuando se hace una nueva solicitud al servidor, todos los Componentes de Servidor se renderizan primero, incluyendo aquellos anidados dentro de Componentes de Cliente. El resultado renderizado (RSC Payload) contendrá referencias a las ubicaciones de los Componentes de Cliente. Luego, en el cliente, React usa el RSC Payload para reconciliar Componentes de Servidor y Cliente en un único árbol.
+
+{/* Diagrama */}
+
+- Dado que los Componentes de Cliente se renderizan después de los Componentes de Servidor, no puede importar un Componente de Servidor en un módulo de Componente de Cliente (ya que requeriría una nueva solicitud al servidor). En su lugar, puede pasar un Componente de Servidor como `props` a un Componente de Cliente. Consulte las secciones de [patrón no soportado](#unsupported-pattern-importing-server-components-into-client-components) y [patrón soportado](#supported-pattern-passing-server-components-to-client-components-as-props) a continuación.
+
+### Patrón No Soportado: Importar Componentes de Servidor en Componentes de Cliente
+
+El siguiente patrón no está soportado. No puede importar un Componente de Servidor en un Componente de Cliente:
+
+```tsx filename="app/client-component.tsx" switcher highlight={4,17}
+'use client'
+
+// No puede importar un Componente de Servidor en un Componente de Cliente.
+import ServerComponent from './Server-Component'
+
+export default function ClientComponent({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      <ServerComponent />
+    </>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" switcher highlight={3,13}
+'use client'
+
+// No puede importar un Componente de Servidor en un Componente de Cliente.
+import ServerComponent from './Server-Component'
+
+export default function ClientComponent({ children }) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      <ServerComponent />
+    </>
+  )
+}
+```
+
+### Patrón Soportado: Pasar Componentes de Servidor a Componentes de Cliente como Props
+
+El siguiente patrón está soportado. Puede pasar Componentes de Servidor como una prop a un Componente de Cliente.
+
+Un patrón común es usar la prop `children` de React para crear un _"espacio"_ en su Componente de Cliente.
+
+En el ejemplo siguiente, `<ClientComponent>` acepta una prop `children`:
+
+```tsx filename="app/client-component.tsx" switcher highlight={6,15}
+'use client'
+
+import { useState } from 'react'
+
+export default function ClientComponent({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+      {children}
+    </>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" switcher highlight={5,12}
+'use client'
+
+import { useState } from 'react'
+
+export default function ClientComponent({ children }) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      {children}
+    </>
+  )
+}
+```
+
+`<ClientComponent>` no sabe que `children` eventualmente será llenado por el resultado de un Componente de Servidor. La única responsabilidad de `<ClientComponent>` es decidir **dónde** se colocará eventualmente `children`.
+
+En un Componente de Servidor padre, puede importar tanto `<ClientComponent>` como `<ServerComponent>` y pasar `<ServerComponent>` como hijo de `<ClientComponent>`:
+
+```tsx filename="app/page.tsx"  highlight={11} switcher
+// Este patrón funciona:
+// Puede pasar un Componente de Servidor como hijo o prop de un
+// Componente de Cliente.
+import ClientComponent from './client-component'
+import ServerComponent from './server-component'
+
+// Las páginas en Next.js son Componentes de Servidor por defecto
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent />
+    </ClientComponent>
+  )
+}
+```
+
+```jsx filename="app/page.js" highlight={11} switcher
+// Este patrón funciona:
+// Puede pasar un Componente de Servidor como hijo o prop de un
+// Componente de Cliente.
+import ClientComponent from './client-component'
+import ServerComponent from './server-component'
+
+// Las páginas en Next.js son Componentes de Servidor por defecto
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent />
+    </ClientComponent>
+  )
+}
+```
+
+Con este enfoque, `<ClientComponent>` y `<ServerComponent>` están desacoplados y pueden renderizarse independientemente. En este caso, el hijo `<ServerComponent>` puede renderizarse en el servidor, mucho antes de que `<ClientComponent>` se renderice en el cliente.
+
+> **Nota importante:**
+>
+> - El patrón de "elevar contenido" se ha usado para evitar rerenderizar un componente hijo anidado cuando un padre se rerenderiza.
+> - No está limitado a la prop `children`. Puede usar cualquier prop para pasar JSX.
