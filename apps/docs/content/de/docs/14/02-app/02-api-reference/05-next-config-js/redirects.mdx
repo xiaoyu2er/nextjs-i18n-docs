@@ -1,0 +1,323 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:30:01.976Z
+title: Weiterleitungen
+description: Weiterleitungen zu Ihrer Next.js-Anwendung hinzufügen.
+---
+
+{/* Der Inhalt dieses Dokuments wird sowohl für den App- als auch für den Pages-Router verwendet. Sie können die `<PagesOnly>Content</PagesOnly>`-Komponente verwenden, um Inhalte hinzuzufügen, die spezifisch für den Pages-Router sind. Gemeinsam genutzte Inhalte sollten nicht in eine Komponente eingeschlossen werden. */}
+
+Weiterleitungen ermöglichen es Ihnen, einen eingehenden Anfragepfad auf einen anderen Zielpfad umzuleiten.
+
+Um Weiterleitungen zu verwenden, können Sie den Schlüssel `redirects` in `next.config.js` nutzen:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+`redirects` ist eine asynchrone Funktion, die ein Array erwartet, das Objekte mit den Eigenschaften `source`, `destination` und `permanent` enthält:
+
+- `source` ist das Muster des eingehenden Anfragepfads.
+- `destination` ist der Pfad, zu dem umgeleitet werden soll.
+- `permanent` `true` oder `false` - wenn `true`, wird der Statuscode 308 verwendet, der Clients/Suchmaschinen anweist, die Weiterleitung dauerhaft zu cachen. Bei `false` wird der temporäre Statuscode 307 verwendet, der nicht gecacht wird.
+
+> **Warum verwendet Next.js 307 und 308?** Traditionell wurde 302 für temporäre Weiterleitungen und 301 für permanente Weiterleitungen verwendet, aber viele Browser haben die Anfragemethode der Weiterleitung unabhängig von der ursprünglichen Methode auf `GET` geändert. Wenn ein Browser beispielsweise eine Anfrage an `POST /v1/users` stellte, die den Statuscode `302` mit dem Ort `/v2/users` zurückgab, könnte die nachfolgende Anfrage `GET /v2/users` sein statt des erwarteten `POST /v2/users`. Next.js verwendet die Statuscodes 307 (temporär) und 308 (permanent), um die verwendete Anfragemethode explizit beizubehalten.
+
+- `basePath`: `false` oder `undefined` - wenn false, wird `basePath` nicht beim Matching einbezogen, kann nur für externe Weiterleitungen verwendet werden.
+- `locale`: `false` oder `undefined` - ob das Locale beim Matching nicht einbezogen werden soll.
+- `has` ist ein Array von [has-Objekten](#header-cookie-und-query-matching) mit den Eigenschaften `type`, `key` und `value`.
+- `missing` ist ein Array von [missing-Objekten](#header-cookie-und-query-matching) mit den Eigenschaften `type`, `key` und `value`.
+
+Weiterleitungen werden vor dem Dateisystem überprüft, das Seiten und `/public`-Dateien enthält.
+
+Bei Verwendung des Pages-Routers werden Weiterleitungen nicht auf das clientseitige Routing (`Link`, `router.push`) angewendet, es sei denn, [Middleware](/docs/app/building-your-application/routing/middleware) ist vorhanden und passt zum Pfad.
+
+Wenn eine Weiterleitung angewendet wird, werden alle in der Anfrage bereitgestellten Query-Werte an das Weiterleitungsziel übergeben. Beispiel siehe folgende Weiterleitungskonfiguration:
+
+```js
+{
+  source: '/old-blog/:path*',
+  destination: '/blog/:path*',
+  permanent: false
+}
+```
+
+Wenn `/old-blog/post-1?hello=world` angefragt wird, wird der Client zu `/blog/post-1?hello=world` weitergeleitet.
+
+## Pfad-Matching
+
+Pfad-Matches sind erlaubt, z.B. wird `/old-blog/:slug` auf `/old-blog/hello-world` passen (keine verschachtelten Pfade):
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/old-blog/:slug',
+        destination: '/news/:slug', // Gematchte Parameter können im Ziel verwendet werden
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### Wildcard-Pfad-Matching
+
+Um einen Wildcard-Pfad zu matchen, können Sie `*` nach einem Parameter verwenden, z.B. wird `/blog/:slug*` auf `/blog/a/b/c/d/hello-world` passen:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/blog/:slug*',
+        destination: '/news/:slug*', // Gematchte Parameter können im Ziel verwendet werden
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### Regex-Pfad-Matching
+
+Um einen Regex-Pfad zu matchen, können Sie den Regex in Klammern nach einem Parameter einschließen, z.B. wird `/post/:slug(\\d{1,})` auf `/post/123` passen, aber nicht auf `/post/abc`:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/post/:slug(\\d{1,})',
+        destination: '/news/:slug', // Gematchte Parameter können im Ziel verwendet werden
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+Die folgenden Zeichen `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` werden für Regex-Pfad-Matching verwendet. Wenn sie in der `source` als nicht-spezielle Werte vorkommen, müssen sie durch Voranstellen von `\\` escaped werden:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        // dies matcht auf `/english(default)/something`
+        source: '/english\\(default\\)/:slug',
+        destination: '/en-us/:slug',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+## Header-, Cookie- und Query-Matching
+
+Um eine Weiterleitung nur dann auszuführen, wenn Header-, Cookie- oder Query-Werte ebenfalls übereinstimmen, kann das Feld `has` verwendet werden, oder wenn sie nicht übereinstimmen, das Feld `missing`. Sowohl die `source` als auch alle `has`-Elemente müssen übereinstimmen und alle `missing`-Elemente dürfen nicht übereinstimmen, damit die Weiterleitung angewendet wird.
+
+`has`- und `missing`-Elemente können folgende Felder haben:
+
+- `type`: `String` - muss entweder `header`, `cookie`, `host` oder `query` sein.
+- `key`: `String` - der Schlüssel des ausgewählten Typs, gegen den gematcht werden soll.
+- `value`: `String` oder `undefined` - der zu prüfende Wert, wenn undefined, wird jeder Wert gematcht. Ein regex-ähnlicher String kann verwendet werden, um einen bestimmten Teil des Werts zu erfassen, z.B. wenn der Wert `first-(?<paramName>.*)` für `first-second` verwendet wird, dann kann `second` im Ziel mit `:paramName` verwendet werden.
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      // wenn der Header `x-redirect-me` vorhanden ist,
+      // wird diese Weiterleitung angewendet
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'header',
+            key: 'x-redirect-me',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // wenn der Header `x-dont-redirect` vorhanden ist,
+      // wird diese Weiterleitung NICHT angewendet
+      {
+        source: '/:path((?!another-page$).*)',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-do-not-redirect',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // wenn source, query und cookie übereinstimmen,
+      // wird diese Weiterleitung angewendet
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // der page-Wert wird im Ziel nicht verfügbar sein,
+            // da value bereitgestellt wird und keine benannte
+            // Capture-Gruppe verwendet wird, z.B. (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        permanent: false,
+        destination: '/another/:path*',
+      },
+      // wenn der Header `x-authorized` vorhanden ist und
+      // einen passenden Wert enthält, wird diese Weiterleitung angewendet
+      {
+        source: '/',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        permanent: false,
+        destination: '/home?authorized=:authorized',
+      },
+      // wenn der Host `example.com` ist,
+      // wird diese Weiterleitung angewendet
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+    ]
+  },
+}
+```
+
+### Weiterleitungen mit basePath-Unterstützung
+
+Bei Verwendung von [`basePath`-Unterstützung](/docs/app/api-reference/next-config-js/basePath) mit Weiterleitungen wird jeder `source` und `destination` automatisch mit dem `basePath` präfixiert, es sei denn, Sie fügen `basePath: false` zur Weiterleitung hinzu:
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async redirects() {
+    return [
+      {
+        source: '/with-basePath', // wird automatisch zu /docs/with-basePath
+        destination: '/another', // wird automatisch zu /docs/another
+        permanent: false,
+      },
+      {
+        // fügt /docs nicht hinzu, da basePath: false gesetzt ist
+        source: '/without-basePath',
+        destination: 'https://example.com',
+        basePath: false,
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+### Weiterleitungen mit i18n-Unterstützung
+
+<AppOnly>
+
+Bei Verwendung von [`i18n`-Unterstützung](/docs/app/building-your-application/routing/internationalization) mit Weiterleitungen wird jeder `source` und `destination` automatisch präfixiert, um die konfigurierten `locales` zu handhaben, es sei denn, Sie fügen `locale: false` zur Weiterleitung hinzu. Wenn `locale: false` verwendet wird, müssen Sie `source` und `destination` mit einem Locale präfixieren, damit sie korrekt gematcht werden.
+
+</AppOnly>
+
+<PagesOnly>
+
+Bei Verwendung von [`i18n`-Unterstützung](/docs/pages/building-your-application/routing/internationalization) mit Weiterleitungen wird jeder `source` und `destination` automatisch präfixiert, um die konfigurierten `locales` zu handhaben, es sei denn, Sie fügen `locale: false` zur Weiterleitung hinzu. Wenn `locale: false` verwendet wird, müssen Sie `source` und `destination` mit einem Locale präfixieren, damit sie korrekt gematcht werden.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/with-locale', // handhabt alle Locales automatisch
+        destination: '/another', // gibt das Locale automatisch weiter
+        permanent: false,
+      },
+      {
+        // handhabt Locales nicht automatisch, da locale: false gesetzt ist
+        source: '/nl/with-locale-manual',
+        destination: '/nl/another',
+        locale: false,
+        permanent: false,
+      },
+      {
+        // matcht '/', da `en` das defaultLocale ist
+        source: '/en',
+        destination: '/en/another',
+        locale: false,
+        permanent: false,
+      },
+      // es ist möglich, alle Locales zu matchen, auch wenn locale: false gesetzt ist
+      {
+        source: '/:locale/page',
+        destination: '/en/newpage',
+        permanent: false,
+        locale: false,
+      },
+      {
+        // wird zu /(en|fr|de)/(.*) konvertiert, matcht also nicht die Top-Level
+        // `/` oder `/fr` Routen wie /:path* es tun würde
+        source: '/(.*)',
+        destination: '/another',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+In seltenen Fällen müssen Sie möglicherweise einen benutzerdefinierten Statuscode für ältere HTTP-Clients festlegen, um eine korrekte Weiterleitung zu ermöglichen. In diesen Fällen können Sie die Eigenschaft `statusCode` anstelle von `permanent` verwenden, aber nicht beide. Um die IE11-Kompatibilität zu gewährleisten, wird für den Statuscode 308 automatisch ein `Refresh`-Header hinzugefügt.
+
+## Andere Weiterleitungen
+
+- Innerhalb von [API-Routen](/docs/pages/building-your-application/routing/api-routes) und [Route Handlern](/docs/app/building-your-application/routing/route-handlers) können Sie basierend auf der eingehenden Anfrage weiterleiten.
+- Innerhalb von [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) und [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) können Sie bestimmte Seiten zur Laufzeit weiterleiten.
+
+## Versionsverlauf
+
+| Version   | Änderungen            |
+| --------- | -------------------- |
+| `v13.3.0` | `missing` hinzugefügt. |
+| `v10.2.0` | `has` hinzugefügt.    |
+| `v9.5.0`  | `redirects` hinzugefügt. |

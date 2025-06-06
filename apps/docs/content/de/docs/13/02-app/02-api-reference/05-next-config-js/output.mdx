@@ -1,0 +1,143 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:57:46.023Z
+title: Output
+description: Next.js verfolgt automatisch, welche Dateien für jede Seite benötigt werden, um die Bereitstellung Ihrer Anwendung zu vereinfachen. Erfahren Sie hier, wie es funktioniert.
+---
+
+{/* Der Inhalt dieses Dokuments wird sowohl für den App- als auch für den Pages-Router verwendet. Sie können die Komponente `<PagesOnly>Inhalt</PagesOnly>` verwenden, um Inhalte hinzuzufügen, die spezifisch für den Pages Router sind. Gemeinsam genutzte Inhalte sollten nicht in eine Komponente eingeschlossen werden. */}
+
+Während eines Builds verfolgt Next.js automatisch jede Seite und ihre Abhängigkeiten, um alle Dateien zu bestimmen, die für die Bereitstellung einer Produktionsversion Ihrer Anwendung benötigt werden.
+
+Diese Funktion hilft, die Größe der Bereitstellungen drastisch zu reduzieren. Früher mussten Sie beim Bereitstellen mit Docker alle Dateien aus den `dependencies` Ihres Pakets installiert haben, um `next start` auszuführen. Ab Next.js 12 können Sie die Output File Tracing-Funktion im `.next/`-Verzeichnis nutzen, um nur die notwendigen Dateien einzubeziehen.
+
+Darüber hinaus entfällt dadurch die Notwendigkeit des veralteten `serverless`-Ziels, das verschiedene Probleme verursachen und unnötige Duplizierung erzeugen kann.
+
+## Funktionsweise
+
+Während `next build` verwendet Next.js [`@vercel/nft`](https://github.com/vercel/nft), um `import`, `require` und `fs`-Verwendung statisch zu analysieren und alle Dateien zu bestimmen, die eine Seite möglicherweise lädt.
+
+Der Produktionsserver von Next.js wird ebenfalls auf seine benötigten Dateien hin verfolgt und unter `.next/next-server.js.nft.json` ausgegeben, was in der Produktion genutzt werden kann.
+
+Um die `.nft.json`-Dateien, die im `.next`-Ausgabeverzeichnis erzeugt werden, zu nutzen, können Sie die Liste der Dateien in jeder Trace lesen, die relativ zur `.nft.json`-Datei sind, und sie dann an Ihren Bereitstellungsort kopieren.
+
+## Automatisches Kopieren verfolgter Dateien
+
+Next.js kann automatisch einen `standalone`-Ordner erstellen, der nur die notwendigen Dateien für eine Produktionsbereitstellung kopiert, einschließlich ausgewählter Dateien in `node_modules`.
+
+Um diese automatische Kopierfunktion zu nutzen, können Sie sie in Ihrer `next.config.js` aktivieren:
+
+```js filename="next.config.js"
+module.exports = {
+  output: 'standalone',
+}
+```
+
+Dadurch wird ein Ordner unter `.next/standalone` erstellt, der dann ohne Installation von `node_modules` bereitgestellt werden kann.
+
+Zusätzlich wird eine minimale `server.js`-Datei ausgegeben, die anstelle von `next start` verwendet werden kann. Dieser minimale Server kopiert standardmäßig nicht die `public`- oder `.next/static`-Ordner, da diese idealerweise von einem CDN gehandhabt werden sollten, obwohl diese Ordner manuell in die `standalone/public`- und `standalone/.next/static`-Ordner kopiert werden können, wonach die `server.js`-Datei diese automatisch bereitstellt.
+
+<AppOnly>
+
+> **Wissenswert**:
+>
+> - Wenn Ihr Projekt auf einen bestimmten Port oder Hostnamen hören muss, können Sie die Umgebungsvariablen `PORT` oder `HOSTNAME` definieren, bevor Sie `server.js` ausführen. Führen Sie beispielsweise `PORT=8080 HOSTNAME=0.0.0.0 node server.js` aus, um den Server unter `http://0.0.0.0:8080` zu starten.
+> - Wenn Ihr Projekt [Image Optimization](/docs/app/building-your-application/optimizing/images) mit dem standardmäßigen `loader` verwendet, müssen Sie `sharp` als Abhängigkeit installieren:
+
+</AppOnly>
+
+<PagesOnly>
+
+> **Wissenswert**:
+>
+> - `next.config.js` wird während `next build` gelesen und in die `server.js`-Ausgabedatei serialisiert. Wenn die veralteten Optionen [`serverRuntimeConfig` oder `publicRuntimeConfig`](/docs/pages/api-reference/next-config-js/runtime-configuration) verwendet werden, sind die Werte spezifisch für die Werte zum Build-Zeitpunkt.
+> - Wenn Ihr Projekt auf einen bestimmten Port oder Hostnamen hören muss, können Sie die Umgebungsvariablen `PORT` oder `HOSTNAME` definieren, bevor Sie `server.js` ausführen. Führen Sie beispielsweise `PORT=8080 HOSTNAME=0.0.0.0 node server.js` aus, um den Server unter `http://0.0.0.0:8080` zu starten.
+> - Wenn Ihr Projekt [Image Optimization](/docs/pages/building-your-application/optimizing/images) mit dem standardmäßigen `loader` verwendet, müssen Sie `sharp` als Abhängigkeit installieren:
+
+</PagesOnly>
+
+```bash filename="Terminal"
+npm i sharp
+```
+
+```bash filename="Terminal"
+yarn add sharp
+```
+
+```bash filename="Terminal"
+pnpm add sharp
+```
+
+```bash filename="Terminal"
+bun add sharp
+```
+
+## Einschränkungen
+
+- Beim Tracing in Monorepo-Setups wird standardmäßig das Projektverzeichnis für das Tracing verwendet. Für `next build packages/web-app` wäre `packages/web-app` das Tracing-Root, und Dateien außerhalb dieses Ordners werden nicht einbezogen. Um Dateien außerhalb dieses Ordners einzubeziehen, können Sie `experimental.outputFileTracingRoot` in Ihrer `next.config.js` festlegen.
+
+```js filename="packages/web-app/next.config.js"
+module.exports = {
+  experimental: {
+    // dies bezieht Dateien aus der Monorepo-Basis zwei Verzeichnisse höher ein
+    outputFileTracingRoot: path.join(__dirname, '../../'),
+  },
+}
+```
+
+- Es gibt einige Fälle, in denen Next.js möglicherweise benötigte Dateien nicht einbezieht oder ungenutzte Dateien fälschlicherweise einbezieht. In diesen Fällen können Sie `experimental.outputFileTracingExcludes` bzw. `experimental.outputFileTracingIncludes` in `next.config.js` nutzen. Jede Konfiguration akzeptiert ein Objekt mit [minimatch globs](https://www.npmjs.com/package/minimatch) für den Schlüssel, um bestimmte Seiten abzugleichen, und einen Wert eines Arrays mit globs relativ zum Projektroot, die entweder in die Trace ein- oder ausgeschlossen werden sollen.
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    outputFileTracingExcludes: {
+      '/api/hello': ['./un-necessary-folder/**/*'],
+    },
+    outputFileTracingIncludes: {
+      '/api/another': ['./necessary-folder/**/*'],
+    },
+  },
+}
+```
+
+- Derzeit macht Next.js nichts mit den ausgegebenen `.nft.json`-Dateien. Die Dateien müssen von Ihrer Bereitstellungsplattform, z.B. [Vercel](https://vercel.com), gelesen werden, um eine minimale Bereitstellung zu erstellen. In einer zukünftigen Version ist ein neuer Befehl geplant, der diese `.nft.json`-Dateien nutzt.
+
+## Experimentelles `turbotrace`
+
+Das Tracing von Abhängigkeiten kann langsam sein, da es sehr komplexe Berechnungen und Analysen erfordert. Wir haben `turbotrace` in Rust als eine schnellere und intelligentere Alternative zur JavaScript-Implementierung erstellt.
+
+Um es zu aktivieren, können Sie Ihrer `next.config.js` die folgende Konfiguration hinzufügen:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    turbotrace: {
+      // steuert die Log-Level von turbotrace, Standard ist `error`
+      logLevel?:
+      | 'bug'
+      | 'fatal'
+      | 'error'
+      | 'warning'
+      | 'hint'
+      | 'note'
+      | 'suggestions'
+      | 'info',
+      // steuert, ob das Log von turbotrace die Details der Analyse enthalten soll, Standard ist `false`
+      logDetail?: boolean
+      // zeigt alle Log-Nachrichten ohne Limit an
+      // turbotrace zeigt standardmäßig nur 1 Log-Nachricht pro Kategorie an
+      logAll?: boolean
+      // steuert das Kontextverzeichnis von turbotrace
+      // Dateien außerhalb des Kontextverzeichnisses werden nicht getraced
+      // das Setzen von `experimental.outputFileTracingRoot` hat den gleichen Effekt
+      // wenn sowohl `experimental.outputFileTracingRoot` als auch diese Option gesetzt sind, wird `experimental.turbotrace.contextDirectory` verwendet
+      contextDirectory?: string
+      // wenn es in Ihrem Code `process.cwd()`-Ausdrücke gibt, können Sie diese Option setzen, um `turbotrace` den Wert von `process.cwd()` während des Tracings mitzuteilen.
+      // z.B. wird require(process.cwd() + '/package.json') als require('/pfad/zu/cwd/package.json') getraced
+      processCwd?: string
+      // steuert die maximale Speichernutzung von `turbotrace`, in `MB`, Standard ist `6000`.
+      memoryLimit?: number
+    },
+  },
+}
+```

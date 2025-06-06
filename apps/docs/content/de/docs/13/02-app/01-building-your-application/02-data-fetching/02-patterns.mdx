@@ -1,0 +1,314 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T18:09:28.324Z
+title: Datenabruf-Muster
+description: Lernen Sie gängige Muster für den Datenabruf in React und Next.js kennen.
+---
+
+Es gibt einige empfohlene Muster und Best Practices für den Datenabruf in React und Next.js. Diese Seite behandelt einige der gängigsten Muster und deren Anwendung.
+
+### Datenabruf auf dem Server
+
+Wann immer möglich, empfehlen wir den Datenabruf auf dem Server. Dies ermöglicht Ihnen:
+
+- Direkten Zugriff auf Backend-Datenressourcen (z.B. Datenbanken).
+- Erhöhte Sicherheit Ihrer Anwendung, indem sensible Informationen wie Zugriffstoken und API-Schlüssel nicht an den Client weitergegeben werden.
+- Datenabruf und Rendering in derselben Umgebung. Dies reduziert sowohl die Kommunikation zwischen Client und Server als auch die [Belastung des Hauptthreads](https://vercel.com/blog/how-react-18-improves-application-performance) auf dem Client.
+- Mehrere Datenabrufe mit einer einzigen Roundtrip-Anfrage anstelle mehrerer einzelner Anfragen vom Client.
+- Reduzierung von [Wasserfall-Effekten](#paralleler-und-sequenzieller-datenabruf) zwischen Client und Server.
+- Abhängig von Ihrer Region kann der Datenabruf näher an der Datenquelle erfolgen, was Latenz verringert und die Leistung verbessert.
+
+Sie können Daten auf dem Server mit Server Components, [Route Handlers](/docs/app/building-your-application/routing/route-handlers) und [Server Actions](/docs/app/building-your-application/data-fetching/forms-and-mutations) abrufen.
+
+### Datenabruf dort, wo sie benötigt werden
+
+Wenn Sie dieselben Daten (z.B. aktuellen Benutzer) in mehreren Komponenten eines Baums benötigen, müssen Sie die Daten nicht global abrufen oder Props zwischen Komponenten weitergeben. Stattdessen können Sie `fetch` oder React `cache` in der Komponente verwenden, die die Daten benötigt, ohne sich um Leistungseinbußen durch mehrere Anfragen für dieselben Daten sorgen zu müssen.
+
+Dies ist möglich, weil `fetch`-Anfragen automatisch memoized werden. Erfahren Sie mehr über [Request Memoization](/docs/app/building-your-application/caching#request-memoization)
+
+> **Gut zu wissen**: Dies gilt auch für Layouts, da Daten nicht zwischen einem Eltern-Layout und seinen Kindern weitergegeben werden können.
+
+### Streaming
+
+Streaming und [Suspense](https://react.dev/reference/react/Suspense) sind React-Features, die es ermöglichen, Teile der UI progressiv zu rendern und schrittweise an den Client zu streamen.
+
+Mit Server Components und [verschachtelten Layouts](/docs/app/building-your-application/routing/pages-and-layouts) können Sie Teile der Seite, die keine spezifischen Daten benötigen, sofort rendern und einen [Ladezustand](/docs/app/building-your-application/routing/loading-ui-and-streaming) für Teile anzeigen, die Daten abrufen. Dies bedeutet, dass der Benutzer nicht warten muss, bis die gesamte Seite geladen ist, bevor er mit ihr interagieren kann.
+
+<Image
+  alt="Server-Rendering mit Streaming"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+Weitere Informationen zu Streaming und Suspense finden Sie auf den Seiten [Loading UI](/docs/app/building-your-application/routing/loading-ui-and-streaming) und [Streaming und Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense).
+
+### Paralleler und sequenzieller Datenabruf
+
+Beim Datenabruf innerhalb von React-Komponenten sollten Sie zwei Muster beachten: Paralleler und sequenzieller Datenabruf.
+
+<Image
+  alt="Sequenzieller und paralleler Datenabruf"
+  srcLight="/docs/light/sequential-parallel-data-fetching.png"
+  srcDark="/docs/dark/sequential-parallel-data-fetching.png"
+  width="1600"
+  height="525"
+/>
+
+- Beim **sequenziellen Datenabruf** sind Anfragen in einer Route voneinander abhängig und erzeugen somit Wasserfälle. Es gibt Fälle, in denen Sie dieses Muster wünschen, weil ein Abruf vom Ergebnis eines anderen abhängt oder eine Bedingung erfüllt sein muss, bevor der nächste Abruf Ressourcen spart. Dieses Verhalten kann jedoch auch unbeabsichtigt sein und zu längeren Ladezeiten führen.
+- Beim **parallelen Datenabruf** werden Anfragen in einer Route gleichzeitig initiiert und die Daten parallel geladen. Dies reduziert Wasserfälle zwischen Client und Server und die Gesamtzeit für den Datenabruf.
+
+#### Sequenzieller Datenabruf
+
+Wenn Sie verschachtelte Komponenten haben und jede Komponente ihre eigenen Daten abruft, erfolgt der Datenabruf sequenziell, wenn diese Datenanfragen unterschiedlich sind (dies gilt nicht für Anfragen nach denselben Daten, da diese automatisch [memoized](/docs/app/building-your-application/caching#request-memoization) werden).
+
+Zum Beispiel wird die `Playlists`-Komponente erst mit dem Datenabruf beginnen, wenn die `Artist`-Komponente damit fertig ist, da `Playlists` von der `artistID`-Prop abhängt:
+
+```tsx filename="app/artist/page.tsx" switcher
+// ...
+
+async function Playlists({ artistID }: { artistID: string }) {
+  // Warten auf die Playlists
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // Warten auf den Künstler
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/page.js" switcher
+// ...
+
+async function Playlists({ artistID }) {
+  // Warten auf die Playlists
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({ params: { username } }) {
+  // Warten auf den Künstler
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+In solchen Fällen können Sie [`loading.js`](/docs/app/building-your-application/routing/loading-ui-and-streaming) (für Routensegmente) oder [React `<Suspense>`](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense) (für verschachtelte Komponenten) verwenden, um einen sofortigen Ladezustand anzuzeigen, während React das Ergebnis streamt.
+
+Dies verhindert, dass die gesamte Route durch den Datenabruf blockiert wird, und der Benutzer kann mit den nicht blockierten Teilen der Seite interagieren.
+
+> **Blockierende Datenanfragen:**
+>
+> Ein alternativer Ansatz zur Vermeidung von Wasserfällen besteht darin, Daten global im Stamm Ihrer Anwendung abzurufen. Dies blockiert jedoch das Rendering für alle darunterliegenden Routensegmente, bis der Datenabruf abgeschlossen ist. Dies kann als "Alles-oder-nichts"-Datenabruf beschrieben werden. Entweder Sie haben alle Daten für Ihre Seite oder Anwendung, oder keine.
+>
+> Jede `await`-Anfrage blockiert das Rendering und den Datenabruf für den gesamten darunterliegenden Baum, es sei denn, sie ist in eine `<Suspense>`-Grenze eingeschlossen oder es wird `loading.js` verwendet. Eine weitere Alternative ist der [parallele Datenabruf](#paralleler-datenabruf) oder das [Preload-Muster](#vorabruf-von-daten).
+
+#### Paralleler Datenabruf
+
+Um Daten parallel abzurufen, können Sie Anfragen außerhalb der Komponenten definieren, die die Daten verwenden, und sie dann innerhalb der Komponente aufrufen. Dies spart Zeit, indem beide Anfragen parallel initiiert werden, allerdings sieht der Benutzer das gerenderte Ergebnis erst, nachdem beide Promises aufgelöst wurden.
+
+Im folgenden Beispiel werden die Funktionen `getArtist` und `getArtistAlbums` außerhalb der `Page`-Komponente definiert, innerhalb der Komponente aufgerufen und auf beide Promises gewartet:
+
+```tsx filename="app/artist/[username]/page.tsx" switcher
+import Albums from './albums'
+
+async function getArtist(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // Beide Anfragen parallel initiieren
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // Auf die Auflösung der Promises warten
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/[username]/page.js" switcher
+import Albums from './albums'
+
+async function getArtist(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({ params: { username } }) {
+  // Beide Anfragen parallel initiieren
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // Auf die Auflösung der Promises warten
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+Um die Benutzererfahrung zu verbessern, können Sie eine [Suspense Boundary](/docs/app/building-your-application/routing/loading-ui-and-streaming) hinzufügen, um das Rendering aufzuteilen und Teile des Ergebnisses so schnell wie möglich anzuzeigen.
+
+### Vorabruf von Daten
+
+Eine weitere Möglichkeit, Wasserfälle zu vermeiden, ist das Preload-Muster. Sie können optional eine `preload`-Funktion erstellen, um den parallelen Datenabruf weiter zu optimieren. Mit diesem Ansatz müssen Sie keine Promises als Props weitergeben. Die `preload`-Funktion kann auch einen beliebigen Namen haben, da es sich um ein Muster und nicht um eine API handelt.
+
+```tsx filename="components/Item.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id: string) => {
+  // void wertet den gegebenen Ausdruck aus und gibt undefined zurück
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }: { id: string }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="components/Item.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id) => {
+  // void wertet den gegebenen Ausdruck aus und gibt undefined zurück
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  // Datenabruf für Item starten
+  preload(id)
+  // weitere asynchrone Aufgabe ausführen
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({ params: { id } }) {
+  // Datenabruf für Item starten
+  preload(id)
+  // weitere asynchrone Aufgabe ausführen
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+### Verwendung von React `cache`, `server-only` und dem Preload-Muster
+
+Sie können die `cache`-Funktion, das `preload`-Muster und das `server-only`-Paket kombinieren, um eine Datenabruf-Hilfsfunktion zu erstellen, die in Ihrer gesamten Anwendung verwendet werden kann.
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id: string) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id: string) => {
+  // ...
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id) => {
+  // ...
+})
+```
+
+Mit diesem Ansatz können Sie Daten vorab abrufen, Antworten zwischenspeichern und sicherstellen, dass dieser Datenabruf [nur auf dem Server](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment) erfolgt.
+
+Die Exporte von `utils/get-item` können von Layouts, Seiten oder anderen Komponenten verwendet werden, um zu steuern, wann die Daten eines Elements abgerufen werden.
+
+> **Gut zu wissen:**
+>
+> - Wir empfehlen die Verwendung des [`server-only`-Pakets](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment), um sicherzustellen, dass Server-Datenabruffunktionen niemals auf dem Client verwendet werden.

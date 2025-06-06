@@ -1,0 +1,246 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T18:03:40.013Z
+title: Draft Mode
+description: Next.js bietet einen Draft Mode zum Wechseln zwischen statischen und dynamischen Seiten. Hier erfahren Sie, wie er mit dem App Router funktioniert.
+---
+
+Statisches Rendering ist nützlich, wenn Ihre Seiten Daten von einem Headless CMS abrufen. Es ist jedoch nicht ideal, wenn Sie einen Entwurf in Ihrem Headless CMS schreiben und diesen sofort auf Ihrer Seite anzeigen möchten. In diesem Fall möchten Sie, dass Next.js diese Seiten zur **Laufzeit** anstatt während des Builds rendert und den Entwurfsinhalt anstelle des veröffentlichten Inhalts abruft. Sie möchten, dass Next.js nur für diesen speziellen Fall auf [dynamisches Rendering](/docs/app/building-your-application/rendering/server-components#dynamic-rendering) umschaltet.
+
+Next.js bietet eine Funktion namens **Draft Mode**, die dieses Problem löst. Hier finden Sie Anleitungen zur Verwendung.
+
+## Schritt 1: Erstellen und Zugreifen auf den Route Handler
+
+Erstellen Sie zunächst einen [Route Handler](/docs/app/building-your-application/routing/route-handlers). Er kann beliebig benannt werden, z.B. `app/api/draft/route.ts`.
+
+Importieren Sie dann `draftMode` aus `next/headers` und rufen Sie die Methode `enable()` auf.
+
+```ts filename="app/api/draft/route.ts" switcher
+// Route Handler zur Aktivierung des Draft Mode
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  draftMode().enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+// Route Handler zur Aktivierung des Draft Mode
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  draftMode().enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+Dadurch wird ein **Cookie** gesetzt, um den Draft Mode zu aktivieren. Nachfolgende Anfragen, die diesen Cookie enthalten, lösen den **Draft Mode** aus und ändern das Verhalten für statisch generierte Seiten (mehr dazu später).
+
+Sie können dies manuell testen, indem Sie `/api/draft` aufrufen und die Entwicklertools Ihres Browsers überprüfen. Beachten Sie den `Set-Cookie`-Antwortheader mit einem Cookie namens `__prerender_bypass`.
+
+### Sicherer Zugriff von Ihrem Headless CMS
+
+In der Praxis möchten Sie diesen Route Handler _sicher_ von Ihrem Headless CMS aus aufrufen. Die genauen Schritte hängen von Ihrem Headless CMS ab, aber hier sind einige allgemeine Schritte:
+
+Diese Schritte setzen voraus, dass Ihr Headless CMS das Setzen von **benutzerdefinierten Draft-URLs** unterstützt. Falls nicht, können Sie diese Methode trotzdem verwenden, um Ihre Draft-URLs zu sichern, müssen die Draft-URL jedoch manuell erstellen und aufrufen.
+
+**Zuerst** sollten Sie einen **geheimen Token-String** mit einem Token-Generator Ihrer Wahl erstellen. Dieser Token sollte nur Ihrer Next.js-App und Ihrem Headless CMS bekannt sein. Dadurch wird verhindert, dass Personen ohne Zugriff auf Ihr CMS auf Draft-URLs zugreifen können.
+
+**Zweitens**, wenn Ihr Headless CMS benutzerdefinierte Draft-URLs unterstützt, geben Sie Folgendes als Draft-URL an. Dies setzt voraus, dass Ihr Route Handler unter `app/api/draft/route.ts` liegt.
+
+```bash filename="Terminal"
+https://<ihre-domain>/api/draft?secret=<token>&slug=<pfad>
+```
+
+- `<ihre-domain>` sollte Ihre Bereitstellungsdomain sein.
+- `<token>` sollte durch den generierten geheimen Token ersetzt werden.
+- `<pfad>` sollte der Pfad der Seite sein, die Sie anzeigen möchten. Wenn Sie `/posts/foo` anzeigen möchten, verwenden Sie `&slug=/posts/foo`.
+
+Ihr Headless CMS könnte es ermöglichen, eine Variable in der Draft-URL zu verwenden, sodass `<pfad>` dynamisch basierend auf den Daten des CMS gesetzt werden kann, z.B. `&slug=/posts/{entry.fields.slug}`.
+
+**Schließlich** im Route Handler:
+
+- Überprüfen Sie, ob der Token übereinstimmt und der `slug`-Parameter vorhanden ist (falls nicht, sollte die Anfrage fehlschlagen).
+- Rufen Sie `draftMode.enable()` auf, um den Cookie zu setzen.
+- Leiten Sie dann den Browser zu dem durch `slug` angegebenen Pfad weiter.
+
+```ts filename="app/api/draft/route.ts" switcher
+// Route Handler mit Token und Slug
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // Query-String-Parameter parsen
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Token und Parameter überprüfen
+  // Dieser Token sollte nur diesem Route Handler und dem CMS bekannt sein
+  if (secret !== 'MEIN_GEHEIMER_TOKEN' || !slug) {
+    return new Response('Ungültiger Token', { status: 401 })
+  }
+
+  // Headless CMS abfragen, um zu überprüfen, ob der angegebene `slug` existiert
+  // getPostBySlug würde die erforderliche Abfragelogik für das Headless CMS implementieren
+  const post = await getPostBySlug(slug)
+
+  // Wenn der Slug nicht existiert, verhindern Sie die Aktivierung des Draft Mode
+  if (!post) {
+    return new Response('Ungültiger Slug', { status: 401 })
+  }
+
+  // Draft Mode durch Setzen des Cookies aktivieren
+  draftMode().enable()
+
+  // Zum Pfad des abgerufenen Beitrags weiterleiten
+  // Wir leiten nicht zu searchParams.slug weiter, da dies zu Open-Redirect-Schwachstellen führen könnte
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+// Route Handler mit Token und Slug
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // Query-String-Parameter parsen
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Token und Parameter überprüfen
+  // Dieser Token sollte nur diesem Route Handler und dem CMS bekannt sein
+  if (secret !== 'MEIN_GEHEIMER_TOKEN' || !slug) {
+    return new Response('Ungültiger Token', { status: 401 })
+  }
+
+  // Headless CMS abfragen, um zu überprüfen, ob der angegebene `slug` existiert
+  // getPostBySlug würde die erforderliche Abfragelogik für das Headless CMS implementieren
+  const post = await getPostBySlug(slug)
+
+  // Wenn der Slug nicht existiert, verhindern Sie die Aktivierung des Draft Mode
+  if (!post) {
+    return new Response('Ungültiger Slug', { status: 401 })
+  }
+
+  // Draft Mode durch Setzen des Cookies aktivieren
+  draftMode().enable()
+
+  // Zum Pfad des abgerufenen Beitrags weiterleiten
+  // Wir leiten nicht zu searchParams.slug weiter, da dies zu Open-Redirect-Schwachstellen führen könnte
+  redirect(post.slug)
+}
+```
+
+Wenn dies erfolgreich ist, wird der Browser zu dem gewünschten Pfad mit dem Draft-Mode-Cookie weitergeleitet.
+
+## Schritt 2: Seite aktualisieren
+
+Der nächste Schritt besteht darin, Ihre Seite so zu aktualisieren, dass sie den Wert von `draftMode().isEnabled` überprüft.
+
+Wenn Sie eine Seite anfordern, für die der Cookie gesetzt ist, werden die Daten zur **Laufzeit** (anstatt während des Builds) abgerufen.
+
+Außerdem ist der Wert von `isEnabled` `true`.
+
+```tsx filename="app/page.tsx" switcher
+// Seite, die Daten abruft
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// Seite, die Daten abruft
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+Das war's! Wenn Sie den Draft Route Handler (mit `secret` und `slug`) von Ihrem Headless CMS oder manuell aufrufen, sollten Sie nun den Entwurfsinhalt sehen können. Und wenn Sie Ihren Entwurf ohne Veröffentlichung aktualisieren, sollten Sie den Entwurf anzeigen können.
+
+Setzen Sie dies als Draft-URL in Ihrem Headless CMS oder rufen Sie sie manuell auf, und Sie sollten den Entwurf sehen können.
+
+```bash filename="Terminal"
+https://<ihre-domain>/api/draft?secret=<token>&slug=<pfad>
+```
+
+## Weitere Details
+
+### Draft-Mode-Cookie löschen
+
+Standardmäßig endet die Draft-Mode-Sitzung, wenn der Browser geschlossen wird.
+
+Um den Draft-Mode-Cookie manuell zu löschen, erstellen Sie einen Route Handler, der `draftMode().disable()` aufruft:
+
+```ts filename="app/api/disable-draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  draftMode().disable()
+  return new Response('Draft mode is disabled')
+}
+```
+
+```js filename="app/api/disable-draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  draftMode().disable()
+  return new Response('Draft mode is disabled')
+}
+```
+
+Rufen Sie dann `/api/disable-draft` auf, um den Route Handler auszulösen. Wenn Sie diese Route mit [`next/link`](/docs/app/api-reference/components/link) aufrufen, müssen Sie `prefetch={false}` übergeben, um ein versehentliches Löschen des Cookies beim Prefetch zu verhindern.
+
+### Einzigartig pro `next build`
+
+Ein neuer Bypass-Cookie-Wert wird jedes Mal generiert, wenn Sie `next build` ausführen.
+
+Dadurch wird sichergestellt, dass der Bypass-Cookie nicht erraten werden kann.
+
+> **Gut zu wissen**: Um Draft Mode lokal über HTTP zu testen, muss Ihr Browser Third-Party-Cookies und Local Storage-Zugriff erlauben.
