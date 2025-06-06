@@ -1,0 +1,147 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:29:17.787Z
+title: getServerSideProps
+description: Récupérer des données à chaque requête avec `getServerSideProps`.
+---
+
+Si vous exportez une fonction appelée `getServerSideProps` (Rendu côté serveur ou SSR) depuis une page, Next.js pré-rendra cette page à chaque requête en utilisant les données retournées par `getServerSideProps`.
+
+```tsx filename="pages/index.tsx" switcher
+import type { InferGetServerSidePropsType, GetServerSideProps } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getServerSideProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetServerSideProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/index.js" switcher
+export async function getServerSideProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+> Notez que quel que soit le type de rendu, toutes les `props` seront passées au composant de page et peuvent être visualisées côté client dans le HTML initial. Ceci permet à la page d'être [hydratée](https://react.dev/reference/react-dom/hydrate) correctement. Assurez-vous de ne pas passer d'informations sensibles qui ne devraient pas être disponibles côté client dans les `props`.
+
+## Quand getServerSideProps s'exécute-t-il
+
+`getServerSideProps` s'exécute uniquement côté serveur et jamais dans le navigateur. Si une page utilise `getServerSideProps`, alors :
+
+- Lorsque vous demandez cette page directement, `getServerSideProps` s'exécute au moment de la requête, et cette page sera pré-rendue avec les props retournées
+- Lorsque vous demandez cette page via des transitions côté client avec [`next/link`](/docs/pages/api-reference/components/link) ou [`next/router`](/docs/pages/api-reference/functions/use-router), Next.js envoie une requête API au serveur, qui exécute `getServerSideProps`
+
+`getServerSideProps` retourne du JSON qui sera utilisé pour rendre la page. Tout ce travail est géré automatiquement par Next.js, vous n'avez donc rien à faire de plus tant que `getServerSideProps` est défini.
+
+Vous pouvez utiliser l'[outil next-code-elimination](https://next-code-elimination.vercel.app/) pour vérifier ce que Next.js élimine du bundle côté client.
+
+`getServerSideProps` ne peut être exporté que depuis une **page**. Vous ne pouvez pas l'exporter depuis des fichiers non-pages.
+
+Notez que vous devez exporter `getServerSideProps` comme une fonction autonome — cela **ne** fonctionnera pas si vous ajoutez `getServerSideProps` comme propriété du composant de page.
+
+La [référence API de `getServerSideProps`](/docs/pages/api-reference/functions/get-server-side-props) couvre tous les paramètres et props pouvant être utilisés avec `getServerSideProps`.
+
+## Quand utiliser getServerSideProps
+
+Vous devriez utiliser `getServerSideProps` uniquement si vous avez besoin de pré-rendre une page dont les données doivent être récupérées au moment de la requête. Cela peut être dû à la nature des données ou aux propriétés de la requête (comme les en-têtes `authorization` ou la géolocalisation). Les pages utilisant `getServerSideProps` seront rendues côté serveur au moment de la requête et ne seront mises en cache que si des [en-têtes cache-control sont configurés](/docs/pages/building-your-application/deploying/production-checklist#caching).
+
+Si vous n'avez pas besoin de pré-rendre les données pendant la requête, vous devriez envisager de récupérer les données [côté client](#récupération-de-données-côté-client) ou avec [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props).
+
+### getServerSideProps ou Routes API
+
+Il peut être tentant d'utiliser une [Route API](/docs/pages/building-your-application/routing/api-routes) lorsque vous souhaitez récupérer des données depuis le serveur, puis d'appeler cette route API depuis `getServerSideProps`. Cette approche est inutile et inefficace, car elle entraînera une requête supplémentaire due à l'exécution de `getServerSideProps` et des Routes API sur le serveur.
+
+Prenez l'exemple suivant. Une route API est utilisée pour récupérer des données depuis un CMS. Cette route API est ensuite appelée directement depuis `getServerSideProps`. Cela génère un appel supplémentaire, réduisant les performances. À la place, importez directement la logique utilisée dans votre Route API dans `getServerSideProps`. Cela peut signifier appeler un CMS, une base de données ou une autre API directement depuis `getServerSideProps`.
+
+### getServerSideProps avec les Routes API Edge
+
+`getServerSideProps` peut être utilisé avec les [Runtimes Serverless et Edge](/docs/pages/building-your-application/rendering/edge-and-nodejs-runtimes), et vous pouvez définir des props dans les deux. Cependant, actuellement dans le Runtime Edge, vous n'avez pas accès à l'objet response. Cela signifie que vous ne pouvez pas — par exemple — ajouter des cookies dans `getServerSideProps`. Pour avoir accès à l'objet response, vous devriez **continuer à utiliser le runtime Node.js**, qui est le runtime par défaut.
+
+Vous pouvez définir explicitement le runtime page par page en modifiant la `config`, par exemple :
+
+```jsx filename="pages/index.js"
+export const config = {
+  runtime: 'nodejs', // ou "edge"
+}
+
+export const getServerSideProps = async () => {}
+```
+
+## Récupération de données côté client
+
+Si votre page contient des données fréquemment mises à jour et que vous n'avez pas besoin de pré-rendre les données, vous pouvez les récupérer [côté client](/docs/pages/building-your-application/data-fetching/client-side). Un exemple de ceci est les données spécifiques à l'utilisateur :
+
+- D'abord, affichez immédiatement la page sans données. Certaines parties de la page peuvent être pré-rendues en utilisant la Génération Statique. Vous pouvez afficher des états de chargement pour les données manquantes
+- Ensuite, récupérez les données côté client et affichez-les lorsqu'elles sont prêtes
+
+Cette approche fonctionne bien pour les pages de tableau de bord utilisateur, par exemple. Comme un tableau de bord est une page privée et spécifique à l'utilisateur, le SEO n'est pas pertinent et la page n'a pas besoin d'être pré-rendue. Les données sont fréquemment mises à jour, ce qui nécessite une récupération de données au moment de la requête.
+
+## Utilisation de getServerSideProps pour récupérer des données au moment de la requête
+
+L'exemple suivant montre comment récupérer des données au moment de la requête et pré-rendre le résultat.
+
+```jsx
+// Ceci est appelé à chaque requête
+export async function getServerSideProps() {
+  // Récupérer des données depuis une API externe
+  const res = await fetch(`https://.../data`)
+  const data = await res.json()
+
+  // Passer les données à la page via props
+  return { props: { data } }
+}
+
+export default function Page({ data }) {
+  // Afficher les données...
+}
+```
+
+## Mise en cache avec le Rendu Côté Serveur (SSR)
+
+Vous pouvez utiliser les en-têtes de cache (`Cache-Control`) dans `getServerSideProps` pour mettre en cache les réponses dynamiques. Par exemple, en utilisant [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/).
+
+```jsx
+// Cette valeur est considérée comme fraîche pendant dix secondes (s-maxage=10).
+// Si une requête est répétée dans les 10 secondes suivantes,
+// la valeur précédemment mise en cache sera toujours fraîche. Si la requête est répétée avant 59 secondes,
+// la valeur mise en cache sera périmée mais toujours affichée (stale-while-revalidate=59).
+//
+// En arrière-plan, une requête de revalidation sera faite pour remplir le cache
+// avec une nouvelle valeur. Si vous rafraîchissez la page, vous verrez la nouvelle valeur.
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+Apprenez-en plus sur la [mise en cache](/docs/pages/building-your-application/deploying/production-checklist#caching).
+
+## getServerSideProps affiche-t-il une page d'erreur
+
+Si une erreur est levée dans `getServerSideProps`, elle affichera le fichier `pages/500.js`. Consultez la documentation pour la [page 500](/docs/pages/building-your-application/routing/custom-error#500-page) pour en savoir plus sur sa création. Pendant le développement, ce fichier ne sera pas utilisé et l'overlay de développement sera affiché à la place.

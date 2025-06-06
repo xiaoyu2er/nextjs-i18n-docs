@@ -1,0 +1,323 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:33:18.916Z
+title: redirections
+description: Ajoutez des redirections à votre application Next.js.
+---
+
+{/* Le contenu de ce document est partagé entre le routeur app et pages. Vous pouvez utiliser le composant `<PagesOnly>Content</PagesOnly>` pour ajouter du contenu spécifique au routeur Pages. Tout contenu partagé ne doit pas être encapsulé dans un composant. */}
+
+Les redirections permettent de rediriger un chemin de requête entrant vers un chemin de destination différent.
+
+Pour utiliser les redirections, vous pouvez utiliser la clé `redirects` dans `next.config.js` :
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+`redirects` est une fonction asynchrone qui attend un tableau d'objets avec les propriétés `source`, `destination` et `permanent` :
+
+- `source` : le motif du chemin de requête entrant.
+- `destination` : le chemin vers lequel vous souhaitez rediriger.
+- `permanent` : `true` ou `false` - si `true`, utilise le code de statut 308 qui indique aux clients/moteurs de recherche de mettre en cache la redirection indéfiniment. Si `false`, utilise le code de statut 307 qui est temporaire et n'est pas mis en cache.
+
+> **Pourquoi Next.js utilise-t-il 307 et 308 ?** Traditionnellement, un 302 était utilisé pour une redirection temporaire et un 301 pour une redirection permanente, mais de nombreux navigateurs ont modifié la méthode de requête de la redirection en `GET`, quelle que soit la méthode originale. Par exemple, si le navigateur effectuait une requête `POST /v1/users` qui retournait le code de statut `302` avec l'emplacement `/v2/users`, la requête suivante pourrait être `GET /v2/users` au lieu du `POST /v2/users` attendu. Next.js utilise les codes de statut 307 pour les redirections temporaires et 308 pour les redirections permanentes afin de préserver explicitement la méthode de requête utilisée.
+
+- `basePath` : `false` ou `undefined` - si `false`, le `basePath` ne sera pas inclus lors de la correspondance, peut être utilisé uniquement pour les redirections externes.
+- `locale` : `false` ou `undefined` - indique si la locale ne doit pas être incluse lors de la correspondance.
+- `has` : un tableau d'[objets has](#correspondance-d-en-tête-de-cookie-et-de-requête) avec les propriétés `type`, `key` et `value`.
+- `missing` : un tableau d'[objets missing](#correspondance-d-en-tête-de-cookie-et-de-requête) avec les propriétés `type`, `key` et `value`.
+
+Les redirections sont vérifiées avant le système de fichiers, qui inclut les pages et les fichiers `/public`.
+
+Les redirections ne sont pas appliquées au routage côté client (`Link`, `router.push`), sauf si un [Middleware](/docs/app/building-your-application/routing/middleware) est présent et correspond au chemin.
+
+Lorsqu'une redirection est appliquée, toutes les valeurs de requête fournies dans la requête seront transmises à la destination de redirection. Par exemple, voyez la configuration de redirection suivante :
+
+```js
+{
+  source: '/old-blog/:path*',
+  destination: '/blog/:path*',
+  permanent: false
+}
+```
+
+Lorsque `/old-blog/post-1?hello=world` est demandé, le client sera redirigé vers `/blog/post-1?hello=world`.
+
+## Correspondance de chemin
+
+Les correspondances de chemin sont autorisées, par exemple `/old-blog/:slug` correspondra à `/old-blog/hello-world` (pas de chemins imbriqués) :
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/old-blog/:slug',
+        destination: '/news/:slug', // Les paramètres correspondants peuvent être utilisés dans la destination
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### Correspondance de chemin avec joker
+
+Pour correspondre à un chemin avec joker, vous pouvez utiliser `*` après un paramètre, par exemple `/blog/:slug*` correspondra à `/blog/a/b/c/d/hello-world` :
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/blog/:slug*',
+        destination: '/news/:slug*', // Les paramètres correspondants peuvent être utilisés dans la destination
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### Correspondance de chemin avec regex
+
+Pour correspondre à un chemin avec regex, vous pouvez encapsuler la regex entre parenthèses après un paramètre, par exemple `/post/:slug(\\d{1,})` correspondra à `/post/123` mais pas à `/post/abc` :
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/post/:slug(\\d{1,})',
+        destination: '/news/:slug', // Les paramètres correspondants peuvent être utilisés dans la destination
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+Les caractères suivants `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` sont utilisés pour la correspondance de chemin avec regex, donc lorsqu'ils sont utilisés dans la `source` comme valeurs non spéciales, ils doivent être échappés en ajoutant `\\` avant eux :
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        // cela correspondra à la requête `/english(default)/something`
+        source: '/english\\(default\\)/:slug',
+        destination: '/en-us/:slug',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+## Correspondance d'en-tête, de cookie et de requête
+
+Pour ne correspondre à une redirection que lorsque les valeurs d'en-tête, de cookie ou de requête correspondent également au champ `has` ou ne correspondent pas au champ `missing`, vous pouvez utiliser ces champs. À la fois la `source` et tous les éléments `has` doivent correspondre, et tous les éléments `missing` ne doivent pas correspondre pour que la redirection soit appliquée.
+
+Les éléments `has` et `missing` peuvent avoir les champs suivants :
+
+- `type` : `String` - doit être soit `header`, `cookie`, `host` ou `query`.
+- `key` : `String` - la clé du type sélectionné à comparer.
+- `value` : `String` ou `undefined` - la valeur à vérifier, si `undefined`, n'importe quelle valeur correspondra. Une chaîne de type regex peut être utilisée pour capturer une partie spécifique de la valeur, par exemple si la valeur `first-(?<paramName>.*)` est utilisée pour `first-second`, alors `second` pourra être utilisé dans la destination avec `:paramName`.
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      // si l'en-tête `x-redirect-me` est présent,
+      // cette redirection sera appliquée
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'header',
+            key: 'x-redirect-me',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // si l'en-tête `x-dont-redirect` est présent,
+      // cette redirection ne sera PAS appliquée
+      {
+        source: '/:path((?!another-page$).*)',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-do-not-redirect',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // si la source, la requête et le cookie correspondent,
+      // cette redirection sera appliquée
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // la valeur de page ne sera pas disponible dans la
+            // destination puisque la valeur est fournie et n'utilise pas
+            // un groupe de capture nommé, par exemple (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        permanent: false,
+        destination: '/another/:path*',
+      },
+      // si l'en-tête `x-authorized` est présent et
+      // contient une valeur correspondante, cette redirection sera appliquée
+      {
+        source: '/',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        permanent: false,
+        destination: '/home?authorized=:authorized',
+      },
+      // si l'hôte est `example.com`,
+      // cette redirection sera appliquée
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+    ]
+  },
+}
+```
+
+### Redirections avec support de basePath
+
+Lorsque vous utilisez le support de [`basePath`](/docs/app/api-reference/next-config-js/basePath) avec des redirections, chaque `source` et `destination` est automatiquement préfixé avec le `basePath` sauf si vous ajoutez `basePath: false` à la redirection :
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async redirects() {
+    return [
+      {
+        source: '/with-basePath', // devient automatiquement /docs/with-basePath
+        destination: '/another', // devient automatiquement /docs/another
+        permanent: false,
+      },
+      {
+        // n'ajoute pas /docs puisque basePath: false est défini
+        source: '/without-basePath',
+        destination: 'https://example.com',
+        basePath: false,
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+### Redirections avec support i18n
+
+<AppOnly>
+
+Lorsque vous utilisez le support [`i18n`](/docs/app/building-your-application/routing/internationalization) avec des redirections, chaque `source` et `destination` est automatiquement préfixé pour gérer les `locales` configurées, sauf si vous ajoutez `locale: false` à la redirection. Si `locale: false` est utilisé, vous devez préfixer la `source` et la `destination` avec une locale pour qu'elle soit correctement correspondante.
+
+</AppOnly>
+
+<PagesOnly>
+
+Lorsque vous utilisez le support [`i18n`](/docs/pages/building-your-application/routing/internationalization) avec des redirections, chaque `source` et `destination` est automatiquement préfixé pour gérer les `locales` configurées, sauf si vous ajoutez `locale: false` à la redirection. Si `locale: false` est utilisé, vous devez préfixer la `source` et la `destination` avec une locale pour qu'elle soit correctement correspondante.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/with-locale', // gère automatiquement toutes les locales
+        destination: '/another', // transmet automatiquement la locale
+        permanent: false,
+      },
+      {
+        // ne gère pas les locales automatiquement puisque locale: false est défini
+        source: '/nl/with-locale-manual',
+        destination: '/nl/another',
+        locale: false,
+        permanent: false,
+      },
+      {
+        // cela correspond à '/' puisque `en` est la defaultLocale
+        source: '/en',
+        destination: '/en/another',
+        locale: false,
+        permanent: false,
+      },
+      // il est possible de correspondre à toutes les locales même lorsque locale: false est défini
+      {
+        source: '/:locale/page',
+        destination: '/en/newpage',
+        permanent: false,
+        locale: false,
+      },
+      {
+        // cela est converti en /(en|fr|de)/(.*) donc ne correspondra pas aux routes
+        // de premier niveau `/` ou `/fr` comme /:path* le ferait
+        source: '/(.*)',
+        destination: '/another',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+Dans certains cas rares, vous pourriez avoir besoin d'attribuer un code de statut personnalisé pour que les anciens clients HTTP redirigent correctement. Dans ces cas, vous pouvez utiliser la propriété `statusCode` au lieu de la propriété `permanent`, mais pas les deux. Pour assurer la compatibilité avec IE11, un en-tête `Refresh` est automatiquement ajouté pour le code de statut 308.
+
+## Autres redirections
+
+- Dans les [routes API](/docs/pages/api-reference/functions/next-server), vous pouvez utiliser `res.redirect()`.
+- Dans [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) et [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props), vous pouvez rediriger des pages spécifiques au moment de la requête.
+
+## Historique des versions
+
+| Version   | Changements            |
+| --------- | ---------------------- |
+| `v13.3.0` | `missing` ajouté.      |
+| `v10.2.0` | `has` ajouté.          |
+| `v9.5.0`  | `redirects` ajouté.    |

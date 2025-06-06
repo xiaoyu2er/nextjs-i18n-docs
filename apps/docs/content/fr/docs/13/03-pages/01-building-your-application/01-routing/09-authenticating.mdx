@@ -1,0 +1,143 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:30:38.092Z
+title: Authentification
+description: Découvrez les modèles d'authentification dans les applications Next.js et explorez quelques exemples.
+---
+
+L'authentification vérifie l'identité d'un utilisateur, tandis que l'autorisation contrôle ce qu'un utilisateur peut accéder. Next.js prend en charge plusieurs modèles d'authentification, chacun conçu pour des cas d'utilisation différents. Cette page passera en revue chaque cas afin que vous puissiez choisir en fonction de vos contraintes.
+
+## Modèles d'authentification
+
+La première étape pour identifier le modèle d'authentification dont vous avez besoin est de comprendre la [stratégie de récupération de données](/docs/pages/building-your-application/data-fetching) que vous souhaitez utiliser. Nous pouvons ensuite déterminer quels fournisseurs d'authentification prennent en charge cette stratégie. Il existe deux modèles principaux :
+
+- Utiliser la [génération statique](/docs/pages/building-your-application/rendering/static-site-generation) pour effectuer un rendu côté serveur d'un état de chargement, suivi d'une récupération des données utilisateur côté client.
+- Récupérer les données utilisateur [côté serveur](/docs/pages/building-your-application/rendering/server-side-rendering) pour éviter un flash de contenu non authentifié.
+
+### Authentification des pages générées statiquement
+
+Next.js détermine automatiquement qu'une page est statique s'il n'y a pas d'exigences de données bloquantes. Cela signifie l'absence de [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) et de `getInitialProps` dans la page. À la place, votre page peut afficher un état de chargement depuis le serveur, puis récupérer l'utilisateur côté client.
+
+Un avantage de ce modèle est qu'il permet aux pages d'être servies depuis un CDN global et préchargées en utilisant [`next/link`](/docs/pages/api-reference/components/link). En pratique, cela se traduit par un TTI ([Time to Interactive](https://web.dev/interactive/)) plus rapide.
+
+Examinons un exemple pour une page de profil. Cela affichera d'abord un squelette de chargement. Une fois la requête pour l'utilisateur terminée, elle affichera le nom de l'utilisateur :
+
+```jsx filename="pages/profile.js"
+import useUser from '../lib/useUser'
+import Layout from '../components/Layout'
+
+const Profile = () => {
+  // Récupère l'utilisateur côté client
+  const { user } = useUser({ redirectTo: '/login' })
+
+  // Affiche l'état de chargement côté serveur
+  if (!user || user.isLoggedIn === false) {
+    return <Layout>Chargement...</Layout>
+  }
+
+  // Une fois la requête utilisateur terminée, affiche l'utilisateur
+  return (
+    <Layout>
+      <h1>Votre Profil</h1>
+      <pre>{JSON.stringify(user, null, 2)}</pre>
+    </Layout>
+  )
+}
+
+export default Profile
+```
+
+Vous pouvez voir [cet exemple en action](https://iron-session-example.vercel.app/). Consultez l'exemple [`with-iron-session`](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session) pour voir comment il fonctionne.
+
+### Authentification des pages rendues côté serveur
+
+Si vous exportez une fonction `async` appelée [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) depuis une page, Next.js pré-rendra cette page à chaque requête en utilisant les données retournées par `getServerSideProps`.
+
+```jsx
+export async function getServerSideProps(context) {
+  return {
+    props: {}, // Seront passés au composant de page comme props
+  }
+}
+```
+
+Transformons l'exemple de profil pour utiliser le [rendu côté serveur](/docs/pages/building-your-application/rendering/server-side-rendering). S'il y a une session, retournez `user` comme prop au composant `Profile` dans la page. Notez qu'il n'y a pas de squelette de chargement dans [cet exemple](https://iron-session-example.vercel.app/).
+
+```jsx filename="pages/profile.js"
+import withSession from '../lib/session'
+import Layout from '../components/Layout'
+
+export const getServerSideProps = withSession(async function ({ req, res }) {
+  const { user } = req.session
+
+  if (!user) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    }
+  }
+
+  return {
+    props: { user },
+  }
+})
+
+const Profile = ({ user }) => {
+  // Affiche l'utilisateur. Aucun état de chargement n'est nécessaire
+  return (
+    <Layout>
+      <h1>Votre Profil</h1>
+      <pre>{JSON.stringify(user, null, 2)}</pre>
+    </Layout>
+  )
+}
+
+export default Profile
+```
+
+Un avantage de ce modèle est d'éviter un flash de contenu non authentifié avant la redirection. Il est important de noter que la récupération des données utilisateur dans `getServerSideProps` bloquera le rendu jusqu'à ce que la requête à votre fournisseur d'authentification soit résolue. Pour éviter de créer un goulot d'étranglement et d'augmenter votre TTFB ([Time to First Byte](https://web.dev/time-to-first-byte/)), vous devez vous assurer que votre recherche d'authentification est rapide. Sinon, envisagez la [génération statique](#authentification-des-pages-générées-statiquement).
+
+## Fournisseurs d'authentification
+
+Maintenant que nous avons discuté des modèles d'authentification, examinons des fournisseurs spécifiques et explorons comment ils sont utilisés avec Next.js.
+
+### Apportez votre propre base de données
+
+<details open>
+  <summary>Exemples</summary>
+
+- [with-iron-session](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session)
+- [next-auth-example](https://github.com/nextauthjs/next-auth-example)
+
+</details>
+
+Si vous avez une base de données existante avec des données utilisateur, vous voudrez probablement utiliser une solution open-source indépendante du fournisseur.
+
+- Si vous voulez un utilitaire de session bas niveau, chiffré et sans état, utilisez [`iron-session`](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session).
+- Si vous voulez un système d'authentification complet avec des fournisseurs intégrés (Google, Facebook, GitHub…), JWT, JWE, email/mot de passe, liens magiques et plus encore… utilisez [`next-auth`](https://github.com/nextauthjs/next-auth-example).
+
+Ces deux bibliothèques prennent en charge les deux modèles d'authentification. Si vous êtes intéressé par [Passport](http://www.passportjs.org/), nous avons également des exemples pour cela utilisant des cookies sécurisés et chiffrés :
+
+- [with-passport](https://github.com/vercel/next.js/tree/canary/examples/with-passport)
+- [with-passport-and-next-connect](https://github.com/vercel/next.js/tree/canary/examples/with-passport-and-next-connect)
+
+### Autres fournisseurs
+
+Pour voir des exemples avec d'autres fournisseurs d'authentification, consultez le [dossier d'exemples](https://github.com/vercel/next.js/tree/canary/examples).
+
+<details open>
+  <summary>Exemples</summary>
+
+- [Auth0](https://github.com/vercel/next.js/tree/canary/examples/auth0)
+- [Clerk](https://github.com/vercel/next.js/tree/canary/examples/with-clerk)
+- [Firebase](https://github.com/vercel/next.js/tree/canary/examples/with-firebase-authentication)
+- [Magic](https://github.com/vercel/next.js/tree/canary/examples/with-magic)
+- [Nhost](https://github.com/vercel/next.js/tree/canary/examples/with-nhost-auth-realtime-graphql)
+- [Ory](https://github.com/vercel/examples/tree/main/solutions/auth-with-ory)
+- [Supabase](https://github.com/vercel/next.js/tree/canary/examples/with-supabase)
+- [Supertokens](https://github.com/vercel/next.js/tree/canary/examples/with-supertokens)
+- [Userbase](https://github.com/vercel/next.js/tree/canary/examples/with-userbase)
+
+</details>

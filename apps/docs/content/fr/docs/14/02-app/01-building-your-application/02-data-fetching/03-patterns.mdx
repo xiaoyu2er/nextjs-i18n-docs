@@ -1,0 +1,405 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:20:40.049Z
+title: Modèles et bonnes pratiques
+nav_title: Modèles et bonnes pratiques pour la récupération de données
+description: Découvrez les modèles courants de récupération de données dans React et Next.js.
+---
+
+Il existe quelques modèles recommandés et bonnes pratiques pour la récupération de données dans React et Next.js. Cette page abordera certains des modèles les plus courants et comment les utiliser.
+
+## Récupération de données côté serveur
+
+Dans la mesure du possible, nous recommandons de récupérer les données côté serveur avec les composants serveur (Server Components). Cela vous permet de :
+
+- Avoir un accès direct aux ressources de données backend (par exemple, les bases de données).
+- Maintenir votre application plus sécurisée en évitant que des informations sensibles, comme les jetons d'accès et les clés API, ne soient exposées au client.
+- Récupérer les données et effectuer le rendu dans le même environnement. Cela réduit à la fois les allers-retours entre le client et le serveur, ainsi que le [travail sur le thread principal](https://vercel.com/blog/how-react-18-improves-application-performance) côté client.
+- Effectuer plusieurs récupérations de données en un seul aller-retour au lieu de multiples requêtes individuelles côté client.
+- Réduire les [cascades](#récupération-de-données-parallèle-et-séquentielle) client-serveur.
+- Selon votre région, la récupération de données peut également se produire plus près de votre source de données, réduisant ainsi la latence et améliorant les performances.
+
+Ensuite, vous pouvez muter ou mettre à jour les données avec les [Actions Serveur](/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+## Récupération de données là où elles sont nécessaires
+
+Si vous avez besoin d'utiliser les mêmes données (par exemple, l'utilisateur actuel) dans plusieurs composants d'une arborescence, vous n'avez pas besoin de récupérer les données globalement, ni de transmettre des props entre les composants. Au lieu de cela, vous pouvez utiliser `fetch` ou `cache` de React dans le composant qui a besoin des données sans vous soucier des implications en termes de performance liées à la réalisation de multiples requêtes pour les mêmes données.
+
+Ceci est possible car les requêtes `fetch` sont automatiquement mémorisées. Apprenez-en plus sur la [mémorisation des requêtes](/docs/app/building-your-application/caching#request-memoization).
+
+> **Bon à savoir** : Cela s'applique également aux layouts, car il n'est pas possible de transmettre des données entre un layout parent et ses enfants.
+
+## Streaming
+
+Le streaming et [Suspense](https://react.dev/reference/react/Suspense) sont des fonctionnalités de React qui vous permettent d'effectuer un rendu progressif et de diffuser de manière incrémentielle des unités rendues de l'interface utilisateur vers le client.
+
+Avec les composants serveur et les [layouts imbriqués](/docs/app/building-your-application/routing/pages-and-layouts), vous pouvez afficher instantanément les parties de la page qui ne nécessitent pas spécifiquement de données, et afficher un [état de chargement](/docs/app/building-your-application/routing/loading-ui-and-streaming) pour les parties de la page qui récupèrent des données. Cela signifie que l'utilisateur n'a pas besoin d'attendre que toute la page soit chargée avant de pouvoir interagir avec elle.
+
+<Image
+  alt="Rendu côté serveur avec streaming"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+Pour en savoir plus sur le streaming et Suspense, consultez les pages [Interface de chargement](/docs/app/building-your-application/routing/loading-ui-and-streaming) et [Streaming avec Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense).
+
+## Récupération de données parallèle et séquentielle
+
+Lors de la récupération de données dans les composants React, vous devez être conscient de deux modèles de récupération de données : parallèle et séquentiel.
+
+<Image
+  alt="Récupération de données séquentielle et parallèle"
+  srcLight="/docs/light/sequential-parallel-data-fetching.png"
+  srcDark="/docs/dark/sequential-parallel-data-fetching.png"
+  width="1600"
+  height="525"
+/>
+
+- Avec la **récupération de données séquentielle**, les requêtes dans une route dépendent les unes des autres et créent donc des cascades. Il peut y avoir des cas où vous voulez ce modèle parce qu'une requête dépend du résultat de l'autre, ou parce que vous voulez qu'une condition soit satisfaite avant la prochaine requête pour économiser des ressources. Cependant, ce comportement peut également être involontaire et entraîner des temps de chargement plus longs.
+- Avec la **récupération de données parallèle**, les requêtes dans une route sont initiées de manière anticipée et chargeront les données en même temps. Cela réduit les cascades client-serveur et le temps total nécessaire pour charger les données.
+
+### Récupération de données séquentielle
+
+Si vous avez des composants imbriqués et que chaque composant récupère ses propres données, alors la récupération de données se fera de manière séquentielle si ces requêtes sont différentes (cela ne s'applique pas aux requêtes pour les mêmes données car elles sont automatiquement [mémorisées](/docs/app/building-your-application/caching#request-memoization)).
+
+Par exemple, le composant `Playlists` ne commencera à récupérer les données que lorsque le composant `Artist` aura fini de récupérer les données car `Playlists` dépend de la prop `artistID` :
+
+```tsx filename="app/artist/[username]/page.tsx" switcher
+// ...
+
+async function Playlists({ artistID }: { artistID: string }) {
+  // Attendre les playlists
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // Attendre l'artiste
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>Chargement...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/[username]/page.js" switcher
+// ...
+
+async function Playlists({ artistID }) {
+  // Attendre les playlists
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default async function Page({ params: { username } }) {
+  // Attendre l'artiste
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Suspense fallback={<div>Chargement...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+Dans des cas comme celui-ci, vous pouvez utiliser [`loading.js`](/docs/app/building-your-application/routing/loading-ui-and-streaming) (pour les segments de route) ou [React `<Suspense>`](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense) (pour les composants imbriqués) pour afficher un état de chargement instantané pendant que React diffuse le résultat.
+
+Cela empêchera toute la route d'être bloquée par la récupération de données, et l'utilisateur pourra interagir avec les parties de la page qui ne sont pas bloquées.
+
+> **Requêtes de données bloquantes :**
+>
+> Une autre approche pour éviter les cascades consiste à récupérer les données globalement, à la racine de votre application, mais cela bloquera le rendu pour tous les segments de route en dessous jusqu'à ce que les données aient fini de charger. Cela peut être décrit comme une récupération de données "tout ou rien". Soit vous avez toutes les données pour votre page ou application, soit aucune.
+>
+> Toute requête `fetch` avec `await` bloquera le rendu et la récupération de données pour toute l'arborescence en dessous, à moins qu'elle ne soit enveloppée dans une limite `<Suspense>` ou que `loading.js` soit utilisé. Une autre alternative consiste à utiliser la [récupération de données parallèle](#récupération-de-données-parallèle) ou le [modèle de préchargement](#préchargement-des-données).
+
+### Récupération de données parallèle
+
+Pour récupérer les données en parallèle, vous pouvez initier les requêtes de manière anticipée en les définissant en dehors des composants qui utilisent les données, puis en les appelant depuis l'intérieur du composant. Cela permet de gagner du temps en initiant les deux requêtes en parallèle, cependant, l'utilisateur ne verra pas le résultat rendu avant que les deux promesses ne soient résolues.
+
+Dans l'exemple ci-dessous, les fonctions `getArtist` et `getArtistAlbums` sont définies en dehors du composant `Page`, puis appelées à l'intérieur du composant, et nous attendons que les deux promesses soient résolues :
+
+```tsx filename="app/artist/[username]/page.tsx" switcher
+import Albums from './albums'
+
+async function getArtist(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({
+  params: { username },
+}: {
+  params: { username: string }
+}) {
+  // Initier les deux requêtes en parallèle
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // Attendre que les promesses soient résolues
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+```jsx filename="app/artist/[username]/page.js" switcher
+import Albums from './albums'
+
+async function getArtist(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getArtistAlbums(username) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({ params: { username } }) {
+  // Initier les deux requêtes en parallèle
+  const artistData = getArtist(username)
+  const albumsData = getArtistAlbums(username)
+
+  // Attendre que les promesses soient résolues
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums}></Albums>
+    </>
+  )
+}
+```
+
+Pour améliorer l'expérience utilisateur, vous pouvez ajouter une [limite Suspense](/docs/app/building-your-application/routing/loading-ui-and-streaming) pour diviser le travail de rendu et afficher une partie du résultat dès que possible.
+
+## Préchargement des données
+
+Une autre façon d'éviter les cascades est d'utiliser le modèle de préchargement. Vous pouvez éventuellement créer une fonction `preload` pour optimiser davantage la récupération de données parallèle. Avec cette approche, vous n'avez pas besoin de transmettre des promesses comme props. La fonction `preload` peut également avoir n'importe quel nom car il s'agit d'un modèle, pas d'une API.
+
+```tsx filename="components/Item.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id: string) => {
+  // void évalue l'expression donnée et retourne undefined
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }: { id: string }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="components/Item.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export const preload = (id) => {
+  // void évalue l'expression donnée et retourne undefined
+  // https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/void
+  void getItem(id)
+}
+export default async function Item({ id }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  // commencer le chargement des données de l'item
+  preload(id)
+  // effectuer une autre tâche asynchrone
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import Item, { preload, checkIsAvailable } from '@/components/Item'
+
+export default async function Page({ params: { id } }) {
+  // commencer le chargement des données de l'item
+  preload(id)
+  // effectuer une autre tâche asynchrone
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+```
+
+### Utilisation de `cache` de React, `server-only` et du modèle de préchargement
+
+Vous pouvez combiner la fonction `cache`, le modèle `preload` et le package `server-only` pour créer un utilitaire de récupération de données qui peut être utilisé dans toute votre application.
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id: string) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id: string) => {
+  // ...
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const preload = (id) => {
+  void getItem(id)
+}
+
+export const getItem = cache(async (id) => {
+  // ...
+})
+```
+
+Avec cette approche, vous pouvez récupérer les données de manière anticipée, mettre en cache les réponses et garantir que cette récupération de données [ne se produit que côté serveur](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment).
+
+Les exports de `utils/get-item` peuvent être utilisés par les layouts, pages ou autres composants pour leur donner le contrôle du moment où les données d'un item sont récupérées.
+
+> **Bon à savoir :**
+>
+> - Nous recommandons d'utiliser le package [`server-only`](/docs/app/building-your-application/rendering/composition-patterns#keeping-server-only-code-out-of-the-client-environment) pour s'assurer que les fonctions de récupération de données côté serveur ne sont jamais utilisées côté client.
+
+## Empêcher l'exposition de données sensibles au client
+
+Nous recommandons d'utiliser les APIs de marquage (taint) de React, [`taintObjectReference`](https://react.dev/reference/react/experimental_taintObjectReference) et [`taintUniqueValue`](https://react.dev/reference/react/experimental_taintUniqueValue), pour empêcher que des instances d'objets entiers ou des valeurs sensibles ne soient transmises au client.
+
+Pour activer le marquage dans votre application, définissez l'option `experimental.taint` de la configuration Next.js sur `true` :
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    taint: true,
+  },
+}
+```
+
+Ensuite, passez l'objet ou la valeur que vous souhaitez marquer aux fonctions `experimental_taintObjectReference` ou `experimental_taintUniqueValue` :
+
+```ts filename="app/utils.ts" switcher
+import { queryDataFromDB } from './api'
+import {
+  experimental_taintObjectReference,
+  experimental_taintUniqueValue,
+} from 'react'
+
+export async function getUserData() {
+  const data = await queryDataFromDB()
+  experimental_taintObjectReference(
+    'Ne pas transmettre l\'objet utilisateur entier au client',
+    data
+  )
+  experimental_taintUniqueValue(
+    "Ne pas transmettre l'adresse de l'utilisateur au client",
+    data,
+    data.address
+  )
+  return data
+}
+```
+
+```js filename="app/utils.js" switcher
+import { queryDataFromDB } from './api'
+import {
+  experimental_taintObjectReference,
+  experimental_taintUniqueValue,
+} from 'react'
+
+export async function getUserData() {
+  const data = await queryDataFromDB()
+  experimental_taintObjectReference(
+    'Ne pas transmettre l\'objet utilisateur entier au client',
+    data
+  )
+  experimental_taintUniqueValue(
+    "Ne pas transmettre l'adresse de l'utilisateur au client",
+    data,
+    data.address
+  )
+  return data
+}
+```
+
+```tsx filename="app/page.tsx" switcher
+import { getUserData } from './data'
+
+export async function Page() {
+  const userData = getUserData()
+  return (
+    <ClientComponent
+      user={userData} // cela causera une erreur à cause de taintObjectReference
+      address={userData.address} // cela causera une erreur à cause de taintUniqueValue
+    />
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { getUserData } from './data'
+
+export async function Page() {
+  const userData = await getUserData()
+  return (
+    <ClientComponent
+      user={userData} // cela causera une erreur à cause de taintObjectReference
+      address={userData.address} // cela causera une erreur à cause de taintUniqueValue
+    />
+  )
+}
+```
+
+Apprenez-en plus sur la [Sécurité et les Actions Serveur](https://nextjs.org/blog/security-nextjs-server-components-actions).

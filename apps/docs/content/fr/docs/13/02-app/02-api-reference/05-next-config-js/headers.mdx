@@ -1,0 +1,516 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:34:43.543Z
+title: headers
+description: Ajoutez des en-têtes HTTP personnalisés à votre application Next.js.
+---
+
+{/* Le contenu de ce document est partagé entre le routeur app et pages. Vous pouvez utiliser le composant `<PagesOnly>Contenu</PagesOnly>` pour ajouter du contenu spécifique au routeur Pages. Tout contenu partagé ne doit pas être encapsulé dans un composant. */}
+
+Les en-têtes (headers) vous permettent de définir des en-têtes HTTP personnalisés sur la réponse à une requête entrante pour un chemin donné.
+
+Pour définir des en-têtes HTTP personnalisés, vous pouvez utiliser la clé `headers` dans `next.config.js` :
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/about',
+        headers: [
+          {
+            key: 'x-custom-header',
+            value: 'ma valeur d\'en-tête personnalisée',
+          },
+          {
+            key: 'x-another-custom-header',
+            value: 'mon autre valeur d\'en-tête personnalisée',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+`headers` est une fonction asynchrone qui attend un tableau d'objets avec les propriétés `source` et `headers` :
+
+- `source` : le motif de chemin de la requête entrante.
+- `headers` : un tableau d'objets d'en-tête de réponse, avec les propriétés `key` et `value`.
+- `basePath` : `false` ou `undefined` - si false, le basePath ne sera pas inclus lors de la correspondance, peut être utilisé uniquement pour les réécritures externes.
+- `locale` : `false` ou `undefined` - indique si la locale ne doit pas être incluse lors de la correspondance.
+- `has` : un tableau d'[objets has](#correspondance-d-en-tête-de-cookie-et-de-requête) avec les propriétés `type`, `key` et `value`.
+- `missing` : un tableau d'[objets missing](#correspondance-d-en-tête-de-cookie-et-de-requête) avec les propriétés `type`, `key` et `value`.
+
+Les en-têtes sont vérifiés avant le système de fichiers, qui inclut les pages et les fichiers `/public`.
+
+## Comportement de remplacement des en-têtes
+
+Si deux en-têtes correspondent au même chemin et définissent la même clé d'en-tête, la dernière clé d'en-tête remplacera la première. Avec les en-têtes ci-dessous, le chemin `/hello` entraînera l'en-tête `x-hello` étant `world` car la dernière valeur définie est `world`.
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'there',
+          },
+        ],
+      },
+      {
+        source: '/hello',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Correspondance de chemin
+
+Les correspondances de chemin sont autorisées, par exemple `/blog/:slug` correspondra à `/blog/hello-world` (pas de chemins imbriqués) :
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug', // Les paramètres correspondants peuvent être utilisés dans la valeur
+          },
+          {
+            key: 'x-slug-:slug', // Les paramètres correspondants peuvent être utilisés dans la clé
+            value: 'mon autre valeur d\'en-tête personnalisée',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Correspondance de chemin avec joker
+
+Pour correspondre à un chemin avec joker, vous pouvez utiliser `*` après un paramètre, par exemple `/blog/:slug*` correspondra à `/blog/a/b/c/d/hello-world` :
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug*',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug*', // Les paramètres correspondants peuvent être utilisés dans la valeur
+          },
+          {
+            key: 'x-slug-:slug*', // Les paramètres correspondants peuvent être utilisés dans la clé
+            value: 'mon autre valeur d\'en-tête personnalisée',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Correspondance de chemin avec regex
+
+Pour correspondre à un chemin avec regex, vous pouvez encapsuler la regex entre parenthèses après un paramètre, par exemple `/blog/:slug(\\d{1,})` correspondra à `/blog/123` mais pas à `/blog/abc` :
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:post(\\d{1,})',
+        headers: [
+          {
+            key: 'x-post',
+            value: ':post',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+Les caractères suivants `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` sont utilisés pour la correspondance de chemin regex, donc lorsqu'ils sont utilisés dans `source` comme valeurs non spéciales, ils doivent être échappés en ajoutant `\\` avant eux :
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        // cela correspondra à `/english(default)/something` demandé
+        source: '/english\\(default\\)/:slug',
+        headers: [
+          {
+            key: 'x-header',
+            value: 'value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Correspondance d'en-tête, de cookie et de requête
+
+Pour appliquer un en-tête uniquement lorsque les valeurs d'en-tête, de cookie ou de requête correspondent également au champ `has` ou ne correspondent pas au champ `missing`, vous pouvez utiliser ces champs. À la fois `source` et tous les éléments `has` doivent correspondre et tous les éléments `missing` ne doivent pas correspondre pour que l'en-tête soit appliqué.
+
+Les éléments `has` et `missing` peuvent avoir les champs suivants :
+
+- `type` : `String` - doit être soit `header`, `cookie`, `host` ou `query`.
+- `key` : `String` - la clé du type sélectionné à comparer.
+- `value` : `String` ou `undefined` - la valeur à vérifier, si undefined, toute valeur correspondra. Une chaîne de type regex peut être utilisée pour capturer une partie spécifique de la valeur, par exemple si la valeur `first-(?<paramName>.*)` est utilisée pour `first-second`, alors `second` sera utilisable dans la destination avec `:paramName`.
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      // si l'en-tête `x-add-header` est présent,
+      // l'en-tête `x-another-header` sera appliqué
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-add-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // si l'en-tête `x-no-header` n'est pas présent,
+      // l'en-tête `x-another-header` sera appliqué
+      {
+        source: '/:path*',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-no-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // si la source, la requête et le cookie correspondent,
+      // l'en-tête `x-authorized` sera appliqué
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // la valeur de la page ne sera pas disponible dans les
+            // clés/valeurs d'en-tête car la valeur est fournie et
+            // n'utilise pas un groupe de capture nommé, par exemple (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-authorized',
+            value: ':authorized',
+          },
+        ],
+      },
+      // si l'en-tête `x-authorized` est présent et
+      // contient une valeur correspondante, l'en-tête `x-another-header` sera appliqué
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+      // si l'hôte est `example.com`,
+      // cet en-tête sera appliqué
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## En-têtes avec support de basePath
+
+Lorsque vous utilisez le support de [`basePath`](/docs/app/api-reference/next-config-js/basePath) avec des en-têtes, chaque `source` est automatiquement préfixé avec le `basePath` sauf si vous ajoutez `basePath: false` à l'en-tête :
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async headers() {
+    return [
+      {
+        source: '/with-basePath', // devient /docs/with-basePath
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        source: '/without-basePath', // n'est pas modifié car basePath: false est défini
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+        basePath: false,
+      },
+    ]
+  },
+}
+```
+
+## En-têtes avec support i18n
+
+<AppOnly>
+
+Lorsque vous utilisez le support [`i18n`](/docs/app/building-your-application/routing/internationalization) avec des en-têtes, chaque `source` est automatiquement préfixé pour gérer les `locales` configurées, sauf si vous ajoutez `locale: false` à l'en-tête. Si `locale: false` est utilisé, vous devez préfixer la `source` avec une locale pour qu'elle corresponde correctement.
+
+</AppOnly>
+
+<PagesOnly>
+
+Lorsque vous utilisez le support [`i18n`](/docs/pages/building-your-application/routing/internationalization) avec des en-têtes, chaque `source` est automatiquement préfixé pour gérer les `locales` configurées, sauf si vous ajoutez `locale: false` à l'en-tête. Si `locale: false` est utilisé, vous devez préfixer la `source` avec une locale pour qu'elle corresponde correctement.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async headers() {
+    return [
+      {
+        source: '/with-locale', // gère automatiquement toutes les locales
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // ne gère pas automatiquement les locales car locale: false est défini
+        source: '/nl/with-locale-manual',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // cela correspond à '/' car `en` est la defaultLocale
+        source: '/en',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // cela est converti en /(en|fr|de)/(.*) donc ne correspondra pas aux routes
+        // de niveau supérieur `/` ou `/fr` comme /:path* le ferait
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Cache-Control
+
+Vous ne pouvez pas définir les en-têtes `Cache-Control` dans `next.config.js` pour les pages ou les ressources, car ces en-têtes seront écrasés en production pour garantir que les réponses et les ressources statiques sont mises en cache efficacement.
+
+<AppOnly>
+
+Apprenez-en plus sur la [mise en cache](/docs/app/building-your-application/caching) avec le routeur App.
+
+</AppOnly>
+
+<PagesOnly>
+
+Si vous devez revalider le cache d'une page qui a été [générée statiquement](/docs/pages/building-your-application/rendering/static-site-generation), vous pouvez le faire en définissant la prop `revalidate` dans la fonction [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) de la page.
+
+Vous pouvez définir l'en-tête `Cache-Control` dans vos [routes API](/docs/pages/building-your-application/routing/api-routes) en utilisant la méthode `res.setHeader` :
+
+```ts filename="pages/api/hello.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+type ResponseData = {
+  message: string
+}
+
+export default function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ResponseData>
+) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+```js filename="pages/api/hello.js" switcher
+export default function handler(req, res) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+</PagesOnly>
+
+## Options
+
+### X-DNS-Prefetch-Control
+
+[Cet en-tête](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-DNS-Prefetch-Control) contrôle la pré-résolution DNS, permettant aux navigateurs d'effectuer proactivement la résolution de nom de domaine sur les liens externes, images, CSS, JavaScript, etc. Cette pré-résolution est effectuée en arrière-plan, donc le [DNS](https://developer.mozilla.org/docs/Glossary/DNS) est plus susceptible d'être résolu au moment où les éléments référencés sont nécessaires. Cela réduit la latence lorsque l'utilisateur clique sur un lien.
+
+```js
+{
+  key: 'X-DNS-Prefetch-Control',
+  value: 'on'
+}
+```
+
+### Strict-Transport-Security
+
+[Cet en-tête](https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security) informe les navigateurs qu'ils ne doivent accéder qu'en utilisant HTTPS, au lieu de HTTP. Avec la configuration ci-dessous, tous les sous-domaines actuels et futurs utiliseront HTTPS pour une durée `max-age` de 2 ans. Cela bloque l'accès aux pages ou sous-domaines qui ne peuvent être servis qu'en HTTP.
+
+Si vous déployez sur [Vercel](https://vercel.com/docs/concepts/edge-network/headers#strict-transport-security?utm_source=next-site&utm_medium=docs&utm_campaign=next-website), cet en-tête n'est pas nécessaire car il est automatiquement ajouté à tous les déploiements, sauf si vous déclarez `headers` dans votre `next.config.js`.
+
+```js
+{
+  key: 'Strict-Transport-Security',
+  value: 'max-age=63072000; includeSubDomains; preload'
+}
+```
+
+### X-Frame-Options
+
+[Cet en-tête](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Frame-Options) indique si le site doit être autorisé à être affiché dans une `iframe`. Cela peut prévenir les attaques de clickjacking.
+
+**Cet en-tête a été remplacé par l'option `frame-ancestors` de CSP**, qui a un meilleur support dans les navigateurs modernes.
+
+```js
+{
+  key: 'X-Frame-Options',
+  value: 'SAMEORIGIN'
+}
+```
+
+### Permissions-Policy
+
+[Cet en-tête](https://developer.mozilla.org/docs/Web/HTTP/Headers/Permissions-Policy) vous permet de contrôler quelles fonctionnalités et API peuvent être utilisées dans le navigateur. Il était auparavant nommé `Feature-Policy`.
+
+```js
+{
+  key: 'Permissions-Policy',
+  value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()'
+}
+```
+
+### X-Content-Type-Options
+
+[Cet en-tête](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Content-Type-Options) empêche le navigateur de tenter de deviner le type de contenu si l'en-tête `Content-Type` n'est pas explicitement défini. Cela peut prévenir les exploits XSS pour les sites web qui permettent aux utilisateurs de télécharger et partager des fichiers.
+
+Par exemple, un utilisateur essayant de télécharger une image, mais ayant celle-ci traitée comme un autre `Content-Type` comme un exécutable, qui pourrait être malveillant. Cet en-tête s'applique également au téléchargement d'extensions de navigateur. La seule valeur valide pour cet en-tête est `nosniff`.
+
+```js
+{
+  key: 'X-Content-Type-Options',
+  value: 'nosniff'
+}
+```
+
+### Referrer-Policy
+
+[Cet en-tête](https://developer.mozilla.org/docs/Web/HTTP/Headers/Referrer-Policy) contrôle la quantité d'informations que le navigateur inclut lors de la navigation du site web actuel (origine) vers un autre.
+
+```js
+{
+  key: 'Referrer-Policy',
+  value: 'origin-when-cross-origin'
+}
+```
+
+### Content-Security-Policy
+
+Apprenez-en plus sur l'ajout d'une [Politique de sécurité de contenu](/docs/app/building-your-application/configuring/content-security-policy) à votre application.
+
+## Historique des versions
+
+| Version   | Changements          |
+| --------- | -------------------- |
+| `v13.3.0` | `missing` ajouté.    |
+| `v10.2.0` | `has` ajouté.        |
+| `v9.5.0`  | En-têtes ajoutés.    |

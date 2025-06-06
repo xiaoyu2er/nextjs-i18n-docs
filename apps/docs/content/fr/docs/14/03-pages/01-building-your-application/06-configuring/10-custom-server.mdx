@@ -1,0 +1,121 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:56:57.721Z
+title: Serveur personnalisé
+description: Démarrer une application Next.js de manière programmatique en utilisant un serveur personnalisé.
+---
+
+<details>
+  <summary>Exemples</summary>
+
+- [Serveur personnalisé](https://github.com/vercel/next.js/tree/canary/examples/custom-server)
+- [Cache SSR](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+Par défaut, Next.js inclut son propre serveur avec `next start`. Si vous avez un backend existant, vous pouvez toujours l'utiliser avec Next.js (ceci n'est pas un serveur personnalisé). Un serveur Next.js personnalisé vous permet de démarrer un serveur 100% programmatiquement pour utiliser des modèles de serveur personnalisés. La plupart du temps, vous n'en aurez pas besoin - mais cette option est disponible pour une personnalisation complète.
+
+> **Bon à savoir** :
+>
+> - Avant de décider d'utiliser un serveur personnalisé, gardez à l'esprit qu'il ne devrait être utilisé que lorsque le routeur intégré de Next.js ne peut pas répondre aux besoins de votre application. Un serveur personnalisé supprimera des optimisations de performance importantes, comme les **fonctions serverless** et l'**[Optimisation statique automatique](/docs/pages/building-your-application/rendering/automatic-static-optimization)**.
+> - Un serveur personnalisé **ne peut pas** être déployé sur [Vercel](https://vercel.com/solutions/nextjs).
+> - Le mode de sortie autonome ne trace pas les fichiers du serveur personnalisé et ce mode génère un fichier minimal séparé `server.js` à la place.
+
+Voici un exemple de serveur personnalisé :
+
+```js filename="server.js"
+const { createServer } = require('http')
+const { parse } = require('url')
+const next = require('next')
+
+const dev = process.env.NODE_ENV !== 'production'
+const hostname = 'localhost'
+const port = 3000
+// lors de l'utilisation de middleware, `hostname` et `port` doivent être fournis ci-dessous
+const app = next({ dev, hostname, port })
+const handle = app.getRequestHandler()
+
+app.prepare().then(() => {
+  createServer(async (req, res) => {
+    try {
+      // Assurez-vous de passer `true` comme second argument à `url.parse`.
+      // Cela indique de parser la partie query de l'URL.
+      const parsedUrl = parse(req.url, true)
+      const { pathname, query } = parsedUrl
+
+      if (pathname === '/a') {
+        await app.render(req, res, '/a', query)
+      } else if (pathname === '/b') {
+        await app.render(req, res, '/b', query)
+      } else {
+        await handle(req, res, parsedUrl)
+      }
+    } catch (err) {
+      console.error('Error occurred handling', req.url, err)
+      res.statusCode = 500
+      res.end('internal server error')
+    }
+  })
+    .once('error', (err) => {
+      console.error(err)
+      process.exit(1)
+    })
+    .listen(port, () => {
+      console.log(`> Ready on http://${hostname}:${port}`)
+    })
+})
+```
+
+> `server.js` ne passe pas par babel ou webpack. Assurez-vous que la syntaxe et les sources requises par ce fichier sont compatibles avec la version de node que vous utilisez.
+
+Pour exécuter le serveur personnalisé, vous devrez mettre à jour les `scripts` dans `package.json` comme suit :
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "NODE_ENV=production node server.js"
+  }
+}
+```
+
+---
+
+Le serveur personnalisé utilise l'import suivant pour connecter le serveur à l'application Next.js :
+
+```js
+const next = require('next')
+const app = next({})
+```
+
+L'import `next` ci-dessus est une fonction qui reçoit un objet avec les options suivantes :
+
+| Option         | Type               | Description                                                                                                   |
+| -------------- | ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `conf`         | `Object`           | Le même objet que vous utiliseriez dans [next.config.js](/docs/pages/api-reference/next-config-js). Par défaut `{}` |
+| `customServer` | `Boolean`          | (_Optionnel_) Défini à false lorsque le serveur est créé par Next.js                                         |
+| `dev`          | `Boolean`          | (_Optionnel_) Si Next.js doit être lancé en mode développement. Par défaut `false`                           |
+| `dir`          | `String`           | (_Optionnel_) Emplacement du projet Next.js. Par défaut `'.'`                                                |
+| `quiet`        | `Boolean`          | (_Optionnel_) Masquer les messages d'erreur contenant des informations sur le serveur. Par défaut `false`     |
+| `hostname`     | `String`           | (_Optionnel_) Le hostname derrière lequel le serveur s'exécute                                               |
+| `port`         | `Number`           | (_Optionnel_) Le port sur lequel le serveur s'exécute                                                        |
+| `httpServer`   | `node:http#Server` | (_Optionnel_) Le serveur HTTP derrière lequel Next.js s'exécute                                              |
+
+L'application `app` retournée peut ensuite être utilisée pour laisser Next.js gérer les requêtes comme nécessaire.
+
+## Désactiver le routage par système de fichiers
+
+Par défaut, `Next` sert chaque fichier du dossier `pages` sous un chemin correspondant au nom du fichier. Si votre projet utilise un serveur personnalisé, ce comportement peut entraîner le même contenu étant servi depuis plusieurs chemins, ce qui peut poser des problèmes de SEO et d'expérience utilisateur.
+
+Pour désactiver ce comportement et empêcher le routage basé sur les fichiers dans `pages`, ouvrez `next.config.js` et désactivez la configuration `useFileSystemPublicRoutes` :
+
+```js filename="next.config.js"
+module.exports = {
+  useFileSystemPublicRoutes: false,
+}
+```
+
+> Notez que `useFileSystemPublicRoutes` désactive les routes basées sur les noms de fichiers pour le SSR ; le routage côté client peut toujours accéder à ces chemins. Lorsque vous utilisez cette option, vous devez protéger contre la navigation vers les routes que vous ne voulez pas de manière programmatique.
+
+> Vous pouvez également configurer le routeur côté client pour interdire les redirections côté client vers les routes basées sur les noms de fichiers ; pour cela, référez-vous à [`router.beforePopState`](/docs/pages/api-reference/functions/use-router#routerbeforepopstate).

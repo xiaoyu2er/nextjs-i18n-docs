@@ -1,0 +1,182 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:57:28.061Z
+title: Mode Brouillon
+description: Next.js propose un mode brouillon pour basculer entre les pages statiques et dynamiques. Découvrez comment cela fonctionne avec le routeur Pages.
+---
+
+Dans la [documentation sur les Pages](/docs/pages/building-your-application/routing/pages-and-layouts) et la [documentation sur la récupération de données](/docs/pages/building-your-application/data-fetching), nous avons expliqué comment pré-rendre une page au moment de la construction (**Génération Statique**) en utilisant `getStaticProps` et `getStaticPaths`.
+
+La Génération Statique est utile lorsque vos pages récupèrent des données depuis un CMS headless. Cependant, elle n'est pas idéale lorsque vous rédigez un brouillon sur votre CMS headless et souhaitez le visualiser immédiatement sur votre page. Vous voudriez que Next.js rende ces pages au **moment de la requête** plutôt qu'au moment de la construction et qu'il récupère le contenu du brouillon plutôt que le contenu publié. Vous voudriez que Next.js contourne la Génération Statique uniquement pour ce cas spécifique.
+
+Next.js dispose d'une fonctionnalité appelée **Mode Brouillon** qui résout ce problème. Voici les instructions pour l'utiliser.
+
+## Étape 1 : Créer et accéder à la route API
+
+> Consultez d'abord la [documentation sur les Routes API](/docs/pages/building-your-application/routing/api-routes) si vous n'êtes pas familier avec les Routes API de Next.js.
+
+Premièrement, créez la **route API**. Elle peut avoir n'importe quel nom - par exemple `pages/api/draft.ts`
+
+Dans cette route API, vous devez appeler `setDraftMode` sur l'objet de réponse.
+
+```js
+export default function handler(req, res) {
+  // ...
+  res.setDraftMode({ enable: true })
+  // ...
+}
+```
+
+Cela définira un **cookie** pour activer le mode brouillon. Les requêtes suivantes contenant ce cookie déclencheront le **Mode Brouillon**, modifiant ainsi le comportement pour les pages générées statiquement (nous y reviendrons plus tard).
+
+Vous pouvez tester cela manuellement en créant une route API comme ci-dessous et en y accédant manuellement depuis votre navigateur :
+
+```ts filename="pages/api/draft.ts"
+// Exemple simple pour le tester manuellement depuis votre navigateur.
+export default function handler(req, res) {
+  res.setDraftMode({ enable: true })
+  res.end('Le mode brouillon est activé')
+}
+```
+
+Si vous ouvrez les outils de développement de votre navigateur et visitez `/api/draft`, vous remarquerez un en-tête de réponse `Set-Cookie` avec un cookie nommé `__prerender_bypass`.
+
+### Accès sécurisé depuis votre CMS Headless
+
+En pratique, vous voudrez appeler cette route API de manière _sécurisée_ depuis votre CMS headless. Les étapes spécifiques varieront selon le CMS headless que vous utilisez, mais voici quelques étapes communes que vous pourriez suivre.
+
+Ces étapes supposent que le CMS headless que vous utilisez prend en charge la définition d'**URLs de brouillon personnalisées**. Si ce n'est pas le cas, vous pouvez toujours utiliser cette méthode pour sécuriser vos URLs de brouillon, mais vous devrez construire et accéder à l'URL de brouillon manuellement.
+
+**Premièrement**, vous devez créer une **chaîne de jeton secrète** en utilisant un générateur de jetons de votre choix. Ce secret ne sera connu que par votre application Next.js et votre CMS headless. Ce secret empêche les personnes qui n'ont pas accès à votre CMS d'accéder aux URLs de brouillon.
+
+**Deuxièmement**, si votre CMS headless prend en charge la définition d'URLs de brouillon personnalisées, spécifiez ce qui suit comme URL de brouillon. Cela suppose que votre route API de brouillon est située à `pages/api/draft.ts`.
+
+```bash filename="Terminal"
+https://<votre-site>/api/draft?secret=<jeton>&slug=<chemin>
+```
+
+- `<votre-site>` doit être votre domaine de déploiement.
+- `<jeton>` doit être remplacé par le jeton secret que vous avez généré.
+- `<chemin>` doit être le chemin de la page que vous souhaitez visualiser. Si vous souhaitez visualiser `/posts/foo`, alors vous devez utiliser `&slug=/posts/foo`.
+
+Votre CMS headless pourrait vous permettre d'inclure une variable dans l'URL de brouillon afin que `<chemin>` puisse être défini dynamiquement en fonction des données du CMS, comme ceci : `&slug=/posts/{entry.fields.slug}`
+
+**Enfin**, dans la route API de brouillon :
+
+- Vérifiez que le secret correspond et que le paramètre `slug` existe (sinon, la requête doit échouer).
+- Appelez `res.setDraftMode`.
+- Puis redirigez le navigateur vers le chemin spécifié par `slug`. (L'exemple suivant utilise une [redirection 307](https://developer.mozilla.org/docs/Web/HTTP/Status/307)).
+
+```js
+export default async (req, res) => {
+  // Vérifiez le secret et les paramètres suivants
+  // Ce secret ne doit être connu que de cette route API et du CMS
+  if (req.query.secret !== 'MY_SECRET_TOKEN' || !req.query.slug) {
+    return res.status(401).json({ message: 'Jeton invalide' })
+  }
+
+  // Récupérez le CMS headless pour vérifier si le `slug` fourni existe
+  // getPostBySlug implémenterait la logique de récupération nécessaire vers le CMS headless
+  const post = await getPostBySlug(req.query.slug)
+
+  // Si le slug n'existe pas, empêchez l'activation du mode brouillon
+  if (!post) {
+    return res.status(401).json({ message: 'Slug invalide' })
+  }
+
+  // Activez le Mode Brouillon en définissant le cookie
+  res.setDraftMode({ enable: true })
+
+  // Redirigez vers le chemin du post récupéré
+  // Nous ne redirigeons pas vers req.query.slug pour éviter les vulnérabilités de redirection ouverte
+  res.redirect(post.slug)
+}
+```
+
+Si cela réussit, le navigateur sera redirigé vers le chemin que vous souhaitez visualiser avec le cookie de mode brouillon.
+
+## Étape 2 : Mettre à jour `getStaticProps`
+
+L'étape suivante consiste à mettre à jour `getStaticProps` pour prendre en charge le mode brouillon.
+
+Si vous demandez une page qui a `getStaticProps` avec le cookie défini (via `res.setDraftMode`), alors `getStaticProps` sera appelé au **moment de la requête** (au lieu du moment de la construction).
+
+De plus, il sera appelé avec un objet `context` où `context.draftMode` sera `true`.
+
+```js
+export async function getStaticProps(context) {
+  if (context.draftMode) {
+    // données dynamiques
+  }
+}
+```
+
+Nous avons utilisé `res.setDraftMode` dans la route API de brouillon, donc `context.draftMode` sera `true`.
+
+Si vous utilisez également `getStaticPaths`, alors `context.params` sera également disponible.
+
+### Récupérer les données de brouillon
+
+Vous pouvez mettre à jour `getStaticProps` pour récupérer des données différentes en fonction de `context.draftMode`.
+
+Par exemple, votre CMS headless pourrait avoir un point de terminaison API différent pour les brouillons de posts. Si c'est le cas, vous pouvez modifier l'URL du point de terminaison API comme ci-dessous :
+
+```js
+export async function getStaticProps(context) {
+  const url = context.draftMode
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+  const res = await fetch(url)
+  // ...
+}
+```
+
+C'est tout ! Si vous accédez à la route API de brouillon (avec `secret` et `slug`) depuis votre CMS headless ou manuellement, vous devriez maintenant pouvoir voir le contenu du brouillon. Et si vous mettez à jour votre brouillon sans le publier, vous devriez pouvoir visualiser le brouillon.
+
+Définissez cela comme URL de brouillon sur votre CMS headless ou accédez-y manuellement, et vous devriez pouvoir voir le brouillon.
+
+```bash filename="Terminal"
+https://<votre-site>/api/draft?secret=<jeton>&slug=<chemin>
+```
+
+## Plus de détails
+
+### Effacer le cookie du Mode Brouillon
+
+Par défaut, la session du Mode Brouillon se termine lorsque le navigateur est fermé.
+
+Pour effacer manuellement le cookie du Mode Brouillon, créez une route API qui appelle `setDraftMode({ enable: false })` :
+
+```ts filename="pages/api/disable-draft.ts"
+export default function handler(req, res) {
+  res.setDraftMode({ enable: false })
+}
+```
+
+Ensuite, envoyez une requête à `/api/disable-draft` pour invoquer la Route API. Si vous appelez cette route en utilisant [`next/link`](/docs/pages/api-reference/components/link), vous devez passer `prefetch={false}` pour éviter de supprimer accidentellement le cookie lors du préchargement.
+
+### Compatible avec `getServerSideProps`
+
+Le Mode Brouillon fonctionne avec `getServerSideProps`, et est disponible comme une clé `draftMode` dans l'objet [`context`](/docs/pages/api-reference/functions/get-server-side-props#context-parameter).
+
+> **Bon à savoir** : Vous ne devriez pas définir l'en-tête `Cache-Control` lors de l'utilisation du Mode Brouillon car il ne peut pas être contourné. Nous recommandons plutôt d'utiliser [ISR](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration).
+
+### Compatible avec les Routes API
+
+Les Routes API auront accès à `draftMode` sur l'objet de requête. Par exemple :
+
+```js
+export default function myApiRoute(req, res) {
+  if (req.draftMode) {
+    // récupérer les données de brouillon
+  }
+}
+```
+
+### Unique par `next build`
+
+Une nouvelle valeur de cookie de contournement sera générée chaque fois que vous exécuterez `next build`.
+
+Cela garantit que le cookie de contournement ne peut pas être deviné.
+
+> **Bon à savoir** : Pour tester le Mode Brouillon localement via HTTP, votre navigateur devra autoriser les cookies tiers et l'accès au stockage local.

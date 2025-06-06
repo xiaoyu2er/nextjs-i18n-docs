@@ -1,0 +1,246 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:39:20.851Z
+title: Mode Brouillon
+description: Next.js propose un mode brouillon pour basculer entre les pages statiques et dynamiques. Découvrez son fonctionnement avec App Router.
+---
+
+Le rendu statique est utile lorsque vos pages récupèrent des données depuis un CMS headless. Cependant, ce n'est pas idéal lorsque vous rédigez un brouillon sur votre CMS et souhaitez le visualiser immédiatement sur votre page. Vous voudriez que Next.js rende ces pages au **moment de la requête** plutôt qu'au moment du build, et qu'il récupère le contenu du brouillon plutôt que le contenu publié. Vous voudriez que Next.js bascule vers un [rendu dynamique](/docs/app/building-your-application/rendering/server-components#dynamic-rendering) uniquement pour ce cas spécifique.
+
+Next.js propose une fonctionnalité appelée **Mode Brouillon** qui résout ce problème. Voici comment l'utiliser.
+
+## Étape 1 : Créer et accéder au gestionnaire de route
+
+Commencez par créer un [gestionnaire de route](/docs/app/building-your-application/routing/route-handlers). Il peut porter n'importe quel nom, par exemple `app/api/draft/route.ts`.
+
+Ensuite, importez `draftMode` depuis `next/headers` et appelez la méthode `enable()`.
+
+```ts filename="app/api/draft/route.ts" switcher
+// gestionnaire de route activant le mode brouillon
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  draftMode().enable()
+  return new Response('Le mode brouillon est activé')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+// gestionnaire de route activant le mode brouillon
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  draftMode().enable()
+  return new Response('Le mode brouillon est activé')
+}
+```
+
+Cela définira un **cookie** pour activer le mode brouillon. Les requêtes suivantes contenant ce cookie déclencheront le **Mode Brouillon**, modifiant ainsi le comportement des pages générées statiquement (nous y reviendrons plus tard).
+
+Vous pouvez tester cela manuellement en visitant `/api/draft` et en inspectant les outils de développement de votre navigateur. Notez l'en-tête de réponse `Set-Cookie` avec un cookie nommé `__prerender_bypass`.
+
+### Accès sécurisé depuis votre CMS Headless
+
+En pratique, vous voudrez appeler ce gestionnaire de route de manière _sécurisée_ depuis votre CMS headless. Les étapes précises varieront selon le CMS utilisé, mais voici quelques étapes courantes.
+
+Ces étapes supposent que votre CMS headless prend en charge la configuration d'**URLs de brouillon personnalisées**. Sinon, vous pouvez toujours utiliser cette méthode pour sécuriser vos URLs de brouillon, mais vous devrez construire et accéder à l'URL manuellement.
+
+**Premièrement**, créez un **jeton secret** en utilisant un générateur de votre choix. Ce secret ne sera connu que de votre application Next.js et de votre CMS headless. Il empêchera les personnes n'ayant pas accès au CMS d'accéder aux URLs de brouillon.
+
+**Deuxièmement**, si votre CMS headless prend en charge les URLs de brouillon personnalisées, spécifiez l'URL suivante comme URL de brouillon. Cela suppose que votre gestionnaire de route se trouve dans `app/api/draft/route.ts`.
+
+```bash filename="Terminal"
+https://<votre-site>/api/draft?secret=<jeton>&slug=<chemin>
+```
+
+- `<votre-site>` doit être votre domaine de déploiement.
+- `<jeton>` doit être remplacé par le jeton secret que vous avez généré.
+- `<chemin>` doit être le chemin de la page que vous souhaitez visualiser. Si vous voulez voir `/posts/foo`, utilisez `&slug=/posts/foo`.
+
+Votre CMS headless pourrait vous permettre d'inclure une variable dans l'URL de brouillon pour que `<chemin>` soit défini dynamiquement en fonction des données du CMS, comme ceci : `&slug=/posts/{entry.fields.slug}`
+
+**Enfin**, dans le gestionnaire de route :
+
+- Vérifiez que le secret correspond et que le paramètre `slug` existe (sinon, la requête doit échouer).
+- Appelez `draftMode.enable()` pour définir le cookie.
+- Redirigez ensuite le navigateur vers le chemin spécifié par `slug`.
+
+```ts filename="app/api/draft/route.ts" switcher
+// gestionnaire de route avec secret et slug
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // Analyse des paramètres de la chaîne de requête
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Vérification du secret et des paramètres
+  // Ce secret ne doit être connu que de ce gestionnaire de route et du CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Jeton invalide', { status: 401 })
+  }
+
+  // Récupération depuis le CMS headless pour vérifier si le `slug` existe
+  // getPostBySlug implémenterait la logique de récupération nécessaire
+  const post = await getPostBySlug(slug)
+
+  // Si le slug n'existe pas, empêchez l'activation du mode brouillon
+  if (!post) {
+    return new Response('Slug invalide', { status: 401 })
+  }
+
+  // Activation du Mode Brouillon en définissant le cookie
+  draftMode().enable()
+
+  // Redirection vers le chemin du post récupéré
+  // Nous ne redirigeons pas vers searchParams.slug pour éviter les vulnérabilités de redirection ouverte
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+// gestionnaire de route avec secret et slug
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // Analyse des paramètres de la chaîne de requête
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Vérification du secret et des paramètres
+  // Ce secret ne doit être connu que de ce gestionnaire de route et du CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Jeton invalide', { status: 401 })
+  }
+
+  // Récupération depuis le CMS headless pour vérifier si le `slug` existe
+  // getPostBySlug implémenterait la logique de récupération nécessaire
+  const post = await getPostBySlug(slug)
+
+  // Si le slug n'existe pas, empêchez l'activation du mode brouillon
+  if (!post) {
+    return new Response('Slug invalide', { status: 401 })
+  }
+
+  // Activation du Mode Brouillon en définissant le cookie
+  draftMode().enable()
+
+  // Redirection vers le chemin du post récupéré
+  // Nous ne redirigeons pas vers searchParams.slug pour éviter les vulnérabilités de redirection ouverte
+  redirect(post.slug)
+}
+```
+
+Si cela réussit, le navigateur sera redirigé vers le chemin que vous souhaitez visualiser, avec le cookie de mode brouillon.
+
+## Étape 2 : Mettre à jour la page
+
+L'étape suivante consiste à mettre à jour votre page pour vérifier la valeur de `draftMode().isEnabled`.
+
+Si vous demandez une page avec le cookie défini, les données seront récupérées au **moment de la requête** (au lieu du moment du build).
+
+De plus, la valeur de `isEnabled` sera `true`.
+
+```tsx filename="app/page.tsx" switcher
+// page qui récupère des données
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// page qui récupère des données
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+Et voilà ! Si vous accédez au gestionnaire de route de brouillon (avec `secret` et `slug`) depuis votre CMS headless ou manuellement, vous devriez maintenant pouvoir voir le contenu du brouillon. Et si vous mettez à jour votre brouillon sans le publier, vous devriez pouvoir visualiser les modifications.
+
+Définissez cette URL comme URL de brouillon dans votre CMS headless ou accédez-y manuellement, et vous devriez pouvoir voir le brouillon.
+
+```bash filename="Terminal"
+https://<votre-site>/api/draft?secret=<jeton>&slug=<chemin>
+```
+
+## Plus de détails
+
+### Effacer le cookie du Mode Brouillon
+
+Par défaut, la session du Mode Brouillon se termine lorsque le navigateur est fermé.
+
+Pour effacer manuellement le cookie du Mode Brouillon, créez un gestionnaire de route qui appelle `draftMode().disable()` :
+
+```ts filename="app/api/disable-draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  draftMode().disable()
+  return new Response('Le mode brouillon est désactivé')
+}
+```
+
+```js filename="app/api/disable-draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  draftMode().disable()
+  return new Response('Le mode brouillon est désactivé')
+}
+```
+
+Envoyez ensuite une requête à `/api/disable-draft` pour invoquer le gestionnaire de route. Si vous appelez cette route en utilisant [`next/link`](/docs/app/api-reference/components/link), vous devez passer `prefetch={false}` pour éviter de supprimer accidentellement le cookie lors du préchargement.
+
+### Unique par `next build`
+
+Une nouvelle valeur de cookie de contournement sera générée à chaque exécution de `next build`.
+
+Cela garantit que le cookie de contournement ne peut pas être deviné.
+
+> **Bon à savoir** : Pour tester le Mode Brouillon localement via HTTP, votre navigateur devra autoriser les cookies tiers et l'accès au stockage local.
