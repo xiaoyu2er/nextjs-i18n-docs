@@ -1,0 +1,154 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:34:59.996Z
+title: Интернационализация
+description: Добавление поддержки нескольких языков с помощью интернационализированной маршрутизации и локализованного контента.
+---
+
+Next.js позволяет настроить маршрутизацию и рендеринг контента для поддержки нескольких языков. Адаптация вашего сайта к разным локалям включает перевод контента (локализация) и интернационализированные маршруты.
+
+## Терминология
+
+- **Локаль (Locale):** Идентификатор для набора языковых и форматных предпочтений. Обычно включает предпочитаемый язык пользователя и, возможно, его географический регион.
+  - `en-US`: Английский язык в США
+  - `nl-NL`: Нидерландский язык в Нидерландах
+  - `nl`: Нидерландский язык без указания региона
+
+## Обзор маршрутизации
+
+Рекомендуется использовать языковые предпочтения пользователя в браузере для выбора локали. Изменение предпочитаемого языка модифицирует заголовок `Accept-Language`, поступающий в ваше приложение.
+
+Например, используя следующие библиотеки, вы можете анализировать входящий `Request` для определения локали на основе `Headers`, поддерживаемых локалей и локали по умолчанию.
+
+```js filename="middleware.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+Маршрутизация может быть интернационализирована через подпуть (`/fr/products`) или домен (`my-site.fr/products`). С этой информацией вы можете перенаправлять пользователя на основе локали внутри [Middleware](/docs/app/building-your-application/routing/middleware).
+
+```js filename="middleware.js"
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// Получение предпочитаемой локали, аналогично примеру выше или с использованием библиотеки
+function getLocale(request) { ... }
+
+export function middleware(request) {
+  // Проверка наличия поддерживаемой локали в пути
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  // Перенаправление при отсутствии локали
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // Например, входящий запрос /products
+  // Новый URL теперь /en-US/products
+  return Response.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // Пропуск всех внутренних путей (_next)
+    '/((?!_next).*)',
+    // Опционально: выполнение только для корневого URL (/)
+    // '/'
+  ],
+}
+```
+
+Наконец, убедитесь, что все специальные файлы внутри `app/` вложены в `app/[lang]`. Это позволяет маршрутизатору Next.js динамически обрабатывать разные локали в маршруте и передавать параметр `lang` в каждый макет и страницу. Например:
+
+```jsx filename="app/[lang]/page.js"
+// Теперь у вас есть доступ к текущей локали
+// Например, /en-US/products -> `lang` равен "en-US"
+export default async function Page({ params: { lang } }) {
+  return ...
+}
+```
+
+Корневой макет также может быть вложен в новую папку (например, `app/[lang]/layout.js`).
+
+## Локализация
+
+Изменение отображаемого контента на основе предпочитаемой локали пользователя (локализация) не является специфичной для Next.js функциональностью. Описанные ниже паттерны работают одинаково для любого веб-приложения.
+
+Предположим, мы хотим поддерживать контент на английском и нидерландском языках в нашем приложении. Мы можем поддерживать два разных "словаря" — объекты, которые сопоставляют ключи с локализованными строками. Например:
+
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+Затем мы можем создать функцию `getDictionary` для загрузки переводов для запрошенной локали:
+
+```jsx filename="app/[lang]/dictionaries.js"
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale) => dictionaries[locale]()
+```
+
+Имея выбранный язык, мы можем получить словарь внутри макета или страницы.
+
+```jsx filename="app/[lang]/page.js"
+import { getDictionary } from './dictionaries'
+
+export default async function Page({ params: { lang } }) {
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+Поскольку все макеты и страницы в директории `app/` по умолчанию являются [Серверными компонентами (Server Components)](/docs/app/building-your-application/rendering/server-components), нам не нужно беспокоиться о размере файлов переводов, влияющем на размер клиентского JavaScript-бандла. Этот код будет выполняться **только на сервере**, и только результирующий HTML будет отправлен в браузер.
+
+## Статическая генерация
+
+Для генерации статических маршрутов для заданного набора локалей мы можем использовать `generateStaticParams` с любой страницей или макетом. Это может быть глобальным, например, в корневом макете:
+
+```jsx filename="app/[lang]/layout.js"
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default function Root({ children, params }) {
+  return (
+    <html lang={params.lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## Ресурсы
+
+- [Минимальная интернационализированная маршрутизация и переводы](https://github.com/vercel/next.js/tree/canary/examples/app-dir-i18n-routing)
+- [`next-intl`](https://next-intl-docs.vercel.app/docs/next-13)
+- [`next-international`](https://github.com/QuiiBz/next-international)
+- [`next-i18n-router`](https://github.com/i18nexus/next-i18n-router)

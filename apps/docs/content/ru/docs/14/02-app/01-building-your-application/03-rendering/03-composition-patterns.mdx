@@ -1,0 +1,562 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:10:10.878Z
+title: Паттерны композиции серверных и клиентских компонентов
+nav_title: Паттерны композиции
+description: Рекомендуемые паттерны использования серверных и клиентских компонентов.
+---
+
+При создании React-приложений необходимо учитывать, какие части приложения должны рендериться на сервере, а какие — на клиенте. На этой странице рассматриваются рекомендуемые паттерны композиции при использовании серверных и клиентских компонентов.
+
+## Когда использовать серверные и клиентские компоненты?
+
+Вот краткое сравнение случаев использования серверных и клиентских компонентов:
+
+| Что вам нужно сделать?                                                           | Серверный компонент | Клиентский компонент |
+| -------------------------------------------------------------------------------- | ------------------- | -------------------- |
+| Получение данных                                                                 | <Check size={18} /> | <Cross size={18} />  |
+| Доступ к серверным ресурсам (напрямую)                                           | <Check size={18} /> | <Cross size={18} />  |
+| Хранение чувствительной информации на сервере (токены доступа, API-ключи и т.д.) | <Check size={18} /> | <Cross size={18} />  |
+| Хранение больших зависимостей на сервере / Уменьшение клиентского JavaScript     | <Check size={18} /> | <Cross size={18} />  |
+| Добавление интерактивности и обработчиков событий (`onClick()`, `onChange()` и т.д.) | <Cross size={18} />  | <Check size={18} /> |
+| Использование состояния и эффектов жизненного цикла (`useState()`, `useReducer()`, `useEffect()` и т.д.) | <Cross size={18} /> | <Check size={18} /> |
+| Использование API, доступных только в браузере                                   | <Cross size={18} />  | <Check size={18} /> |
+| Использование пользовательских хуков, зависящих от состояния, эффектов или API браузера | <Cross size={18} /> | <Check size={18} /> |
+| Использование [классовых компонентов React](https://react.dev/reference/react/Component) | <Cross size={18} /> | <Check size={18} /> |
+
+## Паттерны серверных компонентов
+
+Прежде чем переходить к клиентскому рендерингу, вы можете выполнить некоторые операции на сервере, такие как получение данных или доступ к базе данных и серверным сервисам.
+
+Вот несколько распространённых паттернов при работе с серверными компонентами:
+
+### Обмен данными между компонентами
+
+При получении данных на сервере могут возникнуть ситуации, когда нужно передавать данные между разными компонентами. Например, у вас может быть макет (layout) и страница, зависящие от одних и тех же данных.
+
+Вместо использования [React Context](https://react.dev/learn/passing-data-deeply-with-context) (который недоступен на сервере) или передачи данных через пропсы, вы можете использовать [`fetch`](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#fetching-data-on-the-server-with-fetch) или функцию `cache` от React для получения одних и тех же данных в компонентах, которые в них нуждаются, не беспокоясь о дублировании запросов. Это связано с тем, что React расширяет `fetch` для автоматического мемоизирования запросов, а функцию `cache` можно использовать, когда `fetch` недоступен.
+
+Подробнее о [мемоизации](/docs/app/building-your-application/caching#request-memoization) в React.
+
+### Защита серверного кода от попадания в клиентскую среду
+
+Поскольку модули JavaScript могут использоваться как серверными, так и клиентскими компонентами, код, предназначенный только для сервера, может случайно попасть в клиентскую часть.
+
+Например, рассмотрим следующую функцию для получения данных:
+
+```ts filename="lib/data.ts" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+```js filename="lib/data.js" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+На первый взгляд кажется, что `getData` работает и на сервере, и на клиенте. Однако эта функция содержит `API_KEY`, который предназначен только для серверного использования.
+
+Поскольку переменная окружения `API_KEY` не имеет префикса `NEXT_PUBLIC`, она является приватной и доступна только на сервере. Чтобы предотвратить утечку приватных переменных окружения в клиентскую часть, Next.js заменяет их пустой строкой.
+
+Таким образом, хотя `getData()` можно импортировать и выполнить на клиенте, она не будет работать корректно. И хотя сделать переменную публичной позволит функции работать на клиенте, вы, вероятно, не захотите раскрывать чувствительную информацию.
+
+Чтобы предотвратить случайное использование серверного кода в клиентских компонентах, можно использовать пакет `server-only`, который выдаст ошибку на этапе сборки, если модуль будет импортирован в клиентский компонент.
+
+Для использования `server-only` сначала установите пакет:
+
+```bash filename="Terminal"
+npm install server-only
+```
+
+Затем импортируйте его в любой модуль, содержащий серверный код:
+
+```js filename="lib/data.js"
+import 'server-only'
+
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+Теперь любой клиентский компонент, импортирующий `getData()`, получит ошибку на этапе сборки, указывающую, что этот модуль можно использовать только на сервере.
+
+Аналогичный пакет `client-only` можно использовать для пометки модулей, содержащих код только для клиента — например, код, обращающийся к объекту `window`.
+
+### Использование сторонних пакетов и провайдеров
+
+Поскольку серверные компоненты — это новая возможность React, сторонние пакеты и провайдеры только начинают добавлять директиву `"use client"` к компонентам, использующим клиентские возможности, такие как `useState`, `useEffect` и `createContext`.
+
+Сегодня многие компоненты из пакетов `npm`, использующие клиентские возможности, ещё не имеют этой директивы. Эти сторонние компоненты будут работать как ожидается внутри клиентских компонентов (поскольку они имеют директиву `"use client"`), но не будут работать внутри серверных компонентов.
+
+Например, предположим, что вы установили гипотетический пакет `acme-carousel`, содержащий компонент `<Carousel />`. Этот компонент использует `useState`, но ещё не имеет директивы `"use client"`.
+
+Если использовать `<Carousel />` внутри клиентского компонента, он будет работать как ожидается:
+
+```tsx filename="app/gallery.tsx" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  let [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>View pictures</button>
+
+      {/* Работает, так как Carousel используется внутри клиентского компонента */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/gallery.js" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  let [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>View pictures</button>
+
+      {/* Работает, так как Carousel используется внутри клиентского компонента */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+Однако при попытке использовать его напрямую в серверном компоненте вы получите ошибку:
+
+```tsx filename="app/page.tsx" switcher
+import { Carousel } from 'acme-carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+
+      {/* Ошибка: `useState` нельзя использовать в серверных компонентах */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Carousel } from 'acme-carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+
+      {/* Ошибка: `useState` нельзя использовать в серверных компонентах */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+Это происходит потому, что Next.js не знает, что `<Carousel />` использует клиентские возможности.
+
+Чтобы исправить это, можно обернуть сторонние компоненты, зависящие от клиентских возможностей, в собственные клиентские компоненты:
+
+```tsx filename="app/carousel.tsx" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+```jsx filename="app/carousel.js" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+Теперь можно использовать `<Carousel />` напрямую в серверном компоненте:
+
+```tsx filename="app/page.tsx" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+
+      {/* Работает, так как Carousel теперь клиентский компонент */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+
+      {/* Работает, так как Carousel теперь клиентский компонент */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+Ожидается, что в большинстве случаев вам не потребуется оборачивать сторонние компоненты, так как вы, скорее всего, будете использовать их внутри клиентских компонентов. Однако исключением являются провайдеры контекста, поскольку они зависят от состояния и контекста React и обычно требуются в корне приложения. [Подробнее о провайдерах контекста ниже](#using-context-providers).
+
+#### Использование провайдеров контекста
+
+Провайдеры контекста обычно рендерятся в корне приложения для общих настроек, таких как текущая тема. Поскольку [React context](https://react.dev/learn/passing-data-deeply-with-context) не поддерживается в серверных компонентах, попытка создать контекст в корне приложения вызовет ошибку:
+
+```tsx filename="app/layout.tsx" switcher
+import { createContext } from 'react'
+
+// createContext не поддерживается в серверных компонентах
+export const ThemeContext = createContext({})
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import { createContext } from 'react'
+
+// createContext не поддерживается в серверных компонентах
+export const ThemeContext = createContext({})
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+      </body>
+    </html>
+  )
+}
+```
+
+Чтобы исправить это, создайте контекст и его провайдер внутри клиентского компонента:
+
+```tsx filename="app/theme-provider.tsx" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+```jsx filename="app/theme-provider.js" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({ children }) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+Теперь серверный компонент сможет напрямую рендерить ваш провайдер, так как он помечен как клиентский компонент:
+
+```tsx filename="app/layout.tsx" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+После рендеринга провайдера в корне все клиентские компоненты в вашем приложении смогут использовать этот контекст.
+
+> **Полезно знать**: Рекомендуется размещать провайдеры как можно глубже в дереве компонентов — обратите внимание, что `ThemeProvider` оборачивает только `{children}`, а не весь документ `<html>`. Это позволяет Next.js оптимизировать статические части серверных компонентов.
+
+#### Советы для авторов библиотек
+
+Аналогичным образом авторы библиотек могут использовать директиву `"use client"` для пометки клиентских точек входа своих пакетов. Это позволяет пользователям библиотеки импортировать компоненты напрямую в серверные компоненты без необходимости создания дополнительных обёрток.
+
+Вы можете оптимизировать свой пакет, размещая ['use client' глубже в дереве компонентов](#moving-client-components-down-the-tree), позволяя импортированным модулям быть частью графа серверных компонентов.
+
+Стоит отметить, что некоторые сборщики могут удалять директивы `"use client"`. Пример настройки esbuild для сохранения директивы можно найти в репозиториях [React Wrap Balancer](https://github.com/shuding/react-wrap-balancer/blob/main/tsup.config.ts#L10-L13) и [Vercel Analytics](https://github.com/vercel/analytics/blob/main/packages/web/tsup.config.js#L26-L30).
+
+## Клиентские компоненты
+
+### Размещение клиентских компонентов глубже в дереве
+
+Чтобы уменьшить размер клиентского JavaScript-бандла, рекомендуется размещать клиентские компоненты как можно глубже в дереве компонентов.
+
+Например, у вас может быть макет (layout) со статическими элементами (например, логотипом, ссылками) и интерактивной строкой поиска, использующей состояние.
+
+Вместо того чтобы делать весь макет клиентским компонентом, вынесите интерактивную логику в отдельный клиентский компонент (например, `<SearchBar />`), оставив макет серверным компонентом. Это позволит не отправлять JavaScript всего макета на клиент.
+
+```tsx filename="app/layout.tsx" switcher
+// SearchBar — клиентский компонент
+import SearchBar from './searchbar'
+// Logo — серверный компонент
+import Logo from './logo'
+
+// Layout по умолчанию является серверным компонентом
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+// SearchBar — клиентский компонент
+import SearchBar from './searchbar'
+// Logo — серверный компонент
+import Logo from './logo'
+
+// Layout по умолчанию является серверным компонентом
+export default function Layout({ children }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+### Передача пропсов из серверных в клиентские компоненты (Сериализация)
+
+Если вы получаете данные в серверном компоненте, вам может потребоваться передать их в клиентские компоненты через пропсы. Пропсы, передаваемые из серверных в клиентские компоненты, должны быть [сериализуемыми](https://react.dev/reference/react/use-server#serializable-parameters-and-return-values) в React.
+
+Если ваши клиентские компоненты зависят от данных, которые нельзя сериализовать, вы можете [получать данные на клиенте с помощью сторонних библиотек](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#fetching-data-on-the-client-with-third-party-libraries) или на сервере через [Route Handler](/docs/app/building-your-application/routing/route-handlers).
+
+## Чередование серверных и клиентских компонентов
+
+При чередовании клиентских и серверных компонентов может быть полезно визуализировать ваш интерфейс как дерево компонентов. Начиная с [корневого макета](/docs/app/building-your-application/routing/pages-and-layouts#root-layout-required), который является серверным компонентом, вы затем можете отображать определенные поддеревья компонентов на клиенте, добавив директиву `"use client"`.
+
+{/* Диаграмма - чередование */}
+
+В этих клиентских поддеревьях вы по-прежнему можете вкладывать серверные компоненты или вызывать серверные действия (Server Actions), однако есть несколько моментов, которые следует учитывать:
+
+- В течение жизненного цикла запрос-ответ ваш код перемещается с сервера на клиент. Если вам нужно получить доступ к данным или ресурсам на сервере, находясь на клиенте, вы будете делать **новый** запрос к серверу — а не переключаться туда-обратно.
+- При новом запросе к серверу сначала рендерятся все серверные компоненты, включая те, что вложены в клиентские. Результат рендеринга (RSC Payload) будет содержать ссылки на расположение клиентских компонентов. Затем на клиенте React использует RSC Payload для согласования серверных и клиентских компонентов в единое дерево.
+
+{/* Диаграмма */}
+
+- Поскольку клиентские компоненты рендерятся после серверных, вы не можете импортировать серверный компонент в модуль клиентского компонента (так как это потребует нового запроса к серверу). Вместо этого вы можете передать серверный компонент как `props` в клиентский компонент. См. разделы [неподдерживаемый шаблон](#unsupported-pattern-importing-server-components-into-client-components) и [поддерживаемый шаблон](#supported-pattern-passing-server-components-to-client-components-as-props) ниже.
+
+### Неподдерживаемый шаблон: Импорт серверных компонентов в клиентские
+
+Следующий шаблон не поддерживается. Вы не можете импортировать серверный компонент в клиентский:
+
+```tsx filename="app/client-component.tsx" switcher highlight={4,17}
+'use client'
+
+// Нельзя импортировать серверный компонент в клиентский.
+import ServerComponent from './Server-Component'
+
+export default function ClientComponent({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      <ServerComponent />
+    </>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" switcher highlight={3,13}
+'use client'
+
+// Нельзя импортировать серверный компонент в клиентский.
+import ServerComponent from './Server-Component'
+
+export default function ClientComponent({ children }) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      <ServerComponent />
+    </>
+  )
+}
+```
+
+### Поддерживаемый шаблон: Передача серверных компонентов в клиентские через props
+
+Следующий шаблон поддерживается. Вы можете передавать серверные компоненты как пропсы в клиентский компонент.
+
+Распространенный шаблон — использование пропса `children` в React для создания _"слота"_ в вашем клиентском компоненте.
+
+В примере ниже `<ClientComponent>` принимает пропс `children`:
+
+```tsx filename="app/client-component.tsx" switcher highlight={6,15}
+'use client'
+
+import { useState } from 'react'
+
+export default function ClientComponent({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+      {children}
+    </>
+  )
+}
+```
+
+```jsx filename="app/client-component.js" switcher highlight={5,12}
+'use client'
+
+import { useState } from 'react'
+
+export default function ClientComponent({ children }) {
+  const [count, setCount] = useState(0)
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>{count}</button>
+
+      {children}
+    </>
+  )
+}
+```
+
+`<ClientComponent>` не знает, что `children` в конечном итоге будет заполнен результатом серверного компонента. Единственная ответственность `<ClientComponent>` — определить, **где** будет размещен `children`.
+
+В родительском серверном компоненте вы можете импортировать и `<ClientComponent>`, и `<ServerComponent>`, передав `<ServerComponent>` как дочерний элемент `<ClientComponent>`:
+
+```tsx filename="app/page.tsx"  highlight={11} switcher
+// Этот шаблон работает:
+// Вы можете передать серверный компонент как дочерний элемент или пропс
+// клиентского компонента.
+import ClientComponent from './client-component'
+import ServerComponent from './server-component'
+
+// Страницы в Next.js по умолчанию являются серверными компонентами
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent />
+    </ClientComponent>
+  )
+}
+```
+
+```jsx filename="app/page.js" highlight={11} switcher
+// Этот шаблон работает:
+// Вы можете передать серверный компонент как дочерний элемент или пропс
+// клиентского компонента.
+import ClientComponent from './client-component'
+import ServerComponent from './server-component'
+
+// Страницы в Next.js по умолчанию являются серверными компонентами
+export default function Page() {
+  return (
+    <ClientComponent>
+      <ServerComponent />
+    </ClientComponent>
+  )
+}
+```
+
+При таком подходе `<ClientComponent>` и `<ServerComponent>` разделены и могут рендериться независимо. В этом случае дочерний `<ServerComponent>` может быть отрендерен на сервере задолго до того, как `<ClientComponent>` будет отрендерен на клиенте.
+
+> **Полезно знать:**
+>
+> - Шаблон "поднятия контента" использовался для предотвращения повторного рендеринга вложенного дочернего компонента при повторном рендеринге родительского компонента.
+> - Вы не ограничены пропсом `children`. Вы можете использовать любой пропс для передачи JSX.

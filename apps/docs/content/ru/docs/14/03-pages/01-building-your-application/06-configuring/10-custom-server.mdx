@@ -1,0 +1,121 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:48:22.935Z
+title: Пользовательский сервер
+description: Запуск приложения Next.js программно с использованием пользовательского сервера.
+---
+
+<details>
+  <summary>Примеры</summary>
+
+- [Пользовательский сервер](https://github.com/vercel/next.js/tree/canary/examples/custom-server)
+- [Кэширование SSR](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+По умолчанию Next.js включает собственный сервер с командой `next start`. Если у вас есть существующий бэкенд, вы всё равно можете использовать его с Next.js (это не считается пользовательским сервером). Пользовательский сервер Next.js позволяет запускать сервер полностью программно для реализации пользовательских шаблонов сервера. В большинстве случаев это не требуется — но возможность доступна для полной кастомизации.
+
+> **Важно знать**:
+>
+> - Прежде чем решить использовать пользовательский сервер, учтите, что это следует делать только тогда, когда встроенный роутер Next.js не удовлетворяет требованиям вашего приложения. Пользовательский сервер отключает важные оптимизации производительности, такие как **бессерверные функции** и **[Автоматическая статическая оптимизация](/docs/pages/building-your-application/rendering/automatic-static-optimization).**
+> - Пользовательский сервер **нельзя** развернуть на [Vercel](https://vercel.com/solutions/nextjs).
+> - В режиме standalone output не отслеживаются файлы пользовательского сервера, и этот режим выводит отдельный минимальный файл `server.js`.
+
+Рассмотрим пример пользовательского сервера:
+
+```js filename="server.js"
+const { createServer } = require('http')
+const { parse } = require('url')
+const next = require('next')
+
+const dev = process.env.NODE_ENV !== 'production'
+const hostname = 'localhost'
+const port = 3000
+// при использовании middleware `hostname` и `port` должны быть указаны ниже
+const app = next({ dev, hostname, port })
+const handle = app.getRequestHandler()
+
+app.prepare().then(() => {
+  createServer(async (req, res) => {
+    try {
+      // Обязательно передавайте `true` вторым аргументом в `url.parse`.
+      // Это указывает на необходимость разбора query-части URL.
+      const parsedUrl = parse(req.url, true)
+      const { pathname, query } = parsedUrl
+
+      if (pathname === '/a') {
+        await app.render(req, res, '/a', query)
+      } else if (pathname === '/b') {
+        await app.render(req, res, '/b', query)
+      } else {
+        await handle(req, res, parsedUrl)
+      }
+    } catch (err) {
+      console.error('Error occurred handling', req.url, err)
+      res.statusCode = 500
+      res.end('internal server error')
+    }
+  })
+    .once('error', (err) => {
+      console.error(err)
+      process.exit(1)
+    })
+    .listen(port, () => {
+      console.log(`> Ready on http://${hostname}:${port}`)
+    })
+})
+```
+
+> Файл `server.js` не проходит через babel или webpack. Убедитесь, что синтаксис и используемые модули совместимы с текущей версией Node.js.
+
+Для запуска пользовательского сервера обновите `scripts` в `package.json`:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "NODE_ENV=production node server.js"
+  }
+}
+```
+
+---
+
+Пользовательский сервер использует следующий импорт для подключения к приложению Next.js:
+
+```js
+const next = require('next')
+const app = next({})
+```
+
+Импортируемая функция `next` принимает объект со следующими опциями:
+
+| Опция          | Тип                | Описание                                                                                                   |
+| -------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `conf`         | `Object`           | Тот же объект, что используется в [next.config.js](/docs/pages/api-reference/next-config-js). По умолчанию `{}` |
+| `customServer` | `Boolean`          | (_Опционально_) Установите false, если сервер создан Next.js                                              |
+| `dev`          | `Boolean`          | (_Опционально_) Запускать ли Next.js в режиме разработки. По умолчанию `false`                            |
+| `dir`          | `String`           | (_Опционально_) Путь к проекту Next.js. По умолчанию `'.'`                                                |
+| `quiet`        | `Boolean`          | (_Опционально_) Скрывать сообщения об ошибках с информацией о сервере. По умолчанию `false`               |
+| `hostname`     | `String`           | (_Опционально_) Имя хоста, на котором работает сервер                                                     |
+| `port`         | `Number`           | (_Опционально_) Порт, на котором работает сервер                                                          |
+| `httpServer`   | `node:http#Server` | (_Опционально_) HTTP-сервер, на котором работает Next.js                                                  |
+
+Возвращаемый объект `app` затем можно использовать для обработки запросов с помощью Next.js.
+
+## Отключение файловой маршрутизации
+
+По умолчанию Next.js обслуживает каждый файл из папки `pages` по пути, соответствующему имени файла. Если проект использует пользовательский сервер, это может привести к дублированию контента по разным путям, что создаёт проблемы для SEO и UX.
+
+Чтобы отключить это поведение и предотвратить маршрутизацию на основе файлов в `pages`, откройте `next.config.js` и отключите параметр `useFileSystemPublicRoutes`:
+
+```js filename="next.config.js"
+module.exports = {
+  useFileSystemPublicRoutes: false,
+}
+```
+
+> Примечание: `useFileSystemPublicRoutes` отключает маршруты на основе имён файлов только для SSR; клиентская маршрутизация по-прежнему может обращаться к этим путям. При использовании этой опции следует программно запрещать переходы к нежелательным маршрутам.
+
+> Вы также можете настроить клиентский роутер для запрета клиентских редиректов к файловым маршрутам; для этого см. [`router.beforePopState`](/docs/pages/api-reference/functions/use-router#routerbeforepopstate).

@@ -1,0 +1,375 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:36:23.051Z
+title: Получение, кэширование и ревалидация данных
+nav_title: Получение, кэширование и ревалидация
+description: Узнайте, как получать, кэшировать и ревалидировать данные в вашем приложении Next.js.
+---
+
+Получение данных — это ключевая часть любого приложения. На этой странице объясняется, как можно получать, кэшировать и ревалидировать данные в React и Next.js.
+
+Существует четыре способа получения данных:
+
+1. [На сервере с помощью `fetch`](#получение-данных-на-сервере-с-fetch)
+2. [На сервере с помощью сторонних библиотек](#получение-данных-на-сервере-со-сторонними-библиотеками)
+3. [На клиенте через Route Handler](#получение-данных-на-клиенте-с-route-handlers)
+4. [На клиенте со сторонними библиотеками](#получение-данных-на-клиенте-с-route-handlers).
+
+## Получение данных на сервере с `fetch`
+
+Next.js расширяет нативный [Web API `fetch`](https://developer.mozilla.org/docs/Web/API/Fetch_API), позволяя настраивать поведение [кэширования](#кэширование-данных) и [ревалидации](#ревалидация-данных) для каждого запроса на сервере. React расширяет `fetch`, автоматически [мемоизируя](/docs/app/building-your-application/data-fetching/patterns#fetching-data-where-its-needed) запросы при рендеринге дерева React-компонентов.
+
+Вы можете использовать `fetch` с [`async`/`await` в Server Components](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md), в [Route Handlers](/docs/app/building-your-application/routing/route-handlers) и в [Server Actions](/docs/app/building-your-application/data-fetching/forms-and-mutations).
+
+Например:
+
+```tsx filename="app/page.tsx" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // Возвращаемое значение *не* сериализуется
+  // Можно возвращать Date, Map, Set и т.д.
+
+  if (!res.ok) {
+    // Активирует ближайший Error Boundary из `error.js`
+    throw new Error('Не удалось получить данные')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+```jsx filename="app/page.js" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // Возвращаемое значение *не* сериализуется
+  // Можно возвращать Date, Map, Set и т.д.
+
+  if (!res.ok) {
+    // Активирует ближайший Error Boundary из `error.js`
+    throw new Error('Не удалось получить данные')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+> **Полезно знать**:
+>
+> - Next.js предоставляет полезные функции, которые могут понадобиться при получении данных в Server Components, такие как [`cookies`](/docs/app/api-reference/functions/cookies) и [`headers`](/docs/app/api-reference/functions/headers). Они приводят к динамическому рендерингу маршрута, так как зависят от информации о времени запроса.
+> - В Route Handlers запросы `fetch` не мемоизируются, так как Route Handlers не являются частью дерева React-компонентов.
+> - Для использования `async`/`await` в Server Component с TypeScript требуется TypeScript `5.1.3` или выше и `@types/react` `18.2.8` или выше.
+
+### Кэширование данных
+
+Кэширование сохраняет данные, чтобы их не нужно было повторно запрашивать из источника при каждом запросе.
+
+По умолчанию Next.js автоматически кэширует возвращаемые значения `fetch` в [Data Cache](/docs/app/building-your-application/caching#data-cache) на сервере. Это означает, что данные могут быть получены во время сборки или запроса, закэшированы и повторно использованы при каждом запросе данных.
+
+```js
+// 'force-cache' используется по умолчанию и может быть опущен
+fetch('https://...', { cache: 'force-cache' })
+```
+
+Запросы `fetch` с методом `POST` также автоматически кэшируются. Если только они не находятся внутри [Route Handler](/docs/app/building-your-application/routing/route-handlers), использующего метод `POST`, тогда они не будут кэшироваться.
+
+> **Что такое Data Cache?**
+>
+> Data Cache — это постоянный [HTTP-кэш](https://developer.mozilla.org/docs/Web/HTTP/Caching). В зависимости от платформы кэш может масштабироваться автоматически и быть [общим для нескольких регионов](https://vercel.com/docs/infrastructure/data-cache).
+>
+> Подробнее о [Data Cache](/docs/app/building-your-application/caching#data-cache).
+
+### Ревалидация данных
+
+Ревалидация — это процесс очистки Data Cache и повторного получения актуальных данных. Это полезно, когда ваши данные изменяются и вы хотите убедиться, что отображается самая свежая информация.
+
+Закэшированные данные можно ревалидировать двумя способами:
+
+- **Ревалидация по времени**: Автоматическая ревалидация данных через определенный промежуток времени. Полезно для данных, которые изменяются редко, и свежесть не критична.
+- **Ревалидация по запросу**: Ручная ревалидация данных на основе события (например, отправки формы). Ревалидация по запросу может использовать теги или пути для ревалидации групп данных одновременно. Полезно, когда нужно как можно быстрее показать актуальные данные (например, при обновлении контента из headless CMS).
+
+#### Ревалидация по времени
+
+Для ревалидации данных через определенные интервалы можно использовать опцию `next.revalidate` в `fetch`, чтобы установить время жизни ресурса в кэше (в секундах).
+
+```js
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+Альтернативно, для ревалидации всех запросов `fetch` в сегменте маршрута можно использовать [Segment Config Options](/docs/app/api-reference/file-conventions/route-segment-config).
+
+```jsx filename="layout.js | page.js"
+export const revalidate = 3600 // ревалидировать не чаще чем раз в час
+```
+
+Если в статически рендерящемся маршруте есть несколько запросов `fetch` с разной частотой ревалидации, для всех запросов будет использовано наименьшее время. Для динамически рендерящихся маршрутов каждый запрос `fetch` будет ревалидироваться независимо.
+
+Подробнее о [ревалидации по времени](/docs/app/building-your-application/caching#time-based-revalidation).
+
+#### Ревалидация по запросу
+
+Данные можно ревалидировать по запросу с помощью пути ([`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)) или тега кэша ([`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)) внутри Route Handler или Server Action.
+
+Next.js имеет систему тегирования кэша для инвалидации запросов `fetch` между маршрутами.
+
+1. При использовании `fetch` можно пометить записи кэша одним или несколькими тегами.
+2. Затем можно вызвать `revalidateTag` для ревалидации всех записей, связанных с этим тегом.
+
+Например, следующий запрос `fetch` добавляет тег кэша `collection`:
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+При использовании Route Handler следует создать секретный токен, известный только вашему приложению Next.js. Этот секрет будет использоваться для предотвращения несанкционированных попыток ревалидации. Например, можно обратиться к маршруту (вручную или через вебхук) с помощью следующего URL:
+
+```bash filename="URL"
+https://<your-site.com>/api/revalidate?tag=collection&secret=<token>
+```
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { NextRequest } from 'next/server'
+import { revalidateTag } from 'next/cache'
+
+// Например, вебхук на `your-website.com/api/revalidate?tag=collection&secret=<token>`
+export async function POST(request: NextRequest) {
+  const secret = request.nextUrl.searchParams.get('secret')
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (secret !== process.env.MY_SECRET_TOKEN) {
+    return Response.json({ message: 'Неверный секретный токен' }, { status: 401 })
+  }
+
+  if (!tag) {
+    return Response.json({ message: 'Отсутствует параметр tag' }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidateTag } from 'next/cache'
+
+// Например, вебхук на `your-website.com/api/revalidate?tag=collection&secret=<token>`
+export async function POST(request) {
+  const secret = request.nextUrl.searchParams.get('secret')
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (secret !== process.env.MY_SECRET_TOKEN) {
+    return Response.json({ message: 'Неверный секретный токен' }, { status: 401 })
+  }
+
+  if (!tag) {
+    return Response.json({ message: 'Отсутствует параметр tag' }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+Альтернативно можно использовать [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) для ревалидации всех данных, связанных с путем.
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { NextRequest } from 'next/server'
+import { revalidatePath } from 'next/cache'
+
+export async function POST(request: NextRequest) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (!path) {
+    return Response.json({ message: 'Отсутствует параметр path' }, { status: 400 })
+  }
+
+  revalidatePath(path)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function POST(request) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (!path) {
+    return Response.json({ message: 'Отсутствует параметр path' }, { status: 400 })
+  }
+
+  revalidatePath(path)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+Подробнее о [ревалидации по запросу](/docs/app/building-your-application/caching#on-demand-revalidation).
+
+#### Обработка ошибок и ревалидация
+
+Если при попытке ревалидации данных возникает ошибка, последние успешно сгенерированные данные будут продолжать обслуживаться из кэша. При следующем запросе Next.js повторит попытку ревалидации.
+
+### Отказ от кэширования данных
+
+Запросы `fetch` **не** кэшируются, если:
+
+- Добавлен параметр `cache: 'no-store'` в `fetch`.
+- Добавлена опция `revalidate: 0` для отдельных запросов `fetch`.
+- Запрос `fetch` находится внутри Route Handler, использующего метод `POST`.
+- Запрос `fetch` выполняется после использования `headers` или `cookies`.
+- Используется опция сегмента маршрута `const dynamic = 'force-dynamic'`.
+- Опция сегмента маршрута `fetchCache` настроена на пропуск кэша по умолчанию.
+- Запрос `fetch` использует заголовки `Authorization` или `Cookie`, и выше в дереве компонентов есть некэшированный запрос.
+
+#### Отдельные запросы `fetch`
+
+Чтобы отключить кэширование для отдельных запросов `fetch`, можно установить параметр `cache` в `'no-store'`. Это приведет к динамическому получению данных при каждом запросе.
+
+```js filename="layout.js | page.js"
+fetch('https://...', { cache: 'no-store' })
+```
+
+Все доступные параметры `cache` можно найти в [справочнике API `fetch`](/docs/app/api-reference/functions/fetch).
+
+#### Несколько запросов `fetch`
+
+Если в сегменте маршрута (например, в Layout или Page) есть несколько запросов `fetch`, можно настроить поведение кэширования всех запросов данных в сегменте с помощью [Segment Config Options](/docs/app/api-reference/file-conventions/route-segment-config).
+
+Например, использование `const dynamic = 'force-dynamic'` приведет к тому, что все данные будут получаться во время запроса, а сегмент будет рендериться динамически.
+
+```js filename="layout.js | page.js"
+// Добавить
+export const dynamic = 'force-dynamic'
+```
+
+Существует обширный список опций Segment Config, позволяющий детально контролировать статическое и динамическое поведение сегмента маршрута. Подробнее см. в [справочнике API](/docs/app/api-reference/file-conventions/route-segment-config).
+
+## Получение данных на сервере со сторонними библиотеками
+
+В случаях, когда используется сторонняя библиотека, которая не поддерживает или не предоставляет `fetch` (например, база данных, CMS или ORM-клиент), можно настроить поведение кэширования и ревалидации этих запросов с помощью [Route Segment Config Option](/docs/app/api-reference/file-conventions/route-segment-config) и функции React `cache`.
+
+Будет ли кэшироваться запрос, зависит от того, [статически или динамически](/docs/app/building-your-application/rendering/server-components#server-rendering-strategies) рендерится сегмент маршрута. Если сегмент статический (по умолчанию), результат запроса будет кэшироваться и ревалидироваться как часть сегмента маршрута. Если сегмент динамический, результат запроса _не_ будет кэшироваться и будет повторно запрашиваться при каждом рендеринге сегмента.
+
+> **Полезно знать:**
+>
+> Next.js разрабатывает API `unstable_cache` для настройки кэширования и ревалидации отдельных запросов к сторонним сервисам.
+
+### Пример
+
+В следующем примере:
+
+- Опция `revalidate` установлена в `3600`, что означает, что данные будут кэшироваться и ревалидироваться не чаще чем раз в час.
+- Функция React `cache` используется для [мемоизации](/docs/app/building-your-application/caching#request-memoization) запросов данных.
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+
+export const revalidate = 3600 // ревалидировать данные не чаще чем раз в час
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+
+export const revalidate = 3600 // ревалидировать данные не чаще чем раз в час
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+Хотя функция `getItem` вызывается дважды, будет выполнен только один запрос к базе данных.
+
+```tsx filename="app/item/[id]/layout.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Layout({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/layout.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Layout({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Page({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+## Получение данных на клиенте с Route Handlers
+
+Если нужно получить данные в клиентском компоненте, можно вызвать [Route Handler](/docs/app/building-your-application/routing/route-handlers) из клиента. Route Handlers выполняются на сервере и возвращают данные клиенту. Это полезно, когда не нужно раскрывать конфиденциальную информацию клиенту, например, API-токены.
+
+Примеры см. в документации по [Route Handlers](/docs/app/building-your-application/routing/route-handlers).
+
+> **Server Components и Route Handlers**
+>
+> Поскольку Server Components рендерятся на сервере, не нужно вызывать Route Handler из Server Component для получения данных. Вместо этого можно получить данные непосредственно внутри Server Component.
+
+## Получение данных на клиенте со сторонними библиотеками
+
+Также можно получать данные на клиенте с помощью сторонних библиотек, таких как [SWR](https://swr.vercel.app/) или [React Query](https://tanstack.com/query/latest). Эти библиотеки предоставляют собственные API для мемоизации запросов, кэширования, ревалидации и мутации данных.
+
+> **Будущие API**:
+>
+> `use` — это функция React, которая **принимает и обрабатывает промис**, возвращаемый функцией. Обертывание `fetch` в `use` в настоящее время **не рекомендуется** в клиентских компонентах и может вызвать множественные ререндеры. Подробнее о `use` см. в [RFC React](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md#usepromise).

@@ -1,0 +1,170 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:47:48.653Z
+title: Кэширование сборок в Continuous Integration (CI)
+description: Узнайте, как настроить CI для кэширования сборок Next.js
+---
+
+Для повышения производительности сборки Next.js сохраняет кэш в `.next/cache`, который используется между сборками.
+
+Чтобы использовать этот кэш в средах Continuous Integration (CI), ваш CI-процесс должен быть настроен для корректного сохранения кэша между сборками.
+
+> Если ваш CI не настроен на сохранение `.next/cache` между сборками, вы можете увидеть ошибку [No Cache Detected](/docs/messages/no-cache).
+
+Вот примеры конфигураций кэширования для популярных CI-провайдеров:
+
+## Vercel
+
+Кэширование Next.js настраивается автоматически. Дополнительные действия не требуются.
+
+## CircleCI
+
+Измените шаг `save_cache` в `.circleci/config.yml`, включив `.next/cache`:
+
+```yaml
+steps:
+  - save_cache:
+      key: dependency-cache-{{ checksum "yarn.lock" }}
+      paths:
+        - ./node_modules
+        - ./.next/cache
+```
+
+Если у вас нет ключа `save_cache`, следуйте [документации CircleCI по настройке кэширования сборок](https://circleci.com/docs/2.0/caching/).
+
+## Travis CI
+
+Добавьте или объедините следующее в ваш `.travis.yml`:
+
+```yaml
+cache:
+  directories:
+    - $HOME/.cache/yarn
+    - node_modules
+    - .next/cache
+```
+
+## GitLab CI
+
+Добавьте или объедините следующее в ваш `.gitlab-ci.yml`:
+
+```yaml
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+    - .next/cache/
+```
+
+## Netlify CI
+
+Используйте [Netlify Plugins](https://www.netlify.com/products/build/plugins/) с [`@netlify/plugin-nextjs`](https://www.npmjs.com/package/@netlify/plugin-nextjs).
+
+## AWS CodeBuild
+
+Добавьте (или объедините) следующее в ваш `buildspec.yml`:
+
+```yaml
+cache:
+  paths:
+    - 'node_modules/**/*' # Кэшировать `node_modules` для ускорения `yarn` или `npm i`
+    - '.next/cache/**/*' # Кэшировать Next.js для ускорения пересборки приложения
+```
+
+## GitHub Actions
+
+Используя [actions/cache](https://github.com/actions/cache) от GitHub, добавьте следующий шаг в ваш workflow-файл:
+
+```yaml
+uses: actions/cache@v4
+with:
+  # См. примеры кэширования для `yarn` https://github.com/actions/cache/blob/main/examples.md#node---yarn или используйте кэширование через actions/setup-node https://github.com/actions/setup-node
+  path: |
+    ~/.npm
+    ${{ github.workspace }}/.next/cache
+  # Генерировать новый кэш при изменении пакетов или исходных файлов
+  key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+  # Если исходные файлы изменились, но пакеты нет, использовать предыдущий кэш
+  restore-keys: |
+    ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+```
+
+## Bitbucket Pipelines
+
+Добавьте или объедините следующее в ваш `bitbucket-pipelines.yml` на верхнем уровне (на том же уровне, что и `pipelines`):
+
+```yaml
+definitions:
+  caches:
+    nextcache: .next/cache
+```
+
+Затем укажите его в разделе `caches` шага вашего пайплайна:
+
+```yaml
+- step:
+    name: your_step_name
+    caches:
+      - node
+      - nextcache
+```
+
+## Heroku
+
+Используя [custom cache](https://devcenter.heroku.com/articles/nodejs-support#custom-caching) Heroku, добавьте массив `cacheDirectories` в ваш package.json верхнего уровня:
+
+```javascript
+"cacheDirectories": [".next/cache"]
+```
+
+## Azure Pipelines
+
+Используя [Cache task](https://docs.microsoft.com/en-us/azure/devops/pipelines/tasks/utility/cache) Azure Pipelines, добавьте следующую задачу в ваш pipeline yaml файл перед задачей, выполняющей `next build`:
+
+```yaml
+- task: Cache@2
+  displayName: 'Кэширование .next/cache'
+  inputs:
+    key: next | $(Agent.OS) | yarn.lock
+    path: '$(System.DefaultWorkingDirectory)/.next/cache'
+```
+
+## Jenkins (Pipeline)
+
+Используя плагин [Job Cacher](https://www.jenkins.io/doc/pipeline/steps/jobcacher/) для Jenkins, добавьте следующий шаг сборки в ваш `Jenkinsfile` там, где вы обычно выполняете `next build` или `npm install`:
+
+```yaml
+stage("Восстановление npm пакетов") {
+    steps {
+        // Записывает lock-файл в кэш на основе хэша GIT_COMMIT
+        writeFile file: "next-lock.cache", text: "$GIT_COMMIT"
+
+        cache(caches: [
+            arbitraryFileCache(
+                path: "node_modules",
+                includes: "**/*",
+                cacheValidityDecidingFile: "package-lock.json"
+            )
+        ]) {
+            sh "npm install"
+        }
+    }
+}
+stage("Сборка") {
+    steps {
+        // Записывает lock-файл в кэш на основе хэша GIT_COMMIT
+        writeFile file: "next-lock.cache", text: "$GIT_COMMIT"
+
+        cache(caches: [
+            arbitraryFileCache(
+                path: ".next/cache",
+                includes: "**/*",
+                cacheValidityDecidingFile: "next-lock.cache"
+            )
+        ]) {
+            // то есть `next build`
+            sh "npm run build"
+        }
+    }
+}
+```

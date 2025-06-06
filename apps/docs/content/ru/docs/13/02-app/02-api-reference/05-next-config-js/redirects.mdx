@@ -1,0 +1,322 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:22:58.058Z
+title: redirects
+description: Добавление редиректов в ваше Next.js приложение.
+---
+
+{/* Содержание этого документа является общим для маршрутизаторов app и pages. Вы можете использовать компонент `<PagesOnly>Content</PagesOnly>` для добавления контента, специфичного для маршрутизатора Pages. Любой общий контент не должен быть обёрнут в компонент. */}
+
+Редиректы позволяют перенаправлять входящий путь запроса на другой целевой путь.
+
+Для использования редиректов вы можете использовать ключ `redirects` в `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+`redirects` — это асинхронная функция, которая ожидает возврата массива объектов со свойствами `source`, `destination` и `permanent`:
+
+- `source` — шаблон пути входящего запроса.
+- `destination` — путь, на который нужно перенаправить.
+- `permanent` — `true` или `false`. Если `true`, будет использоваться код состояния 308, который указывает клиентам/поисковым системам кэшировать редирект навсегда. Если `false`, будет использоваться код 307, который является временным и не кэшируется.
+
+> **Почему Next.js использует 307 и 308?** Традиционно 302 использовался для временных редиректов, а 301 — для постоянных, но многие браузеры изменяли метод запроса редиректа на `GET`, независимо от исходного метода. Например, если браузер делал запрос `POST /v1/users`, который возвращал код состояния `302` с местоположением `/v2/users`, последующий запрос мог быть `GET /v2/users` вместо ожидаемого `POST /v2/users`. Next.js использует коды состояния 307 (временный редирект) и 308 (постоянный редирект), чтобы явно сохранить использованный метод запроса.
+
+- `basePath`: `false` или `undefined` — если `false`, `basePath` не будет включаться при сопоставлении, может использоваться только для внешних редиректов.
+- `locale`: `false` или `undefined` — указывает, следует ли исключать локаль при сопоставлении.
+- `has` — массив [объектов has](#header-cookie-and-query-matching) со свойствами `type`, `key` и `value`.
+- `missing` — массив [объектов missing](#header-cookie-and-query-matching) со свойствами `type`, `key` и `value`.
+
+Редиректы проверяются до файловой системы, включая страницы и файлы `/public`.
+
+Редиректы не применяются к клиентской маршрутизации (`Link`, `router.push`), если только не присутствует [Middleware](/docs/app/building-your-application/routing/middleware) и соответствует пути.
+
+При применении редиректа любые значения запроса, предоставленные в запросе, будут переданы в целевой путь редиректа. Например, рассмотрим следующую конфигурацию редиректа:
+
+```js
+{
+  source: '/old-blog/:path*',
+  destination: '/blog/:path*',
+  permanent: false
+}
+```
+
+При запросе `/old-blog/post-1?hello=world` клиент будет перенаправлен на `/blog/post-1?hello=world`.
+
+## Сопоставление путей
+
+Разрешено сопоставление путей, например `/old-blog/:slug` совпадёт с `/old-blog/hello-world` (без вложенных путей):
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/old-blog/:slug',
+        destination: '/news/:slug', // Сопоставленные параметры могут использоваться в destination
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### Сопоставление путей с подстановочными знаками
+
+Для сопоставления пути с подстановочными знаками можно использовать `*` после параметра, например `/blog/:slug*` совпадёт с `/blog/a/b/c/d/hello-world`:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/blog/:slug*',
+        destination: '/news/:slug*', // Сопоставленные параметры могут использоваться в destination
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+### Сопоставление путей с регулярными выражениями
+
+Для сопоставления пути с регулярным выражением можно обернуть regex в скобки после параметра, например `/post/:slug(\\d{1,})` совпадёт с `/post/123`, но не с `/post/abc`:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/post/:slug(\\d{1,})',
+        destination: '/news/:slug', // Сопоставленные параметры могут использоваться в destination
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+Следующие символы `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` используются для сопоставления путей с регулярными выражениями, поэтому при использовании в `source` как неспециальные значения они должны быть экранированы добавлением `\\` перед ними:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        // это совпадёт с запросом `/english(default)/something`
+        source: '/english\\(default\\)/:slug',
+        destination: '/en-us/:slug',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+## Сопоставление заголовков, кук и запросов
+
+Чтобы редирект применялся только при совпадении значений заголовков, кук или запросов, можно использовать поле `has` или `missing`. И `source`, и все элементы `has` должны совпадать, а все элементы `missing` не должны совпадать для применения редиректа.
+
+Элементы `has` и `missing` могут иметь следующие поля:
+
+- `type`: `String` — должно быть `header`, `cookie`, `host` или `query`.
+- `key`: `String` — ключ из выбранного типа для сопоставления.
+- `value`: `String` или `undefined` — значение для проверки. Если `undefined`, будет совпадать любое значение. Можно использовать строку, похожую на regex, для захвата определённой части значения, например, если значение `first-(?<paramName>.*)` используется для `first-second`, то `second` можно будет использовать в destination как `:paramName`.
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      // если присутствует заголовок `x-redirect-me`,
+      // этот редирект будет применён
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'header',
+            key: 'x-redirect-me',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // если присутствует заголовок `x-dont-redirect`,
+      // этот редирект НЕ будет применён
+      {
+        source: '/:path((?!another-page$).*)',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-do-not-redirect',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+      // если совпадают source, query и cookie,
+      // этот редирект будет применён
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // значение page не будет доступно в destination,
+            // так как value предоставлено и не использует именованную группу захвата, например (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        permanent: false,
+        destination: '/another/:path*',
+      },
+      // если заголовок `x-authorized` присутствует и
+      // содержит соответствующее значение, этот редирект будет применён
+      {
+        source: '/',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        permanent: false,
+        destination: '/home?authorized=:authorized',
+      },
+      // если хост — `example.com`,
+      // этот редирект будет применён
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        permanent: false,
+        destination: '/another-page',
+      },
+    ]
+  },
+}
+```
+
+### Редиректы с поддержкой basePath
+
+При использовании [`basePath`](/docs/app/api-reference/next-config-js/basePath) с редиректами каждый `source` и `destination` автоматически дополняется `basePath`, если только вы не добавите `basePath: false` к редиректу:
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async redirects() {
+    return [
+      {
+        source: '/with-basePath', // автоматически становится /docs/with-basePath
+        destination: '/another', // автоматически становится /docs/another
+        permanent: false,
+      },
+      {
+        // не добавляет /docs, так как установлено basePath: false
+        source: '/without-basePath',
+        destination: 'https://example.com',
+        basePath: false,
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+### Редиректы с поддержкой i18n
+
+<AppOnly>
+
+При использовании [`i18n`](/docs/app/building-your-application/routing/internationalization) с редиректами каждый `source` и `destination` автоматически дополняется для обработки настроенных `locales`, если только вы не добавите `locale: false` к редиректу. Если используется `locale: false`, вы должны добавить локаль к `source` и `destination` для правильного сопоставления.
+
+</AppOnly>
+
+<PagesOnly>
+
+При использовании [`i18n`](/docs/pages/building-your-application/routing/internationalization) с редиректами каждый `source` и `destination` автоматически дополняется для обработки настроенных `locales`, если только вы не добавите `locale: false` к редиректу. Если используется `locale: false`, вы должны добавить локаль к `source` и `destination` для правильного сопоставления.
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/with-locale', // автоматически обрабатывает все локали
+        destination: '/another', // автоматически передаёт локаль
+        permanent: false,
+      },
+      {
+        // не обрабатывает локали автоматически, так как установлено locale: false
+        source: '/nl/with-locale-manual',
+        destination: '/nl/another',
+        locale: false,
+        permanent: false,
+      },
+      {
+        // совпадает с '/', так как `en` — defaultLocale
+        source: '/en',
+        destination: '/en/another',
+        locale: false,
+        permanent: false,
+      },
+      // возможно сопоставить все локали, даже если установлено locale: false
+      {
+        source: '/:locale/page',
+        destination: '/en/newpage',
+        permanent: false,
+        locale: false,
+      },
+      {
+        // преобразуется в /(en|fr|de)/(.*), поэтому не совпадёт с корневыми
+        // маршрутами `/` или `/fr`, как это сделал бы /:path*
+        source: '/(.*)',
+        destination: '/another',
+        permanent: false,
+      },
+    ]
+  },
+}
+```
+
+В некоторых редких случаях может потребоваться назначить пользовательский код состояния для правильного перенаправления старых HTTP-клиентов. В таких случаях можно использовать свойство `statusCode` вместо `permanent`, но не оба одновременно. Для обеспечения совместимости с IE11 автоматически добавляется заголовок `Refresh` для кода состояния 308.
+
+## Другие редиректы
+
+- Внутри [API Routes](/docs/pages/api-reference/functions/next-server) можно использовать `res.redirect()`.
+- Внутри [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) и [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) можно перенаправлять определённые страницы во время запроса.
+
+## История версий
+
+| Версия    | Изменения          |
+| --------- | ------------------ |
+| `v13.3.0` | Добавлено `missing`. |
+| `v10.2.0` | Добавлено `has`.    |
+| `v9.5.0`  | Добавлено `redirects`. |

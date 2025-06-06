@@ -1,0 +1,147 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:18:50.532Z
+title: getServerSideProps
+description: Получение данных при каждом запросе с помощью `getServerSideProps`.
+---
+
+Если вы экспортируете функцию `getServerSideProps` (рендеринг на стороне сервера, SSR) из страницы, Next.js будет предварительно рендерить эту страницу при каждом запросе, используя данные, возвращённые `getServerSideProps`.
+
+```tsx filename="pages/index.tsx" switcher
+import type { InferGetServerSidePropsType, GetServerSideProps } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getServerSideProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetServerSideProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/index.js" switcher
+export async function getServerSideProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+> Обратите внимание, что независимо от типа рендеринга, любые `props` будут переданы в компонент страницы и могут быть просмотрены на стороне клиента в исходном HTML. Это необходимо для корректного [гидратирования](https://react.dev/reference/react-dom/hydrate) страницы. Убедитесь, что вы не передаёте в `props` никакой конфиденциальной информации, которая не должна быть доступна на клиенте.
+
+## Когда выполняется getServerSideProps
+
+`getServerSideProps` выполняется только на стороне сервера и никогда в браузере. Если страница использует `getServerSideProps`, то:
+
+- При прямом запросе этой страницы `getServerSideProps` выполняется во время запроса, и страница будет предварительно отрендерена с возвращёнными props
+- При переходе на эту страницу на стороне клиента через [`next/link`](/docs/pages/api-reference/components/link) или [`next/router`](/docs/pages/api-reference/functions/use-router), Next.js отправляет API-запрос на сервер, который выполняет `getServerSideProps`
+
+`getServerSideProps` возвращает JSON, который используется для рендеринга страницы. Вся эта работа автоматически обрабатывается Next.js, поэтому вам не нужно делать ничего дополнительного, пока у вас определён `getServerSideProps`.
+
+Вы можете использовать [инструмент next-code-elimination](https://next-code-elimination.vercel.app/) для проверки, что Next.js исключает из клиентского бандла.
+
+`getServerSideProps` можно экспортировать только из **страницы**. Вы не можете экспортировать его из других файлов.
+
+Обратите внимание, что `getServerSideProps` должен экспортироваться как отдельная функция — он **не** будет работать, если добавить его как свойство компонента страницы.
+
+В [справочнике API `getServerSideProps`](/docs/pages/api-reference/functions/get-server-side-props) описаны все параметры и props, которые можно использовать с `getServerSideProps`.
+
+## Когда следует использовать getServerSideProps
+
+Следует использовать `getServerSideProps` только если вам нужно рендерить страницу, данные для которой должны быть получены во время запроса. Это может быть связано с природой данных или свойствами запроса (например, заголовками `authorization` или геолокацией). Страницы, использующие `getServerSideProps`, будут рендериться на стороне сервера во время запроса и кэшироваться только если [настроены заголовки cache-control](/docs/pages/building-your-application/deploying/production-checklist#caching).
+
+Если вам не нужно рендерить данные во время запроса, рассмотрите возможность получения данных на [стороне клиента](#fetching-data-on-the-client-side) или с помощью [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props).
+
+### getServerSideProps или API Routes
+
+Может возникнуть соблазн использовать [API Route](/docs/pages/building-your-application/routing/api-routes) для получения данных с сервера, а затем вызывать этот API Route из `getServerSideProps`. Это избыточный и неэффективный подход, так как он приведёт к дополнительному запросу, поскольку и `getServerSideProps`, и API Routes выполняются на сервере.
+
+Рассмотрим следующий пример. API Route используется для получения данных из CMS. Затем этот API Route вызывается напрямую из `getServerSideProps`. Это создаёт дополнительный запрос, снижая производительность. Вместо этого можно напрямую импортировать логику из вашего API Route в `getServerSideProps`. Это может означать прямой вызов CMS, базы данных или другого API из `getServerSideProps`.
+
+### getServerSideProps с Edge API Routes
+
+`getServerSideProps` может использоваться как с [Serverless, так и с Edge Runtime](/docs/pages/building-your-application/rendering/edge-and-nodejs-runtimes), и вы можете устанавливать props в обоих случаях. Однако в Edge Runtime в настоящее время нет доступа к объекту ответа. Это означает, что вы не можете, например, добавлять куки в `getServerSideProps`. Для доступа к объекту ответа следует **продолжать использовать Node.js runtime**, который является runtime по умолчанию.
+
+Вы можете явно задать runtime для конкретной страницы, изменив `config`, например:
+
+```jsx filename="pages/index.js"
+export const config = {
+  runtime: 'nodejs', // или "edge"
+}
+
+export const getServerSideProps = async () => {}
+```
+
+## Получение данных на стороне клиента
+
+Если ваша страница содержит часто обновляемые данные и вам не нужно предварительно рендерить эти данные, вы можете получать их на [стороне клиента](/docs/pages/building-your-application/data-fetching/client-side). Примером таких данных могут быть пользовательские данные:
+
+- Сначала сразу покажите страницу без данных. Части страницы могут быть предварительно отрендерены с помощью Static Generation. Вы можете показать состояние загрузки для отсутствующих данных
+- Затем получите данные на стороне клиента и отобразите их, когда они будут готовы
+
+Такой подход хорошо подходит, например, для страниц пользовательских дашбордов. Поскольку дашборд — это приватная, пользовательская страница, SEO не имеет значения, и страницу не нужно предварительно рендерить. Данные часто обновляются, что требует их получения во время запроса.
+
+## Использование getServerSideProps для получения данных во время запроса
+
+Следующий пример показывает, как получать данные во время запроса и предварительно рендерить результат.
+
+```jsx
+// Эта функция вызывается при каждом запросе
+export async function getServerSideProps() {
+  // Получение данных из внешнего API
+  const res = await fetch(`https://.../data`)
+  const data = await res.json()
+
+  // Передача данных в страницу через props
+  return { props: { data } }
+}
+
+export default function Page({ data }) {
+  // Рендеринг данных...
+}
+```
+
+## Кэширование при рендеринге на стороне сервера (SSR)
+
+Вы можете использовать заголовки кэширования (`Cache-Control`) внутри `getServerSideProps` для кэширования динамических ответов. Например, используя [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/).
+
+```jsx
+// Это значение считается свежим в течение десяти секунд (s-maxage=10).
+// Если запрос повторяется в течение следующих 10 секунд, будет использоваться
+// закэшированное значение. Если запрос повторяется в течение 59 секунд,
+// закэшированное значение будет считаться устаревшим, но всё равно отобразится (stale-while-revalidate=59).
+//
+// На фоне будет выполнен запрос на повторную валидацию для обновления кэша
+// новым значением. Если обновить страницу, вы увидите новое значение.
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+Узнайте больше о [кэшировании](/docs/pages/building-your-application/deploying/production-checklist#caching).
+
+## Отображает ли getServerSideProps страницу ошибки
+
+Если внутри `getServerSideProps` возникает ошибка, будет показан файл `pages/500.js`. Ознакомьтесь с документацией по [странице 500](/docs/pages/building-your-application/routing/custom-error#500-page), чтобы узнать больше о её создании. Во время разработки этот файл не используется, вместо него отображается оверлей разработчика.
