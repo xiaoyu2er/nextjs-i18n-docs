@@ -1,0 +1,183 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:42:50.783Z
+title: インクリメンタル静的再生成 (ISR)
+description: インクリメンタル静的再生成を使用して、ランタイム時に静的ページを作成または更新する方法を学びます。
+---
+
+<details>
+  <summary>例</summary>
+
+- [Next.js Commerce](https://nextjs.org/commerce)
+- [GitHub Reactions デモ](https://reactions-demo.vercel.app/)
+- [Static Tweet デモ](https://static-tweet.vercel.app/)
+
+</details>
+
+Next.jsでは、サイトをビルドした**後**でも静的ページを作成または更新できます。インクリメンタル静的再生成 (ISR) を使用すると、**サイト全体を再ビルドする必要なく**、ページ単位で静的生成を利用できます。ISRを使用することで、静的生成の利点を維持しながら数百万ページにスケールできます。
+
+> **補足**: 現在、[`edge`ランタイム](/docs/pages/api-reference/edge)はISRと互換性がありませんが、`cache-control`ヘッダーを手動で設定することで`stale-while-revalidate`を活用できます。
+
+ISRを使用するには、`getStaticProps`に`revalidate`プロパティを追加します:
+
+```jsx
+function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+// この関数はサーバーサイドでビルド時に呼び出されます。
+// 再検証が有効で新しいリクエストがある場合、
+// サーバーレス関数で再度呼び出される可能性があります
+export async function getStaticProps() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  return {
+    props: {
+      posts,
+    },
+    // Next.jsはページの再生成を試みます:
+    // - リクエストがあるとき
+    // - 最大10秒に1回
+    revalidate: 10, // 秒単位
+  }
+}
+
+// この関数はサーバーサイドでビルド時に呼び出されます。
+// パスが生成されていない場合、
+// サーバーレス関数で再度呼び出される可能性があります
+export async function getStaticPaths() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // 投稿に基づいてプリレンダリングするパスを取得
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // ビルド時にこれらのパスのみプリレンダリングします。
+  // { fallback: 'blocking' }は、パスが存在しない場合
+  // オンデマンドでページをサーバーレンダリングします
+  return { paths, fallback: 'blocking' }
+}
+
+export default Blog
+```
+
+ビルド時にプリレンダリングされたページにリクエストがあると、最初はキャッシュされたページが表示されます。
+
+- 初期リクエスト後10秒以内のリクエストもキャッシュされ、即時に表示されます
+- 10秒の期間が過ぎると、次のリクエストでは依然としてキャッシュされた（古い）ページが表示されます
+- Next.jsはバックグラウンドでページの再生成をトリガーします
+- ページの生成が成功すると、Next.jsはキャッシュを無効化し、更新されたページを表示します。バックグラウンドでの再生成が失敗した場合、古いページは変更されません
+
+生成されていないパスへのリクエストがある場合、Next.jsは最初のリクエストでページをサーバーレンダリングします。以降のリクエストではキャッシュから静的ファイルが提供されます。Vercel上のISRは[キャッシュをグローバルに永続化し、ロールバックを処理します](https://vercel.com/docs/concepts/next.js/incremental-static-regeneration?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)。
+
+> **補足**: 上流のデータプロバイダーがデフォルトでキャッシュを有効にしているか確認してください。ISRキャッシュを更新するために新しいデータを取得するには、キャッシュを無効化（例: `useCdn: false`）する必要があるかもしれません。`Cache-Control`ヘッダーが返されると、CDNレベルでキャッシュが発生する可能性があります。
+
+## オンデマンド再検証
+
+`revalidate`時間を`60`に設定すると、すべての訪問者は1分間同じ生成バージョンのサイトを見ることになります。キャッシュを無効化する唯一の方法は、1分が経過した後にそのページを訪問することです。
+
+`v12.2.0`から、Next.jsはオンデマンドインクリメンタル静的再生成をサポートしており、特定のページのNext.jsキャッシュを手動でパージできます。これは以下の場合にサイトを更新しやすくします:
+
+- ヘッドレスCMSからのコンテンツが作成または更新されたとき
+- 電子商取引のメタデータが変更されたとき（価格、説明、カテゴリ、レビューなど）
+
+`getStaticProps`内で、オンデマンド再検証を使用するために`revalidate`を指定する必要はありません。`revalidate`が省略されている場合、Next.jsはデフォルト値`false`（再検証なし）を使用し、`revalidate()`が呼び出されたときにのみオンデマンドでページを再検証します。
+
+> **補足**: [ミドルウェア](/docs/pages/building-your-application/routing/middleware)はオンデマンドISRリクエストでは実行されません。代わりに、再検証したい正確なパスで`revalidate()`を呼び出してください。例えば、`pages/blog/[slug].js`があり、`/post-1`から`/blog/post-1`へのリライトがある場合、`res.revalidate('/blog/post-1')`を呼び出す必要があります。
+
+### オンデマンド再検証の使用
+
+まず、Next.jsアプリのみが知る秘密トークンを作成します。この秘密は再検証APIルートへの不正アクセスを防ぐために使用されます。以下のURL構造で（手動またはウェブフック経由で）ルートにアクセスできます:
+
+```bash filename="ターミナル"
+https://<your-site.com>/api/revalidate?secret=<token>
+```
+
+次に、この秘密をアプリケーションの[環境変数](/docs/pages/building-your-application/configuring/environment-variables)として追加します。最後に、再検証APIルートを作成します:
+
+```js filename="pages/api/revalidate.js"
+export default async function handler(req, res) {
+  // 秘密を確認して有効なリクエストか検証
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: '無効なトークンです' })
+  }
+
+  try {
+    // これはリライトされたパスではなく実際のパスである必要があります
+    // 例: "/blog/[slug]"の場合は"/blog/post-1"
+    await res.revalidate('/path-to-revalidate')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // エラーが発生した場合、Next.jsは最後に正常に生成された
+    // ページを表示し続けます
+    return res.status(500).send('再検証中にエラーが発生しました')
+  }
+}
+```
+
+[デモを確認](https://on-demand-isr.vercel.app)してオンデマンド再検証の動作を確認し、フィードバックを提供してください。
+
+### 開発中のオンデマンドISRテスト
+
+`next dev`でローカル実行する場合、`getStaticProps`はすべてのリクエストで呼び出されます。オンデマンドISR設定が正しいことを確認するには、[本番ビルド](/docs/pages/api-reference/cli/next#next-build-options)を作成し、[本番サーバー](/docs/pages/api-reference/cli/next#next-start-options)を起動する必要があります:
+
+```bash filename="ターミナル"
+$ next build
+$ next start
+```
+
+その後、静的ページが正常に再検証されたことを確認できます。
+
+## エラー処理と再検証
+
+バックグラウンド再生成中に`getStaticProps`内でエラーが発生した場合、または手動でエラーをスローした場合、最後に正常に生成されたページが表示され続けます。次のリクエストでは、Next.jsは`getStaticProps`の呼び出しを再試行します。
+
+```jsx
+export async function getStaticProps() {
+  // このリクエストがキャッチされないエラーをスローした場合、
+  // Next.jsは現在表示されているページを無効化せず、
+  // 次のリクエストでgetStaticPropsを再試行します
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  if (!res.ok) {
+    // サーバーエラーがある場合、キャッシュが更新されないように
+    // 返す代わりにエラーをスローすることを検討してください
+    throw new Error(`投稿の取得に失敗しました、ステータスコード ${res.status}`)
+  }
+
+  // リクエストが成功した場合、投稿を返し、
+  // 10秒ごとに再検証します
+  return {
+    props: {
+      posts,
+    },
+    revalidate: 10,
+  }
+}
+```
+
+## セルフホスティングISR
+
+インクリメンタル静的再生成 (ISR) は、`next start`を使用する場合、[セルフホスティングNext.jsサイト](/docs/pages/building-your-application/deploying#self-hosting)でそのまま動作します。
+
+[Next.jsのセルフホスティング](/docs/pages/building-your-application/deploying#self-hosting)について詳しく学んでください。
+
+## バージョン履歴
+
+| バージョン   | 変更点                                                                                 |
+| --------- | --------------------------------------------------------------------------------------- |
+| `v14.1.0` | カスタム`cacheHandler`が安定版になりました。                                                        |
+| `v12.2.0` | オンデマンドISRが安定版になりました                                                                 |
+| `v12.1.0` | オンデマンドISRが追加されました（ベータ）。                                                             |
+| `v12.0.0` | [ボット対応ISRフォールバック](https://nextjs.org/blog/next-12#bot-aware-isr-fallback)が追加されました。 |
+| `v9.5.0`  | ベースパスが追加されました。                                                                        |

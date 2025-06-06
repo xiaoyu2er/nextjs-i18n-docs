@@ -1,0 +1,143 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:12:00.216Z
+title: 認証
+description: Next.jsアプリケーションにおける認証パターンについて学び、いくつかの例を確認します。
+---
+
+認証（Authentication）はユーザーが誰であるかを確認し、認可（Authorization）はユーザーがアクセスできる内容を制御します。Next.jsはさまざまな認証パターンをサポートしており、それぞれ異なるユースケースに対応しています。このページでは各ケースについて説明し、制約条件に基づいて選択できるようにします。
+
+## 認証パターン
+
+適切な認証パターンを特定する最初のステップは、使用したい[データ取得戦略](/docs/pages/building-your-application/data-fetching)を理解することです。その後、この戦略をサポートする認証プロバイダーを決定できます。主に2つのパターンがあります:
+
+- [静的生成（Static Generation）](/docs/pages/building-your-application/rendering/static-site-generation)を使用してサーバー側でローディング状態をレンダリングし、その後クライアントサイドでユーザーデータを取得する
+- ユーザーデータを[サーバーサイド（Server-side）](/docs/pages/building-your-application/rendering/server-side-rendering)で取得し、未認証コンテンツのちらつきを防ぐ
+
+### 静的生成ページの認証
+
+Next.jsは、ブロッキングデータ要件がない場合、ページが静的であると自動的に判断します。これはページ内に[`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)や`getInitialProps`が存在しないことを意味します。代わりに、サーバーからローディング状態をレンダリングし、その後クライアントサイドでユーザーを取得できます。
+
+このパターンの利点の1つは、ページをグローバルCDNから配信し、[`next/link`](/docs/pages/api-reference/components/link)を使用してプリロードできることです。実際には、これによりTTI（[Time to Interactive](https://web.dev/interactive/)が向上します。
+
+プロフィールページの例を見てみましょう。最初にローディングスケルトンを表示し、ユーザーリクエストが完了するとユーザー名を表示します:
+
+```jsx filename="pages/profile.js"
+import useUser from '../lib/useUser'
+import Layout from '../components/Layout'
+
+const Profile = () => {
+  // クライアントサイドでユーザーを取得
+  const { user } = useUser({ redirectTo: '/login' })
+
+  // サーバー側でローディング状態をレンダリング
+  if (!user || user.isLoggedIn === false) {
+    return <Layout>Loading...</Layout>
+  }
+
+  // ユーザーリクエスト完了後、ユーザーを表示
+  return (
+    <Layout>
+      <h1>Your Profile</h1>
+      <pre>{JSON.stringify(user, null, 2)}</pre>
+    </Layout>
+  )
+}
+
+export default Profile
+```
+
+この[動作例](https://iron-session-example.vercel.app/)を確認できます。[`with-iron-session`](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session)の例で実際の動作を確認してください。
+
+### サーバーサイドレンダリングページの認証
+
+ページから`async`関数[`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)をエクスポートすると、Next.jsは各リクエスト時に`getServerSideProps`から返されたデータを使用してページをプリレンダリングします。
+
+```jsx
+export async function getServerSideProps(context) {
+  return {
+    props: {}, // ページコンポーネントにpropsとして渡されます
+  }
+}
+```
+
+プロフィール例を[サーバーサイドレンダリング（SSR）](/docs/pages/building-your-application/rendering/server-side-rendering)を使用するように変更してみましょう。セッションがある場合、ページ内の`Profile`コンポーネントに`user`をpropsとして渡します。[この例](https://iron-session-example.vercel.app/)ではローディングスケルトンがありません。
+
+```jsx filename="pages/profile.js"
+import withSession from '../lib/session'
+import Layout from '../components/Layout'
+
+export const getServerSideProps = withSession(async function ({ req, res }) {
+  const { user } = req.session
+
+  if (!user) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    }
+  }
+
+  return {
+    props: { user },
+  }
+})
+
+const Profile = ({ user }) => {
+  // ユーザーを表示。ローディング状態は不要
+  return (
+    <Layout>
+      <h1>Your Profile</h1>
+      <pre>{JSON.stringify(user, null, 2)}</pre>
+    </Layout>
+  )
+}
+
+export default Profile
+```
+
+このパターンの利点は、リダイレクト前に未認証コンテンツがちらつくのを防げることです。`getServerSideProps`でユーザーデータを取得すると、認証プロバイダーへのリクエストが解決するまでレンダリングがブロックされることに注意してください。ボトルネックを作成しTTFB（[Time to First Byte](https://web.dev/time-to-first-byte/)を増加させないためには、認証ルックアップを高速化する必要があります。そうでない場合は、[静的生成](#authenticating-statically-generated-pages)を検討してください。
+
+## 認証プロバイダー
+
+認証パターンについて説明したので、特定のプロバイダーとNext.jsでの使用方法を見てみましょう。
+
+### 独自データベースの使用
+
+<details open>
+  <summary>例</summary>
+
+- [with-iron-session](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session)
+- [next-auth-example](https://github.com/nextauthjs/next-auth-example)
+
+</details>
+
+ユーザーデータを含む既存のデータベースがある場合、プロバイダーに依存しないオープンソースソリューションを利用すると良いでしょう。
+
+- 低レベルで暗号化されたステートレスなセッション機能が必要な場合は[`iron-session`](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session)を使用
+- 組み込みプロバイダー（Google、Facebook、GitHubなど）、JWT、JWE、メール/パスワード、マジックリンクなど包括的な認証システムが必要な場合は[`next-auth`](https://github.com/nextauthjs/next-auth-example)を使用
+
+これらのライブラリはどちらも認証パターンをサポートしています。[Passport](http://www.passportjs.org/)に興味がある場合は、安全で暗号化されたクッキーを使用した例もあります:
+
+- [with-passport](https://github.com/vercel/next.js/tree/canary/examples/with-passport)
+- [with-passport-and-next-connect](https://github.com/vercel/next.js/tree/canary/examples/with-passport-and-next-connect)
+
+### その他のプロバイダー
+
+他の認証プロバイダーの例については、[examplesフォルダ](https://github.com/vercel/next.js/tree/canary/examples)を確認してください。
+
+<details open>
+  <summary>例</summary>
+
+- [Auth0](https://github.com/vercel/next.js/tree/canary/examples/auth0)
+- [Clerk](https://github.com/vercel/next.js/tree/canary/examples/with-clerk)
+- [Firebase](https://github.com/vercel/next.js/tree/canary/examples/with-firebase-authentication)
+- [Magic](https://github.com/vercel/next.js/tree/canary/examples/with-magic)
+- [Nhost](https://github.com/vercel/next.js/tree/canary/examples/with-nhost-auth-realtime-graphql)
+- [Ory](https://github.com/vercel/examples/tree/main/solutions/auth-with-ory)
+- [Supabase](https://github.com/vercel/next.js/tree/canary/examples/with-supabase)
+- [Supertokens](https://github.com/vercel/next.js/tree/canary/examples/with-supertokens)
+- [Userbase](https://github.com/vercel/next.js/tree/canary/examples/with-userbase)
+
+</details>

@@ -1,0 +1,145 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:09:04.210Z
+title: プロダクション環境への移行
+description: Next.jsアプリケーションをプロダクション環境に移行する前に、最適なユーザー体験を確保するための推奨事項をご紹介します。
+---
+
+Next.jsアプリケーションをプロダクション環境に移行する前に、最適なユーザー体験を確保するための推奨事項をご紹介します。
+
+## 一般的な推奨事項
+
+- 可能な限り[キャッシュ](#caching)を活用する
+- データベースとバックエンドを同じリージョンにデプロイする
+- JavaScriptのサイズを可能な限り最小化する
+- 重いJavaScriptバンドルの読み込みを必要時まで遅延させる
+- [ロギング](#logging)が適切に設定されていることを確認する
+- [エラーハンドリング](#error-handling)が適切に設定されていることを確認する
+- [404（ページが見つかりません）](/docs/pages/building-your-application/routing/custom-error#404-page)と[500（エラー）ページ](/docs/pages/building-your-application/routing/custom-error#500-page)を設定する
+- [パフォーマンス計測](/docs/pages/building-your-application/optimizing/analytics)を実施する
+- [Lighthouse](https://developers.google.com/web/tools/lighthouse)を実行してパフォーマンス、ベストプラクティス、アクセシビリティ、SEOを確認する。最適な結果を得るには、Next.jsのプロダクションビルドを使用し、ブラウザのシークレットモードで実行して拡張機能の影響を受けないようにする
+- [サポート対象のブラウザと機能](/docs/architecture/supported-browsers)を確認する
+- 以下の機能を使用してパフォーマンスを向上させる:
+  - [`next/image`と自動画像最適化](/docs/pages/building-your-application/optimizing/images)
+  - [自動フォント最適化](/docs/pages/building-your-application/optimizing/fonts)
+  - [スクリプト最適化](/docs/pages/building-your-application/optimizing/scripts)
+- [読み込みパフォーマンス](#loading-performance)を改善する
+- [コンテンツセキュリティポリシー](/docs/pages/building-your-application/configuring/content-security-policy)の追加を検討する
+
+## キャッシュ
+
+<details open>
+  <summary>例</summary>
+
+- [ssr-caching](https://github.com/vercel/next.js/tree/canary/examples/ssr-caching)
+
+</details>
+
+キャッシュを活用することで応答時間を改善し、外部サービスへのリクエスト数を削減できます。Next.jsは自動的に`/_next/static`から配信されるJavaScript、CSS、静的画像、その他のメディアに対して不変のキャッシュヘッダーを追加します。
+
+```terminal
+Cache-Control: public, max-age=31536000, immutable
+```
+
+`next.config.js`で設定した`Cache-Control`ヘッダーは、静的アセットが効果的にキャッシュされるようにプロダクション環境で上書きされます。[静的生成](/docs/pages/building-your-application/rendering/static-site-generation)されたページのキャッシュを再検証する必要がある場合は、ページの[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)関数で`revalidate`を設定できます。`next/image`を使用している場合、デフォルトの画像最適化ローダーに対して[`minimumCacheTTL`](/docs/pages/api-reference/components/image#minimumcachettl)を設定できます。
+
+> **豆知識**: `next dev`でアプリケーションをローカルで実行する場合、キャッシュを防ぐためにヘッダーが上書きされます。
+
+```terminal
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+```
+
+動的なレスポンスに対して`getServerSideProps`やAPIルート内でキャッシュヘッダーを使用することもできます。例えば、[`stale-while-revalidate`](https://web.dev/stale-while-revalidate/)を使用します。
+
+```jsx
+// この値は10秒間新鮮とみなされます（s-maxage=10）。
+// 次の10秒以内にリクエストが繰り返されると、以前にキャッシュされた値がまだ新鮮な状態で使用されます。
+// 59秒以内にリクエストが繰り返されると、キャッシュされた値は古くなりますが、まだ表示されます（stale-while-revalidate=59）。
+//
+// バックグラウンドで、キャッシュを新しい値で更新するための再検証リクエストが行われます。
+// ページを更新すると、新しい値が表示されます。
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+デフォルトでは、データの取得方法に応じて`Cache-Control`ヘッダーが異なる方法で設定されます。
+
+- ページが`getServerSideProps`または`getInitialProps`を使用している場合、キャッシュできないレスポンスの誤ったキャッシュを防ぐために、`next start`で設定されたデフォルトの`Cache-Control`ヘッダーが使用されます。`getServerSideProps`を使用しながら異なるキャッシュ動作を希望する場合は、上記のように関数内で`res.setHeader('Cache-Control', '希望する値')`を使用します。
+- ページが`getStaticProps`を使用している場合、`revalidate`が使用されていれば`s-maxage=REVALIDATE_SECONDS, stale-while-revalidate`、使用されていなければ`s-maxage=31536000, stale-while-revalidate`という`Cache-Control`ヘッダーが設定され、可能な限り長期間キャッシュされます。
+
+> **豆知識**: 動的なレスポンスのキャッシュをサポートするには、デプロイプロバイダーがキャッシュをサポートしている必要があります。セルフホスティングの場合、Redisのようなキーバリューストアを使用してこのロジックを自分で追加する必要があります。Vercelを使用している場合、[設定なしでエッジキャッシュが機能します](https://vercel.com/docs/edge-network/caching?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)。
+
+## JavaScriptサイズの削減
+
+<details open>
+  <summary>例</summary>
+
+- [with-dynamic-import](https://github.com/vercel/next.js/tree/canary/examples/with-dynamic-import)
+
+</details>
+
+ブラウザに送信されるJavaScriptの量を削減するために、各JavaScriptバンドルに含まれる内容を理解する以下のツールを使用できます:
+
+- [Import Cost](https://marketplace.visualstudio.com/items?itemName=wix.vscode-import-cost) - VSCode内でインポートされたパッケージのサイズを表示
+- [Package Phobia](https://packagephobia.com/) - プロジェクトに新しいdev依存関係を追加するコストを調査
+- [Bundle Phobia](https://bundlephobia.com/) - 依存関係がバンドルサイズに与える影響を分析
+- [Webpack Bundle Analyzer](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer) - Webpackの出力ファイルサイズをインタラクティブなズーム可能なツリーマップで可視化
+- [bundlejs](https://bundlejs.com/) - プロジェクトを迅速にバンドル＆ミニファイし、圧縮されたgzip/brotliバンドルサイズを表示するオンラインツール
+
+`next build`時に、`pages/`ディレクトリ内の各ファイルは自動的に独自のJavaScriptバンドルにコード分割されます。[動的インポート](/docs/pages/building-your-application/optimizing/lazy-loading)を使用して、コンポーネントやライブラリの遅延読み込みも可能です。例えば、モーダルコードの読み込みをユーザーが開くボタンをクリックするまで遅延させることができます。
+
+## ロギング
+
+<details open>
+  <summary>例</summary>
+
+- [PinoとLogflareの例](https://github.com/Logflare/next-pino-logflare-logging-example)
+
+</details>
+
+Next.jsはクライアントとサーバーの両方で実行されるため、複数の形式のロギングがサポートされています:
+
+- ブラウザでの`console.log`
+- サーバーでの`stdout`
+
+構造化ロギングパッケージが必要な場合は、[Pino](https://www.npmjs.com/package/pino)をお勧めします。Vercelを使用している場合、Next.jsと互換性のある[事前構築済みのロギング統合](https://vercel.com/integrations?utm_source=next-site&utm_medium=docs&utm_campaign=next-website#logging)があります。
+
+## エラーハンドリング
+
+<details open>
+  <summary>例</summary>
+
+- [with-sentry](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)
+
+</details>
+
+未処理の例外が発生した場合、[500ページ](/docs/pages/building-your-application/routing/custom-error#500-page)を使用してユーザー体験を制御できます。Next.jsのデフォルトテーマではなく、ブランドに合わせてカスタマイズすることをお勧めします。
+
+Sentryのようなツールを使用して例外を記録・追跡することもできます。[この例](https://github.com/vercel/next.js/tree/canary/examples/with-sentry)では、Next.js用のSentry SDKを使用してクライアント側とサーバー側の両方でエラーをキャッチ・報告する方法を示しています。また、[Vercel向けのSentry統合](https://vercel.com/integrations/sentry?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)もあります。
+
+## 読み込みパフォーマンス
+
+読み込みパフォーマンスを改善するには、まず何を測定し、どのように測定するかを決定する必要があります。[Core Web Vitals](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)は、自身のWebブラウザを使用して測定される優れた業界標準です。Core Web Vitalsのメトリクスに慣れていない場合は、この[ブログ記事](https://vercel.com/blog/core-web-vitals?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)を確認し、読み込みパフォーマンスのドライバーとなる特定のメトリクスを決定してください。理想的には、以下の環境で読み込みパフォーマンスを測定したいでしょう:
+
+- ラボ環境: 自身のコンピュータまたはシミュレータを使用
+- フィールド環境: 実際の訪問者からの実世界のデータを使用
+- ローカル環境: デバイス上で実行されるテストを使用
+- リモート環境: クラウドで実行されるテストを使用
+
+読み込みパフォーマンスを測定できるようになったら、以下の戦略を使用して反復的に改善を行います。1つの戦略を適用し、新しいパフォーマンスを測定し、改善が見られなくなるまで調整を続けます。その後、次の戦略に移行できます。
+
+- データベースやAPIがデプロイされているリージョンに近いキャッシュリージョンを使用する
+- [キャッシュ](#caching)セクションで説明したように、バックエンドに過負荷をかけない`stale-while-revalidate`値を使用する
+- [増分的静的再生成](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)を使用してバックエンドへのリクエスト数を削減する
+- 未使用のJavaScriptを削除する。この[ブログ記事](https://calibreapp.com/blog/bundle-size-optimization)を確認して、Core Web Vitalsのメトリクスにバンドルサイズがどのように影響するか、および以下のような削減戦略を理解する:
+  - インポートコストとサイズを表示するようにコードエディタを設定
+  - より小さい代替パッケージを探す
+  - コンポーネントと依存関係を動的に読み込む

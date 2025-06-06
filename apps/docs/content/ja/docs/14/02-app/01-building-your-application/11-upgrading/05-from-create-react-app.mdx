@@ -1,0 +1,550 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:52:50.522Z
+title: Create React App からの移行
+description: 既存の React アプリケーションを Create React App から Next.js に移行する方法を学びます。
+---
+
+このガイドでは、既存の Create React App サイトを Next.js に移行する手順を説明します。
+
+## 移行する理由
+
+Create React App から Next.js に移行する主な理由は次のとおりです:
+
+### 初期ページ読み込みの遅さ
+
+Create React App はクライアントサイドのみの React を使用しています。クライアントサイドのみのアプリケーション（SPA: シングルページアプリケーション）では、初期ページの読み込みが遅くなる傾向があります。これには主に2つの理由があります:
+
+1. ブラウザは、データ読み込みリクエストを送信する前に、React コードとアプリケーション全体のバンドルをダウンロードして実行する必要があります。
+2. 新しい機能や依存関係を追加するたびにアプリケーションコードが肥大化します。
+
+### 自動コード分割の欠如
+
+読み込み時間の遅さの問題は、コード分割である程度軽減できます。しかし、手動でコード分割を実施すると、かえってパフォーマンスが悪化する可能性があります。手動でのコード分割では、ネットワークウォーターフォールを意図せず導入してしまうことがあります。Next.js にはルーターに組み込まれた自動コード分割機能があります。
+
+### ネットワークウォーターフォール
+
+パフォーマンス低下の一般的な原因は、アプリケーションがデータ取得のためにクライアント-サーバー間で順次リクエストを行うことです。SPA でのデータ取得の一般的なパターンは、最初にプレースホルダーをレンダリングし、コンポーネントがマウントされた後にデータを取得する方法です。残念ながら、この方法では、データを取得する子コンポーネントは、親コンポーネントが自身のデータの読み込みを完了するまでデータ取得を開始できません。
+
+Next.js でもクライアントサイドでのデータ取得はサポートされていますが、サーバーサイドにデータ取得を移行するオプションも提供されており、クライアント-サーバー間のウォーターフォールを解消できます。
+
+### 高速で意図的なローディング状態
+
+[React Suspense を使ったストリーミング](/docs/app/building-your-application/routing/loading-ui-and-streaming#streaming-with-suspense)の組み込みサポートにより、UI のどの部分をどの順序で最初に読み込むかをより意図的に制御でき、ネットワークウォーターフォールを導入せずに実現できます。
+
+これにより、読み込みが速く[レイアウトシフト](https://vercel.com/blog/how-core-web-vitals-affect-seo)のないページを構築できます。
+
+### データ取得戦略の選択
+
+Next.js では、ページやコンポーネントごとにデータ取得戦略を選択できます。ビルド時、サーバーでのリクエスト時、クライアントサイドでの取得など、ニーズに応じて選択可能です。例えば、CMS からデータを取得してブログ記事をビルド時にレンダリングし、CDN で効率的にキャッシュすることができます。
+
+### ミドルウェア
+
+[Next.js ミドルウェア](/docs/app/building-your-application/routing/middleware)を使用すると、リクエストが完了する前にサーバー上でコードを実行できます。これは特に、認証が必要なページにユーザーがアクセスした際に未認証コンテンツが一瞬表示されるのを防ぎ、ログインページにリダイレクトする場合に有用です。また、ミドルウェアは実験や[国際化](/docs/app/building-your-application/routing/internationalization)にも役立ちます。
+
+### 組み込み最適化
+
+[画像](/docs/app/building-your-application/optimizing/images)、[フォント](/docs/app/building-your-application/optimizing/fonts)、[サードパーティスクリプト](/docs/app/building-your-application/optimizing/scripts)は、アプリケーションのパフォーマンスに大きな影響を与えることが多いです。Next.js にはこれらのリソースを自動的に最適化する組み込みコンポーネントが含まれています。
+
+## 移行手順
+
+この移行の目的は、できるだけ早く動作する Next.js アプリケーションを取得し、その後段階的に Next.js の機能を採用できるようにすることです。最初は、既存のルーターを移行せずに、純粋なクライアントサイドアプリケーション（SPA）として維持します。これにより、移行プロセス中に問題が発生する可能性を最小限に抑え、マージコンフリクトを減らすことができます。
+
+### ステップ1: Next.js 依存関係のインストール
+
+最初に `next` を依存関係としてインストールします:
+
+```bash filename="Terminal"
+npm install next@latest
+```
+
+### ステップ2: Next.js 設定ファイルの作成
+
+プロジェクトのルートに `next.config.mjs` を作成します。このファイルには [Next.js の設定オプション](/docs/app/api-reference/next-config-js)が含まれます。
+
+```js filename="next.config.mjs"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // シングルページアプリケーション（SPA）として出力
+  distDir: './dist', // ビルド出力ディレクトリを `./dist/` に変更
+}
+
+export default nextConfig
+```
+
+### ステップ3: TypeScript 設定の更新
+
+TypeScript を使用している場合、Next.js と互換性を持たせるために `tsconfig.json` ファイルを次のように更新します:
+
+```json filename="tsconfig.json"
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "strictNullChecks": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "./dist/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}
+```
+
+TypeScript の設定について詳しくは [Next.js ドキュメント](/docs/app/building-your-application/configuring/typescript#typescript-plugin)を参照してください。
+
+### ステップ4: ルートレイアウトの作成
+
+Next.js の [App Router](/docs/app) アプリケーションには、アプリケーション内のすべてのページをラップする [ルートレイアウト](/docs/app/building-your-application/routing/pages-and-layouts#root-layout-required) ファイル（[React Server Component](/docs/app/building-your-application/rendering/server-components)）を含める必要があります。このファイルは `app` ディレクトリの最上位レベルに定義されます。
+
+CRA アプリケーションでルートレイアウトファイルに最も近いのは、`<html>`、`<head>`、`<body>` タグを含む `index.html` ファイルです。
+
+このステップでは、`index.html` ファイルをルートレイアウトファイルに変換します:
+
+1. `src` ディレクトリ内に新しい `app` ディレクトリを作成します。
+2. その `app` ディレクトリ内に新しい `layout.tsx` ファイルを作成します:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return null
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return null
+}
+```
+
+> **補足**: レイアウトファイルには `.js`、`.jsx`、`.tsx` 拡張子を使用できます。
+
+`index.html` ファイルの内容を先ほど作成した `<RootLayout>` コンポーネントにコピーし、`body.div#root` と `body.script` タグを `<div id="root">{children}</div>` に置き換えます:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+> **補足**: [マニフェストファイル](/docs/app/api-reference/file-conventions/metadata)、favicon 以外のアイコン、[テスト設定](/docs/app/building-your-application/testing)についてはここでは無視しますが、Next.js でもこれらのオプションはサポートされています。
+
+### ステップ5: メタデータ
+
+Next.js にはデフォルトで [meta charset](https://developer.mozilla.org/docs/Web/HTML/Element/meta#charset) と [meta viewport](https://developer.mozilla.org/docs/Web/HTML/Viewport_meta_tag) タグが含まれているため、`<head>` からこれらを安全に削除できます:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+`favicon.ico`、`icon.png`、`robots.txt` などの [メタデータファイル](/docs/app/building-your-application/optimizing/metadata#file-based-metadata) は、`app` ディレクトリの最上位レベルに配置されている限り、自動的にアプリケーションの `<head>` タグに追加されます。[サポートされているすべてのファイル](/docs/app/building-your-application/optimizing/metadata#file-based-metadata) を `app` ディレクトリに移動した後、それらの `<link>` タグを安全に削除できます:
+
+```tsx filename="app/layout.tsx" switcher
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        <title>React App</title>
+        <meta name="description" content="Web site created..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+最後に、Next.js は [Metadata API](/docs/app/building-your-application/optimizing/metadata) を使用して最後の `<head>` タグを管理できます。最終的なメタデータ情報をエクスポートされた [`metadata` オブジェクト](/docs/app/api-reference/functions/generate-metadata#metadata-object) に移動します:
+
+```tsx filename="app/layout.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'React App',
+  description: 'Web site created with Next.js.',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+export const metadata = {
+  title: 'React App',
+  description: 'Web site created with Next.js.',
+}
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+上記の変更により、`index.html` ですべてを宣言する方法から、フレームワークに組み込まれた Next.js の規約ベースのアプローチ（[Metadata API](/docs/app/building-your-application/optimizing/metadata)）に移行しました。このアプローチにより、ページの SEO と Web 共有性をより簡単に向上させることができます。
+
+### ステップ6: スタイル
+
+Create React App と同様に、Next.js には [CSS Modules](/docs/app/building-your-application/styling/css-modules) の組み込みサポートがあります。
+
+グローバル CSS ファイルを使用している場合は、`app/layout.tsx` ファイルにインポートします:
+
+```tsx filename="app/layout.tsx" switcher
+import '../index.css'
+
+// ...
+```
+
+Tailwind を使用している場合は、`postcss` と `autoprefixer` をインストールする必要があります:
+
+```bash filename="Terminal"
+npm install postcss autoprefixer
+```
+
+次に、プロジェクトのルートに `postcss.config.js` ファイルを作成します:
+
+```js filename="postcss.config.js"
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+```
+
+### ステップ7: エントリポイントページの作成
+
+Next.js では、`page.tsx` ファイルを作成することでアプリケーションのエントリポイントを宣言します。CRA でこれに最も近いのは `src/index.tsx` ファイルです。このステップでは、アプリケーションのエントリポイントを設定します。
+
+**`app` ディレクトリ内に `[[...slug]]` ディレクトリを作成します。**
+
+このガイドでは最初に Next.js を SPA（シングルページアプリケーション）として設定することを目的としているため、アプリケーションのすべてのルートをキャッチするページエントリポイントが必要です。そのために、`app` ディレクトリ内に新しい `[[...slug]]` ディレクトリを作成します。
+
+このディレクトリは [オプションのキャッチオールルートセグメント](/docs/app/building-your-application/routing/dynamic-routes#optional-catch-all-segments) と呼ばれます。Next.js は [ディレクトリを使用してルートを定義する](/docs/app/building-your-application/routing/defining-routes#creating-routes) ファイルシステムベースのルーターを使用しています。この特別なディレクトリにより、アプリケーションのすべてのルートが含まれる `page.tsx` ファイルに確実に誘導されます。
+
+**`app/[[...slug]]` ディレクトリ内に新しい `page.tsx` ファイルを作成し、次の内容を記述します:**
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // 後で更新します
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // 後で更新します
+}
+```
+
+このファイルは [Server Component](/docs/app/building-your-application/rendering/server-components) です。`next build` を実行すると、このファイルは静的アセットにプリレンダリングされます。動的コードは _必要ありません_。
+
+このファイルはグローバル CSS をインポートし、[`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params) に対して `/` のインデックスルートのみを生成することを伝えます。
+
+次に、クライアントのみで実行される CRA アプリケーションの残りの部分を移動します。
+
+```tsx filename="app/[[...slug]]/client.tsx" switcher
+'use client'
+
+import React from 'react'
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+```jsx filename="app/[[...slug]]/client.js" switcher
+'use client'
+
+import React from 'react'
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+このファイルは `'use client'` ディレクティブで定義された [Client Component](/docs/app/building-your-application/rendering/client-components) です。Client Component は、クライアントに送信される前にサーバー上で [HTML にプリレンダリングされます](/docs/app/building-your-application/rendering/client-components#how-are-client-components-rendered)。
+
+最初はクライアントのみのアプリケーションを開始したいので、`App` コンポーネント以下のプリレンダリングを無効にするように Next.js を設定できます。
+
+```tsx
+const App = dynamic(() => import('../../App'), { ssr: false })
+```
+
+次に、エントリポイントページを新しいコンポーネントを使用するように更新します:
+
+```tsx filename="app/[[...slug]]/page.tsx" switcher
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+```jsx filename="app/[[...slug]]/page.js" switcher
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+### ステップ8: 静的画像インポートの更新
+
+Next.jsでは静的画像のインポート処理がCRAと少し異なります。CRAでは画像ファイルをインポートすると公開URLが文字列として返されます:
+
+```tsx filename="App.tsx"
+import image from './img.png'
+
+export default function App() {
+  return <img src={image} />
+}
+```
+
+Next.jsでは、静的画像インポートはオブジェクトを返します。このオブジェクトはNext.jsの[`<Image>`コンポーネント](/docs/app/api-reference/components/image)で直接使用できるほか、既存の`<img>`タグでオブジェクトの`src`プロパティを使用することもできます。
+
+`<Image>`コンポーネントには[自動画像最適化](/docs/app/building-your-application/optimizing/images)という追加の利点があります。`<Image>`コンポーネントは画像の寸法に基づいて結果の`<img>`の`width`と`height`属性を自動的に設定します。これにより画像読み込み時のレイアウトシフトを防げます。ただし、片方の寸法のみがスタイリングされ、もう片方が`auto`にスタイリングされていない画像がある場合、問題が発生する可能性があります。`auto`にスタイリングされていない場合、その寸法は`<img>`のdimension属性の値にデフォルト設定され、画像が歪んで表示されることがあります。
+
+`<img>`タグを維持することでアプリケーションの変更量を減らし、上記の問題を防げます。その後、必要に応じて[ローダーの設定](/docs/app/building-your-application/optimizing/images#loaders)を行って`<Image>`コンポーネントに移行し、画像最適化を活用したり、自動画像最適化機能を持つデフォルトのNext.jsサーバーに移行したりできます。
+
+**`/public`からインポートした画像の絶対パスを相対インポートに変換:**
+
+```tsx
+// 変更前
+import logo from '/logo.png'
+
+// 変更後
+import logo from '../public/logo.png'
+```
+
+**`<img>`タグに画像オブジェクト全体ではなく`src`プロパティを渡す:**
+
+```tsx
+// 変更前
+<img src={logo} />
+
+// 変更後
+<img src={logo.src} />
+```
+
+あるいは、ファイル名に基づいて画像アセットの公開URLを参照することもできます。例えば、`public/logo.png`はアプリケーションで`/logo.png`として画像を提供し、これが`src`の値になります。
+
+> **警告:** TypeScriptを使用している場合、`src`プロパティにアクセスすると型エラーが発生する可能性があります。現時点ではこれらのエラーを無視して構いません。このガイドの最後までに修正されます。
+
+### ステップ9: 環境変数の移行
+
+Next.jsはCRAと同様に`.env`[環境変数](/docs/app/building-your-application/configuring/environment-variables)をサポートしています。
+
+主な違いは、クライアントサイドで環境変数を公開する際に使用するプレフィックスです。`REACT_APP_`プレフィックスのあるすべての環境変数を`NEXT_PUBLIC_`に変更してください。
+
+### ステップ10: `package.json`のスクリプト更新
+
+これでNext.jsへの移行が成功したかどうかをテストするためにアプリケーションを実行できるはずです。ただしその前に、`package.json`の`scripts`をNext.js関連のコマンドで更新し、`.next`、`next-env.d.ts`、`dist`を`.gitignore`ファイルに追加する必要があります:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+```txt filename=".gitignore"
+# ...
+.next
+next-env.d.ts
+dist
+```
+
+`npm run dev`を実行し、[`http://localhost:3000`](http://localhost:3000)を開きます。Next.jsで動作するアプリケーションが表示されるはずです。
+
+### ステップ11: クリーンアップ
+
+Create React Appに関連するアーティファクトをコードベースから削除できます:
+
+- `src/index.tsx`を削除
+- `public/index.html`を削除
+- `reportWebVitals`の設定を削除
+- CRAの依存関係(`react-scripts`)をアンインストール
+
+## バンドラーの互換性
+
+Create React AppとNext.jsはどちらもデフォルトでwebpackをバンドラーとして使用します。
+
+CRAアプリケーションをNext.jsに移行する際、移行したいカスタムwebpack設定があるかもしれません。Next.jsは[カスタムwebpack設定](/docs/app/api-reference/next-config-js/webpack)の提供をサポートしています。
+
+さらに、Next.jsは`next dev --turbo`を通じて[Turbopack](/docs/app/api-reference/next-config-js/turbo)をサポートしており、ローカル開発のパフォーマンスを向上させます。Turbopackは互換性と段階的な採用のためにいくつかの[webpackローダー](/docs/app/api-reference/next-config-js/turbo)もサポートしています。
+
+## 次のステップ
+
+すべてが計画通りに進んだ場合、現在シングルページアプリケーションとして動作するNext.jsアプリケーションができています。ただし、まだNext.jsの利点のほとんどを活用していませんが、増分的な変更を加えてすべての利点を得られるようになりました。次に行いたいこと:
+
+- React Routerから[Next.js App Router](/docs/app/building-your-application/routing)に移行して以下を取得:
+  - 自動コード分割
+  - [ストリーミングサーバーレンダリング](/docs/app/building-your-application/routing/loading-ui-and-streaming)
+  - [Reactサーバーコンポーネント](/docs/app/building-your-application/rendering/server-components)
+- [`<Image>`コンポーネントで画像を最適化](/docs/app/building-your-application/optimizing/images)
+- [`next/font`でフォントを最適化](/docs/app/building-your-application/optimizing/fonts)
+- [`<Script>`コンポーネントでサードパーティスクリプトを最適化](/docs/app/building-your-application/optimizing/scripts)
+- [ESLint設定を更新してNext.jsルールをサポート](/docs/app/building-your-application/configuring/eslint)
+
+> **豆知識:** 静的エクスポートを使用する場合、現在[`useParams`フックの使用はサポートされていません](https://github.com/vercel/next.js/issues/54393)。

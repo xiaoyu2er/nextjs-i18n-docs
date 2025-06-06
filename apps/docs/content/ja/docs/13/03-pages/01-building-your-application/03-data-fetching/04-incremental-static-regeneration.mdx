@@ -1,0 +1,199 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:11:01.813Z
+title: インクリメンタル静的再生成 (ISR)
+description: インクリメンタル静的再生成 (ISR) を使用して、ビルド後に静的ページを作成または更新する方法を学びます。
+---
+
+<details>
+  <summary>使用例</summary>
+
+- [Next.js Commerce](https://nextjs.org/commerce)
+- [GitHub Reactions デモ](https://reactions-demo.vercel.app/)
+- [Static Tweet デモ](https://static-tweet.vercel.app/)
+
+</details>
+
+Next.js では、サイトをビルドした**後**に静的ページを作成または更新できます。インクリメンタル静的再生成 (ISR) を使用すると、ページ単位で静的生成を利用可能で、**サイト全体を再ビルドする必要はありません**。ISR を活用することで、静的生成の利点を維持しながら数百万ページにスケールできます。
+
+> **補足**: 現在、[`edge` ランタイム](/docs/pages/api-reference/edge) は ISR と互換性がありませんが、`cache-control` ヘッダーを手動で設定することで `stale-while-revalidate` を利用できます。
+
+ISR を使用するには、`getStaticProps` に `revalidate` プロパティを追加します:
+
+```jsx
+function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+// この関数はビルド時にサーバーサイドで呼び出されます。
+// 再検証が有効で新しいリクエストがある場合、
+// サーバーレス関数で再度呼び出される可能性があります
+export async function getStaticProps() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  return {
+    props: {
+      posts,
+    },
+    // Next.js はページの再生成を試みます:
+    // - リクエストが来た時
+    // - 最大10秒に1回
+    revalidate: 10, // 秒単位
+  }
+}
+
+// この関数はビルド時にサーバーサイドで呼び出されます。
+// パスが生成されていない場合、
+// サーバーレス関数で再度呼び出される可能性があります
+export async function getStaticPaths() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // 投稿に基づいてプリレンダリングするパスを取得
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // ビルド時にこれらのパスのみをプリレンダリングします。
+  // { fallback: 'blocking' } は、パスが存在しない場合
+  // オンデマンドでページをサーバーレンダリングします
+  return { paths, fallback: 'blocking' }
+}
+
+export default Blog
+```
+
+ビルド時にプリレンダリングされたページにリクエストがあると、最初はキャッシュされたページが表示されます。
+
+- 最初のリクエスト後、10秒以内のすべてのリクエストもキャッシュされ、即時に表示されます
+- 10秒の期間が過ぎると、次のリクエストではキャッシュされた（古い）ページが表示されます
+- Next.js はバックグラウンドでページの再生成をトリガーします
+- ページの生成が成功すると、Next.js はキャッシュを無効化し、更新されたページを表示します。バックグラウンドでの再生成が失敗した場合、古いページは変更されません
+
+生成されていないパスへのリクエストがある場合、Next.js は最初のリクエストでページをサーバーレンダリングします。それ以降のリクエストでは、キャッシュから静的ファイルが提供されます。Vercel 上の ISR は [キャッシュをグローバルに保持し、ロールバックを処理します](https://vercel.com/docs/concepts/next.js/incremental-static-regeneration?utm_source=next-site&utm_medium=docs&utm_campaign=next-website)。
+
+> **補足**: 上流のデータプロバイダーがデフォルトでキャッシュを有効にしているか確認してください。ISR キャッシュを更新するために新しいデータを取得できるように、無効化（例: `useCdn: false`）する必要があるかもしれません。`Cache-Control` ヘッダーが返されると、CDN レベルでキャッシュが発生する場合があります。
+
+## オンデマンド再検証
+
+`revalidate` 時間を `60` に設定すると、すべての訪問者は1分間同じ生成バージョンのサイトを見ることになります。キャッシュを無効にする唯一の方法は、1分が経過した後に誰かがそのページを訪問することです。
+
+`v12.2.0` から、Next.js はオンデマンドインクリメンタル静的再生成をサポートし、特定のページの Next.js キャッシュを手動でパージできます。これにより、以下のような場合にサイトを簡単に更新できます:
+
+- ヘッドレス CMS からのコンテンツが作成または更新された時
+- 電子商取引のメタデータ（価格、説明、カテゴリ、レビューなど）が変更された時
+
+`getStaticProps` 内で、オンデマンド再検証を使用するために `revalidate` を指定する必要はありません。`revalidate` が省略されている場合、Next.js はデフォルト値 `false`（再検証なし）を使用し、`revalidate()` が呼び出された時のみオンデマンドでページを再検証します。
+
+> **補足**: [ミドルウェア](/docs/pages/building-your-application/routing/middleware) はオンデマンド ISR リクエストに対して実行されません。代わりに、再検証したい正確なパスで `revalidate()` を呼び出してください。例えば、`pages/blog/[slug].js` があり、`/post-1` から `/blog/post-1` へのリライトがある場合、`res.revalidate('/blog/post-1')` を呼び出す必要があります。
+
+### オンデマンド再検証の使用
+
+まず、Next.js アプリのみが知る秘密トークンを作成します。この秘密は、再検証 API ルートへの不正アクセスを防ぐために使用されます。以下の URL 構造でルートにアクセスできます（手動またはウェブフック経由）:
+
+```bash filename="ターミナル"
+https://<your-site.com>/api/revalidate?secret=<token>
+```
+
+次に、秘密をアプリケーションの[環境変数](/docs/pages/building-your-application/configuring/environment-variables)として追加します。最後に、再検証 API ルートを作成します:
+
+```js filename="pages/api/revalidate.js"
+export default async function handler(req, res) {
+  // 秘密を確認して有効なリクエストか検証
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: '無効なトークンです' })
+  }
+
+  try {
+    // これはリライトされたパスではなく実際のパスである必要があります
+    // 例: "/blog/[slug]" の場合は "/blog/post-1"
+    await res.revalidate('/path-to-revalidate')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // エラーが発生した場合、Next.js は最後に正常に
+    // 生成されたページを表示し続けます
+    return res.status(500).send('再検証エラー')
+  }
+}
+```
+
+[デモを確認](https://on-demand-isr.vercel.app)して、オンデマンド再検証の動作を確認し、フィードバックを提供してください。
+
+### 開発中のオンデマンド ISR テスト
+
+`next dev` でローカル実行する場合、`getStaticProps` はすべてのリクエストで呼び出されます。オンデマンド ISR 設定が正しいことを確認するには、[本番ビルド](/docs/pages/api-reference/next-cli#build)を作成し、[本番サーバー](/docs/pages/api-reference/next-cli#production)を起動する必要があります:
+
+```bash filename="ターミナル"
+$ next build
+$ next start
+```
+
+その後、静的ページが正常に再検証されたことを確認できます。
+
+## エラー処理と再検証
+
+バックグラウンド再生成中に `getStaticProps` 内でエラーが発生した場合、または手動でエラーをスローした場合、最後に正常に生成されたページが表示され続けます。次のリクエストでは、Next.js は `getStaticProps` の呼び出しを再試行します。
+
+```jsx
+export async function getStaticProps() {
+  // このリクエストで捕捉されないエラーが発生した場合、
+  // Next.js は現在表示されているページを無効化せず、
+  // 次のリクエストで getStaticProps を再試行します
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  if (!res.ok) {
+    // サーバーエラーがある場合、キャッシュが更新されないように
+    // 返す代わりにエラーをスローすることを検討してください
+    throw new Error(`投稿の取得に失敗しました、ステータスコード ${res.status}`)
+  }
+
+  // リクエストが成功した場合、投稿を返し、
+  // 10秒ごとに再検証します
+  return {
+    props: {
+      posts,
+    },
+    revalidate: 10,
+  }
+}
+```
+
+## セルフホスティング ISR
+
+インクリメンタル静的再生成 (ISR) は、`next start` を使用する場合、[セルフホストされた Next.js サイト](/docs/pages/building-your-application/deploying#self-hosting) でそのまま動作します。
+
+このアプローチは、[Kubernetes](https://kubernetes.io/) や [HashiCorp Nomad](https://www.nomadproject.io/) などのコンテナオーケストレーターにデプロイする場合に使用できます。デフォルトでは、生成されたアセットは各ポッドのメモリ内に保存されます。つまり、各ポッドには静的ファイルの独自のコピーがあります。その特定のポッドにリクエストが到達するまで、古いデータが表示される可能性があります。
+
+すべてのポッド間で一貫性を確保するには、メモリ内キャッシュを無効にできます。これにより、Next.js サーバーはファイルシステム内の ISR によって生成されたアセットのみを利用するようになります。
+
+Kubernetes ポッド（または類似の設定）で共有ネットワークマウントを使用して、異なるコンテナ間で同じファイルシステムキャッシュを再利用できます。同じマウントを共有することで、`next/image` キャッシュを含む `.next` フォルダも共有され、再利用されます。
+
+メモリ内キャッシュを無効にするには、`next.config.js` ファイルで `isrMemoryCacheSize` を `0` に設定します:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    // デフォルトは50MB
+    isrMemoryCacheSize: 0, // バイト単位のキャッシュサイズ
+  },
+}
+```
+
+> **補足**: 共有マウントの設定方法に応じて、複数のポッドが同時にキャッシュを更新しようとする競合状態を考慮する必要があるかもしれません。
+
+## バージョン履歴
+
+| バージョン   | 変更点                                                                                 |
+| --------- | --------------------------------------------------------------------------------------- |
+| `v12.2.0` | オンデマンド ISR が安定版に                                                             |
+| `v12.1.0` | オンデマンド ISR が追加（ベータ版）                                                     |
+| `v12.0.0` | [ボット対応 ISR フォールバック](https://nextjs.org/blog/next-12#bot-aware-isr-fallback) が追加 |
+| `v9.5.0`  | ベースパスが追加                                                                        |
