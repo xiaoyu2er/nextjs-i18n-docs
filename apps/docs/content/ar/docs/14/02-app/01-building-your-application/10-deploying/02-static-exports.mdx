@@ -1,0 +1,372 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:38:24.877Z
+title: التصدير الثابت
+description: يتيح Next.js البدء كموقع ثابت أو تطبيق صفحة واحدة (SPA)، ثم الترقية لاحقًا بشكل اختياري لاستخدام ميزات تتطلب خادمًا.
+---
+
+{/* The content of this doc is shared between the app and pages router. You can use the `<PagesOnly>Content</PagesOnly>` component to add content that is specific to the Pages Router. Any shared content should not be wrapped in a component. */}
+
+يتيح Next.js البدء كموقع ثابت أو تطبيق صفحة واحدة (SPA)، ثم الترقية لاحقًا بشكل اختياري لاستخدام ميزات تتطلب خادمًا.
+
+عند تشغيل `next build`، يقوم Next.js بإنشاء ملف HTML لكل مسار. من خلال تقسيم تطبيق SPA صارم إلى ملفات HTML فردية، يمكن لـ Next.js تجنب تحميل كود JavaScript غير الضروري على جانب العميل، مما يقلل حجم الحزمة ويُمكن من تحميل الصفحات بشكل أسرع.
+
+بما أن Next.js يدعم هذا التصدير الثابت، فيمكن نشره واستضافته على أي خادم ويب يمكنه تقديم أصول ثابتة من نوع HTML/CSS/JS.
+
+<PagesOnly>
+
+> **معلومة مفيدة**: نوصي باستخدام موجه التطبيق (App Router) لدعم محسن للتصدير الثابت.
+
+</PagesOnly>
+
+## التهيئة
+
+لتمكين التصدير الثابت، قم بتغيير وضع الإخراج داخل `next.config.js`:
+
+```js filename="next.config.js" highlight={5}
+/**
+ * @type {import('next').NextConfig}
+ */
+const nextConfig = {
+  output: 'export',
+
+  // اختياري: تغيير الروابط `/me` -> `/me/` وإنشاء `/me.html` -> `/me/index.html`
+  // trailingSlash: true,
+
+  // اختياري: منع التحويل التلقائي `/me` -> `/me/`، والحفاظ على `href` كما هو
+  // skipTrailingSlashRedirect: true,
+
+  // اختياري: تغيير دليل الإخراج `out` -> `dist`
+  // distDir: 'dist',
+}
+
+module.exports = nextConfig
+```
+
+بعد تشغيل `next build`، سينشئ Next.js مجلد `out` الذي يحتوي على أصول HTML/CSS/JS لتطبيقك.
+
+<PagesOnly>
+
+يمكنك استخدام [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) و [`getStaticPaths`](/docs/pages/building-your-application/data-fetching/get-static-paths) لإنشاء ملف HTML لكل صفحة في دليل `pages` الخاص بك (أو أكثر لـ [المسارات الديناميكية](/docs/app/building-your-application/routing/dynamic-routes)).
+
+</PagesOnly>
+
+<AppOnly>
+
+## الميزات المدعومة
+
+تم تصميم نواة Next.js لدعم التصدير الثابت.
+
+### مكونات الخادم
+
+عند تشغيل `next build` لإنشاء تصدير ثابت، ستتم معالجة مكونات الخادم المستهلكة داخل دليل `app` أثناء عملية البناء، بشكل مشابه لإنشاء المواقع الثابتة التقليدية.
+
+سيتم تقديم المكون الناتج إلى HTML ثابت لتحميل الصفحة الأولية وحمولة ثابتة للتنقل بين المسارات على العميل. لا توجد تغييرات مطلوبة لمكونات الخادم عند استخدام التصدير الثابت، إلا إذا كانت تستهلك [وظائف الخادم الديناميكية](#unsupported-features).
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  // سيتم تنفيذ هذا الـ fetch على الخادم أثناء `next build`
+  const res = await fetch('https://api.example.com/...')
+  const data = await res.json()
+
+  return <main>...</main>
+}
+```
+
+### مكونات العميل
+
+إذا كنت تريد تنفيذ جلب البيانات على العميل، يمكنك استخدام مكون عميل مع [SWR](https://github.com/vercel/swr) لتخزين الطلبات مؤقتًا.
+
+```tsx filename="app/other/page.tsx" switcher
+'use client'
+
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+export default function Page() {
+  const { data, error } = useSWR(
+    `https://jsonplaceholder.typicode.com/posts/1`,
+    fetcher
+  )
+  if (error) return 'Failed to load'
+  if (!data) return 'Loading...'
+
+  return data.title
+}
+```
+
+```jsx filename="app/other/page.js" switcher
+'use client'
+
+import useSWR from 'swr'
+
+const fetcher = (url) => fetch(url).then((r) => r.json())
+
+export default function Page() {
+  const { data, error } = useSWR(
+    `https://jsonplaceholder.typicode.com/posts/1`,
+    fetcher
+  )
+  if (error) return 'Failed to load'
+  if (!data) return 'Loading...'
+
+  return data.title
+}
+```
+
+نظرًا لأن انتقالات المسار تحدث على جانب العميل، فإن هذا يعمل مثل تطبيق SPA تقليدي. على سبيل المثال، يسمح مسار الفهرس التالي بالتنقل بين منشورات مختلفة على العميل:
+
+```tsx filename="app/page.tsx" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <>
+      <h1>Index Page</h1>
+      <hr />
+      <ul>
+        <li>
+          <Link href="/post/1">Post 1</Link>
+        </li>
+        <li>
+          <Link href="/post/2">Post 2</Link>
+        </li>
+      </ul>
+    </>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <>
+      <h1>Index Page</h1>
+      <p>
+        <Link href="/other">Other Page</Link>
+      </p>
+    </>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+## الميزات المدعومة
+
+يتم دعم معظم ميزات Next.js الأساسية اللازمة لبناء موقع ثابت، بما في ذلك:
+
+- [المسارات الديناميكية عند استخدام `getStaticPaths`](/docs/app/building-your-application/routing/dynamic-routes)
+- الجلب المسبق مع `next/link`
+- التحميل المسبق لـ JavaScript
+- [الاستيراد الديناميكي](/docs/pages/building-your-application/optimizing/lazy-loading)
+- أي خيارات للتنسيق (مثل وحدات CSS، styled-jsx)
+- [جلب البيانات من جانب العميل](/docs/pages/building-your-application/data-fetching/client-side)
+- [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)
+- [`getStaticPaths`](/docs/pages/building-your-application/data-fetching/get-static-paths)
+
+</PagesOnly>
+
+### تحسين الصور
+
+يمكن استخدام [تحسين الصور](/docs/app/building-your-application/optimizing/images) عبر `next/image` مع التصدير الثابت عن طريق تعريف محمل صور مخصص في `next.config.js`. على سبيل المثال، يمكنك تحسين الصور باستخدام خدمة مثل Cloudinary:
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export',
+  images: {
+    loader: 'custom',
+    loaderFile: './my-loader.ts',
+  },
+}
+
+module.exports = nextConfig
+```
+
+سيحدد هذا المحمل المخصص كيفية جلب الصور من مصدر بعيد. على سبيل المثال، سيقوم المحمل التالي ببناء عنوان URL لـ Cloudinary:
+
+```ts filename="my-loader.ts" switcher
+export default function cloudinaryLoader({
+  src,
+  width,
+  quality,
+}: {
+  src: string
+  width: number
+  quality?: number
+}) {
+  const params = ['f_auto', 'c_limit', `w_${width}`, `q_${quality || 'auto'}`]
+  return `https://res.cloudinary.com/demo/image/upload/${params.join(
+    ','
+  )}${src}`
+}
+```
+
+```js filename="my-loader.js" switcher
+export default function cloudinaryLoader({ src, width, quality }) {
+  const params = ['f_auto', 'c_limit', `w_${width}`, `q_${quality || 'auto'}`]
+  return `https://res.cloudinary.com/demo/image/upload/${params.join(
+    ','
+  )}${src}`
+}
+```
+
+يمكنك بعد ذلك استخدام `next/image` في تطبيقك، مع تحديد مسارات نسبية للصورة في Cloudinary:
+
+```tsx filename="app/page.tsx" switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return <Image alt="turtles" src="/turtles.jpg" width={300} height={300} />
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Image from 'next/image'
+
+export default function Page() {
+  return <Image alt="turtles" src="/turtles.jpg" width={300} height={300} />
+}
+```
+
+<AppOnly>
+
+### معالجات المسار
+
+ستقوم معالجات المسار (Route Handlers) بعرض استجابة ثابتة عند تشغيل `next build`. يتم دعم فعل HTTP `GET` فقط. يمكن استخدام هذا لإنشاء ملفات ثابتة من نوع HTML أو JSON أو TXT أو غيرها من البيانات المخزنة مؤقتًا أو غير المخزنة. على سبيل المثال:
+
+```ts filename="app/data.json/route.ts" switcher
+export async function GET() {
+  return Response.json({ name: 'Lee' })
+}
+```
+
+```js filename="app/data.json/route.js" switcher
+export async function GET() {
+  return Response.json({ name: 'Lee' })
+}
+```
+
+سيقوم الملف أعلاه `app/data.json/route.ts` بعرض ملف ثابت أثناء `next build`، منتجًا `data.json` يحتوي على `{ name: 'Lee' }`.
+
+إذا كنت بحاجة إلى قراءة قيم ديناميكية من الطلب الوارد، فلا يمكنك استخدام التصدير الثابت.
+
+### واجهات برمجة تطبيقات المتصفح
+
+يتم تقديم مكونات العميل مسبقًا إلى HTML أثناء `next build`. نظرًا لأن [واجهات برمجة تطبيقات الويب](https://developer.mozilla.org/docs/Web/API) مثل `window` و `localStorage` و `navigator` غير متوفرة على الخادم، فأنت بحاجة إلى الوصول إلى هذه الواجهات بأمان فقط عند التشغيل في المتصفح. على سبيل المثال:
+
+```jsx
+'use client';
+
+import { useEffect } from 'react';
+
+export default function ClientComponent() {
+  useEffect(() => {
+    // لديك الآن إمكانية الوصول إلى `window`
+    console.log(window.innerHeight);
+  }, [])
+
+  return ...;
+}
+```
+
+</AppOnly>
+
+## الميزات غير المدعومة
+
+الميزات التي تتطلب خادم Node.js، أو المنطق الديناميكي الذي لا يمكن حسابه أثناء عملية البناء، **غير** مدعومة:
+
+<AppOnly>
+
+- [المسارات الديناميكية](/docs/app/building-your-application/routing/dynamic-routes) مع `dynamicParams: true`
+- [المسارات الديناميكية](/docs/app/building-your-application/routing/dynamic-routes) بدون `generateStaticParams()`
+- [معالجات المسار](/docs/app/building-your-application/routing/route-handlers) التي تعتمد على Request
+- [الكوكيز](/docs/app/api-reference/functions/cookies)
+- [إعادة الكتابة](/docs/app/api-reference/next-config-js/rewrites)
+- [إعادة التوجيه](/docs/app/api-reference/next-config-js/redirects)
+- [الرؤوس](/docs/app/api-reference/next-config-js/headers)
+- [الوسيط](/docs/app/building-your-application/routing/middleware)
+- [التجديد الثابت التدريجي](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating)
+- [تحسين الصور](/docs/app/building-your-application/optimizing/images) مع المحمل الافتراضي `loader`
+- [وضع المسودة](/docs/app/building-your-application/configuring/draft-mode)
+
+سيؤدي محاولة استخدام أي من هذه الميزات مع `next dev` إلى حدوث خطأ، مشابهًا لتعيين الخيار [`dynamic`](/docs/app/api-reference/file-conventions/route-segment-config#dynamic) إلى `error` في تخطيط الجذر.
+
+```jsx
+export const dynamic = 'error'
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+- [التوجيه الدولي](/docs/pages/building-your-application/routing/internationalization)
+- [مسارات API](/docs/pages/building-your-application/routing/api-routes)
+- [إعادة الكتابة](/docs/pages/api-reference/next-config-js/rewrites)
+- [إعادة التوجيه](/docs/pages/api-reference/next-config-js/redirects)
+- [الرؤوس](/docs/pages/api-reference/next-config-js/headers)
+- [الوسيط](/docs/pages/building-your-application/routing/middleware)
+- [التجديد الثابت التدريجي](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration)
+- [تحسين الصور](/docs/pages/building-your-application/optimizing/images) مع المحمل الافتراضي `loader`
+- [وضع المسودة](/docs/pages/building-your-application/configuring/draft-mode)
+- [`getStaticPaths` مع `fallback: true`](/docs/pages/api-reference/functions/get-static-paths#fallback-true)
+- [`getStaticPaths` مع `fallback: 'blocking'`](/docs/pages/api-reference/functions/get-static-paths#fallback-blocking)
+- [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props)
+
+</PagesOnly>
+
+## النشر
+
+مع التصدير الثابت، يمكن نشر Next.js واستضافته على أي خادم ويب يمكنه تقديم أصول ثابتة من نوع HTML/CSS/JS.
+
+عند تشغيل `next build`، ينشئ Next.js التصدير الثابت في مجلد `out`. على سبيل المثال، لنفترض أن لديك المسارات التالية:
+
+- `/`
+- `/blog/[id]`
+
+بعد تشغيل `next build`، سينشئ Next.js الملفات التالية:
+
+- `/out/index.html`
+- `/out/404.html`
+- `/out/blog/post-1.html`
+- `/out/blog/post-2.html`
+
+إذا كنت تستخدم مضيفًا ثابتًا مثل Nginx، فيمكنك تكوين إعادة كتابة من الطلبات الواردة إلى الملفات الصحيحة:
+
+```nginx filename="nginx.conf"
+server {
+  listen 80;
+  server_name acme.com;
+
+  root /var/www/out;
+
+  location / {
+      try_files $uri $uri.html $uri/ =404;
+  }
+
+  # هذا ضروري عندما `trailingSlash: false`.
+  # يمكنك حذف هذا عندما `trailingSlash: true`.
+  location /blog/ {
+      rewrite ^/blog/(.*)$ /blog/$1.html break;
+  }
+
+  error_page 404 /404.html;
+  location = /404.html {
+      internal;
+  }
+}
+```
+
+## سجل الإصدارات
+
+| الإصدار   | التغييرات                                                                                                              |
+| --------- | -------------------------------------------------------------------------------------------------------------------- |
+| `v14.0.0` | تمت إزالة `next export` لصالح `"output": "export"`                                                      |
+| `v13.4.0` | أضاف موجه التطبيق (App Router) دعمًا محسنًا للتصدير الثابت، بما في ذلك استخدام مكونات خادم React ومعالجات المسار. |
+| `v13.3.0` | أصبح `next export` قديمًا واستُبدل بـ `"output": "export"`                                                   |

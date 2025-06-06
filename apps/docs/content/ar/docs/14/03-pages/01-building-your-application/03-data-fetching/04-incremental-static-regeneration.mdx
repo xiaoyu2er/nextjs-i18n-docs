@@ -1,0 +1,184 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:26:19.966Z
+title: التحديث التدريجي للصفحات الثابتة (ISR)
+description: تعلم كيفية إنشاء أو تحديث الصفحات الثابتة أثناء التشغيل باستخدام التحديث التدريجي للصفحات الثابتة.
+---
+
+<details>
+  <summary>أمثلة</summary>
+
+- [Next.js Commerce](https://nextjs.org/commerce)
+- [GitHub Reactions Demo](https://reactions-demo.vercel.app/)
+- [Static Tweet Demo](https://static-tweet.vercel.app/)
+
+</details>
+
+يسمح لك Next.js بإنشاء أو تحديث الصفحات الثابتة _بعد_ بناء موقعك. يتيح لك التحديث التدريجي للصفحات الثابتة (ISR) استخدام التوليد الثابت على أساس كل صفحة، **دون الحاجة إلى إعادة بناء الموقع بالكامل**. مع ISR، يمكنك الاحتفاظ بمزايا التوليد الثابت مع التوسع إلى ملايين الصفحات.
+
+> **معلومة مفيدة**: وقت التشغيل [`edge`](/docs/pages/api-reference/edge) غير متوافق حاليًا مع ISR، على الرغم من أنه يمكنك الاستفادة من `stale-while-revalidate` عن طريق تعيين رأس `cache-control` يدويًا.
+
+لاستخدام ISR، أضف خاصية `revalidate` إلى `getStaticProps`:
+
+```jsx
+function Blog({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+// يتم استدعاء هذه الدالة أثناء البناء على جانب الخادم.
+// قد يتم استدعاؤها مرة أخرى، على دالة بدون خادم، إذا
+// تم تمكين إعادة التحقق وجاء طلب جديد
+export async function getStaticProps() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  return {
+    props: {
+      posts,
+    },
+    // سيحاول Next.js إعادة توليد الصفحة:
+    // - عند وصول طلب جديد
+    // - على الأكثر مرة كل 10 ثوانٍ
+    revalidate: 10, // بالثواني
+  }
+}
+
+// يتم استدعاء هذه الدالة أثناء البناء على جانب الخادم.
+// قد يتم استدعاؤها مرة أخرى، على دالة بدون خادم، إذا
+// لم يتم توليد المسار بعد.
+export async function getStaticPaths() {
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  // الحصول على المسارات التي نريد تقديمها مسبقًا بناءً على المنشورات
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  // سنقوم بتقديم هذه المسارات مسبقًا فقط أثناء البناء.
+  // { fallback: 'blocking' } سيقوم بتقديم الصفحات على الخادم
+  // عند الطلب إذا لم يكن المسار موجودًا.
+  return { paths, fallback: 'blocking' }
+}
+
+export default Blog
+```
+
+عند إجراء طلب إلى صفحة تم تقديمها مسبقًا أثناء البناء، سيتم عرض الصفحة المخزنة مؤقتًا في البداية.
+
+- أي طلبات للصفحة بعد الطلب الأولي وقبل مرور 10 ثوانٍ يتم تخزينها أيضًا وتكون فورية.
+- بعد نافذة الـ 10 ثوانٍ، سيظل الطلب التالي يعرض الصفحة المخزنة (القديمة)
+- يقوم Next.js بتشغيل إعادة توليد الصفحة في الخلفية.
+- بمجرد اكتمال توليد الصفحة بنجاح، سيقوم Next.js بإبطال التخزين المؤقت وعرض الصفحة المحدثة. إذا فشل التوليد في الخلفية، ستظل الصفحة القديمة كما هي دون تغيير.
+
+عند إجراء طلب إلى مسار لم يتم توليده بعد، سيقوم Next.js بتقديم الصفحة على الخادم عند الطلب الأول. ستخدم الطلبات المستقبلية الملف الثابت من التخزين المؤقت. يحافظ ISR على Vercel [على التخزين المؤقت عالميًا ويتعامل مع التراجعات](https://vercel.com/docs/concepts/next.js/incremental-static-regeneration?utm_source=next-site&utm_medium=docs&utm_campaign=next-website).
+
+> **معلومة مفيدة**: تحقق مما إذا كان مزود البيانات الأعلى لديك قد مكّن التخزين المؤقت افتراضيًا. قد تحتاج إلى تعطيله (مثل `useCdn: false`)، وإلا لن تتمكن إعادة التحقق من سحب بيانات جديدة لتحديث تخزين ISR المؤقت. يمكن أن يحدث التخزين المؤقت في CDN (لنقطة نهاية يتم طلبها) عندما تُرجع رأس `Cache-Control`.
+
+## إعادة التحقق عند الطلب
+
+إذا قمت بتعيين وقت `revalidate` بقيمة `60`، فسيشاهد جميع الزوار نفس النسخة المولدة من موقعك لمدة دقيقة واحدة. الطريقة الوحيدة لإبطال التخزين المؤقت هي من خلال زيارة شخص ما لتلك الصفحة بعد مرور الدقيقة.
+
+بدءًا من الإصدار `v12.2.0`، يدعم Next.js التحديث التدريجي للصفحات الثابتة عند الطلب لإبطال التخزين المؤقت لـ Next.js يدويًا لصفحة محددة. وهذا يسهل تحديث موقعك عندما:
+
+- يتم إنشاء محتوى جديد أو تحديثه من نظام إدارة المحتوى الخاص بك
+- تتغير بيانات التجارة الإلكترونية (السعر، الوصف، الفئة، التقييمات، إلخ.)
+
+داخل `getStaticProps`، لا تحتاج إلى تحديد `revalidate` لاستخدام إعادة التحقق عند الطلب. إذا تم حذف `revalidate`، فسيستخدم Next.js القيمة الافتراضية `false` (لا إعادة تحقق) وسيعيد التحقق من الصفحة عند الطلب فقط عند استدعاء `revalidate()`.
+
+> **معلومة مفيدة**: لن يتم تنفيذ [البرمجيات الوسيطة](/docs/pages/building-your-application/routing/middleware) لطلبات ISR عند الطلب. بدلاً من ذلك، استدعِ `revalidate()` على المسار _الدقيق_ الذي تريد إعادة التحقق منه. على سبيل المثال، إذا كان لديك `pages/blog/[slug].js` وإعادة توجيه من `/post-1` -> `/blog/post-1`، فستحتاج إلى استدعاء `res.revalidate('/blog/post-1')`.
+
+### استخدام إعادة التحقق عند الطلب
+
+أولاً، أنشئ رمزًا سريًا يعرفه فقط تطبيق Next.js الخاص بك. سيتم استخدام هذا الرمز السري لمنع الوصول غير المصرح به إلى مسار API إعادة التحقق. يمكنك الوصول إلى المسار (إما يدويًا أو عبر webhook) باستخدام هيكل URL التالي:
+
+```bash filename="Terminal"
+https://<your-site.com>/api/revalidate?secret=<token>
+```
+
+بعد ذلك، أضف الرمز السري كـ [متغير بيئة](/docs/pages/building-your-application/configuring/environment-variables) إلى تطبيقك. أخيرًا، أنشئ مسار API إعادة التحقق:
+
+```js filename="pages/api/revalidate.js"
+export default async function handler(req, res) {
+  // تحقق من الرمز السري للتأكد من أن هذا طلب صالح
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: 'Invalid token' })
+  }
+
+  try {
+    // يجب أن يكون هذا المسار الفعلي وليس مسارًا معاد توجيهه
+    // على سبيل المثال، بالنسبة لـ "/blog/[slug]" يجب أن يكون "/blog/post-1"
+    await res.revalidate('/path-to-revalidate')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // إذا كان هناك خطأ، سيستمر Next.js
+    // في عرض آخر صفحة تم توليدها بنجاح
+    return res.status(500).send('Error revalidating')
+  }
+}
+```
+
+[شاهد العرض التوضيحي لدينا](https://on-demand-isr.vercel.app) لرؤية إعادة التحقق عند الطلب في العمل وتقديم ملاحظاتك.
+
+### اختبار ISR عند الطلب أثناء التطوير
+
+عند التشغيل محليًا باستخدام `next dev`، يتم استدعاء `getStaticProps` عند كل طلب. للتحقق من صحة تكوين ISR عند الطلب، ستحتاج إلى إنشاء [بناء إنتاج](/docs/pages/api-reference/cli/next#next-build-options) وبدء [خادم الإنتاج](/docs/pages/api-reference/cli/next#next-start-options):
+
+```bash filename="Terminal"
+$ next build
+$ next start
+```
+
+ثم، يمكنك التأكد من أن الصفحات الثابتة قد تم إعادة التحقق منها بنجاح.
+
+## معالجة الأخطاء وإعادة التحقق
+
+إذا حدث خطأ داخل `getStaticProps` أثناء معالجة التوليد في الخلفية، أو إذا قمت برمي خطأ يدويًا، فستستمر الصفحة الأخيرة التي تم توليدها بنجاح في العرض. في الطلب التالي، سيعيد Next.js محاولة استدعاء `getStaticProps`.
+
+```jsx
+export async function getStaticProps() {
+  // إذا ألقى هذا الطلب خطأ غير معالج، فلن يقوم Next.js
+  // بإبطال الصفحة المعروضة حاليًا وسيتم
+  // إعادة محاولة getStaticProps في الطلب التالي.
+  const res = await fetch('https://.../posts')
+  const posts = await res.json()
+
+  if (!res.ok) {
+    // إذا كان هناك خطأ في الخادم، فقد ترغب في
+    // إلقاء خطأ بدلاً من الإرجاع حتى لا يتم تحديث التخزين المؤقت
+    // حتى الطلب الناجح التالي.
+    throw new Error(`Failed to fetch posts, received status ${res.status}`)
+  }
+
+  // إذا كان الطلب ناجحًا، قم بإرجاع المنشورات
+  // وإعادة التحقق كل 10 ثوانٍ.
+  return {
+    props: {
+      posts,
+    },
+    revalidate: 10,
+  }
+}
+```
+
+## استضافة ISR ذاتيًا
+
+يعمل التحديث التدريجي للصفحات الثابتة (ISR) على [مواقع Next.js المخصصة للاستضافة الذاتية](/docs/pages/building-your-application/deploying#self-hosting) مباشرة عند استخدام `next start`.
+
+تعلم المزيد عن [استضافة Next.js ذاتيًا](/docs/pages/building-your-application/deploying#self-hosting).
+
+## سجل الإصدارات
+
+| الإصدار   | التغييرات                                                                                 |
+| --------- | --------------------------------------------------------------------------------------- |
+| `v14.1.0` | أصبح `cacheHandler` المخصص مستقرًا.                                                        |
+| `v12.2.0` | أصبح ISR عند الطلب مستقرًا                                                                 |
+| `v12.1.0` | تمت إضافة ISR عند الطلب (بيتا).                                                             |
+| `v12.0.0` | تمت إضافة [التراجع المعتمد على الروبوتات لـ ISR](https://nextjs.org/blog/next-12#bot-aware-isr-fallback). |
+| `v9.5.0`  | تمت إضافة مسار الأساس.                                                                        |

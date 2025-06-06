@@ -1,0 +1,199 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T18:04:06.067Z
+title: سياسة أمان المحتوى (CSP)
+description: تعلم كيفية تعيين سياسة أمان المحتوى (CSP) لتطبيق Next.js الخاص بك.
+related:
+  links:
+    - app/building-your-application/routing/middleware
+    - app/api-reference/functions/headers
+---
+
+{/* يتم مشاركة محتوى هذا المستند بين موجه التطبيق وموجه الصفحات. يمكنك استخدام مكون `<PagesOnly>المحتوى</PagesOnly>` لإضافة محتوى خاص بموجه الصفحات. أي محتوى مشترك يجب عدم تضمينه في مكون. */}
+
+[سياسة أمان المحتوى (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP) مهمة لحماية تطبيق Next.js الخاص بك من تهديدات أمنية مختلفة مثل البرمجة النصية عبر المواقع (XSS)، والتصيد بالنقر (clickjacking)، وهجمات حقن التعليمات البرمجية الأخرى.
+
+باستخدام CSP، يمكن للمطورين تحديد المصادر المسموح بها للمحتوى، والنصوص البرمجية، وملفات الأنماط، والصور، والخطوط، والكائنات، والوسائط (الصوت، الفيديو)، والإطارات المضمنة (iframes)، والمزيد.
+
+<details>
+  <summary>أمثلة</summary>
+
+- [CSP صارمة](https://github.com/vercel/next.js/tree/canary/examples/with-strict-csp)
+
+</details>
+
+## القيم العشوائية لمرة واحدة (Nonces)
+
+[القيمة العشوائية لمرة واحدة (nonce)](https://developer.mozilla.org/docs/Web/HTML/Global_attributes/nonce) هي سلسلة فريدة وعشوائية من الأحرف يتم إنشاؤها لاستخدام لمرة واحدة. تُستخدم مع CSP للسماح بشكل انتقائي بتنفيذ نصوص برمجية مضمنة معينة أو أنماط، متجاوزة توجيهات CSP الصارمة.
+
+### لماذا تستخدم nonce؟
+
+على الرغم من أن سياسات CSP مصممة لحجب النصوص البرمجية الضارة، إلا أن هناك حالات مشروعة حيث تكون النصوص البرمجية المضمنة ضرورية. في مثل هذه الحالات، توفر القيم العشوائية لمرة واحدة طريقة للسماح بتنفيذ هذه النصوص البرمجية إذا كانت تحتوي على القيمة العشوائية الصحيحة.
+
+### إضافة nonce باستخدام Middleware
+
+[البرنامج الوسيط (Middleware)](/docs/app/building-your-application/routing/middleware) يتيح لك إضافة رؤوس وإنشاء قيم عشوائية لمرة واحدة قبل عرض الصفحة.
+
+يجب إنشاء قيمة عشوائية جديدة في كل مرة يتم فيها عرض الصفحة. هذا يعني أنه **يجب عليك استخدام العرض الديناميكي لإضافة القيم العشوائية لمرة واحدة**.
+
+على سبيل المثال:
+
+```ts filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    block-all-mixed-content;
+    upgrade-insecure-requests;
+`
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set(
+    'Content-Security-Policy',
+    // استبدال الأحرف الجديدة والمسافات
+    cspHeader.replace(/\s{2,}/g, ' ').trim()
+  )
+
+  return NextResponse.next({
+    headers: requestHeaders,
+    request: {
+      headers: requestHeaders,
+    },
+  })
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    block-all-mixed-content;
+    upgrade-insecure-requests;
+`
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set(
+    'Content-Security-Policy',
+    // استبدال الأحرف الجديدة والمسافات
+    cspHeader.replace(/\s{2,}/g, ' ').trim()
+  )
+
+  return NextResponse.next({
+    headers: requestHeaders,
+    request: {
+      headers: requestHeaders,
+    },
+  })
+}
+```
+
+بشكل افتراضي، يعمل البرنامج الوسيط على جميع الطلبات. يمكنك تصفية البرنامج الوسيط ليعمل على مسارات محددة باستخدام [`matcher`](/docs/app/building-your-application/routing/middleware#matcher).
+
+نوصي بتجاهل مطابقة الجلب المسبق (من `next/link`) والموارد الثابتة التي لا تحتاج إلى رأس CSP.
+
+```ts filename="middleware.ts" switcher
+export const config = {
+  matcher: [
+    /*
+     * مطابقة جميع مسارات الطلبات باستثناء تلك التي تبدأ بـ:
+     * - api (مسارات API)
+     * - _next/static (ملفات ثابتة)
+     * - _next/image (ملفات تحسين الصور)
+     * - favicon.ico (ملف الأيقونة)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+```js filename="middleware.js" switcher
+export const config = {
+  matcher: [
+    /*
+     * مطابقة جميع مسارات الطلبات باستثناء تلك التي تبدأ بـ:
+     * - api (مسارات API)
+     * - _next/static (ملفات ثابتة)
+     * - _next/image (ملفات تحسين الصور)
+     * - favicon.ico (ملف الأيقونة)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+### قراءة القيمة العشوائية لمرة واحدة
+
+يمكنك الآن قراءة القيمة العشوائية لمرة واحدة من [مكون الخادم (Server Component)](/docs/app/building-your-application/rendering/server-components) باستخدام [`headers`](/docs/app/api-reference/functions/headers):
+
+```tsx filename="app/page.tsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default function Page() {
+  const nonce = headers().get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default function Page() {
+  const nonce = headers().get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+## سجل الإصدارات
+
+نوصي باستخدام إصدار `v13.4.20+` من Next.js للتعامل مع القيم العشوائية لمرة واحدة وتطبيقها بشكل صحيح.

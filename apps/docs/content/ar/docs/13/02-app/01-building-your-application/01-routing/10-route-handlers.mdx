@@ -1,0 +1,693 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T18:12:46.561Z
+title: معالجات المسارات (Route Handlers)
+description: إنشاء معالجات طلبات مخصصة لمسار معين باستخدام واجهات طلب (Request) واستجابة (Response) الويب.
+related:
+  title: مرجع API
+  description: تعلم المزيد حول ملف route.js.
+  links:
+    - app/api-reference/file-conventions/route
+---
+
+تسمح لك معالجات المسارات (Route Handlers) بإنشاء معالجات طلبات مخصصة لمسار معين باستخدام واجهات [طلب (Request)](https://developer.mozilla.org/docs/Web/API/Request) و[استجابة (Response)](https://developer.mozilla.org/docs/Web/API/Response) للويب.
+
+<Image
+  alt="ملف Route.js الخاص"
+  srcLight="/docs/light/route-special-file.png"
+  srcDark="/docs/dark/route-special-file.png"
+  width="1600"
+  height="444"
+/>
+
+> **معلومة مفيدة**: معالجات المسارات متاحة فقط داخل دليل `app`. وهي تعادل [مسارات API](/docs/pages/building-your-application/routing/api-routes) داخل دليل `pages` مما يعني أنك **لا تحتاج** إلى استخدام مسارات API ومعالجات المسارات معًا.
+
+## الاصطلاح
+
+يتم تعريف معالجات المسارات في ملف [`route.js|ts`](/docs/app/api-reference/file-conventions/route) داخل دليل `app`:
+
+```ts filename="app/api/route.ts" switcher
+export async function GET(request: Request) {}
+```
+
+```js filename="app/api/route.js" switcher
+export async function GET(request) {}
+```
+
+يمكن تداخل معالجات المسارات داخل دليل `app`، بشكل مشابه لـ `page.js` و `layout.js`. ولكن **لا يمكن** وجود ملف `route.js` في نفس مستوى مقطع المسار مثل `page.js`.
+
+### طرق HTTP المدعومة
+
+طرق [HTTP](https://developer.mozilla.org/docs/Web/HTTP/Methods) التالية مدعومة: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, و `OPTIONS`. إذا تم استدعاء طريقة غير مدعومة، ستعيد Next.js استجابة `405 Method Not Allowed`.
+
+### واجهات `NextRequest` و `NextResponse` الممتدة
+
+بالإضافة إلى دعم واجهات [Request](https://developer.mozilla.org/docs/Web/API/Request) و [Response](https://developer.mozilla.org/docs/Web/API/Response) الأصلية، تمتد Next.js مع
+[`NextRequest`](/docs/app/api-reference/functions/next-request) و [`NextResponse`](/docs/app/api-reference/functions/next-response) لتوفير مساعدات ملائمة لحالات الاستخدام المتقدمة.
+
+## السلوك
+
+### التخزين المؤقت
+
+يتم تخزين معالجات المسارات مؤقتًا افتراضيًا عند استخدام طريقة `GET` مع كائن `Response`.
+
+```ts filename="app/items/route.ts" switcher
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+  })
+  const data = await res.json()
+
+  return Response.json({ data })
+}
+```
+
+```js filename="app/items/route.js" switcher
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+  })
+  const data = await res.json()
+
+  return Response.json({ data })
+}
+```
+
+> **تحذير TypeScript**: `Response.json()` صالحة فقط من TypeScript 5.2. إذا كنت تستخدم إصدارًا أقدم من TypeScript، يمكنك استخدام [`NextResponse.json()`](/docs/app/api-reference/functions/next-response#json) للاستجابات المكتوبة بدلاً من ذلك.
+
+### إلغاء التخزين المؤقت
+
+يمكنك إلغاء التخزين المؤقت عن طريق:
+
+- استخدام كائن `Request` مع طريقة `GET`.
+- استخدام أي من طرق HTTP الأخرى.
+- استخدام [الدوال الديناميكية](#dynamic-functions) مثل `cookies` و `headers`.
+- تحديد الوضع الديناميكي يدويًا باستخدام [خيارات تكوين المقطع](#segment-config-options).
+
+مثال:
+
+```ts filename="app/products/api/route.ts" switcher
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+  const res = await fetch(`https://data.mongodb-api.com/product/${id}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+  })
+  const product = await res.json()
+
+  return Response.json({ product })
+}
+```
+
+```js filename="app/products/api/route.js" switcher
+export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+  const res = await fetch(`https://data.mongodb-api.com/product/${id}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+  })
+  const product = await res.json()
+
+  return Response.json({ product })
+}
+```
+
+بالمثل، ستؤدي طريقة `POST` إلى تقييم معالج المسار بشكل ديناميكي.
+
+```ts filename="app/items/route.ts" switcher
+export async function POST() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+    body: JSON.stringify({ time: new Date().toISOString() }),
+  })
+
+  const data = await res.json()
+
+  return Response.json(data)
+}
+```
+
+```js filename="app/items/route.js" switcher
+export async function POST() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+    body: JSON.stringify({ time: new Date().toISOString() }),
+  })
+
+  const data = await res.json()
+
+  return Response.json(data)
+}
+```
+
+> **معلومة مفيدة**: مثل مسارات API، يمكن استخدام معالجات المسارات لحالات مثل معالجة إرسال النماذج. يتم العمل على تجريد جديد لـ [معالجة النماذج والتحولات](/docs/app/building-your-application/data-fetching/forms-and-mutations) الذي يتكامل بعمق مع React.
+
+### تحليل المسار
+
+يمكنك اعتبار `route` كأدنى مستوى من البدائية للتوجيه.
+
+- **لا تشارك** في التخطيطات أو التنقلات من جانب العميل مثل `page`.
+- **لا يمكن** وجود ملف `route.js` في نفس المسار مثل `page.js`.
+
+| الصفحة                 | المسار              | النتيجة                       |
+| -------------------- | ------------------ | ---------------------------- |
+| `app/page.js`        | `app/route.js`     | <Cross size={18} /> تعارض |
+| `app/page.js`        | `app/api/route.js` | <Check size={18} /> صالح    |
+| `app/[user]/page.js` | `app/api/route.js` | <Check size={18} /> صالح    |
+
+كل ملف `route.js` أو `page.js` يأخذ كل أفعال HTTP لذلك المسار.
+
+```jsx filename="app/page.js"
+export default function Page() {
+  return <h1>مرحبًا، Next.js!</h1>
+}
+
+// ❌ تعارض
+// `app/route.js`
+export async function POST(request) {}
+```
+
+## أمثلة
+
+توضح الأمثلة التالية كيفية دمج معالجات المسارات مع واجهات وميزات Next.js الأخرى.
+
+### إعادة التحقق من البيانات المخزنة مؤقتًا
+
+يمكنك [إعادة التحقق من البيانات المخزنة مؤقتًا](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data) باستخدام خيار [`next.revalidate`](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data):
+
+```ts filename="app/items/route.ts" switcher
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    next: { revalidate: 60 }, // إعادة التحقق كل 60 ثانية
+  })
+  const data = await res.json()
+
+  return Response.json(data)
+}
+```
+
+```js filename="app/items/route.js" switcher
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    next: { revalidate: 60 }, // إعادة التحقق كل 60 ثانية
+  })
+  const data = await res.json()
+
+  return Response.json(data)
+}
+```
+
+بدلاً من ذلك، يمكنك استخدام [خيار تكوين المقطع `revalidate`](/docs/app/api-reference/file-conventions/route-segment-config#revalidate):
+
+```ts
+export const revalidate = 60
+```
+
+### الدوال الديناميكية
+
+يمكن استخدام معالجات المسارات مع الدوال الديناميكية من Next.js، مثل [`cookies`](/docs/app/api-reference/functions/cookies) و [`headers`](/docs/app/api-reference/functions/headers).
+
+#### الكوكيز
+
+يمكنك قراءة الكوكيز باستخدام [`cookies`](/docs/app/api-reference/functions/cookies) من `next/headers`. يمكن استدعاء هذه الدالة الخادمية مباشرة في معالج المسار، أو تداخلها داخل دالة أخرى.
+
+نسخة `cookies` هذه للقراءة فقط. لتعيين الكوكيز، تحتاج إلى إعادة `Response` جديدة باستخدام رأس [`Set-Cookie`](https://developer.mozilla.org/docs/Web/HTTP/Headers/Set-Cookie).
+
+```ts filename="app/api/route.ts" switcher
+import { cookies } from 'next/headers'
+
+export async function GET(request: Request) {
+  const cookieStore = cookies()
+  const token = cookieStore.get('token')
+
+  return new Response('Hello, Next.js!', {
+    status: 200,
+    headers: { 'Set-Cookie': `token=${token.value}` },
+  })
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { cookies } from 'next/headers'
+
+export async function GET(request) {
+  const cookieStore = cookies()
+  const token = cookieStore.get('token')
+
+  return new Response('Hello, Next.js!', {
+    status: 200,
+    headers: { 'Set-Cookie': `token=${token}` },
+  })
+}
+```
+
+بدلاً من ذلك، يمكنك استخدام تجريدات فوق واجهات الويب الأساسية لقراءة الكوكيز ([`NextRequest`](/docs/app/api-reference/functions/next-request)):
+
+```ts filename="app/api/route.ts" switcher
+import { type NextRequest } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get('token')
+}
+```
+
+```js filename="app/api/route.js" switcher
+export async function GET(request) {
+  const token = request.cookies.get('token')
+}
+```
+
+#### الرؤوس
+
+يمكنك قراءة الرؤوس باستخدام [`headers`](/docs/app/api-reference/functions/headers) من `next/headers`. يمكن استدعاء هذه الدالة الخادمية مباشرة في معالج المسار، أو تداخلها داخل دالة أخرى.
+
+نسخة `headers` هذه للقراءة فقط. لتعيين الرؤوس، تحتاج إلى إعادة `Response` جديدة برؤوس جديدة.
+
+```ts filename="app/api/route.ts" switcher
+import { headers } from 'next/headers'
+
+export async function GET(request: Request) {
+  const headersList = headers()
+  const referer = headersList.get('referer')
+
+  return new Response('Hello, Next.js!', {
+    status: 200,
+    headers: { referer: referer },
+  })
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { headers } from 'next/headers'
+
+export async function GET(request) {
+  const headersList = headers()
+  const referer = headersList.get('referer')
+
+  return new Response('Hello, Next.js!', {
+    status: 200,
+    headers: { referer: referer },
+  })
+}
+```
+
+بدلاً من ذلك، يمكنك استخدام تجريدات فوق واجهات الويب الأساسية لقراءة الرؤوس ([`NextRequest`](/docs/app/api-reference/functions/next-request)):
+
+```ts filename="app/api/route.ts" switcher
+import { type NextRequest } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers)
+}
+```
+
+```js filename="app/api/route.js" switcher
+export async function GET(request) {
+  const requestHeaders = new Headers(request.headers)
+}
+```
+
+### إعادة التوجيه
+
+```ts filename="app/api/route.ts" switcher
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  redirect('https://nextjs.org/')
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  redirect('https://nextjs.org/')
+}
+```
+
+### مقاطع المسار الديناميكية
+
+> نوصي بقراءة صفحة [تحديد المسارات](/docs/app/building-your-application/routing/defining-routes) قبل المتابعة.
+
+يمكن لمعالجات المسارات استخدام [المقاطع الديناميكية](/docs/app/building-your-application/routing/dynamic-routes) لإنشاء معالجات طلبات من البيانات الديناميكية.
+
+```ts filename="app/items/[slug]/route.ts" switcher
+export async function GET(
+  request: Request,
+  { params }: { params: { slug: string } }
+) {
+  const slug = params.slug // 'a', 'b', أو 'c'
+}
+```
+
+```js filename="app/items/[slug]/route.js" switcher
+export async function GET(request, { params }) {
+  const slug = params.slug // 'a', 'b', أو 'c'
+}
+```
+
+| المسار                       | مثال URL | `params`        |
+| --------------------------- | ----------- | --------------- |
+| `app/items/[slug]/route.js` | `/items/a`  | `{ slug: 'a' }` |
+| `app/items/[slug]/route.js` | `/items/b`  | `{ slug: 'b' }` |
+| `app/items/[slug]/route.js` | `/items/c`  | `{ slug: 'c' }` |
+
+### معلمات استعلام URL
+
+كائن الطلب الممرر إلى معالج المسار هو نسخة من `NextRequest`، والتي تحتوي على [بعض الطرق الملائمة الإضافية](/docs/app/api-reference/functions/next-request#nexturl)، بما في ذلك التعامل بسهولة أكبر مع معلمات الاستعلام.
+
+```ts filename="app/api/search/route.ts" switcher
+import { type NextRequest } from 'next/server'
+
+export function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const query = searchParams.get('query')
+  // query هي "hello" لـ /api/search?query=hello
+}
+```
+
+```js filename="app/api/search/route.js" switcher
+export function GET(request) {
+  const searchParams = request.nextUrl.searchParams
+  const query = searchParams.get('query')
+  // query هي "hello" لـ /api/search?query=hello
+}
+```
+
+### البث (Streaming)
+
+يُستخدم البث عادةً جنبًا إلى جنب مع نماذج اللغة الكبيرة (LLMs) مثل OpenAI للمحتوى المُنشأ بواسطة الذكاء الاصطناعي. تعرّف على المزيد حول [حزمة تطوير الذكاء الاصطناعي (AI SDK)](https://sdk.vercel.ai/docs).
+
+```ts filename="app/api/chat/route.ts" switcher
+import { Configuration, OpenAIApi } from 'openai-edge'
+import { OpenAIStream, StreamingTextResponse } from 'ai'
+
+export const runtime = 'edge'
+
+const apiConfig = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY!,
+})
+
+const openai = new OpenAIApi(apiConfig)
+
+export async function POST(req: Request) {
+  // استخراج الرسائل (messages) من جسم الطلب
+  const { messages } = await req.json()
+
+  // طلب استجابة من واجهة برمجة تطبيقات OpenAI بناءً على المطالبة
+  const response = await openai.createChatCompletion({
+    model: 'gpt-3.5-turbo',
+    stream: true,
+    messages: messages,
+    max_tokens: 500,
+    temperature: 0.7,
+    top_p: 1,
+    frequency_penalty: 1,
+    presence_penalty: 1,
+  })
+
+  // تحويل الاستجابة إلى تدفق نصي سهل
+  const stream = OpenAIStream(response)
+
+  // الرد بالتدفق
+  return new StreamingTextResponse(stream)
+}
+```
+
+```js filename="app/api/chat/route.js" switcher
+import { Configuration, OpenAIApi } from 'openai-edge'
+import { OpenAIStream, StreamingTextResponse } from 'ai'
+
+export const runtime = 'edge'
+
+const apiConfig = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+const openai = new OpenAIApi(apiConfig)
+
+export async function POST(req) {
+  // استخراج الرسائل (messages) من جسم الطلب
+  const { messages } = await req.json()
+
+  // طلب استجابة من واجهة برمجة تطبيقات OpenAI بناءً على المطالبة
+  const response = await openai.createChatCompletion({
+    model: 'gpt-3.5-turbo',
+    stream: true,
+    messages: messages,
+    max_tokens: 500,
+    temperature: 0.7,
+    top_p: 1,
+    frequency_penalty: 1,
+    presence_penalty: 1,
+  })
+
+  // تحويل الاستجابة إلى تدفق نصي سهل
+  const stream = OpenAIStream(response)
+
+  // الرد بالتدفق
+  return new StreamingTextResponse(stream)
+}
+```
+
+تستخدم هذه التجريدات واجهات برمجة تطبيقات الويب لإنشاء تدفق. يمكنك أيضًا استخدام واجهات برمجة تطبيقات الويب الأساسية مباشرة.
+
+```ts filename="app/api/route.ts" switcher
+// https://developer.mozilla.org/docs/Web/API/ReadableStream#convert_async_iterator_to_stream
+function iteratorToStream(iterator: any) {
+  return new ReadableStream({
+    async pull(controller) {
+      const { value, done } = await iterator.next()
+
+      if (done) {
+        controller.close()
+      } else {
+        controller.enqueue(value)
+      }
+    },
+  })
+}
+
+function sleep(time: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, time)
+  })
+}
+
+const encoder = new TextEncoder()
+
+async function* makeIterator() {
+  yield encoder.encode('<p>One</p>')
+  await sleep(200)
+  yield encoder.encode('<p>Two</p>')
+  await sleep(200)
+  yield encoder.encode('<p>Three</p>')
+}
+
+export async function GET() {
+  const iterator = makeIterator()
+  const stream = iteratorToStream(iterator)
+
+  return new Response(stream)
+}
+```
+
+```js filename="app/api/route.js" switcher
+// https://developer.mozilla.org/docs/Web/API/ReadableStream#convert_async_iterator_to_stream
+function iteratorToStream(iterator) {
+  return new ReadableStream({
+    async pull(controller) {
+      const { value, done } = await iterator.next()
+
+      if (done) {
+        controller.close()
+      } else {
+        controller.enqueue(value)
+      }
+    },
+  })
+}
+
+function sleep(time) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, time)
+  })
+}
+
+const encoder = new TextEncoder()
+
+async function* makeIterator() {
+  yield encoder.encode('<p>One</p>')
+  await sleep(200)
+  yield encoder.encode('<p>Two</p>')
+  await sleep(200)
+  yield encoder.encode('<p>Three</p>')
+}
+
+export async function GET() {
+  const iterator = makeIterator()
+  const stream = iteratorToStream(iterator)
+
+  return new Response(stream)
+}
+```
+
+### جسم الطلب (Request Body)
+
+يمكنك قراءة جسم الطلب (`Request`) باستخدام طرق واجهة برمجة تطبيقات الويب القياسية:
+
+```ts filename="app/items/route.ts" switcher
+export async function POST(request: Request) {
+  const res = await request.json()
+  return Response.json({ res })
+}
+```
+
+```js filename="app/items/route.js" switcher
+export async function POST(request) {
+  const res = await request.json()
+  return Response.json({ res })
+}
+```
+
+### بيانات النموذج (FormData) في الطلب
+
+يمكنك قراءة بيانات `FormData` باستخدام الدالة `request.formData()`:
+
+```ts filename="app/items/route.ts" switcher
+export async function POST(request: Request) {
+  const formData = await request.formData()
+  const name = formData.get('name')
+  const email = formData.get('email')
+  return Response.json({ name, email })
+}
+```
+
+```js filename="app/items/route.js" switcher
+export async function POST(request) {
+  const formData = await request.formData()
+  const name = formData.get('name')
+  const email = formData.get('email')
+  return Response.json({ name, email })
+}
+```
+
+بما أن بيانات `formData` كلها نصوص، قد ترغب في استخدام [`zod-form-data`](https://www.npmjs.com/zod-form-data) للتحقق من صحة الطلب واسترجاع البيانات بالشكل الذي تفضله (مثل `number`).
+
+### CORS
+
+يمكنك تعيين رؤوس CORS على `Response` باستخدام طرق واجهة برمجة تطبيقات الويب القياسية:
+
+```ts filename="app/api/route.ts" switcher
+export async function GET(request: Request) {
+  return new Response('Hello, Next.js!', {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  })
+}
+```
+
+```js filename="app/api/route.js" switcher
+export async function GET(request) {
+  return new Response('Hello, Next.js!', {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  })
+}
+```
+
+### بيئات التشغيل Edge و Node.js
+
+تمتلك معالجات المسارات (Route Handlers) واجهة برمجة تطبيقات ويب متساوية الشكل (isomorphic) لدعم بيئتي تشغيل Edge و Node.js بسلاسة، بما في ذلك دعم البث. نظرًا لأن معالجات المسارات تستخدم نفس [تهيئة قطاع المسار](/docs/app/api-reference/file-conventions/route-segment-config) مثل الصفحات والتخطيطات، فإنها تدعم ميزات طال انتظارها مثل معالجات المسارات ذات [إعادة توليد ثابت](/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data) للأغراض العامة.
+
+يمكنك استخدام خيار تهيئة القطاع `runtime` لتحديد بيئة التشغيل:
+
+```ts
+export const runtime = 'edge' // الافتراضي هو 'nodejs'
+```
+
+### ردود غير واجهة المستخدم
+
+يمكنك استخدام معالجات المسارات لإرجاع محتوى غير واجهة مستخدم. لاحظ أن [`sitemap.xml`](/docs/app/api-reference/file-conventions/metadata/sitemap#generate-a-sitemap)، و[`robots.txt`](/docs/app/api-reference/file-conventions/metadata/robots#generate-a-robots-file)، و[أيقونات التطبيق](/docs/app/api-reference/file-conventions/metadata/app-icons#generate-icons-using-code-js-ts-tsx)، و[صور Open Graph](/docs/app/api-reference/file-conventions/metadata/opengraph-image) جميعها مدعومة مدمجة.
+
+```ts filename="app/rss.xml/route.ts" switcher
+export async function GET() {
+  return new Response(`<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+
+<channel>
+  <title>Next.js Documentation</title>
+  <link>https://nextjs.org/docs</link>
+  <description>The React Framework for the Web</description>
+</channel>
+
+</rss>`)
+}
+```
+
+```js filename="app/rss.xml/route.js" switcher
+export async function GET() {
+  return new Response(`<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+
+<channel>
+  <title>Next.js Documentation</title>
+  <link>https://nextjs.org/docs</link>
+  <description>The React Framework for the Web</description>
+</channel>
+
+</rss>`)
+}
+```
+
+### خيارات تهيئة القطاع (Segment Config)
+
+تستخدم معالجات المسارات نفس [تهيئة قطاع المسار](/docs/app/api-reference/file-conventions/route-segment-config) مثل الصفحات والتخطيطات.
+
+```ts filename="app/items/route.ts" switcher
+export const dynamic = 'auto'
+export const dynamicParams = true
+export const revalidate = false
+export const fetchCache = 'auto'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
+```
+
+```js filename="app/items/route.js" switcher
+export const dynamic = 'auto'
+export const dynamicParams = true
+export const revalidate = false
+export const fetchCache = 'auto'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
+```
+
+راجع [مرجع واجهة برمجة التطبيقات](/docs/app/api-reference/file-conventions/route-segment-config) لمزيد من التفاصيل.

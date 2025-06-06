@@ -1,0 +1,143 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:56:15.635Z
+title: المصادقة
+description: تعلم عن أنماط المصادقة في تطبيقات Next.js واستكشف بعض الأمثلة.
+---
+
+المصادقة تحقق من هوية المستخدم، بينما التحكم في الصلاحيات يحدد ما يمكن للمستخدم الوصول إليه. يدعم Next.js أنماطًا متعددة للمصادقة، كل منها مصمم لحالات استخدام مختلفة. هذه الصفحة ستغطي كل حالة حتى تتمكن من الاختيار بناءً على متطلباتك.
+
+## أنماط المصادقة
+
+الخطوة الأولى لتحديد نمط المصادقة الذي تحتاجه هي فهم [إستراتيجية جلب البيانات](/docs/pages/building-your-application/data-fetching) التي تريدها. ثم يمكننا تحديد موفري المصادقة الذين يدعمون هذه الإستراتيجية. هناك نمطان رئيسيان:
+
+- استخدام [التوليد الثابت](/docs/pages/building-your-application/rendering/static-site-generation) لعرض حالة تحميل من الخادم، ثم جلب بيانات المستخدم من جانب العميل.
+- جلب بيانات المستخدم [من جانب الخادم](/docs/pages/building-your-application/rendering/server-side-rendering) لتجنب ظهور محتوى غير مصادق عليه.
+
+### مصادقة الصفحات المولدة ثابتًا
+
+يحدد Next.js تلقائيًا أن الصفحة ثابتة إذا لم تكن هناك متطلبات بيانات حظرية. هذا يعني عدم وجود [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) أو `getInitialProps` في الصفحة. بدلاً من ذلك، يمكن لصفحتك عرض حالة تحميل من الخادم، ثم جلب المستخدم من جانب العميل.
+
+إحدى مزايا هذا النمط هي أنه يسمح بعرض الصفحات من شبكة CDN عالمية وتحميلها مسبقًا باستخدام [`next/link`](/docs/pages/api-reference/components/link). عمليًا، هذا يؤدي إلى وقت تفاعل أسرع ([Time to Interactive](https://web.dev/interactive/)).
+
+لننظر إلى مثال لصفحة الملف الشخصي. سيتم عرض هيكل تحميل في البداية. بمجرد انتهاء طلب المستخدم، سيتم عرض اسم المستخدم:
+
+```jsx filename="pages/profile.js"
+import useUser from '../lib/useUser'
+import Layout from '../components/Layout'
+
+const Profile = () => {
+  // جلب المستخدم من جانب العميل
+  const { user } = useUser({ redirectTo: '/login' })
+
+  // عرض حالة التحميل من الخادم
+  if (!user || user.isLoggedIn === false) {
+    return <Layout>جار التحميل...</Layout>
+  }
+
+  // بمجرد انتهاء طلب المستخدم، عرض المستخدم
+  return (
+    <Layout>
+      <h1>ملفك الشخصي</h1>
+      <pre>{JSON.stringify(user, null, 2)}</pre>
+    </Layout>
+  )
+}
+
+export default Profile
+```
+
+يمكنك مشاهدة [هذا المثال في العمل](https://iron-session-example.vercel.app/). تحقق من مثال [`with-iron-session`](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session) لترى كيف يعمل.
+
+### مصادقة الصفحات المعروضة من الخادم
+
+إذا قمت بتصدير دالة `async` تسمى [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) من صفحة، فسوف يقوم Next.js بعرض هذه الصفحة مسبقًا في كل طلب باستخدام البيانات التي تُرجعها `getServerSideProps`.
+
+```jsx
+export async function getServerSideProps(context) {
+  return {
+    props: {}, // سيتم تمريرها إلى مكون الصفحة كخصائص
+  }
+}
+```
+
+لنحول مثال الملف الشخصي لاستخدام [العرض من جانب الخادم](/docs/pages/building-your-application/rendering/server-side-rendering). إذا كانت هناك جلسة، قم بإرجاع `user` كخاصية لمكون `Profile` في الصفحة. لاحظ عدم وجود هيكل تحميل في [هذا المثال](https://iron-session-example.vercel.app/).
+
+```jsx filename="pages/profile.js"
+import withSession from '../lib/session'
+import Layout from '../components/Layout'
+
+export const getServerSideProps = withSession(async function ({ req, res }) {
+  const { user } = req.session
+
+  if (!user) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    }
+  }
+
+  return {
+    props: { user },
+  }
+})
+
+const Profile = ({ user }) => {
+  // عرض المستخدم. لا حاجة لحالة تحميل
+  return (
+    <Layout>
+      <h1>ملفك الشخصي</h1>
+      <pre>{JSON.stringify(user, null, 2)}</pre>
+    </Layout>
+  )
+}
+
+export default Profile
+```
+
+ميزة هذا النمط هي منع ظهور محتوى غير مصادق عليه قبل التوجيه. من المهم ملاحظة أن جلب بيانات المستخدم في `getServerSideProps` سوف يحجب العرض حتى يتم حل الطلب إلى موفر المصادقة الخاص بك. لمنع إنشاء عنق زجاجة وزيادة وقت أول بايت ([Time to First Byte](https://web.dev/time-to-first-byte/))، يجب أن تتأكد من أن البحث عن المصادقة سريع. وإلا، فكر في [التوليد الثابت](#authenticating-statically-generated-pages).
+
+## موفرو المصادقة
+
+بعد مناقشة أنماط المصادقة، دعونا ننظر إلى موفري مصادقة محددين ونستكشف كيفية استخدامهم مع Next.js.
+
+### استخدم قاعدة بياناتك الخاصة
+
+<details open>
+  <summary>أمثلة</summary>
+
+- [with-iron-session](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session)
+- [next-auth-example](https://github.com/nextauthjs/next-auth-example)
+
+</details>
+
+إذا كان لديك قاعدة بيانات موجودة تحتوي على بيانات المستخدمين، فمن المحتمل أنك ترغب في استخدام حل مفتوح المصدر غير مرتبط بموفر محدد.
+
+- إذا كنت تريد أداة جلسة منخفضة المستوى، مشفرة، وبدون حالة، استخدم [`iron-session`](https://github.com/vercel/next.js/tree/canary/examples/with-iron-session).
+- إذا كنت تريد نظام مصادقة كامل الميزات مع موفرين مدمجين (Google، Facebook، GitHub...)، JWT، JWE، البريد الإلكتروني/كلمة المرور، روابط سحرية وغيرها... استخدم [`next-auth`](https://github.com/nextauthjs/next-auth-example).
+
+كلا هاتين المكتبتين تدعمان أيًا من نمطي المصادقة. إذا كنت مهتمًا بـ [Passport](http://www.passportjs.org/)، فلدينا أيضًا أمثلة له باستخدام ملفات تعريف الارتباط الآمنة والمشفرة:
+
+- [with-passport](https://github.com/vercel/next.js/tree/canary/examples/with-passport)
+- [with-passport-and-next-connect](https://github.com/vercel/next.js/tree/canary/examples/with-passport-and-next-connect)
+
+### موفرو مصادقة آخرون
+
+لمشاهدة أمثلة مع موفري مصادقة آخرين، تحقق من [مجلد الأمثلة](https://github.com/vercel/next.js/tree/canary/examples).
+
+<details open>
+  <summary>أمثلة</summary>
+
+- [Auth0](https://github.com/vercel/next.js/tree/canary/examples/auth0)
+- [Clerk](https://github.com/vercel/next.js/tree/canary/examples/with-clerk)
+- [Firebase](https://github.com/vercel/next.js/tree/canary/examples/with-firebase-authentication)
+- [Magic](https://github.com/vercel/next.js/tree/canary/examples/with-magic)
+- [Nhost](https://github.com/vercel/next.js/tree/canary/examples/with-nhost-auth-realtime-graphql)
+- [Ory](https://github.com/vercel/examples/tree/main/solutions/auth-with-ory)
+- [Supabase](https://github.com/vercel/next.js/tree/canary/examples/with-supabase)
+- [Supertokens](https://github.com/vercel/next.js/tree/canary/examples/with-supertokens)
+- [Userbase](https://github.com/vercel/next.js/tree/canary/examples/with-userbase)
+
+</details>
