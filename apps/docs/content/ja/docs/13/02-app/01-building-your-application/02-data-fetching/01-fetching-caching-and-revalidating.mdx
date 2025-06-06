@@ -1,0 +1,375 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:29:20.307Z
+title: データフェッチング、キャッシュ、再検証
+nav_title: フェッチング、キャッシュ、再検証
+description: Next.jsアプリケーションでデータをフェッチ、キャッシュ、再検証する方法を学びます。
+---
+
+データフェッチングはあらゆるアプリケーションのコアとなる部分です。このページでは、ReactとNext.jsでデータをフェッチ、キャッシュ、再検証する方法について説明します。
+
+データをフェッチする方法は4つあります：
+
+1. [サーバーサイドで`fetch`を使用](#fetching-data-on-the-server-with-fetch)
+2. [サーバーサイドでサードパーティライブラリを使用](#fetching-data-on-the-server-with-third-party-libraries)
+3. [クライアントサイドでRoute Handler経由](#fetching-data-on-the-client-with-route-handlers)
+4. [クライアントサイドでサードパーティライブラリを使用](#fetching-data-on-the-client-with-route-handlers)
+
+## サーバーサイドでの`fetch`によるデータフェッチング
+
+Next.jsはネイティブの[`fetch` Web API](https://developer.mozilla.org/docs/Web/API/Fetch_API)を拡張し、サーバー上の各フェッチリクエストに対して[キャッシュ](#caching-data)と[再検証](#revalidating-data)の動作を設定できるようにしています。Reactは`fetch`を拡張して、Reactコンポーネントツリーのレンダリング中にフェッチリクエストを自動的に[メモ化](/docs/app/building-your-application/data-fetching/patterns#fetching-data-where-its-needed)します。
+
+[Server Components](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md)の[`async`/`await`](/docs/app/building-your-application/data-fetching/forms-and-mutations)、[Route Handlers](/docs/app/building-your-application/routing/route-handlers)、[Server Actions](/docs/app/building-your-application/data-fetching/forms-and-mutations)で`fetch`を使用できます。
+
+例：
+
+```tsx filename="app/page.tsx" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // 戻り値はシリアライズされません
+  // Date、Map、Setなどを返すことができます
+
+  if (!res.ok) {
+    // 最も近い`error.js`エラーバウンダリが有効になります
+    throw new Error('データの取得に失敗しました')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+```jsx filename="app/page.js" switcher
+async function getData() {
+  const res = await fetch('https://api.example.com/...')
+  // 戻り値はシリアライズされません
+  // Date、Map、Setなどを返すことができます
+
+  if (!res.ok) {
+    // 最も近い`error.js`エラーバウンダリが有効になります
+    throw new Error('データの取得に失敗しました')
+  }
+
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+
+  return <main></main>
+}
+```
+
+> **知っておくと良いこと**:
+>
+> - Next.jsはServer Componentsでデータをフェッチする際に便利な[`cookies`](/docs/app/api-reference/functions/cookies)や[`headers`](/docs/app/api-reference/functions/headers)などの関数を提供しています。これらはリクエスト時の情報に依存するため、ルートが動的にレンダリングされます。
+> - Route Handlersでは、フェッチリクエストはメモ化されません。Route HandlersはReactコンポーネントツリーの一部ではないためです。
+> - TypeScriptでServer Component内で`async`/`await`を使用するには、TypeScript `5.1.3`以上と`@types/react` `18.2.8`以上が必要です。
+
+### データのキャッシュ
+
+キャッシュはデータを保存し、リクエストごとにデータソースから再フェッチする必要をなくします。
+
+デフォルトでは、Next.jsはサーバー上の[Data Cache](/docs/app/building-your-application/caching#data-cache)に`fetch`の戻り値を自動的にキャッシュします。これは、データがビルド時またはリクエスト時にフェッチされ、キャッシュされ、各データリクエストで再利用されることを意味します。
+
+```js
+// 'force-cache'はデフォルトで、省略可能です
+fetch('https://...', { cache: 'force-cache' })
+```
+
+`POST`メソッドを使用する`fetch`リクエストも自動的にキャッシュされます。[Route Handler](/docs/app/building-your-application/routing/route-handlers)内で`POST`メソッドを使用する場合を除き、その場合はキャッシュされません。
+
+> **Data Cacheとは？**
+>
+> Data Cacheは永続的な[HTTPキャッシュ](https://developer.mozilla.org/docs/Web/HTTP/Caching)です。プラットフォームによっては、キャッシュは自動的にスケーリングされ、[複数のリージョン間で共有](https://vercel.com/docs/infrastructure/data-cache)できます。
+>
+> [Data Cache](/docs/app/building-your-application/caching#data-cache)について詳しく学びます。
+
+### データの再検証
+
+再検証はData Cacheをクリアし、最新のデータを再フェッチするプロセスです。データが変更され、最新の情報を表示したい場合に便利です。
+
+キャッシュされたデータは2つの方法で再検証できます：
+
+- **時間ベースの再検証**：一定時間が経過した後、自動的にデータを再検証します。頻繁に変更されず、新鮮さがそれほど重要でないデータに便利です。
+- **オンデマンド再検証**：イベント（フォーム送信など）に基づいて手動でデータを再検証します。オンデマンド再検証では、タグベースまたはパスベースのアプローチを使用して、一度にデータのグループを再検証できます。ヘッドレスCMSからのコンテンツが更新されたときなど、できるだけ早く最新のデータを表示したい場合に便利です。
+
+#### 時間ベースの再検証
+
+一定間隔でデータを再検証するには、`fetch`の`next.revalidate`オプションを使用してリソースのキャッシュ寿命（秒単位）を設定します。
+
+```js
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+または、ルートセグメント内のすべての`fetch`リクエストを再検証するには、[Segment Config Options](/docs/app/api-reference/file-conventions/route-segment-config)を使用できます。
+
+```jsx filename="layout.js | page.js"
+export const revalidate = 3600 // 最大1時間ごとに再検証
+```
+
+静的にレンダリングされるルートに複数のフェッチリクエストがあり、それぞれに異なる再検証頻度がある場合、すべてのリクエストに対して最も短い時間が使用されます。動的にレンダリングされるルートでは、各`fetch`リクエストが独立して再検証されます。
+
+[時間ベースの再検証](/docs/app/building-your-application/caching#time-based-revalidation)について詳しく学びます。
+
+#### オンデマンド再検証
+
+データは、Route HandlerまたはServer Action内でパス（[`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)）またはキャッシュタグ（[`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)）によってオンデマンドで再検証できます。
+
+Next.jsには、ルート間で`fetch`リクエストを無効化するキャッシュタグシステムがあります。
+
+1. `fetch`を使用する際、1つ以上のタグでキャッシュエントリをタグ付けできます。
+2. その後、`revalidateTag`を呼び出して、そのタグに関連付けられたすべてのエントリを再検証できます。
+
+例えば、次の`fetch`リクエストはキャッシュタグ`collection`を追加します：
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const res = await fetch('https://...', { next: { tags: ['collection'] } })
+  const data = await res.json()
+  // ...
+}
+```
+
+Route Handlerを使用する場合、Next.jsアプリのみが知る秘密トークンを作成する必要があります。この秘密は不正な再検証試行を防ぐために使用されます。例えば、次のURL構造でルートにアクセスできます（手動またはWebhookで）：
+
+```bash filename="URL"
+https://<your-site.com>/api/revalidate?tag=collection&secret=<token>
+```
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { NextRequest } from 'next/server'
+import { revalidateTag } from 'next/cache'
+
+// 例：`your-website.com/api/revalidate?tag=collection&secret=<token>`へのWebhook
+export async function POST(request: NextRequest) {
+  const secret = request.nextUrl.searchParams.get('secret')
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (secret !== process.env.MY_SECRET_TOKEN) {
+    return Response.json({ message: '無効な秘密トークン' }, { status: 401 })
+  }
+
+  if (!tag) {
+    return Response.json({ message: 'タグパラメータが不足しています' }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidateTag } from 'next/cache'
+
+// 例：`your-website.com/api/revalidate?tag=collection&secret=<token>`へのWebhook
+export async function POST(request) {
+  const secret = request.nextUrl.searchParams.get('secret')
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (secret !== process.env.MY_SECRET_TOKEN) {
+    return Response.json({ message: '無効な秘密トークン' }, { status: 401 })
+  }
+
+  if (!tag) {
+    return Response.json({ message: 'タグパラメータが不足しています' }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+または、[`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)を使用して、パスに関連付けられたすべてのデータを再検証できます。
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { NextRequest } from 'next/server'
+import { revalidatePath } from 'next/cache'
+
+export async function POST(request: NextRequest) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (!path) {
+    return Response.json({ message: 'パスパラメータが不足しています' }, { status: 400 })
+  }
+
+  revalidatePath(path)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function POST(request) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (!path) {
+    return Response.json({ message: 'パスパラメータが不足しています' }, { status: 400 })
+  }
+
+  revalidatePath(path)
+
+  return Response.json({ revalidated: true, now: Date.now() })
+}
+```
+
+[オンデマンド再検証](/docs/app/building-your-application/caching#on-demand-revalidation)について詳しく学びます。
+
+#### エラー処理と再検証
+
+データの再検証中にエラーが発生した場合、最後に正常に生成されたデータがキャッシュから提供され続けます。次のリクエストで、Next.jsはデータの再検証を再試行します。
+
+### データキャッシュのオプトアウト
+
+`fetch`リクエストは以下の場合にキャッシュ**されません**：
+
+- `fetch`リクエストに`cache: 'no-store'`が追加されている場合
+- 個々の`fetch`リクエストに`revalidate: 0`オプションが追加されている場合
+- `fetch`リクエストが`POST`メソッドを使用するRouter Handler内にある場合
+- `fetch`リクエストが`headers`または`cookies`の使用後に来る場合
+- `const dynamic = 'force-dynamic'`ルートセグメントオプションが使用されている場合
+- `fetchCache`ルートセグメントオプションがデフォルトでキャッシュをスキップするように設定されている場合
+- `fetch`リクエストが`Authorization`または`Cookie`ヘッダーを使用し、コンポーネントツリー内にその上の未キャッシュリクエストがある場合
+
+#### 個々の`fetch`リクエスト
+
+個々の`fetch`リクエストのキャッシュをオプトアウトするには、`fetch`の`cache`オプションを`'no-store'`に設定します。これにより、リクエストごとに動的にデータがフェッチされます。
+
+```js filename="layout.js | page.js"
+fetch('https://...', { cache: 'no-store' })
+```
+
+利用可能なすべての`cache`オプションは[`fetch` APIリファレンス](/docs/app/api-reference/functions/fetch)で確認できます。
+
+#### 複数の`fetch`リクエスト
+
+ルートセグメント（レイアウトやページなど）に複数の`fetch`リクエストがある場合、[Segment Config Options](/docs/app/api-reference/file-conventions/route-segment-config)を使用してセグメント内のすべてのデータリクエストのキャッシュ動作を設定できます。
+
+例えば、`const dynamic = 'force-dynamic'`を使用すると、すべてのデータがリクエスト時にフェッチされ、セグメントが動的にレンダリングされます。
+
+```js filename="layout.js | page.js"
+// 追加
+export const dynamic = 'force-dynamic'
+```
+
+ルートセグメントの静的および動的動作を細かく制御するための多くのSegment Configオプションがあります。詳細は[APIリファレンス](/docs/app/api-reference/file-conventions/route-segment-config)を参照してください。
+
+## サードパーティライブラリを使用したサーバーサイドでのデータフェッチング
+
+`fetch`をサポートまたは公開していないサードパーティライブラリ（データベース、CMS、ORMクライアントなど）を使用する場合、[Route Segment Config Option](/docs/app/api-reference/file-conventions/route-segment-config)とReactの`cache`関数を使用して、それらのリクエストのキャッシュと再検証の動作を設定できます。
+
+データがキャッシュされるかどうかは、ルートセグメントが[静的または動的にレンダリングされるか](/docs/app/building-your-application/rendering/server-components#server-rendering-strategies)によって異なります。セグメントが静的（デフォルト）の場合、リクエストの出力はルートセグメントの一部としてキャッシュされ、再検証されます。セグメントが動的な場合、リクエストの出力はキャッシュされず、セグメントがレンダリングされるたびにリクエストごとに再フェッチされます。
+
+> **知っておくと良いこと**:
+>
+> Next.jsは、個々のサードパーティリクエストのキャッシュと再検証の動作を設定するためのAPI、`unstable_cache`を開発中です。
+
+### 例
+
+以下の例では：
+
+- `revalidate`オプションは`3600`に設定されており、データは最大1時間ごとにキャッシュおよび再検証されます。
+- Reactの`cache`関数は、データリクエストを[メモ化](/docs/app/building-your-application/caching#request-memoization)するために使用されます。
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+
+export const revalidate = 3600 // 最大1時間ごとにデータを再検証
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+
+export const revalidate = 3600 // 最大1時間ごとにデータを再検証
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+`getItem`関数が2回呼び出されても、データベースへのクエリは1回だけ実行されます。
+
+```tsx filename="app/item/[id]/layout.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Layout({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/layout.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Layout({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Page({
+  params: { id },
+}: {
+  params: { id: string }
+}) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import { getItem } from '@/utils/get-item'
+
+export default async function Page({ params: { id } }) {
+  const item = await getItem(id)
+  // ...
+}
+```
+
+## Route Handlersを使用したクライアントサイドでのデータフェッチング
+
+クライアントコンポーネントでデータをフェッチする必要がある場合、クライアントから[Route Handler](/docs/app/building-your-application/routing/route-handlers)を呼び出すことができます。Route Handlersはサーバー上で実行され、データをクライアントに返します。これは、APIトークンなどの機密情報をクライアントに公開したくない場合に便利です。
+
+例については[Route Handler](/docs/app/building-your-application/routing/route-handlers)ドキュメントを参照してください。
+
+> **Server ComponentsとRoute Handlers**
+>
+> Server Componentsはサーバー上でレンダリングされるため、Server ComponentからデータをフェッチするためにRoute Handlerを呼び出す必要はありません。代わりに、Server Component内で直接データをフェッチできます。
+
+## サードパーティライブラリを使用したクライアントサイドでのデータフェッチング
+
+[SWR](https://swr.vercel.app/)や[React Query](https://tanstack.com/query/latest)などのサードパーティライブラリを使用して、クライアントでデータをフェッチすることもできます。これらのライブラリは、リクエストのメモ化、キャッシュ、再検証、データの変更のための独自のAPIを提供します。
+
+> **将来のAPI**:
+>
+> `use`は、関数によって返される**Promiseを受け入れ、処理する**React関数です。現在、Client Componentsで`fetch`を`use`でラップすることは**推奨されていません**。複数の再レンダリングを引き起こす可能性があります。`use`について詳しくは[React RFC](https://github.com/acdlite/rfcs/blob/first-class-promises/text/0000-first-class-support-for-promises.md#usepromise)を参照してください。

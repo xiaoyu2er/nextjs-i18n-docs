@@ -1,0 +1,147 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:10:33.528Z
+title: getServerSideProps
+description: リクエストごとに `getServerSideProps` を使用してデータを取得
+---
+
+ページから `getServerSideProps`（サーバーサイドレンダリング）という関数をエクスポートすると、Next.js は `getServerSideProps` が返すデータを使用して、リクエストごとにこのページを事前レンダリングします。
+
+```tsx filename="pages/index.tsx" switcher
+import type { InferGetServerSidePropsType, GetServerSideProps } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getServerSideProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetServerSideProps<{
+  repo: Repo
+}>
+
+export default function Page({
+  repo,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  return repo.stargazers_count
+}
+```
+
+```jsx filename="pages/index.js" switcher
+export async function getServerSideProps() {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo = await res.json()
+  return { props: { repo } }
+}
+
+export default function Page({ repo }) {
+  return repo.stargazers_count
+}
+```
+
+> レンダリングタイプに関係なく、すべての `props` はページコンポーネントに渡され、初期HTMLでクライアントサイドから確認できることに注意してください。これはページを正しく[ハイドレート](https://react.dev/reference/react-dom/hydrate)するためです。クライアント側で利用可能であってはならない機密情報を `props` に含めないように注意してください。
+
+## getServerSideProps が実行されるタイミング
+
+`getServerSideProps` はサーバーサイドでのみ実行され、ブラウザでは決して実行されません。ページが `getServerSideProps` を使用している場合:
+
+- このページを直接リクエストすると、`getServerSideProps` はリクエスト時に実行され、返された props でページが事前レンダリングされます
+- [`next/link`](/docs/pages/api-reference/components/link) または [`next/router`](/docs/pages/api-reference/functions/use-router) を介してクライアントサイドのページ遷移でこのページをリクエストすると、Next.js はサーバーにAPIリクエストを送信し、`getServerSideProps` が実行されます
+
+`getServerSideProps` はページのレンダリングに使用されるJSONを返します。このすべての作業はNext.jsによって自動的に処理されるため、`getServerSideProps` を定義している限り、追加で何かを行う必要はありません。
+
+クライアントサイドのバンドルからNext.jsが何を削除しているかを確認するには、[next-code-eliminationツール](https://next-code-elimination.vercel.app/)を使用できます。
+
+`getServerSideProps` は**ページ**からのみエクスポートできます。非ページファイルからエクスポートすることはできません。
+
+`getServerSideProps` はスタンドアロン関数としてエクスポートする必要があります。ページコンポーネントのプロパティとして `getServerSideProps` を追加しても**機能しません**。
+
+[`getServerSideProps` APIリファレンス](/docs/pages/api-reference/functions/get-server-side-props)では、`getServerSideProps` で使用できるすべてのパラメーターとpropsについて説明しています。
+
+## getServerSideProps を使用すべきケース
+
+ページのデータをリクエスト時に取得する必要がある場合にのみ `getServerSideProps` を使用してください。これはデータの性質やリクエストのプロパティ（`authorization` ヘッダーや地理位置情報など）による場合があります。`getServerSideProps` を使用するページはリクエスト時にサーバーサイドでレンダリングされ、[cache-controlヘッダーが設定されている](/docs/pages/building-your-application/deploying/production-checklist#caching)場合にのみキャッシュされます。
+
+リクエスト時にデータをレンダリングする必要がない場合は、[クライアントサイド](#fetching-data-on-the-client-side)でのデータ取得または[`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)の使用を検討してください。
+
+### getServerSideProps とAPIルート
+
+サーバーからデータを取得したい場合、[APIルート](/docs/pages/building-your-application/routing/api-routes)を使用してから `getServerSideProps` からそのAPIルートを呼び出すことを考えがちです。これは不要で非効率なアプローチです。`getServerSideProps` とAPIルートの両方がサーバーで実行されるため、追加のリクエストが発生します。
+
+次の例を考えてみましょう。APIルートはCMSからデータを取得するために使用されます。そのAPIルートは `getServerSideProps` から直接呼び出されます。これにより追加の呼び出しが発生し、パフォーマンスが低下します。代わりに、APIルート内で使用されるロジックを `getServerSideProps` に直接インポートしてください。これはCMS、データベース、または他のAPIを `getServerSideProps` 内から直接呼び出すことを意味します。
+
+### Edge APIルートでの getServerSideProps 使用
+
+`getServerSideProps` は[サーバーレスおよびEdgeランタイム](/docs/pages/building-your-application/rendering/edge-and-nodejs-runtimes)の両方で使用でき、両方でpropsを設定できます。ただし、現在Edgeランタイムではレスポンスオブジェクトにアクセスできません。つまり、例えば `getServerSideProps` でクッキーを追加することはできません。レスポンスオブジェクトにアクセスするには、デフォルトのランタイムである**Node.jsランタイムを引き続き使用する**必要があります。
+
+`config` を変更することで、ページごとにランタイムを明示的に設定できます。例えば:
+
+```jsx filename="pages/index.js"
+export const config = {
+  runtime: 'nodejs', // または "edge"
+}
+
+export const getServerSideProps = async () => {}
+```
+
+## クライアントサイドでのデータ取得
+
+ページに頻繁に更新されるデータが含まれており、データを事前レンダリングする必要がない場合は、[クライアントサイド](/docs/pages/building-your-application/data-fetching/client-side)でデータを取得できます。この例としてユーザー固有のデータがあります:
+
+- 最初に、データなしで即座にページを表示します。ページの一部は静的生成を使用して事前レンダリングできます。不足しているデータに対してローディング状態を表示できます
+- 次に、クライアントサイドでデータを取得し、準備ができたら表示します
+
+このアプローチは、例えばユーザーダッシュボードページに適しています。ダッシュボードはプライベートでユーザー固有のページであるため、SEOは関係なく、ページを事前レンダリングする必要はありません。データは頻繁に更新されるため、リクエスト時のデータ取得が必要です。
+
+## リクエスト時にデータを取得する getServerSideProps の使用
+
+次の例は、リクエスト時にデータを取得し、結果を事前レンダリングする方法を示しています。
+
+```jsx
+// これはすべてのリクエストで呼び出されます
+export async function getServerSideProps() {
+  // 外部APIからデータを取得
+  const res = await fetch(`https://.../data`)
+  const data = await res.json()
+
+  // propsを介してページにデータを渡す
+  return { props: { data } }
+}
+
+export default function Page({ data }) {
+  // データをレンダリング...
+}
+```
+
+## サーバーサイドレンダリング (SSR) でのキャッシュ
+
+`getServerSideProps` 内でキャッシュヘッダー（`Cache-Control`）を使用して、動的なレスポンスをキャッシュできます。例えば、[`stale-while-revalidate`](https://web.dev/stale-while-revalidate/)を使用します。
+
+```jsx
+// この値は10秒間新鮮とみなされます（s-maxage=10）。
+// 次の10秒以内にリクエストが繰り返されると、以前に
+// キャッシュされた値がまだ新鮮な状態で使用されます。59秒前にリクエストが繰り返された場合、
+// キャッシュされた値は古くなりますが、レンダリングされます（stale-while-revalidate=59）。
+//
+// バックグラウンドで、キャッシュを新しい値で更新するための再検証リクエストが行われます。
+// ページを更新すると、新しい値が表示されます。
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+[キャッシュ](/docs/pages/building-your-application/deploying/production-checklist#caching)について詳しく学びましょう。
+
+## getServerSideProps がエラーページをレンダリングするか
+
+`getServerSideProps` 内でエラーがスローされると、`pages/500.js` ファイルが表示されます。[500ページ](/docs/pages/building-your-application/routing/custom-error#500-page)のドキュメントをチェックして、作成方法を学んでください。開発中はこのファイルは使用されず、代わりに開発用オーバーレイが表示されます。

@@ -1,0 +1,155 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T17:00:14.469Z
+title: 国際化 (Internationalization)
+description: 国際化ルーティングとローカライズされたコンテンツで多言語対応を追加します。
+---
+
+Next.jsでは、ルーティングとコンテンツのレンダリングを設定して複数の言語をサポートできます。サイトを異なるロケールに適応させるには、翻訳されたコンテンツ（ローカライゼーション）と国際化されたルートが必要です。
+
+## 用語解説
+
+- **ロケール (Locale):** 言語とフォーマット設定の識別子。通常、ユーザーの優先言語と地理的な地域が含まれます。
+  - `en-US`: アメリカで話される英語
+  - `nl-NL`: オランダで話されるオランダ語
+  - `nl`: 特定の地域を指定しないオランダ語
+
+## ルーティング概要
+
+ブラウザの言語設定を使用してロケールを選択することを推奨します。優先言語を変更すると、アプリケーションへのリクエストの`Accept-Language`ヘッダーが変更されます。
+
+例えば、以下のライブラリを使用して、`Headers`、サポート予定のロケール、デフォルトロケールに基づいて、受信した`Request`から使用するロケールを決定できます。
+
+```js filename="middleware.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+ルーティングは、サブパス（`/fr/products`）またはドメイン（`my-site.fr/products`）で国際化できます。この情報を使用して、[Middleware](/docs/app/building-your-application/routing/middleware)内でロケールに基づいてユーザーをリダイレクトできます。
+
+```js filename="middleware.js"
+import { NextResponse } from "next/server";
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// 上記と同様の方法またはライブラリを使用して優先ロケールを取得
+function getLocale(request) { ... }
+
+export function middleware(request) {
+  // パス名にサポートされているロケールがあるか確認
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  // ロケールがない場合はリダイレクト
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // 例: 受信リクエストが/productsの場合
+  // 新しいURLは/en-US/productsになる
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // 内部パス(_next)をスキップ
+    '/((?!_next).*)',
+    // オプション: ルート(/)URLのみで実行
+    // '/'
+  ],
+}
+```
+
+最後に、`app/`内のすべての特別なファイルが`app/[lang]`の下にネストされていることを確認してください。これにより、Next.jsルーターがルート内の異なるロケールを動的に処理し、`lang`パラメータをすべてのレイアウトとページに転送できます。例えば:
+
+```jsx filename="app/[lang]/page.js"
+// 現在のロケールにアクセス可能
+// 例: /en-US/products -> `lang`は"en-US"
+export default async function Page({ params: { lang } }) {
+  return ...
+}
+```
+
+ルートレイアウトも新しいフォルダ（例: `app/[lang]/layout.js`）にネストできます。
+
+## ローカライゼーション
+
+ユーザーの優先ロケールに基づいて表示コンテンツを変更するローカライゼーションは、Next.jsに固有のものではありません。以下で説明するパターンは、どのウェブアプリケーションでも同じように機能します。
+
+アプリケーション内で英語とオランダ語のコンテンツをサポートしたいと仮定しましょう。2つの異なる「辞書」を維持する場合があります。これは、キーからローカライズされた文字列へのマッピングを提供するオブジェクトです。例えば:
+
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+次に、要求されたロケールの翻訳を読み込む`getDictionary`関数を作成できます:
+
+```jsx filename="app/[lang]/dictionaries.js"
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale) => dictionaries[locale]()
+```
+
+現在選択されている言語を考慮して、レイアウトまたはページ内で辞書を取得できます。
+
+```jsx filename="app/[lang]/page.js"
+import { getDictionary } from './dictionaries'
+
+export default async function Page({ params: { lang } }) {
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+`app/`ディレクトリ内のすべてのレイアウトとページはデフォルトで[サーバーコンポーネント](/docs/app/building-your-application/rendering/server-components)であるため、翻訳ファイルのサイズがクライアント側のJavaScriptバンドルサイズに影響を与えることを心配する必要はありません。このコードは**サーバー上でのみ実行**され、結果のHTMLのみがブラウザに送信されます。
+
+## 静的生成
+
+特定のロケールセットに対して静的ルートを生成するには、任意のページまたはレイアウトで`generateStaticParams`を使用できます。これはルートレイアウトでグローバルに設定できます:
+
+```jsx filename="app/[lang]/layout.js"
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default function Root({ children, params }) {
+  return (
+    <html lang={params.lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## リソース
+
+- [最小限のi18nルーティングと翻訳](https://github.com/vercel/next.js/tree/canary/examples/app-dir-i18n-routing)
+- [`next-intl`](https://next-intl-docs.vercel.app/docs/next-13)
+- [`next-international`](https://github.com/QuiiBz/next-international)
+- [`next-i18n-router`](https://github.com/i18nexus/next-i18n-router)
