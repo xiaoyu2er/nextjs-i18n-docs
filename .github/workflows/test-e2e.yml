@@ -14,24 +14,34 @@ on:
         default: 3
 
 jobs:
-  prepare-shards:
+  prepare-matrix:
     runs-on: ubuntu-latest
     outputs:
-      shard-array: ${{ steps.generate-shards.outputs.shard-array }}
+      test-matrix: ${{ steps.generate-matrix.outputs.test-matrix }}
     steps:
-      - name: Generate shard array
-        id: generate-shards
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version-file: .nvmrc
+      
+      - name: Generate test matrix
+        id: generate-matrix
         run: |
-          shards=$(seq 1 ${{ inputs.shard-total }} | jq -s -c 'map(tonumber)')
-          echo "shard-array=$shards" >> $GITHUB_OUTPUT
+          # Use the Node.js script to generate the matrix
+          output=$(node .github/scripts/generate-e2e-matrix.js '${{ inputs.matrix-include }}' ${{ inputs.shard-total }})
+          echo "$output" >> $GITHUB_OUTPUT
+          echo "Generated matrix: $output"
 
   test:
-    needs: prepare-shards
+    needs: prepare-matrix
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        include: ${{ fromJson(inputs.matrix-include) }}
-        shard: ${{ fromJson(needs.prepare-shards.outputs.shard-array) }}
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.test-matrix) }}
     name: Test ${{ matrix.locale }} (Shard ${{ matrix.shard }}/${{ inputs.shard-total }})
     steps:
       - name: Checkout code
@@ -62,6 +72,8 @@ jobs:
           pnpm --filter @next-i18n/docs playwright:install
     
       - name: Run E2E Tests
+        env:
+          LOCALE: ${{ matrix.locale }}
         run: |
           echo "Running tests for ${{ matrix.locale }} (Shard ${{ matrix.shard }}/${{ inputs.shard-total }})"
           pnpm --filter @next-i18n/docs test:e2e --shard ${{ matrix.shard }}/${{ inputs.shard-total }}
