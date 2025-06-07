@@ -23,53 +23,27 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version-file: .nvmrc
       - name: Generate matrix from locales config
         id: set-matrix
         run: |
           LABELS_JSON='${{ toJson(github.event.pull_request.labels.*.name) }}'
           echo "LABELS_JSON: $LABELS_JSON"
           
-          # Check if we should deploy all locales (general prerelease)
-          SHOULD_DEPLOY_GENERAL=false
-          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
-            SHOULD_DEPLOY_GENERAL=true
-          elif echo "$LABELS_JSON" | grep -E '"prerelease"' > /dev/null; then
-            SHOULD_DEPLOY_GENERAL=true
-          fi
+          # Use Node.js script to generate matrix
+          OUTPUT=$(node .github/scripts/generate-prerelease-matrix.js "$LABELS_JSON")
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "Generated matrix output: $OUTPUT"
           
-          echo "Should deploy all locales: $SHOULD_DEPLOY_GENERAL"
-          
-          # Read the locales config and generate matrix for enabled locales that should deploy
-          MATRIX=$(jq -c --argjson should_deploy_general "$SHOULD_DEPLOY_GENERAL" --argjson labels "$LABELS_JSON" '
-            to_entries |
-            map(select(.value.enabled == true)) |
-            map(. as $item | {
-              locale: $item.key,
-              secret_project_id: $item.value.secret_project_id,
-              should_deploy: (
-                $should_deploy_general or 
-                ($labels | any(. == ("prerelease:" + $item.key)))
-              )
-            }) |
-            map(select(.should_deploy == true)) |
-            map({locale: .locale, secret_project_id: .secret_project_id})
-          ' .github/locales-config.json)
-          
-          echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
-          echo "Generated matrix: {\"include\":$MATRIX}"
-          
-          # Check if there are any enabled locales
-          ENABLED_COUNT=$(echo "$MATRIX" | jq length)
-          if [ "$ENABLED_COUNT" -eq 0 ]; then
-            echo "No enabled locales found in locales-config.json"
-            exit 1
-          fi
   test:
     needs: generate-matrix
-    if: needs.generate-matrix.outputs.matrix != '[]'
+    if: needs.generate-matrix.outputs.matrix != '{"include":[]}'
     uses: ./.github/workflows/test-e2e.yml
     with:
-      matrix-include: ${{ needs.generate-matrix.outputs.matrix }}
+      matrix-include: ${{ toJson(fromJson(needs.generate-matrix.outputs.matrix).include) }}
       shard-total: 5
     secrets: inherit
 
