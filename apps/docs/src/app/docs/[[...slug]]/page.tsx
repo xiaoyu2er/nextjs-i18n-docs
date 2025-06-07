@@ -2,7 +2,9 @@ import { DocsLayout } from '@/app/docs/[[...slug]]/docs.layout';
 import { getPage } from '@/lib/docs';
 import { createMetadata } from '@/lib/metadata';
 import { getPageTreePeers } from '@/lib/pageTree';
+import { getToc } from '@/lib/remark-plugins/toc';
 import { type DocsPage, type DocsSource, docs } from '@/lib/source';
+import { filterCotent } from '@/lib/toc';
 import { getDocId, getDocUrl, parseDocId } from '@/lib/utils';
 import { getMDXComponents } from '@/mdx-components';
 import { Identity } from '@/mdx/Identity';
@@ -25,24 +27,27 @@ export default async function Docs(props: {
   const page = getPage(docUrl);
   if (!page) notFound();
   const { isApp, isPages, isVLatest, version } = parseDocId(docId);
+  let content = page.data.content;
 
   let { body: MdxContent, toc } = await page.data.load();
-
-  // source: app/getting-started/installation
   const ref = page.data.source;
   if (ref) {
     const refUrl = getDocUrl(isVLatest ? ref : `${version}/${ref}`);
     const refPage = getPage(refUrl);
     if (!refPage) notFound();
-
     const { body: MdxContent2, toc: toc2 } = await refPage.data.load();
 
+    content = refPage.data.content;
     MdxContent = MdxContent2;
     toc = toc2;
   }
 
   const hasRelated = page.data.related;
   const isIndex = page.file.name === 'index';
+
+  if (isApp || isPages) {
+    toc = await getToc(filterCotent({ content, isApp, isPages }));
+  }
 
   return (
     <DocsLayout docId={docId} pageTree={docs.pageTree}>
