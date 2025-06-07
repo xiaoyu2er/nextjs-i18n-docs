@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { getRoutesByType } from './utils/static-routes';
 
-test.describe('Static routes', () => {
+test.describe(`Static routes ${process.env.LOCALE}`, () => {
   const routes = getRoutesByType();
 
   // biome-ignore lint/complexity/noForEach: <explanation>
