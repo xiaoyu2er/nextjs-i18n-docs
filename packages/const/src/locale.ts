@@ -45,7 +45,7 @@ export const LOCALES: LocaleConfig[] = [
   {
     color: 'from-pink-500 to-pink-600',
     description: 'Next.js 日本語ドキュメント',
-    enabled: false,
+    enabled: true,
     flag: '🇯🇵',
     locale: 'ja',
     name: 'Japanese',
@@ -55,7 +55,7 @@ export const LOCALES: LocaleConfig[] = [
   {
     color: 'from-amber-500 to-amber-600',
     description: 'Documentación de Next.js en español',
-    enabled: false,
+    enabled: true,
     flag: '🇪🇸',
     locale: 'es',
     name: 'Spanish',
@@ -65,7 +65,7 @@ export const LOCALES: LocaleConfig[] = [
   {
     color: 'from-gray-500 to-gray-600',
     description: 'Next.js Dokumentation auf Deutsch',
-    enabled: false,
+    enabled: true,
     flag: '🇩🇪',
     locale: 'de',
     name: 'German',
@@ -75,7 +75,7 @@ export const LOCALES: LocaleConfig[] = [
   {
     color: 'from-indigo-500 to-indigo-600',
     description: 'Documentation Next.js en français',
-    enabled: false,
+    enabled: true,
     flag: '🇫🇷',
     locale: 'fr',
     name: 'French',
@@ -85,7 +85,7 @@ export const LOCALES: LocaleConfig[] = [
   {
     color: 'from-emerald-500 to-emerald-600',
     description: 'Документация Next.js на русском языке',
-    enabled: false,
+    enabled: true,
     flag: '🇷🇺',
     locale: 'ru',
     name: 'French',
@@ -95,7 +95,7 @@ export const LOCALES: LocaleConfig[] = [
   {
     color: 'from-green-500 to-green-600',
     description: 'وثائق Next.js باللغة العربية',
-    enabled: false,
+    enabled: true,
     flag: '🇸🇦',
     locale: 'ar',
     name: 'Arabic',

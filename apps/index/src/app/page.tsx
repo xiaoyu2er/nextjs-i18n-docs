@@ -239,16 +239,18 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="mt-8 p-4 bg-white/10 backdrop-blur-sm rounded-xl">
-                <p className="text-white/80 text-sm">
-                  <strong>Most requested so far:</strong>{' '}
-                  {pedingSites
-                    .map(({ name }) => {
-                      return name;
-                    })
-                    .join(', ')}
-                </p>
-              </div>
+              {pedingSites.length > 0 && (
+                <div className="mt-8 p-4 bg-white/10 backdrop-blur-sm rounded-xl">
+                  <p className="text-white/80 text-sm">
+                    <strong>Most requested so far:</strong>{' '}
+                    {pedingSites
+                      .map(({ name }) => {
+                        return name;
+                      })
+                      .join(', ')}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
