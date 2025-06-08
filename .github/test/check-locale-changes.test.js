@@ -13,7 +13,7 @@ const {
   processAutoTrigger,
   isLocaleEnabled,
   getLocaleConfig,
-} = require('./check-locale-changes.js');
+} = require('../scripts/check-locale-changes.js');
 
 // Mock locale config for testing
 const mockLocaleConfig = {

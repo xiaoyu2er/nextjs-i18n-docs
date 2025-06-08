@@ -28,7 +28,7 @@ const {
   getDeletedFiles,
   processRenames,
   processDeletions,
-} = require('./process-file-changes.js');
+} = require('../scripts/process-file-changes.js');
 
 // Mock test directory setup
 let testDir;

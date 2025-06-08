@@ -7,7 +7,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { generateE2EMatrix } = require('./generate-e2e-matrix.js');
+const { generateE2EMatrix } = require('../scripts/generate-e2e-matrix.js');
 
 test('generateE2EMatrix should create cross-product of locales and shards', () => {
   const localesJson =

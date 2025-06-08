@@ -11,7 +11,7 @@ const {
   processPrerelease,
   isLocaleEnabled,
   getLocaleConfig,
-} = require('./generate-prerelease-matrix.js');
+} = require('../scripts/generate-prerelease-matrix.js');
 
 // Mock locale config for testing
 const mockLocaleConfig = {
