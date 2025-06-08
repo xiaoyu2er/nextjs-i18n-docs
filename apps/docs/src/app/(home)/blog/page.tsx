@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 export default function Page(): React.ReactElement {
   const t = useTranslations('BlogPage');
-  const tBase = useTranslations('baseOptions');
+  const tBase = useTranslations('meta');
   const posts = [...blog.getPages()].sort(
     (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime(),
   );
@@ -150,7 +150,7 @@ export default function Page(): React.ReactElement {
 }
 
 export async function generateMetadata() {
-  const t = await getTranslations('baseOptions');
+  const t = await getTranslations('meta');
   return createMetadata({
     title: t('blog'),
     pathname: '/blog',

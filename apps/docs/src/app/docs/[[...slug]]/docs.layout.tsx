@@ -2,7 +2,6 @@
 
 import { useBaseOptions } from '@/hooks/useLayoutOptions';
 import { useRouterType } from '@/hooks/useRouterType';
-import type { RouterType } from '@/lib/const';
 import { getDocsLayoutTree } from '@/lib/pageTree';
 import { parseDocId } from '@/lib/utils';
 import {

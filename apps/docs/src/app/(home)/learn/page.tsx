@@ -88,7 +88,7 @@ export default function LearnIndexPage() {
 }
 
 export async function generateMetadata() {
-  const t = await getTranslations('baseOptions');
+  const t = await getTranslations('meta');
   return createMetadata({
     title: t('learn'),
     pathname: '/learn',
