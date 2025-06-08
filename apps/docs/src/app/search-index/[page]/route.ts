@@ -2,7 +2,6 @@ import { getOramaDocuments } from '@/lib/orama/orama-document';
 import { docs } from '@/lib/source';
 
 import { getLocale } from 'next-intl/server';
-import { notFound } from 'next/navigation';
 
 import { NextResponse } from 'next/server';
 

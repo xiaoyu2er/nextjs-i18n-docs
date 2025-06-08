@@ -7,9 +7,17 @@ import {
 import { useOnChange } from 'fumadocs-core/utils/use-on-change';
 import {
   SearchDialog,
+  SearchDialogClose,
+  SearchDialogContent,
+  SearchDialogFooter,
+  SearchDialogHeader,
+  SearchDialogIcon,
+  SearchDialogInput,
+  SearchDialogList,
+  SearchDialogOverlay,
   type SharedProps,
-  type TagItem,
   TagsList,
+  TagsListItem,
 } from 'fumadocs-ui/components/dialog/search';
 import { type ReactNode, useState } from 'react';
 
@@ -20,7 +28,7 @@ export interface OramaSearchDialogProps extends SharedProps {
   footer?: ReactNode;
   defaultTag?: string;
   whereTag?: string;
-  tags?: TagItem[];
+  tags?: { name: string; value: string }[];
 
   /**
    * Add the "Powered by Orama" label
@@ -49,13 +57,14 @@ export default function OramaSearchDialog({
   showOrama = false,
   allowClear = false,
   index,
+  footer,
   ...props
 }: OramaSearchDialogProps): ReactNode {
   const [tag, setTag] = useState(defaultTag);
   let where = {};
   if (whereTag) {
     where = {
-      tag: { in: [...new Set([tag, whereTag])] },
+      tag: [...new Set([tag, whereTag])],
     };
   }
   const { search, setSearch, query } = useDocsSearch(
@@ -80,27 +89,34 @@ export default function OramaSearchDialog({
     <SearchDialog
       search={search}
       onSearchChange={setSearch}
-      results={query.data ?? []}
       isLoading={query.isLoading}
       {...props}
-      footer={
-        tags ? (
-          <>
-            <TagsList
-              tag={tag}
-              onTagChange={setTag}
-              items={tags}
-              allowClear={allowClear}
-            >
-              {showOrama ? <Label /> : null}
+    >
+      <SearchDialogOverlay />
+      <SearchDialogContent>
+        <SearchDialogHeader>
+          <SearchDialogIcon />
+          <SearchDialogInput />
+          <SearchDialogClose />
+        </SearchDialogHeader>
+        {query.data !== 'empty' && query.data && (
+          <SearchDialogList items={query.data} />
+        )}
+        <SearchDialogFooter className="flex flex-row">
+          {tags ? (
+            <TagsList tag={tag} onTagChange={setTag} allowClear={allowClear}>
+              {tags.map(({ name, value }) => (
+                <TagsListItem key={name} value={value}>
+                  {name}
+                </TagsListItem>
+              ))}
             </TagsList>
-            {props.footer}
-          </>
-        ) : (
-          props.footer
-        )
-      }
-    />
+          ) : null}
+          {showOrama ? <Label /> : null}
+          {footer}
+        </SearchDialogFooter>
+      </SearchDialogContent>
+    </SearchDialog>
   );
 }
 

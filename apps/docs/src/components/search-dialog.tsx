@@ -24,7 +24,8 @@ export default function CustomSearchDialog(props: SharedProps) {
     [config],
   );
   const docId = getDocId(locale, pathname);
-  const { isPages, appTag, pagesTag, whereTag } = parseDocId(docId);
+  const { isPages, version, isVLatest, appTag, pagesTag, whereTag } =
+    parseDocId(docId);
 
   return (
     <SearchOrama
@@ -33,8 +34,8 @@ export default function CustomSearchDialog(props: SharedProps) {
       whereTag={whereTag}
       allowClear
       tags={[
-        { name: 'App', value: appTag },
-        { name: 'Pages', value: pagesTag },
+        { name: isVLatest ? 'App' : `App(v${version})`, value: appTag },
+        { name: isVLatest ? 'Pages' : `Pages(v${version})`, value: pagesTag },
       ]}
       client={client}
       showOrama
