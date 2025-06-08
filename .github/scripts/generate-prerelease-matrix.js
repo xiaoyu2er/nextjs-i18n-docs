@@ -7,53 +7,32 @@
  * labels-json: JSON string containing array of PR labels
  */
 
-const fs = require('node:fs');
-const path = require('node:path');
+const {
+  log,
+  loadLocaleConfig,
+  isLocaleEnabled,
+  getLocaleConfig,
+  createUsageFunction,
+} = require('./lib/common');
 
-// Default values
-const SCRIPT_DIR = __dirname;
-const ROOT_DIR = path.resolve(SCRIPT_DIR, '../..');
-const LOCALE_CONFIG_FILE = path.join(ROOT_DIR, '.github/locales-config.json');
-
-/**
- * Print usage information
- */
-function usage() {
-  console.log(`Usage: ${process.argv[1]} <labels-json>`);
-  console.log('');
-  console.log('Arguments:');
-  console.log('  labels-json     JSON string containing array of PR labels');
-  console.log('');
-  console.log('Examples:');
-  console.log(`  ${process.argv[1]} '["prerelease"]'`);
-  console.log(`  ${process.argv[1]} '["prerelease:en", "prerelease:zh-hans"]'`);
-  process.exit(1);
-}
-
-/**
- * Log messages with timestamp and emoji
- */
-function log(message) {
-  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-  console.error(`🔧 [${timestamp}] ${message}`);
-}
+// Usage information
+const usage = createUsageFunction(
+  process.argv[1],
+  [
+    {
+      name: 'labels-json',
+      required: true,
+      description: 'JSON string containing array of PR labels',
+    },
+  ],
+  [
+    `${process.argv[1]} '["prerelease"]'`,
+    `${process.argv[1]} '["prerelease:en", "prerelease:zh-hans"]'`,
+  ],
+);
 
 /**
- * Check if locale is enabled in config
- */
-function isLocaleEnabled(localeConfig, locale) {
-  return localeConfig[locale]?.enabled === true;
-}
-
-/**
- * Get locale configuration value
- */
-function getLocaleConfig(localeConfig, locale, field) {
-  return localeConfig[locale]?.[field] || '';
-}
-
-/**
- * Add locale to matrix
+ * Add locale to prerelease matrix (simplified version without orama_private_api_key)
  */
 function addLocaleToMatrix(matrix, locale, secretProjectId) {
   return [
@@ -96,7 +75,7 @@ function processPrerelease(localeConfig, labels) {
           );
           log(`✅ Added ${locale} to deployment matrix`);
         } else {
-          log(`⚠️ Skipping ${locale} (missing secret_project_id)`);
+          log(`⚠️ Skipping ${locale} (missing secret_project_id)`, 'warn');
         }
       } else {
         log(`⏭️ Skipping ${locale} (not enabled)`);
@@ -129,10 +108,10 @@ function processPrerelease(localeConfig, labels) {
             );
             log(`✅ Added ${locale} to deployment matrix`);
           } else {
-            log(`⚠️ Skipping ${locale} (missing secret_project_id)`);
+            log(`⚠️ Skipping ${locale} (missing secret_project_id)`, 'warn');
           }
         } else {
-          log(`❌ Skipping ${locale} (not enabled or not found)`);
+          log(`❌ Skipping ${locale} (not enabled or not found)`, 'warn');
         }
       }
     } else {
@@ -177,19 +156,13 @@ function main() {
       process.exit(1);
     }
 
-    // Read locale configuration
-    let localeConfig;
-    try {
-      if (!fs.existsSync(LOCALE_CONFIG_FILE)) {
-        throw new Error(`Locale config file not found: ${LOCALE_CONFIG_FILE}`);
-      }
+    log('=== Prerelease Matrix Generator ===');
 
-      const configContent = fs.readFileSync(LOCALE_CONFIG_FILE, 'utf8');
-      localeConfig = JSON.parse(configContent);
-    } catch (error) {
-      console.error(`Error reading locale config: ${error.message}`);
-      process.exit(1);
-    } // Process prerelease labels
+    // Load locale configuration
+    const localeConfig = loadLocaleConfig();
+    log(`Loaded configuration for ${Object.keys(localeConfig).length} locales`);
+
+    // Process prerelease labels
     const result = processPrerelease(localeConfig, labels);
 
     // Output results in GitHub Actions format
@@ -197,11 +170,13 @@ function main() {
 
     // Validate that we have at least one locale to deploy
     if (result.matrixInclude.length === 0) {
-      log('❌ No enabled locales found to deploy');
+      log('❌ No enabled locales found to deploy', 'error');
       process.exit(1);
     }
+
+    log(`✅ Generated matrix with ${result.matrixInclude.length} locale(s)`);
   } catch (error) {
-    console.error(`💥 Error: ${error.message}`);
+    log(`Error: ${error.message}`, 'error');
     process.exit(1);
   }
 }
@@ -214,6 +189,4 @@ if (require.main === module) {
 module.exports = {
   main,
   processPrerelease,
-  isLocaleEnabled,
-  getLocaleConfig,
 };

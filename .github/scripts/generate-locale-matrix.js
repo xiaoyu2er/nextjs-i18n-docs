@@ -10,100 +10,45 @@
  */
 
 const fs = require('node:fs');
-const path = require('node:path');
+const {
+  log,
+  loadLocaleConfig,
+  isLocaleEnabled,
+  getLocaleConfig,
+  addLocaleToMatrix,
+  parseLocaleList,
+  outputGitHubActions,
+  createUsageFunction,
+} = require('./lib/common');
 
-// Default values
-const SCRIPT_DIR = __dirname;
-const ROOT_DIR = path.resolve(SCRIPT_DIR, '../..');
-const LOCALE_CONFIG_FILE = path.join(ROOT_DIR, '.github/locales-config.json');
-
-/**
- * Print usage information
- */
-function usage() {
-  console.log(
-    `Usage: ${process.argv[1]} <trigger-type> [manual-locales] [changes-json-file]`,
-  );
-  console.log('');
-  console.log('Arguments:');
-  console.log("  trigger-type       Type of trigger: 'manual' or 'auto'");
-  console.log(
-    '  manual-locales     Comma-separated list of locales (optional, for manual trigger)',
-  );
-  console.log(
-    '  changes-json-file  File path containing JSON output from changed-files action (for auto triggers)',
-  );
-  console.log('');
-  console.log('Examples:');
-  console.log(`  ${process.argv[1]} manual`);
-  console.log(`  ${process.argv[1]} manual 'en,zh-hans'`);
-  console.log(`  ${process.argv[1]} auto '/tmp/changes.json'`);
-  console.log(`  ${process.argv[1]} auto '/tmp/changes.json'`);
-  process.exit(1);
-}
-
-/**
- * Log messages with timestamp
- */
-function log(message) {
-  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-  console.error(`[${timestamp}] ${message}`);
-}
-
-/**
- * Validate JSON
- */
-function validateJson(jsonString) {
-  try {
-    JSON.parse(jsonString);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-/**
- * Remove comments from JSON string
- * @param {string} jsonString
- * @returns {string}
- */
-function stripJsonComments(jsonString) {
-  // Remove single line comments starting with //
-  return jsonString.replace(/^\s*\/\/.*$/gm, '');
-}
-
-/**
- * Add locale to matrix
- */
-function addLocaleToMatrix(
-  matrix,
-  locale,
-  secretProjectId,
-  oramaPrivateApiKey,
-) {
-  return [
-    ...matrix,
+// Usage information
+const usage = createUsageFunction(
+  process.argv[1],
+  [
     {
-      locale,
-      secret_project_id: secretProjectId,
-      orama_private_api_key: oramaPrivateApiKey,
+      name: 'trigger-type',
+      required: true,
+      description: "Type of trigger: 'manual' or 'auto'",
     },
-  ];
-}
-
-/**
- * Check if locale is enabled
- */
-function isLocaleEnabled(localeConfig, locale) {
-  return localeConfig[locale]?.enabled === true;
-}
-
-/**
- * Get locale configuration
- */
-function getLocaleConfig(localeConfig, locale, field) {
-  return localeConfig[locale]?.[field] || '';
-}
+    {
+      name: 'manual-locales',
+      required: false,
+      description:
+        'Comma-separated list of locales (optional, for manual trigger)',
+    },
+    {
+      name: 'changes-json-file',
+      required: false,
+      description:
+        'File path containing JSON output from changed-files action (for auto triggers)',
+    },
+  ],
+  [
+    `${process.argv[1]} manual`,
+    `${process.argv[1]} manual 'en,zh-hans'`,
+    `${process.argv[1]} auto '/tmp/changes.json'`,
+  ],
+);
 
 /**
  * Process manual trigger
@@ -139,7 +84,7 @@ function processManualTrigger(localeConfig, manualLocales) {
           hasChanges = true;
           log(`✅ Added ${locale} to deployment matrix`);
         } else {
-          log(`⚠️ Skipping ${locale} (missing configuration)`);
+          log(`⚠️ Skipping ${locale} (missing configuration)`, 'warn');
         }
       } else {
         log(`Skipping ${locale} (not enabled)`);
@@ -147,12 +92,7 @@ function processManualTrigger(localeConfig, manualLocales) {
     }
   } else {
     log(`Manual locales specified: ${manualLocales}`);
-
-    // Parse comma-separated locales
-    const locales = manualLocales
-      .split(',')
-      .map((locale) => locale.trim())
-      .filter((locale) => locale);
+    const locales = parseLocaleList(manualLocales);
 
     for (const locale of locales) {
       if (isLocaleEnabled(localeConfig, locale)) {
@@ -177,10 +117,13 @@ function processManualTrigger(localeConfig, manualLocales) {
           hasChanges = true;
           log(`✅ Added ${locale} to deployment matrix`);
         } else {
-          log(`⚠️ Skipping ${locale} (missing configuration)`);
+          log(`⚠️ Skipping ${locale} (missing configuration)`, 'warn');
         }
       } else {
-        log(`⚠️ Skipping ${locale} (not enabled or not found in config)`);
+        log(
+          `⚠️ Skipping ${locale} (not enabled or not found in config)`,
+          'warn',
+        );
       }
     }
   }
@@ -274,26 +217,12 @@ function main() {
   }
 
   try {
-    // Check if locale config file exists
-    if (!fs.existsSync(LOCALE_CONFIG_FILE)) {
-      console.error(
-        `Error: Locale config file not found: ${LOCALE_CONFIG_FILE}`,
-      );
-      process.exit(1);
-    }
-
-    // Read locale config
-    let localeConfig;
-    try {
-      const localeConfigContent = fs.readFileSync(LOCALE_CONFIG_FILE, 'utf8');
-      localeConfig = JSON.parse(stripJsonComments(localeConfigContent));
-    } catch (error) {
-      console.error('Error: Failed to read or parse locale config file');
-      process.exit(1);
-    }
-
     log('=== Locale Matrix Generator ===');
     log(`Trigger type: ${triggerType}`);
+
+    // Load locale configuration
+    const localeConfig = loadLocaleConfig();
+    log(`Loaded configuration for ${Object.keys(localeConfig).length} locales`);
 
     let result;
 
@@ -324,20 +253,14 @@ function main() {
       result = processAutoTrigger(localeConfig, changesJson);
     }
 
-    // Format and validate the matrix output
+    // Format and output the matrix
     const matrixOutput = JSON.stringify(result.matrixInclude);
+    console.log(`include=${matrixOutput}`);
+    console.log(`has-changes=${result.hasChanges}`);
 
-    if (validateJson(matrixOutput)) {
-      console.log(`include=${matrixOutput}`);
-      console.log(`has-changes=${result.hasChanges}`);
-    } else {
-      console.error('Error: Generated invalid JSON matrix');
-      console.log('include=[]');
-      console.log('has-changes=false');
-      process.exit(1);
-    }
+    log(`✅ Generated matrix with ${result.matrixInclude.length} locale(s)`);
   } catch (error) {
-    console.error(`Error: ${error.message}`);
+    log(`Error: ${error.message}`, 'error');
     console.log('include=[]');
     console.log('has-changes=false');
     process.exit(1);
@@ -353,6 +276,4 @@ module.exports = {
   main,
   processManualTrigger,
   processAutoTrigger,
-  isLocaleEnabled,
-  getLocaleConfig,
 };
