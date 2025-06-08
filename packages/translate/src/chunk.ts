@@ -1,8 +1,22 @@
+import type { DeepSeekModel } from './types';
+
 // Constants for token estimation
 export const CHAR_TO_TOKEN_RATIO = 0.3; // 1 English character ≈ 0.3 token
 export const CHAR_TO_TOKEN_RATIO_ZH = 0.5; // 1 Chinese character ≈ 0.5 token
 export const MAX_INPUT_TOKENS = 64 * 1024; // DeepSeek's 64K context length
-export const MAX_OUTPUT_TOKENS = 8 * 1024; // DeepSeek's 8K max output
+
+// Model-specific output token limits
+export const MAX_OUTPUT_TOKENS_CHAT = 8 * 1024; // deepseek-chat: max 8K output
+export const MAX_OUTPUT_TOKENS_REASONER = 64 * 1024; // deepseek-reasoner: max 64K output
+
+// Get max output tokens for a specific model
+export function getMaxOutputTokens(
+  model: DeepSeekModel = 'deepseek-chat',
+): number {
+  return model === 'deepseek-reasoner'
+    ? MAX_OUTPUT_TOKENS_REASONER
+    : MAX_OUTPUT_TOKENS_CHAT;
+}
 
 // Chunk size constants (in estimated tokens)
 export const MAX_CHUNK_SIZE_TOKENS = 16 * 1024; // Use smaller chunks for better translation quality
@@ -13,12 +27,20 @@ export function estimateTokens(content: string): number {
   return Math.ceil(content.length * CHAR_TO_TOKEN_RATIO_ZH);
 }
 
-export function needsChunking(content: string): boolean {
-  return estimateTokens(content) > MAX_OUTPUT_TOKENS;
+export function needsChunking(
+  content: string,
+  model: DeepSeekModel = 'deepseek-chat',
+): boolean {
+  return estimateTokens(content) > getMaxOutputTokens(model);
 }
 
 // Split text into chunks that respect markdown structure and heading hierarchy
-export function splitIntoChunks(content: string): string[] {
+export function splitIntoChunks(
+  content: string,
+  model: DeepSeekModel = 'deepseek-chat',
+): string[] {
+  const maxOutputTokens = getMaxOutputTokens(model);
+
   // Define a regex pattern for markdown headings (## Heading)
   const headingPattern = /^(#{2,}) /gm;
 
@@ -65,7 +87,7 @@ export function splitIntoChunks(content: string): string[] {
   for (const section of sections) {
     const sectionTokens = estimateTokens(section);
 
-    if (currentTokens + sectionTokens > MAX_OUTPUT_TOKENS) {
+    if (currentTokens + sectionTokens > maxOutputTokens) {
       // If adding this section would exceed the limit, start a new chunk
       chunks.push(currentChunk);
       currentChunk = section;

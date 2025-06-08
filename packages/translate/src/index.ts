@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import { getConfig } from './config';
 import { logger } from './logger';
 import { main } from './main';
-import type { MainConfig } from './types';
+import type { DeepSeekModel, MainConfig } from './types';
 
 export type Config = MainConfig | MainConfig[];
 
@@ -41,6 +41,10 @@ program
     '--concurrency <number>',
     'Number of concurrent translation tasks (default: 10)',
   )
+  .option(
+    '-m, --model <model>',
+    'DeepSeek model to use: "deepseek-chat" or "deepseek-reasoner" (default: "deepseek-chat")',
+  )
   .action(
     async (options: {
       config?: string;
@@ -51,6 +55,7 @@ program
       targetLanguage?: string;
       max?: number;
       concurrency?: number;
+      model?: DeepSeekModel;
     }) => {
       if (options.verbose) {
         logger.setVerbose(true);
@@ -66,6 +71,7 @@ program
           ...(options.docsPath ? { docsPath: options.docsPath } : {}),
           ...(options.max ? { max: options.max } : {}),
           ...(options.concurrency ? { concurrency: options.concurrency } : {}),
+          ...(options.model ? { model: options.model } : {}),
           verbose: options.verbose,
           listOnly: options.listOnly,
           targetLanguage: options.targetLanguage,

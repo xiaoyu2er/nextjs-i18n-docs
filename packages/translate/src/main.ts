@@ -24,6 +24,7 @@ export async function main({
   targetLanguage,
   concurrency = 10,
   verbose,
+  model = 'deepseek-chat',
 }: MainConfig): Promise<void> {
   // Filter languages based on targetLanguage if specified
   const filteredLangs = targetLanguage
@@ -211,6 +212,7 @@ export async function main({
             targetPath: task.targetPath,
             langConfig,
             docsContext,
+            model,
           });
 
           completedRefDocs++;

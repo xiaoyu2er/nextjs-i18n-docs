@@ -1,12 +1,13 @@
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources.mjs';
 import {
-  MAX_OUTPUT_TOKENS,
   estimateTokens,
+  getMaxOutputTokens,
   needsChunking,
   splitIntoChunks,
 } from './chunk';
 import { logger } from './logger';
+import type { DeepSeekModel } from './types';
 import { type Usage, addUsage } from './usage';
 
 interface LangConfig {
@@ -18,6 +19,7 @@ interface TranslateDocumentParams {
   content: string;
   langConfig: LangConfig;
   context?: string;
+  model?: DeepSeekModel;
 }
 
 // Initialize OpenAI client if API key is available
@@ -46,6 +48,7 @@ async function translateChunk(
   langConfig: LangConfig,
   context: string,
   needsFrontmatterRules = true,
+  modelName: DeepSeekModel = 'deepseek-chat',
 ): Promise<string> {
   if (!openai) {
     throw new Error('OPENAI_API_KEY is not set.');
@@ -341,9 +344,9 @@ The next message contains the COMPLETE original text that needs to be translated
   // console.log(chunk);
 
   const response = await openai.chat.completions.create({
-    model: model,
-    max_completion_tokens: MAX_OUTPUT_TOKENS,
-    max_tokens: MAX_OUTPUT_TOKENS,
+    model: modelName,
+    max_completion_tokens: getMaxOutputTokens(modelName),
+    max_tokens: getMaxOutputTokens(modelName),
     messages: messages,
   });
 
@@ -363,6 +366,7 @@ export async function $translateDocument({
   content,
   langConfig,
   context = '',
+  model: modelName = 'deepseek-chat',
 }: TranslateDocumentParams): Promise<string> {
   if (!openai) {
     throw new Error('OPENAI_API_KEY is not set.');
@@ -374,14 +378,14 @@ export async function $translateDocument({
   );
 
   // For small documents, use the direct approach
-  if (!needsChunking(content)) {
-    return await translateChunk(content, langConfig, context, true);
+  if (!needsChunking(content, modelName)) {
+    return await translateChunk(content, langConfig, context, true, modelName);
   }
 
   logger.debug(
     'Document is large, splitting into chunks for multi-round translation',
   );
-  const chunks = splitIntoChunks(content);
+  const chunks = splitIntoChunks(content, modelName);
   logger.debug(`Split document into ${chunks.length} chunks`);
 
   let translatedContent = '';
@@ -395,6 +399,7 @@ export async function $translateDocument({
       langConfig,
       context,
       i === 0,
+      modelName,
     );
 
     // Add to the complete translated content

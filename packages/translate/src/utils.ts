@@ -6,6 +6,7 @@ import matter from 'gray-matter';
 import { needsChunking, splitIntoChunks } from './chunk';
 import { logger } from './logger';
 import { $translateDocument } from './openai';
+import type { DeepSeekModel } from './types';
 
 interface LangConfig {
   name: string;
@@ -167,6 +168,7 @@ interface TranslateDocumentFileParams {
   targetPath: string;
   langConfig: LangConfig;
   docsContext?: string;
+  model?: DeepSeekModel;
 }
 
 export async function translateDoc({
@@ -174,6 +176,7 @@ export async function translateDoc({
   targetPath,
   langConfig,
   docsContext,
+  model = 'deepseek-chat',
 }: TranslateDocumentFileParams) {
   // Create directory if it doesn't exist
   logger.debug(`Translating ${sourcePath} to ${targetPath}`);
@@ -192,6 +195,7 @@ export async function translateDoc({
     content: sourceContent,
     langConfig,
     context: translationContext,
+    model,
   });
 
   // Format as ISO strings (UTC)

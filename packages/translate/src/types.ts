@@ -1,3 +1,5 @@
+export type DeepSeekModel = 'deepseek-chat' | 'deepseek-reasoner';
+
 export interface LangConfig {
   locale: string;
   name: string;
@@ -30,6 +32,7 @@ export interface MainConfig {
   targetLanguage?: string;
   concurrency?: number;
   verbose?: boolean;
+  model?: DeepSeekModel;
 }
 
 export interface TranslationResult {
