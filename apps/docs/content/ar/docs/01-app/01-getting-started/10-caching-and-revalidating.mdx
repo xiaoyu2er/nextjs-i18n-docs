@@ -1,0 +1,252 @@
+---
+source-updated-at: 2025-06-08T05:18:03.000Z
+translation-updated-at: 2025-06-08T05:18:03.000Z
+title: كيفية تخزين البيانات مؤقتًا وإعادة التحقق منها
+nav_title: التخزين المؤقت وإعادة التحقق
+description: تعلم كيفية تخزين البيانات مؤقتًا وإعادة التحقق منها في تطبيقك.
+related:
+  title: مرجع API
+  description: تعرف على المزيد حول الميزات المذكورة في هذه الصفحة من خلال قراءة مرجع API.
+  links:
+    - app/api-reference/functions/fetch
+    - app/api-reference/functions/unstable_cache
+    - app/api-reference/functions/revalidatePath
+    - app/api-reference/functions/revalidateTag
+---
+
+التخزين المؤقت (Caching) هو تقنية لتخزين نتائج جلب البيانات والحسابات الأخرى بحيث يمكن تقديم الطلبات المستقبلية لنفس البيانات بشكل أسرع، دون الحاجة إلى إعادة العمل مرة أخرى. بينما تتيح لك إعادة التحقق (Revalidation) تحديث إدخالات التخزين المؤقت دون الحاجة إلى إعادة بناء تطبيقك بالكامل.
+
+يوفر Next.js بعض واجهات برمجة التطبيقات (APIs) للتعامل مع التخزين المؤقت وإعادة التحقق. سيرشدك هذا الدليل حول متى وكيفية استخدامها.
+
+- [`fetch`](#fetch)
+- [`unstable_cache`](#unstable_cache)
+- [`revalidatePath`](#revalidatepath)
+- [`revalidateTag`](#revalidatetag)
+
+## `fetch`
+
+بشكل افتراضي، لا يتم تخزين طلبات [`fetch`](/docs/app/api-reference/functions/fetch) مؤقتًا. يمكنك تخزين الطلبات الفردية مؤقتًا عن طريق تعيين خيار `cache` إلى `'force-cache'`.
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+> **معلومة مفيدة**: على الرغم من أن طلبات `fetch` لا يتم تخزينها مؤقتًا افتراضيًا، إلا أن Next.js سيقوم [بالتقديم المسبق](/docs/app/getting-started/partial-prerendering#static-rendering) للمسارات التي تحتوي على طلبات `fetch` وتخزين HTML مؤقتًا. إذا كنت تريد ضمان أن يكون المسار [ديناميكيًا](/docs/app/getting-started/partial-prerendering#dynamic-rendering)، استخدم [واجهة برمجة التطبيقات `connection`](/docs/app/api-reference/functions/connection).
+
+لإعادة التحقق من البيانات التي تم إرجاعها بواسطة طلب `fetch`، يمكنك استخدام خيار `next.revalidate`.
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+سيؤدي هذا إلى إعادة التحقق من البيانات بعد عدد محدد من الثواني.
+
+راجع [مرجع واجهة برمجة التطبيقات `fetch`](/docs/app/api-reference/functions/fetch) لمعرفة المزيد.
+
+## `unstable_cache`
+
+تتيح لك `unstable_cache` تخزين نتائج استعلامات قواعد البيانات والوظائف غير المتزامنة الأخرى مؤقتًا. لاستخدامها، قم بلف `unstable_cache` حول الوظيفة. على سبيل المثال:
+
+```tsx filename="app/lib/data.ts swichter
+import { db } from '@/lib/db'
+export async function getUserById(id: string) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```jsx filename="app/lib/data.js" switcher
+import { db } from '@/lib/db'
+
+export async function getUserById(id) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```tsx filename="app/page.tsx" highlight={2,11,13} switcher
+import { unstable_cache } from 'next/cache'
+import { getUserById } from '@/app/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ userId: string }>
+}) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // إضافة معرف المستخدم إلى مفتاح التخزين المؤقت
+  )
+}
+```
+
+```jsx filename="app/page.jsx" highlight={2,7,9} switcher
+import { unstable_cache } from 'next/cache';
+import { getUserById } from '@/app/lib/data';
+
+export default async function Page({ params } }) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // إضافة معرف المستخدم إلى مفتاح التخزين المؤقت
+  );
+}
+```
+
+تقبل الوظيفة كائنًا اختياريًا ثالثًا لتحديد كيفية إعادة التحقق من التخزين المؤقت. وهي تقبل:
+
+- `tags`: مصفوفة من العلامات (tags) التي يستخدمها Next.js لإعادة التحقق من التخزين المؤقت.
+- `revalidate`: عدد الثواني التي يجب بعدها إعادة التحقق من التخزين المؤقت.
+
+```tsx filename="app/page.tsx" highlight={6-9} switcher
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+```jsx filename="app/page.js" highlight={6-9} switcher
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+راجع [مرجع واجهة برمجة التطبيقات `unstable_cache`](/docs/app/api-reference/functions/unstable_cache) لمعرفة المزيد.
+
+## `revalidateTag`
+
+يتم استخدام `revalidateTag` لإعادة التحقق من إدخالات التخزين المؤقت بناءً على علامة (tag) وبعد حدث ما. لاستخدامها مع `fetch`، ابدأ بوضع علامة على الوظيفة باستخدام خيار `next.tags`:
+
+```tsx filename="app/lib/data.ts" highlight={3-5} switcher
+export async function getUserById(id: string) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'],
+    },
+  })
+}
+```
+
+```jsx filename="app/lib/data.js" highlight={3-5} switcher
+export async function getUserById(id) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'],
+    },
+  })
+}
+```
+
+بدلاً من ذلك، يمكنك وضع علامة على وظيفة `unstable_cache` باستخدام خيار `tags`:
+
+```tsx filename="app/lib/data.ts" highlight={6-8} switcher
+export const getUserById = unstable_cache(
+  async (id: string) => {
+    return db.query.users.findFirst({ where: eq(users.id, id) })
+  },
+  ['user'], // مطلوب إذا لم يتم تمرير المتغيرات كمعلمات
+  {
+    tags: ['user'],
+  }
+)
+```
+
+```jsx filename="app/lib/data.js" highlight={6-8} switcher
+export const getUserById = unstable_cache(
+  async (id) => {
+    return db.query.users.findFirst({ where: eq(users.id, id) })
+  },
+  ['user'], // مطلوب إذا لم يتم تمرير المتغيرات كمعلمات
+  {
+    tags: ['user'],
+  }
+)
+```
+
+ثم، استدعِ `revalidateTag` في [معالج المسار (Route Handler)](/docs/app/api-reference/file-conventions/route) أو إجراء الخادم (Server Action):
+
+```tsx filename="app/lib/actions.ts" highlight={1} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // تعديل البيانات
+  revalidateTag('user')
+}
+```
+
+```jsx filename="app/lib/actions.js" highlight={1} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id) {
+  // تعديل البيانات
+  revalidateTag('user')
+}
+```
+
+يمكنك إعادة استخدام نفس العلامة في وظائف متعددة لإعادة التحقق منها جميعًا مرة واحدة.
+
+راجع [مرجع واجهة برمجة التطبيقات `revalidateTag`](/docs/app/api-reference/functions/revalidateTag) لمعرفة المزيد.
+
+## `revalidatePath`
+
+يتم استخدام `revalidatePath` لإعادة التحقق من مسار وبعد حدث ما. لاستخدامها، استدعِها في [معالج المسار (Route Handler)](/docs/app/api-reference/file-conventions/route) أو إجراء الخادم (Server Action):
+
+```tsx filename="app/lib/actions.ts" highlight={1} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // تعديل البيانات
+  revalidatePath('/profile')
+```
+
+```jsx filename="app/lib/actions.js" highlight={1} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id) {
+  // تعديل البيانات
+  revalidatePath('/profile')
+```
+
+راجع [مرجع واجهة برمجة التطبيقات `revalidatePath`](/docs/app/api-reference/functions/revalidatePath) لمعرفة المزيد.

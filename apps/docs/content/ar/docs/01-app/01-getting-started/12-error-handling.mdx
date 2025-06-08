@@ -1,0 +1,317 @@
+---
+source-updated-at: 2025-06-08T05:18:03.000Z
+translation-updated-at: 2025-06-08T05:18:03.000Z
+title: كيفية التعامل مع الأخطاء
+nav_title: معالجة الأخطاء
+description: تعلم كيفية عرض الأخطاء المتوقعة والتعامل مع الاستثناءات غير الملتقطة.
+related:
+  title: مرجع API
+  description: تعرف على المزيد حول الميزات المذكورة في هذه الصفحة من خلال قراءة مرجع API.
+  links:
+    - app/api-reference/functions/redirect
+    - app/api-reference/file-conventions/error
+    - app/api-reference/functions/not-found
+    - app/api-reference/file-conventions/not-found
+---
+
+يمكن تقسيم الأخطاء إلى فئتين: [الأخطاء المتوقعة](#handling-expected-errors) و[الاستثناءات غير الملتقطة](#handling-uncaught-exceptions). ستوجهك هذه الصفحة حول كيفية التعامل مع هذه الأخطاء في تطبيق Next.js الخاص بك.
+
+## التعامل مع الأخطاء المتوقعة
+
+الأخطاء المتوقعة هي تلك التي قد تحدث أثناء التشغيل العادي للتطبيق، مثل الأخطاء الناتجة عن [التحقق من صحة النموذج من جانب الخادم](/docs/app/guides/forms) أو الطلبات الفاشلة. يجب التعامل مع هذه الأخطاء بشكل صريح وإعادتها إلى العميل.
+
+### دوال الخادم
+
+يمكنك استخدام خطاف [`useActionState`](https://react.dev/reference/react/useActionState) للتعامل مع الأخطاء المتوقعة في [دوال الخادم (Server Functions)](https://react.dev/reference/rsc/server-functions).
+
+بالنسبة لهذه الأخطاء، تجنب استخدام كتل `try`/`catch` ورمي الأخطاء. بدلاً من ذلك، قم بنمذجة الأخطاء المتوقعة كقيم مرتجعة.
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function createPost(prevState: any, formData: FormData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  const res = await fetch('https://api.vercel.app/posts', {
+    method: 'POST',
+    body: { title, content },
+  })
+  const json = await res.json()
+
+  if (!res.ok) {
+    return { message: 'Failed to create post' }
+  }
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function createPost(prevState, formData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  const res = await fetch('https://api.vercel.app/posts', {
+    method: 'POST',
+    body: { title, content },
+  })
+  const json = await res.json()
+
+  if (!res.ok) {
+    return { message: 'Failed to create post' }
+  }
+}
+```
+
+يمكنك تمرير الإجراء الخاص بك إلى خطاف `useActionState` واستخدام الحالة `state` المرتجعة لعرض رسالة خطأ.
+
+```tsx filename="app/ui/form.tsx" highlight={11,19} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createPost } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Form() {
+  const [state, formAction, pending] = useActionState(createPost, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="title">Title</label>
+      <input type="text" id="title" name="title" required />
+      <label htmlFor="content">Content</label>
+      <textarea id="content" name="content" required />
+      {state?.message && <p aria-live="polite">{state.message}</p>}
+      <button disabled={pending}>Create Post</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/form.js" highlight={11,19} switcher
+'use client'
+
+import { useActionState } from 'react'
+import { createPost } from '@/app/actions'
+
+const initialState = {
+  message: '',
+}
+
+export function Form() {
+  const [state, formAction, pending] = useActionState(createPost, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="title">Title</label>
+      <input type="text" id="title" name="title" required />
+      <label htmlFor="content">Content</label>
+      <textarea id="content" name="content" required />
+      {state?.message && <p aria-live="polite">{state.message}</p>}
+      <button disabled={pending}>Create Post</button>
+    </form>
+  )
+}
+```
+
+### مكونات الخادم
+
+عند جلب البيانات داخل مكون خادم (Server Component)، يمكنك استخدام الاستجابة لعرض رسالة خطأ شرطية أو [`إعادة توجيه (redirect)`](/docs/app/api-reference/functions/redirect).
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const res = await fetch(`https://...`)
+  const data = await res.json()
+
+  if (!res.ok) {
+    return 'There was an error.'
+  }
+
+  return '...'
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const res = await fetch(`https://...`)
+  const data = await res.json()
+
+  if (!res.ok) {
+    return 'There was an error.'
+  }
+
+  return '...'
+}
+```
+
+### غير موجود
+
+يمكنك استدعاء دالة [`notFound`](/docs/app/api-reference/functions/not-found) داخل جزء مسار واستخدام ملف [`not-found.js`](/docs/app/api-reference/file-conventions/not-found) لعرض واجهة مستخدم 404.
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+import { getPostBySlug } from '@/lib/posts'
+
+export default async function Page({ params }: { params: { slug: string } }) {
+  const { slug } = await params
+  const post = getPostBySlug(slug)
+
+  if (!post) {
+    notFound()
+  }
+
+  return <div>{post.title}</div>
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+import { getPostBySlug } from '@/lib/posts'
+
+export default async function Page({ params }) {
+  const { slug } = await params
+  const post = getPostBySlug(slug)
+
+  if (!post) {
+    notFound()
+  }
+
+  return <div>{post.title}</div>
+}
+```
+
+```tsx filename="app/blog/[slug]/not-found.tsx" switcher
+export default function NotFound() {
+  return <div>404 - Page Not Found</div>
+}
+```
+
+```jsx filename="app/blog/[slug]/not-found.js" switcher
+export default function NotFound() {
+  return <div>404 - Page Not Found</div>
+}
+```
+
+## التعامل مع الاستثناءات غير الملتقطة
+
+الاستثناءات غير الملتقطة هي أخطاء غير متوقعة تشير إلى أخطاء أو مشكلات لا ينبغي أن تحدث أثناء التدفق العادي لتطبيقك. يجب التعامل مع هذه الأخطاء عن طريق رميها، والتي سيتم التقاطها بعد ذلك بواسطة حدود الأخطاء (error boundaries).
+
+### حدود الأخطاء المتداخلة
+
+يستخدم Next.js حدود الأخطاء للتعامل مع الاستثناءات غير الملتقطة. تلتقط حدود الأخطاء الأخطاء في المكونات الفرعية الخاصة بها وتعرض واجهة مستخدم بديلة بدلاً من شجرة المكونات التي تعطلت.
+
+قم بإنشاء حد خطأ عن طريق إضافة ملف [`error.js`](/docs/app/api-reference/file-conventions/error) داخل جزء مسار وتصدير مكون React:
+
+```tsx filename="app/dashboard/error.tsx" switcher
+'use client' // يجب أن تكون حدود الأخطاء مكونات عميل
+
+import { useEffect } from 'react'
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useEffect(() => {
+    // تسجيل الخطأ في خدمة إعداد التقارير عن الأخطاء
+    console.error(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button
+        onClick={
+          // محاولة الاسترداد عن طريق إعادة عرض الجزء
+          () => reset()
+        }
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/dashboard/error.js" switcher
+'use client' // يجب أن تكون حدود الأخطاء مكونات عميل
+
+import { useEffect } from 'react'
+
+export default function Error({ error, reset }) {
+  useEffect(() => {
+    // تسجيل الخطأ في خدمة إعداد التقارير عن الأخطاء
+    console.error(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button
+        onClick={
+          // محاولة الاسترداد عن طريق إعادة عرض الجزء
+          () => reset()
+        }
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+```
+
+ستتصاعد الأخطاء إلى حد الخطأ الأب الأقرب. يسمح ذلك بمعالجة الأخطاء بشكل دقيق عن طريق وضع ملفات `error.tsx` على مستويات مختلفة في [تسلسل المسارات](/docs/app/getting-started/project-structure#component-hierarchy).
+
+<Image
+  alt="Nested Error Component Hierarchy"
+  srcLight="/docs/light/nested-error-component-hierarchy.png"
+  srcDark="/docs/dark/nested-error-component-hierarchy.png"
+  width="1600"
+  height="687"
+/>
+
+### الأخطاء العامة
+
+على الرغم من ندرتها، يمكنك التعامل مع الأخطاء في تخطيط الجذر باستخدام ملف [`global-error.js`](/docs/app/api-reference/file-conventions/error#global-error)، الموجود في دليل التطبيق الجذر، حتى عند استخدام [التدويل](/docs/app/guides/internationalization). يجب أن تحدد واجهة مستخدم الخطأ العام علامات `<html>` و`<body>` الخاصة بها، حيث إنها تحل محل تخطيط الجذر أو القالب عند التنشيط.
+
+```tsx filename="app/global-error.tsx" switcher
+'use client' // يجب أن تكون حدود الأخطاء مكونات عميل
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  return (
+    // يجب أن يتضمن global-error علامات html و body
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => reset()}>Try again</button>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/global-error.js" switcher
+'use client' // يجب أن تكون حدود الأخطاء مكونات عميل
+
+export default function GlobalError({ error, reset }) {
+  return (
+    // يجب أن يتضمن global-error علامات html و body
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => reset()}>Try again</button>
+      </body>
+    </html>
+  )
+}
+```

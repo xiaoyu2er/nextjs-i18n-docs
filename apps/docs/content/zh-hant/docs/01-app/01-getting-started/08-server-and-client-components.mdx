@@ -1,0 +1,568 @@
+---
+source-updated-at: 2025-06-08T05:18:03.000Z
+translation-updated-at: 2025-06-08T05:18:03.000Z
+title: 如何使用伺服器與客戶端元件
+nav_title: 伺服器與客戶端元件
+description: 了解如何透過 React 伺服器元件 (Server Components) 與客戶端元件 (Client Components) 在伺服器或客戶端渲染應用程式的不同部分。
+related:
+  title: 後續步驟
+  description: 進一步了解本頁提到的 API。
+  links:
+    - app/api-reference/directives/use-client
+---
+
+預設情況下，版面配置 (layouts) 和頁面 (pages) 都是[伺服器元件 (Server Components)](https://react.dev/reference/rsc/server-components)，這讓您可以在伺服器端獲取資料並渲染部分 UI，選擇性地快取結果並串流至客戶端。當需要互動性或使用瀏覽器 API 時，您可以使用[客戶端元件 (Client Components)](https://react.dev/reference/rsc/use-client) 來添加功能層。
+
+本頁將說明伺服器元件與客戶端元件在 Next.js 中的運作原理、使用時機，並提供如何在應用程式中組合它們的範例。
+
+## 何時使用伺服器與客戶端元件？
+
+客戶端與伺服器環境具有不同的能力。伺服器元件與客戶端元件讓您可以根據使用情境，在各自環境中執行邏輯。
+
+當您需要以下功能時，請使用**客戶端元件**：
+
+- [狀態 (State)](https://react.dev/learn/managing-state) 與[事件處理器 (event handlers)](https://react.dev/learn/responding-to-events)。例如 `onClick`、`onChange`。
+- [生命週期邏輯 (Lifecycle logic)](https://react.dev/learn/lifecycle-of-reactive-effects)。例如 `useEffect`。
+- 僅限瀏覽器的 API。例如 `localStorage`、`window`、`Navigator.geolocation` 等。
+- [自訂鉤子 (Custom hooks)](https://react.dev/learn/reusing-logic-with-custom-hooks)。
+
+當您需要以下功能時，請使用**伺服器元件**：
+
+- 從資料庫或靠近來源的 API 獲取資料。
+- 使用 API 金鑰、令牌等機密資訊而不暴露給客戶端。
+- 減少傳送至瀏覽器的 JavaScript 數量。
+- 改善[首次內容繪製 (First Contentful Paint, FCP)](https://web.dev/fcp/)，並逐步串流內容至客戶端。
+
+例如，`<Page>` 元件是一個伺服器元件，它獲取文章資料並將其作為 props 傳遞給處理客戶端互動的 `<LikeButton>`。
+
+```tsx filename="app/[id]/page.tsx" highlight={1,12} switcher
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({ params }: { params: { id: string } }) {
+  const post = await getPost(params.id)
+
+  return (
+    <div>
+      <main>
+        <h1>{post.title}</h1>
+        {/* ... */}
+        <LikeButton likes={post.likes} />
+      </main>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/[id]/page.js" highlight={1,12} switcher
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({ params }) {
+  const post = await getPost(params.id)
+
+  return (
+    <div>
+      <main>
+        <h1>{post.title}</h1>
+        {/* ... */}
+        <LikeButton likes={post.likes} />
+      </main>
+    </div>
+  )
+}
+```
+
+```tsx filename="app/ui/like-button.tsx" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function LikeButton({ likes }: { likes: number }) {
+  // ...
+}
+```
+
+```jsx filename="app/ui/like-button.js" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function LikeButton({ likes }) {
+  // ...
+}
+```
+
+## 伺服器與客戶端元件在 Next.js 中如何運作？
+
+### 在伺服器端
+
+在伺服器端，Next.js 使用 React 的 API 來協調渲染工作。渲染工作會按個別路由區段 ([版面配置與頁面](/docs/app/getting-started/layouts-and-pages)) 拆分成多個部分：
+
+- **伺服器元件**會被渲染成一種稱為 React 伺服器元件負載 (RSC Payload) 的特殊資料格式。
+- **客戶端元件**與 RSC 負載會用於[預渲染 (prerender)](/docs/app/getting-started/partial-prerendering#how-does-partial-prerendering-work) HTML。
+
+> **什麼是 React 伺服器元件負載 (RSC Payload)？**
+>
+> RSC 負載是已渲染 React 伺服器元件樹的精簡二進位表示法。React 會在客戶端使用它來更新瀏覽器的 DOM。RSC 負載包含：
+>
+> - 伺服器元件的渲染結果
+> - 客戶端元件應渲染位置的佔位符及其 JavaScript 檔案的參考
+> - 從伺服器元件傳遞給客戶端元件的任何 props
+
+### 在客戶端 (首次載入)
+
+接著，在客戶端：
+
+1. **HTML** 會立即顯示路由的非互動式預覽給使用者。
+2. **RSC 負載**用於協調客戶端與伺服器元件樹。
+3. **JavaScript** 用於水合 (hydrate) 客戶端元件並使應用程式具有互動性。
+
+> **什麼是水合 (hydration)？**
+>
+> 水合是 React 將[事件處理器 (event handlers)](https://react.dev/learn/responding-to-events) 附加至 DOM 的過程，使靜態 HTML 具有互動性。
+
+### 後續導航
+
+在後續導航時：
+
+- **RSC 負載**會被預先獲取並快取，實現瞬間導航。
+- **客戶端元件**完全在客戶端渲染，無需伺服器渲染的 HTML。
+
+## 範例
+
+### 使用客戶端元件
+
+您可以在檔案頂部、import 語句之前添加 [`"use client"`](https://react.dev/reference/react/use-client) 指令來建立客戶端元件。
+
+```tsx filename="app/ui/counter.tsx" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div>
+      <p>{count} likes</p>
+      <button onClick={() => setCount(count + 1)}>Click me</button>
+    </div>
+  )
+}
+```
+
+```jsx filename="app/ui/counter.tsx" highlight={1} switcher
+'use client'
+
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div>
+      <p>{count} likes</p>
+      <button onClick={() => setCount(count + 1)}>Click me</button>
+    </div>
+  )
+}
+```
+
+`"use client"` 用於宣告伺服器與客戶端模組圖 (樹) 之間的**邊界**。
+
+一旦檔案標記了 `"use client"`，**其所有導入的子元件都會被視為客戶端套件的一部分**。這意味著您不需要為每個客戶端元件都添加此指令。
+
+### 減少 JS 套件大小
+
+為了減少客戶端 JavaScript 套件的大小，請將 `'use client'` 添加到特定的互動式元件，而不是將大部分 UI 標記為客戶端元件。
+
+例如，`<Layout>` 元件包含靜態元素如標誌和導航連結，但也包含一個互動式搜尋欄。`<Search />` 是互動式的且需要是客戶端元件，但版面配置的其餘部分可以保持為伺服器元件。
+
+```tsx filename="app/ui/search.tsx" highlight={1} switcher
+'use client'
+
+export default function Search() {
+  // ...
+}
+```
+
+```jsx filename="app/ui/search.js" highlight={1} switcher
+'use client'
+
+export default function Search() {
+  // ...
+}
+```
+
+```tsx filename="app/layout.tsx" switcher
+// 客戶端元件
+import Search from './search'
+// 伺服器元件
+import Logo from './logo'
+
+// Layout 預設為伺服器元件
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <Search />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+// 客戶端元件
+import Search from './search'
+// 伺服器元件
+import Logo from './logo'
+
+// Layout 預設為伺服器元件
+export default function Layout({ children }) {
+  return (
+    <>
+      <nav>
+        <Logo />
+        <Search />
+      </nav>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+### 從伺服器元件傳遞資料至客戶端元件
+
+您可以使用 props 將資料從伺服器元件傳遞至客戶端元件。
+
+```tsx filename="app/[id]/page.tsx" highlight={1,7} switcher
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({ params }: { params: { id: string } }) {
+  const post = await getPost(params.id)
+
+  return <LikeButton likes={post.likes} />
+}
+```
+
+```jsx filename="app/[id]/page.js" highlight={1,7} switcher
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({ params }) {
+  const post = await getPost(params.id)
+
+  return <LikeButton likes={post.likes} />
+}
+```
+
+```tsx filename="app/ui/like-button.tsx" highlight={1} switcher
+'use client'
+
+export default function LikeButton({ likes }: { likes: number }) {
+  // ...
+}
+```
+
+```jsx filename="app/ui/like-button.js" highlight={1} switcher
+'use client'
+
+export default function LikeButton({ likes }) {
+  // ...
+}
+```
+
+或者，您可以使用 [`use` Hook](https://react.dev/reference/react/use) 從伺服器元件串流資料至客戶端元件。請參閱[範例](/docs/app/getting-started/fetching-data#streaming-data-with-the-use-hook)。
+
+> **須知**：傳遞給客戶端元件的 props 需要能被 React [序列化 (serializable)](https://react.dev/reference/react/use-server#serializable-parameters-and-return-values)。
+
+### 交錯使用伺服器與客戶端元件
+
+您可以將伺服器元件作為 prop 傳遞給客戶端元件。這讓您可以在客戶端元件中嵌套伺服器渲染的 UI。
+
+常見的模式是使用 `children` 在 `<ClientComponent>` 中建立一個_插槽 (slot)_。例如，一個在伺服器端獲取資料的 `<Cart>` 元件，嵌套在使用客戶端狀態控制顯示的 `<Modal>` 元件中。
+
+```tsx filename="app/ui/modal.tsx" switcher
+'use client'
+
+export default function Modal({ children }: { children: React.ReactNode }) {
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/ui/modal.js" switcher
+'use client'
+
+export default function Modal({ children }) {
+  return <div>{children}</div>
+}
+```
+
+然後，在父級伺服器元件 (例如 `<Page>`) 中，您可以將 `<Cart>` 作為 `<Modal>` 的子元件傳遞：
+
+```tsx filename="app/page.tsx"  highlight={7} switcher
+import Modal from './ui/modal'
+import Cart from './ui/cart'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Cart />
+    </Modal>
+  )
+}
+```
+
+```jsx filename="app/page.js" highlight={7} switcher
+import Modal from './ui/modal'
+import Cart from './ui/cart'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Cart />
+    </Modal>
+  )
+}
+```
+
+在此模式中，所有伺服器元件 (包括作為 props 傳遞的元件) 都會在伺服器端預先渲染。產生的 RSC 負載將包含客戶端元件在元件樹中的渲染位置參考。
+
+### 上下文提供者 (Context providers)
+
+[React 上下文 (context)](https://react.dev/learn/passing-data-deeply-with-context) 常用於共享全域狀態，例如當前主題。然而，React 上下文不支援在伺服器元件中使用。
+
+要使用上下文，請建立一個接受 `children` 的客戶端元件：
+
+```tsx filename="app/theme-provider.tsx" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+```jsx filename="app/theme-provider.js" switcher
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({ children }) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+然後，將其導入伺服器元件 (例如 `layout`)：
+
+```tsx filename="app/layout.tsx" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.js" switcher
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+現在，您的伺服器元件將能直接渲染提供者，而應用程式中的所有其他客戶端元件都能使用此上下文。
+
+> **須知**：您應盡可能在樹的深層渲染提供者 — 注意 `ThemeProvider` 僅包裹 `{children}` 而非整個 `<html>` 文件。這讓 Next.js 更容易優化伺服器元件的靜態部分。
+
+### 第三方元件
+
+當使用依賴客戶端功能的第三方元件時，您可以將其包裹在客戶端元件中以確保正常運作。
+
+例如，`<Carousel />` 可從 `acme-carousel` 套件導入。此元件使用 `useState`，但尚未添加 `"use client"` 指令。
+
+如果您在客戶端元件中使用 `<Carousel />`，它將如預期運作：
+
+```tsx filename="app/gallery.tsx" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>View pictures</button>
+      {/* 正常運作，因為 Carousel 在客戶端元件中使用 */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/gallery.js" switcher
+'use client'
+
+import { useState } from 'react'
+import { Carousel } from 'acme-carousel'
+
+export default function Gallery() {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>View pictures</button>
+      {/* 正常運作，因為 Carousel 在客戶端元件中使用 */}
+      {isOpen && <Carousel />}
+    </div>
+  )
+}
+```
+
+然而，如果您嘗試直接在伺服器元件中使用它，將會出現錯誤。這是因為 Next.js 不知道 `<Carousel />` 使用了僅限客戶端的功能。
+
+要解決此問題，您可以將依賴客戶端功能的第三方元件包裹在自訂的客戶端元件中：
+
+```tsx filename="app/carousel.tsx" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+```jsx filename="app/carousel.js" switcher
+'use client'
+
+import { Carousel } from 'acme-carousel'
+
+export default Carousel
+```
+
+現在，您可以直接在伺服器元件中使用 `<Carousel />`：
+
+```tsx filename="app/page.tsx" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+      {/* 正常運作，因為 Carousel 是客戶端元件 */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import Carousel from './carousel'
+
+export default function Page() {
+  return (
+    <div>
+      <p>View pictures</p>
+      {/* 正常運作，因為 Carousel 是客戶端元件 */}
+      <Carousel />
+    </div>
+  )
+}
+```
+
+> **給函式庫作者的建議**
+>
+> 如果您正在建立元件函式庫，請為依賴客戶端功能的入口點添加 `"use client"` 指令。這讓使用者能直接將元件導入伺服器元件，而無需建立包裹元件。
+>
+> 值得注意的是，某些打包工具可能會移除 `"use client"` 指令。您可以在 [React Wrap Balancer](https://github.com/shuding/react-wrap-balancer/blob/main/tsup.config.ts#L10-L13) 和 [Vercel Analytics](https://github.com/vercel/analytics/blob/main/packages/web/tsup.config.js#L26-L30) 儲存庫中找到如何配置 esbuild 以包含 `"use client"` 指令的範例。
+
+### 防止環境污染
+
+JavaScript 模組可以在伺服器元件和客戶端元件之間共享，這意味著有可能意外將僅限伺服器的程式碼導入客戶端。例如，考慮以下函式：
+
+```ts filename="lib/data.ts" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+```js filename="lib/data.js" switcher
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+此函式包含一個 `API_KEY`，絕不應該暴露給客戶端。
+
+在 Next.js 中，只有以 `NEXT_PUBLIC_` 為前綴的環境變數會被包含在客戶端套件中。如果變數沒有前綴，Next.js 會將其替換為空字串。
+
+因此，即使 `getData()` 可以被導入並在客戶端執行，它也不會如預期般運作。
+
+為了防止在客戶端元件中意外使用，你可以使用 [`server-only` 套件](https://www.npmjs.com/package/server-only)。
+
+```bash filename="Terminal"
+npm install server-only
+```
+
+然後，將套件導入包含僅限伺服器程式碼的檔案中：
+
+```js filename="lib/data.js"
+import 'server-only'
+
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+
+  return res.json()
+}
+```
+
+現在，如果你嘗試將此模組導入客戶端元件，將會在構建時出現錯誤。
+
+> **小知識**：對應的 [`client-only` 套件](https://www.npmjs.com/package/client-only) 可用來標記包含僅限客戶端邏輯的模組，例如存取 `window` 物件的程式碼。
