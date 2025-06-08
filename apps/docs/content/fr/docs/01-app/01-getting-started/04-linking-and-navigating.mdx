@@ -1,0 +1,466 @@
+---
+source-updated-at: 2025-06-08T05:18:05.000Z
+translation-updated-at: 2025-06-08T21:48:37.856Z
+title: Liaison et Navigation
+description: Apprenez comment le préchargement (prefetching), le prérendu (prerendering) et la navigation côté client fonctionnent dans Next.js, et comment utiliser le composant Link.
+related:
+  links:
+    - app/api-reference/components/link
+    - app/api-reference/file-conventions/loading
+---
+
+Dans Next.js, les routes sont rendues côté serveur par défaut. Cela signifie souvent que le client doit attendre une réponse du serveur avant qu'une nouvelle route puisse être affichée. Next.js intègre nativement le [préchargement](#prefetching), le [streaming](#streaming) et les [transitions côté client](#client-side-transitions) pour garantir une navigation rapide et réactive.
+
+Ce guide explique comment fonctionne la navigation dans Next.js et comment l'optimiser pour les [routes dynamiques](#dynamic-routes-without-loadingtsx) et les [réseaux lents](#slow-networks).
+
+## Fonctionnement de la navigation
+
+Pour comprendre comment fonctionne la navigation dans Next.js, il est utile de se familiariser avec les concepts suivants :
+
+- [Rendu côté serveur (Server Rendering)](#server-rendering)
+- [Préchargement (Prefetching)](#prefetching)
+- [Streaming](#streaming)
+- [Transitions côté client (Client-side transitions)](#client-side-transitions)
+
+### Rendu côté serveur (Server Rendering)
+
+Dans Next.js, les [Layouts et Pages](/docs/app/getting-started/layouts-and-pages) sont des [Composants Serveur React (React Server Components)](https://react.dev/reference/rsc/server-components) par défaut. Lors des navigations initiales et ultérieures, le [Payload des Composants Serveur (Server Component Payload)](/docs/app/getting-started/server-and-client-components#how-do-server-and-client-components-work-in-nextjs) est généré côté serveur avant d'être envoyé au client.
+
+Il existe deux types de rendu côté serveur, selon le moment où il se produit :
+
+- **Rendu statique (ou Prérendu - Static Rendering ou Prerendering)** : se produit au moment du build ou pendant la [revalidation](/docs/app/getting-started/caching-and-revalidating) et le résultat est mis en cache.
+- **Rendu dynamique (Dynamic Rendering)** : se produit au moment de la requête en réponse à une demande du client.
+
+L'inconvénient du rendu côté serveur est que le client doit attendre la réponse du serveur avant que la nouvelle route puisse être affichée. Next.js résout ce délai en [préchargeant](#prefetching) les routes que l'utilisateur est susceptible de visiter et en effectuant des [transitions côté client](#client-side-transitions).
+
+> **Bon à savoir** : Le HTML est également généré pour la visite initiale.
+
+### Préchargement (Prefetching)
+
+Le préchargement est le processus de chargement d'une route en arrière-plan avant que l'utilisateur n'y navigue. Cela rend la navigation entre les routes de votre application instantanée, car au moment où un utilisateur clique sur un lien, les données pour afficher la route suivante sont déjà disponibles côté client.
+
+Next.js précharge automatiquement les routes liées avec le [composant `<Link>`](/docs/app/api-reference/components/link) lorsqu'elles entrent dans le champ de vision de l'utilisateur.
+
+```tsx filename="app/layout.tsx" switcher
+import Link from 'next/link'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <nav>
+          {/* Préchargé lorsque le lien est survolé ou entre dans le champ de vision */}
+          <Link href="/blog">Blog</Link>
+          {/* Pas de préchargement */}
+          <a href="/contact">Contact</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+import Link from 'next/link'
+
+export default function Layout() {
+  return (
+    <html>
+      <body>
+        <nav>
+          {/* Préchargé lorsque le lien est survolé ou entre dans le champ de vision */}
+          <Link href="/blog">Blog</Link>
+          {/* Pas de préchargement */}
+          <a href="/contact">Contact</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+La quantité de la route préchargée dépend du fait qu'elle soit statique ou dynamique :
+
+- **Route statique** : la route entière est préchargée.
+- **Route dynamique** : le préchargement est ignoré, ou la route est partiellement préchargée si [`loading.tsx`](/docs/app/api-reference/file-conventions/loading) est présent.
+
+En ignorant ou en préchargeant partiellement les routes dynamiques, Next.js évite un travail inutile côté serveur pour des routes que les utilisateurs ne visiteront peut-être jamais. Cependant, attendre une réponse du serveur avant la navigation peut donner aux utilisateurs l'impression que l'application ne répond pas.
+
+<Image
+  alt="Server Rendering without Streaming"
+  srcLight="/docs/light/server-rendering-without-streaming.png"
+  srcDark="/docs/dark/server-rendering-without-streaming.png"
+  width="1600"
+  height="748"
+/>
+
+Pour améliorer l'expérience de navigation vers les routes dynamiques, vous pouvez utiliser le [streaming](#streaming).
+
+### Streaming
+
+Le streaming permet au serveur d'envoyer des parties d'une route dynamique au client dès qu'elles sont prêtes, plutôt que d'attendre que la route entière soit rendue. Cela signifie que les utilisateurs voient quelque chose plus tôt, même si certaines parties de la page sont encore en cours de chargement.
+
+Pour les routes dynamiques, cela signifie qu'elles peuvent être **partiellement préchargées**. C'est-à-dire que les layouts partagés et les squelettes de chargement peuvent être demandés à l'avance.
+
+<Image
+  alt="How Server Rendering with Streaming Works"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+Pour utiliser le streaming, créez un fichier `loading.tsx` dans votre dossier de route :
+
+<Image
+  alt="loading.js special file"
+  srcLight="/docs/light/loading-special-file.png"
+  srcDark="/docs/dark/loading-special-file.png"
+  width="1600"
+  height="606"
+/>
+
+```tsx filename="app/dashboard/loading.tsx" switcher
+export default function Loading() {
+  // Ajoutez une interface de secours qui sera affichée pendant le chargement de la route.
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/dashboard/loading.js" switcher
+export default function Loading() {
+  // Ajoutez une interface de secours qui sera affichée pendant le chargement de la route.
+  return <LoadingSkeleton />
+}
+```
+
+En arrière-plan, Next.js encapsulera automatiquement le contenu de `page.tsx` dans une limite `<Suspense>`. L'interface de secours préchargée sera affichée pendant le chargement de la route et remplacée par le contenu réel une fois prêt.
+
+> **Bon à savoir** : Vous pouvez également utiliser [`<Suspense>`](https://react.dev/reference/react/Suspense) pour créer une interface de chargement pour les composants imbriqués.
+
+Avantages de `loading.tsx` :
+
+- Navigation immédiate et retour visuel pour l'utilisateur.
+- Les layouts partagés restent interactifs et la navigation peut être interrompue.
+- Amélioration des Core Web Vitals : [TTFB](https://web.dev/articles/ttfb), [FCP](https://web.dev/articles/fcp) et [TTI](https://web.dev/articles/tti).
+
+Pour encore améliorer l'expérience de navigation, Next.js effectue une [transition côté client](#client-side-transitions) avec le composant `<Link>`.
+
+### Transitions côté client (Client-side transitions)
+
+Traditionnellement, la navigation vers une page rendue côté serveur déclenche un rechargement complet de la page. Cela efface l'état, réinitialise la position de défilement et bloque l'interactivité.
+
+Next.js évite cela avec des transitions côté client en utilisant le composant `<Link>`. Au lieu de recharger la page, il met à jour le contenu dynamiquement en :
+
+- Conservant les layouts et interfaces partagés.
+- Remplaçant la page actuelle par l'état de chargement préchargé ou une nouvelle page si disponible.
+
+Les transitions côté client sont ce qui donne aux applications rendues côté serveur une sensation d'applications rendues côté client. Et lorsqu'elles sont associées au [préchargement](#prefetching) et au [streaming](#streaming), elles permettent des transitions rapides, même pour les routes dynamiques.
+
+## Qu'est-ce qui peut ralentir les transitions ?
+
+Ces optimisations de Next.js rendent la navigation rapide et réactive. Cependant, dans certaines conditions, les transitions peuvent toujours sembler lentes. Voici quelques causes courantes et comment améliorer l'expérience utilisateur :
+
+### Routes dynamiques sans `loading.tsx`
+
+Lors de la navigation vers une route dynamique, le client doit attendre la réponse du serveur avant d'afficher le résultat. Cela peut donner aux utilisateurs l'impression que l'application ne répond pas.
+
+Nous recommandons d'ajouter `loading.tsx` aux routes dynamiques pour activer le préchargement partiel, déclencher une navigation immédiate et afficher une interface de chargement pendant le rendu de la route.
+
+```tsx filename="app/blog/[slug]/loading.tsx" switcher
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/blog/[slug]/loading.js" switcher
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+> **Bon à savoir** : En mode développement, vous pouvez utiliser les outils de développement Next.js pour identifier si la route est statique ou dynamique. Voir [`devIndicators`](/docs/app/api-reference/config/next-config-js/devIndicators) pour plus d'informations.
+
+### Segments dynamiques sans `generateStaticParams`
+
+Si un [segment dynamique](/docs/app/api-reference/file-conventions/dynamic-routes) pourrait être prérendu mais ne l'est pas parce qu'il manque [`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params), la route basculera vers un rendu dynamique au moment de la requête.
+
+Assurez-vous que la route est générée statiquement au moment du build en ajoutant `generateStaticParams` :
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  // ...
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+
+export default async function Page({ params }) {
+  const { slug } = await params
+  // ...
+}
+```
+
+### Réseaux lents
+
+Sur des réseaux lents ou instables, le préchargement peut ne pas se terminer avant que l'utilisateur ne clique sur un lien. Cela peut affecter à la fois les routes statiques et dynamiques. Dans ces cas, le fallback `loading.js` peut ne pas apparaître immédiatement car il n'a pas encore été préchargé.
+
+Pour améliorer les performances perçues, vous pouvez utiliser le [hook `useLinkStatus`](/docs/app/api-reference/functions/use-link-status) pour afficher un retour visuel en ligne à l'utilisateur (comme des spinners ou des effets de texte sur le lien) pendant qu'une transition est en cours.
+
+```tsx
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return pending ? (
+    <div role="status" aria-label="Loading" className="spinner" />
+  ) : null
+}
+```
+
+```tsx
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return pending ? (
+    <div role="status" aria-label="Loading" className="spinner" />
+  ) : null
+}
+```
+
+Vous pouvez "débouncer" l'indicateur de chargement en ajoutant un délai d'animation initial (par exemple 100 ms) et en commençant l'animation comme invisible (par exemple `opacity: 0`). Cela signifie que l'indicateur de chargement ne sera affiché que si la navigation prend plus de temps que le délai spécifié.
+
+```css
+.spinner {
+  /* ... */
+  opacity: 0;
+  animation:
+    fadeIn 500ms 100ms forwards,
+    rotate 1s linear infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+```
+
+> **Bon à savoir** : Vous pouvez utiliser d'autres modèles de retour visuel comme une barre de progression. Voir un exemple [ici](https://github.com/vercel/react-transition-progress).
+
+### Désactivation du préchargement
+
+Vous pouvez désactiver le préchargement en définissant la prop `prefetch` à `false` sur le composant `<Link>`. Cela est utile pour éviter une utilisation inutile des ressources lors du rendu de grandes listes de liens (par exemple une table avec défilement infini).
+
+```tsx
+<Link prefetch={false} href="/blog">
+  Blog
+</Link>
+```
+
+Cependant, désactiver le préchargement a des inconvénients :
+
+- **Routes statiques** : ne seront chargées que lorsque l'utilisateur cliquera sur le lien.
+- **Routes dynamiques** : devront être rendues côté serveur avant que le client puisse y naviguer.
+
+Pour réduire l'utilisation des ressources sans désactiver complètement le préchargement, vous pouvez précharger uniquement au survol. Cela limite le préchargement aux routes que l'utilisateur est plus susceptible de visiter, plutôt qu'à tous les liens dans le champ de vision.
+
+```tsx filename="app/ui/hover-prefetch-link.tsx" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+function HoverPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/ui/hover-prefetch-link.js" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+function HoverPrefetchLink({ href, children }) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+### Hydratation non terminée
+
+`<Link>` est un Composant Client et doit être hydraté avant de pouvoir précharger les routes. Lors de la visite initiale, de gros bundles JavaScript peuvent retarder l'hydratation, empêchant le préchargement de démarrer immédiatement.
+
+React atténue cela avec l'Hydratation Sélective et vous pouvez encore améliorer cela en :
+
+- Utilisant le plugin [`@next/bundle-analyzer`](/docs/app/guides/package-bundling#analyzing-javascript-bundles) pour identifier et réduire la taille des bundles en supprimant les dépendances volumineuses.
+- Déplaçant la logique du client vers le serveur lorsque possible. Voir la documentation [Composants Serveur et Client](/docs/app/getting-started/server-and-client-components) pour des conseils.
+
+## Exemples
+
+### API History native
+
+Next.js vous permet d'utiliser les méthodes natives [`window.history.pushState`](https://developer.mozilla.org/en-US/docs/Web/API/History/pushState) et [`window.history.replaceState`](https://developer.mozilla.org/en-US/docs/Web/API/History/replaceState) pour mettre à jour la pile d'historique du navigateur sans recharger la page.
+
+Les appels `pushState` et `replaceState` s'intègrent au routeur Next.js, vous permettant de synchroniser avec [`usePathname`](/docs/app/api-reference/functions/use-pathname) et [`useSearchParams`](/docs/app/api-reference/functions/use-search-params).
+
+#### `window.history.pushState`
+
+Utilisez-le pour ajouter une nouvelle entrée à la pile d'historique du navigateur. L'utilisateur peut naviguer vers l'état précédent. Par exemple, pour trier une liste de produits :
+
+```tsx fileName="app/ui/sort-products.tsx" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${params.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Trier par ordre croissant</button>
+      <button onClick={() => updateSorting('desc')}>Trier par ordre décroissant</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/sort-products.js" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${params.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Trier par ordre croissant</button>
+      <button onClick={() => updateSorting('desc')}>Trier par ordre décroissant</button>
+    </>
+  )
+}
+```
+
+#### `window.history.replaceState`
+
+Utilisez cette méthode pour remplacer l'entrée actuelle dans la pile d'historique du navigateur. L'utilisateur ne peut pas revenir à l'état précédent. Par exemple, pour changer la locale de l'application :
+
+```tsx fileName="app/ui/locale-switcher.tsx" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export function LocaleSwitcher() {
+  const pathname = usePathname()
+
+  function switchLocale(locale: string) {
+    // ex. '/en/about' ou '/fr/contact'
+    const newPath = `/${locale}${pathname}`
+    window.history.replaceState(null, '', newPath)
+  }
+
+  return (
+    <>
+      <button onClick={() => switchLocale('en')}>English</button>
+      <button onClick={() => switchLocale('fr')}>French</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/locale-switcher.js" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export function LocaleSwitcher() {
+  const pathname = usePathname()
+
+  function switchLocale(locale) {
+    // ex. '/en/about' ou '/fr/contact'
+    const newPath = `/${locale}${pathname}`
+    window.history.replaceState(null, '', newPath)
+  }
+
+  return (
+    <>
+      <button onClick={() => switchLocale('en')}>English</button>
+      <button onClick={() => switchLocale('fr')}>French</button>
+    </>
+  )
+}
+```
