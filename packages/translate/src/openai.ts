@@ -288,7 +288,7 @@ TRANSLATION VERIFICATION CHECKLIST (CHECK BEFORE SUBMITTING):
 1. Does ANY frontmatter value start with \`, ', or "? → If YES, REARRANGE the sentence
 2. Does ANY frontmatter value contain a colon (:)? → If YES, REPHRASE to avoid it
 3. Is the frontmatter valid YAML? → Test mentally: can a YAML parser read it?
-4. Are all component tags properly closed?
+4. Are all component tags properly closed if they were closed in the original text?
 5. Are code blocks and inline code preserved exactly?
 
 End of frontmatter rules.
@@ -300,7 +300,7 @@ ${context}
 Please read the following rules carefully:
 
 General rules:
-- The document is MDX format - ensure all component tags are properly closed (e.g., \`<AppOnly> </AppOnly>\` \`<PagesOnly> </PagesOnly>\` )
+- The document is MDX format - ensure all component tags are properly closed if they were closed in the original text (e.g., \`<AppOnly> </AppOnly>\` \`<PagesOnly> </PagesOnly>\` )
 - Keep unchanged:
   - All code blocks
   - Markdown formatting
