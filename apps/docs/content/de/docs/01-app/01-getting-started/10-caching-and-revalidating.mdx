@@ -1,0 +1,252 @@
+---
+source-updated-at: 2025-06-08T05:18:03.000Z
+translation-updated-at: 2025-06-08T05:18:03.000Z
+title: Daten cachen und revalidieren
+nav_title: Caching und Revalidierung
+description: Erfahren Sie, wie Sie Daten in Ihrer Anwendung cachen und revalidieren können.
+related:
+  title: API-Referenz
+  description: Erfahren Sie mehr über die auf dieser Seite erwähnten Funktionen in der API-Referenz.
+  links:
+    - app/api-reference/functions/fetch
+    - app/api-reference/functions/unstable_cache
+    - app/api-reference/functions/revalidatePath
+    - app/api-reference/functions/revalidateTag
+---
+
+Caching ist eine Technik, um die Ergebnisse von Datenabfragen und anderen Berechnungen zu speichern, sodass zukünftige Anfragen für dieselben Daten schneller bedient werden können, ohne die Arbeit erneut ausführen zu müssen. Revalidierung ermöglicht es Ihnen, Cache-Einträge zu aktualisieren, ohne Ihre gesamte Anwendung neu erstellen zu müssen.
+
+Next.js bietet einige APIs zur Handhabung von Caching und Revalidierung. Diese Anleitung führt Sie durch die richtige Verwendung.
+
+- [`fetch`](#fetch)
+- [`unstable_cache`](#unstable_cache)
+- [`revalidatePath`](#revalidatepath)
+- [`revalidateTag`](#revalidatetag)
+
+## `fetch`
+
+Standardmäßig werden [`fetch`](/docs/app/api-reference/functions/fetch)-Anfragen nicht gecacht. Sie können einzelne Anfragen cachen, indem Sie die `cache`-Option auf `'force-cache'` setzen.
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+> **Gut zu wissen**: Obwohl `fetch`-Anfragen standardmäßig nicht gecacht werden, wird Next.js Routen mit `fetch`-Anfragen [prerendern](/docs/app/getting-started/partial-prerendering#static-rendering) und den HTML-Cache speichern. Wenn Sie sicherstellen möchten, dass eine Route [dynamisch](/docs/app/getting-started/partial-prerendering#dynamic-rendering) ist, verwenden Sie die [`connection`-API](/docs/app/api-reference/functions/connection).
+
+Um die von einer `fetch`-Anfrage zurückgegebenen Daten zu revalidieren, können Sie die `next.revalidate`-Option verwenden.
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+Dadurch werden die Daten nach einer bestimmten Anzahl von Sekunden revalidiert.
+
+Weitere Informationen finden Sie in der [`fetch`-API-Referenz](/docs/app/api-reference/functions/fetch).
+
+## `unstable_cache`
+
+`unstable_cache` ermöglicht es Ihnen, die Ergebnisse von Datenbankabfragen und anderen asynchronen Funktionen zu cachen. Um es zu verwenden, wrappen Sie `unstable_cache` um die Funktion. Beispiel:
+
+```tsx filename="app/lib/data.ts swichter
+import { db } from '@/lib/db'
+export async function getUserById(id: string) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```jsx filename="app/lib/data.js" switcher
+import { db } from '@/lib/db'
+
+export async function getUserById(id) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```tsx filename="app/page.tsx" highlight={2,11,13} switcher
+import { unstable_cache } from 'next/cache'
+import { getUserById } from '@/app/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ userId: string }>
+}) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // Fügen Sie die Benutzer-ID zum Cache-Schlüssel hinzu
+  )
+}
+```
+
+```jsx filename="app/page.jsx" highlight={2,7,9} switcher
+import { unstable_cache } from 'next/cache';
+import { getUserById } from '@/app/lib/data';
+
+export default async function Page({ params } }) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // Fügen Sie die Benutzer-ID zum Cache-Schlüssel hinzu
+  );
+}
+```
+
+Die Funktion akzeptiert ein drittes optionales Objekt, um zu definieren, wie der Cache revalidiert werden soll. Es akzeptiert:
+
+- `tags`: Ein Array von Tags, die von Next.js zur Revalidierung des Caches verwendet werden.
+- `revalidate`: Die Anzahl der Sekunden, nach denen der Cache revalidiert werden soll.
+
+```tsx filename="app/page.tsx" highlight={6-9} switcher
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+```jsx filename="app/page.js" highlight={6-9} switcher
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+Weitere Informationen finden Sie in der [`unstable_cache`-API-Referenz](/docs/app/api-reference/functions/unstable_cache).
+
+## `revalidateTag`
+
+`revalidateTag` wird verwendet, um Cache-Einträge basierend auf einem Tag und nach einem Ereignis zu revalidieren. Um es mit `fetch` zu verwenden, markieren Sie zunächst die Funktion mit der `next.tags`-Option:
+
+```tsx filename="app/lib/data.ts" highlight={3-5} switcher
+export async function getUserById(id: string) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'],
+    },
+  })
+}
+```
+
+```jsx filename="app/lib/data.js" highlight={3-5} switcher
+export async function getUserById(id) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'],
+    },
+  })
+}
+```
+
+Alternativ können Sie eine `unstable_cache`-Funktion mit der `tags`-Option markieren:
+
+```tsx filename="app/lib/data.ts" highlight={6-8} switcher
+export const getUserById = unstable_cache(
+  async (id: string) => {
+    return db.query.users.findFirst({ where: eq(users.id, id) })
+  },
+  ['user'], // Erforderlich, wenn Variablen nicht als Parameter übergeben werden
+  {
+    tags: ['user'],
+  }
+)
+```
+
+```jsx filename="app/lib/data.js" highlight={6-8} switcher
+export const getUserById = unstable_cache(
+  async (id) => {
+    return db.query.users.findFirst({ where: eq(users.id, id) })
+  },
+  ['user'], // Erforderlich, wenn Variablen nicht als Parameter übergeben werden
+  {
+    tags: ['user'],
+  }
+)
+```
+
+Rufen Sie dann `revalidateTag` in einem [Route Handler](/docs/app/api-reference/file-conventions/route) oder einer Server Action auf:
+
+```tsx filename="app/lib/actions.ts" highlight={1} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Daten mutieren
+  revalidateTag('user')
+}
+```
+
+```jsx filename="app/lib/actions.js" highlight={1} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id) {
+  // Daten mutieren
+  revalidateTag('user')
+}
+```
+
+Sie können dasselbe Tag in mehreren Funktionen wiederverwenden, um sie alle gleichzeitig zu revalidieren.
+
+Weitere Informationen finden Sie in der [`revalidateTag`-API-Referenz](/docs/app/api-reference/functions/revalidateTag).
+
+## `revalidatePath`
+
+`revalidatePath` wird verwendet, um eine Route nach einem Ereignis zu revalidieren. Um es zu verwenden, rufen Sie es in einem [Route Handler](/docs/app/api-reference/file-conventions/route) oder einer Server Action auf:
+
+```tsx filename="app/lib/actions.ts" highlight={1} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Daten mutieren
+  revalidatePath('/profile')
+```
+
+```jsx filename="app/lib/actions.js" highlight={1} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id) {
+  // Daten mutieren
+  revalidatePath('/profile')
+```
+
+Weitere Informationen finden Sie in der [`revalidatePath`-API-Referenz](/docs/app/api-reference/functions/revalidatePath).

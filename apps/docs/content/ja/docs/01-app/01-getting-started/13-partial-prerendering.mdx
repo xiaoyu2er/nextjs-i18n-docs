@@ -1,0 +1,283 @@
+---
+source-updated-at: 2025-06-08T05:18:03.000Z
+translation-updated-at: 2025-06-08T05:18:03.000Z
+title: 部分プリレンダリング (Partial Prerendering) の使用方法
+nav_title: 部分プリレンダリング
+description: 静的レンダリングと動的レンダリングの利点を組み合わせた部分プリレンダリング (PPR) の使用方法を学びましょう。
+version: experimental
+related:
+  title: 次のステップ
+  description: 部分プリレンダリングの設定オプションについてさらに学ぶ。
+  links:
+    - app/api-reference/config/next-config-js/ppr
+---
+
+部分プリレンダリング (PPR) は、同じルート内で静的コンテンツと動的コンテンツを組み合わせることができるレンダリング戦略です。これにより、初期ページのパフォーマンスを向上させながら、パーソナライズされた動的データをサポートできます。
+
+<Image
+  alt="静的ナビゲーションと商品情報、動的なカートとおすすめ商品を表示する部分プリレンダリングされた商品ページ"
+  srcLight="/learn/light/thinking-in-ppr.png"
+  srcDark="/learn/dark/thinking-in-ppr.png"
+  width="1600"
+  height="632"
+/>
+
+ユーザーがルートにアクセスすると:
+
+- サーバーは静的コンテンツを含む**シェル**を送信し、高速な初期読み込みを保証します
+- シェルには、非同期的に読み込まれる動的コンテンツのための**穴**が残されます
+- 動的な穴は**並列でストリーミング**され、ページ全体の読み込み時間を短縮します
+
+> **🎥 動画で学ぶ:** PPRの仕組みとその利点 → [YouTube (10分)](https://www.youtube.com/watch?v=MTcPrTIBkpA)
+
+## 部分プリレンダリングの仕組み
+
+部分プリレンダリングを理解するには、Next.jsで利用可能なレンダリング戦略に慣れておくと役立ちます。
+
+### 静的レンダリング
+
+静的レンダリングでは、HTMLが事前に生成されます（ビルド時または[再検証](/docs/app/guides/incremental-static-regeneration)時）。結果はキャッシュされ、ユーザーやリクエスト間で共有されます。
+
+部分プリレンダリングでは、Next.jsがルートの**静的シェル**を事前にレンダリングします。これには、リクエスト時のデータに依存しないレイアウトやその他のコンポーネントを含めることができます。
+
+### 動的レンダリング
+
+動的レンダリングでは、HTMLが**リクエスト時**に生成されます。これにより、リクエスト時のデータに基づいてパーソナライズされたコンテンツを提供できます。
+
+以下のAPIを使用するとコンポーネントは動的になります:
+
+- [`cookies`](/docs/app/api-reference/functions/cookies)
+- [`headers`](/docs/app/api-reference/functions/headers)
+- [`connection`](/docs/app/api-reference/functions/connection)
+- [`draftMode`](/docs/app/api-reference/functions/draft-mode)
+- [`searchParams` prop](/docs/app/api-reference/file-conventions/page#searchparams-optional)
+- [`unstable_noStore`](/docs/app/api-reference/functions/unstable_noStore)
+- [`fetch`](/docs/app/api-reference/functions/fetch) with `{ cache: 'no-store' }`
+
+部分プリレンダリングでは、これらのAPIを使用すると特別なReactエラーがスローされ、コンポーネントが静的にレンダリングできないことをNext.jsに通知し、ビルドエラーが発生します。[Suspense](#suspense) 境界を使用してコンポーネントをラップし、ランタイムまでレンダリングを延期できます。
+
+### Suspense
+
+Reactの[Suspense](https://react.dev/reference/react/Suspense)は、アプリケーションの一部のレンダリングを特定の条件が満たされるまで延期するために使用されます。
+
+部分プリレンダリングでは、Suspenseはコンポーネントツリー内の**動的境界**をマークするために使用されます。
+
+ビルド時、Next.jsは静的コンテンツと`fallback` UIを事前にレンダリングします。動的コンテンツは、ユーザーがルートをリクエストするまで**延期**されます。
+
+コンポーネントをSuspenseでラップしても、コンポーネント自体が動的になるわけではありません（APIの使用が動的にします）。Suspenseは動的コンテンツをカプセル化し、[ストリーミング](#streaming)を可能にする境界として使用されます。
+
+```jsx filename="app/page.js"
+import { Suspense } from 'react'
+import StaticComponent from './StaticComponent'
+import DynamicComponent from './DynamicComponent'
+import Fallback from './Fallback'
+
+export const experimental_ppr = true
+
+export default function Page() {
+  return (
+    <>
+      <StaticComponent />
+      <Suspense fallback={<Fallback />}>
+        <DynamicComponent />
+      </Suspense>
+    </>
+  )
+}
+```
+
+### ストリーミング
+
+ストリーミングはルートをチャンクに分割し、準備が整った時点でクライアントに段階的にストリーミングします。これにより、コンテンツ全体のレンダリングが完了する前に、ユーザーはページの一部をすぐに確認できます。
+
+<Image
+  alt="クライアント側で部分的にレンダリングされたページと、ストリーミング中のチャンクのローディングUIを示す図"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+部分プリレンダリングでは、Suspenseでラップされた動的コンポーネントがサーバーから並列でストリーミングを開始します。
+
+<Image
+  alt="ストリーミング中のルートセグメントの並列化を示す図。個々のチャンクのデータ取得、レンダリング、ハイドレーションが表示されています"
+  srcLight="/docs/light/sequential-parallel-data-fetching.png"
+  srcDark="/docs/dark/sequential-parallel-data-fetching.png"
+  width="1600"
+  height="525"
+/>
+
+ネットワークのオーバーヘッドを削減するため、静的HTMLとストリーミングされる動的パーツを含む完全なレスポンスが**単一のHTTPリクエスト**で送信されます。これにより、追加の往復通信を回避し、初期読み込みと全体的なパフォーマンスが向上します。
+
+## 部分プリレンダリングの有効化
+
+`next.config.ts`ファイルに[`ppr`](https://rc.nextjs.org/docs/app/api-reference/next-config-js/ppr)オプションを追加することでPPRを有効にできます:
+
+```ts filename="next.config.ts" highlight={5} switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    ppr: 'incremental',
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" highlight={4} switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    ppr: 'incremental',
+  },
+}
+```
+
+`'incremental'`値を指定すると、特定のルートに対してPPRを採用できます:
+
+```tsx filename="/app/dashboard/layout.tsx"
+export const experimental_ppr = true
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  // ...
+}
+```
+
+```jsx filename="/app/dashboard/layout.js"
+export const experimental_ppr = true
+
+export default function Layout({ children }) {
+  // ...
+}
+```
+
+`experimental_ppr`を持たないルートはデフォルトで`false`になり、PPRを使用して事前レンダリングされません。各ルートに対して明示的にPPRをオプトインする必要があります。
+
+> **知っておくと良いこと**:
+>
+> - `experimental_ppr`は、ネストされたレイアウトやページを含む、ルートセグメントのすべての子に適用されます。すべてのファイルに追加する必要はなく、ルートの最上位セグメントのみに追加します。
+> - 子セグメントでPPRを無効にするには、子セグメントで`experimental_ppr`を`false`に設定します。
+
+## 例
+
+### 動的API
+
+受信リクエストを確認する必要がある動的APIを使用する場合、Next.jsはルートに対して動的レンダリングを選択します。PPRを引き続き使用するには、コンポーネントをSuspenseでラップします。例えば、`<User />`コンポーネントは`cookies` APIを使用しているため動的です:
+
+```jsx filename="app/user.js" switcher
+import { cookies } from 'next/headers'
+
+export async function User() {
+  const session = (await cookies()).get('session')?.value
+  return '...'
+}
+```
+
+```tsx filename="app/user.tsx" switcher
+import { cookies } from 'next/headers'
+
+export async function User() {
+  const session = (await cookies()).get('session')?.value
+  return '...'
+}
+```
+
+`<User />`コンポーネントはストリーミングされ、`<Page />`内の他のコンテンツは事前レンダリングされて静的シェルの一部になります。
+
+```tsx filename="app/page.tsx" switcher
+import { Suspense } from 'react'
+import { User, AvatarSkeleton } from './user'
+
+export const experimental_ppr = true
+
+export default function Page() {
+  return (
+    <section>
+      <h1>これは事前レンダリングされます</h1>
+      <Suspense fallback={<AvatarSkeleton />}>
+        <User />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Suspense } from 'react'
+import { User, AvatarSkeleton } from './user'
+
+export const experimental_ppr = true
+
+export default function Page() {
+  return (
+    <section>
+      <h1>これは事前レンダリングされます</h1>
+      <Suspense fallback={<AvatarSkeleton />}>
+        <User />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+### 動的プロパティの受け渡し
+
+コンポーネントは、値がアクセスされたときにのみ動的レンダリングを選択します。例えば、`<Page />`コンポーネントから`searchParams`を読み取る場合、この値を別のコンポーネントにプロパティとして転送できます:
+
+```tsx filename="app/page.tsx" switcher
+import { Table, TableSkeleton } from './table'
+import { Suspense } from 'react'
+
+export default function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort: string }>
+}) {
+  return (
+    <section>
+      <h1>これは事前レンダリングされます</h1>
+      <Suspense fallback={<TableSkeleton />}>
+        <Table searchParams={searchParams} />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Table, TableSkeleton } from './table'
+import { Suspense } from 'react'
+
+export default function Page({ searchParams }) {
+  return (
+    <section>
+      <h1>これは事前レンダリングされます</h1>
+      <Suspense fallback={<TableSkeleton />}>
+        <Table searchParams={searchParams} />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+テーブルコンポーネント内で`searchParams`から値にアクセスすると、コンポーネントが動的になり、ページの他の部分は事前レンダリングされます。
+
+```tsx filename="app/table.tsx" switcher
+export async function Table({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort: string }>
+}) {
+  const sort = (await searchParams).sort === 'true'
+  return '...'
+}
+```
+
+```jsx filename="app/table.js" switcher
+export async function Table({ searchParams }) {
+  const sort = (await searchParams).sort === 'true'
+  return '...'
+}
+```

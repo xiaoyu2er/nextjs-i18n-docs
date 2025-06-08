@@ -1,0 +1,252 @@
+---
+source-updated-at: 2025-06-08T05:18:03.000Z
+translation-updated-at: 2025-06-08T05:18:03.000Z
+title: 如何快取與重新驗證資料
+nav_title: 快取與重新驗證
+description: 學習如何在應用程式中快取與重新驗證資料。
+related:
+  title: API 參考
+  description: 透過閱讀 API 參考文件深入了解本頁提到的功能。
+  links:
+    - app/api-reference/functions/fetch
+    - app/api-reference/functions/unstable_cache
+    - app/api-reference/functions/revalidatePath
+    - app/api-reference/functions/revalidateTag
+---
+
+快取是一種儲存資料擷取結果與其他計算的技術，讓未來對相同資料的請求能更快回應，無需重新執行相同工作。而重新驗證則讓您能在不需重建整個應用程式的情況下更新快取項目。
+
+Next.js 提供了幾個 API 來處理快取與重新驗證。本指南將帶您了解何時以及如何使用這些功能。
+
+- [`fetch`](#fetch)
+- [`unstable_cache`](#unstable_cache)
+- [`revalidatePath`](#revalidatepath)
+- [`revalidateTag`](#revalidatetag)
+
+## `fetch`
+
+預設情況下，[`fetch`](/docs/app/api-reference/functions/fetch) 請求不會被快取。您可以透過將 `cache` 選項設為 `'force-cache'` 來快取個別請求。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+> **須知**：雖然 `fetch` 請求預設不會被快取，但 Next.js 會對包含 `fetch` 請求的路由進行[預渲染](/docs/app/getting-started/partial-prerendering#static-rendering)並快取 HTML。如果您想確保路由是[動態的](/docs/app/getting-started/partial-prerendering#dynamic-rendering)，請使用 [`connection` API](/docs/app/api-reference/functions/connection)。
+
+若要重新驗證 `fetch` 請求返回的資料，您可以使用 `next.revalidate` 選項。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+這會在指定秒數後重新驗證資料。
+
+請參閱 [`fetch` API 參考文件](/docs/app/api-reference/functions/fetch)以了解更多。
+
+## `unstable_cache`
+
+`unstable_cache` 讓您可以快取資料庫查詢與其他非同步函式的結果。使用時，請用 `unstable_cache` 包裹函式。例如：
+
+```tsx filename="app/lib/data.ts" switcher
+import { db } from '@/lib/db'
+export async function getUserById(id: string) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```jsx filename="app/lib/data.js" switcher
+import { db } from '@/lib/db'
+
+export async function getUserById(id) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```tsx filename="app/page.tsx" highlight={2,11,13} switcher
+import { unstable_cache } from 'next/cache'
+import { getUserById } from '@/app/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ userId: string }>
+}) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // 將使用者 ID 加入快取鍵
+  )
+}
+```
+
+```jsx filename="app/page.jsx" highlight={2,7,9} switcher
+import { unstable_cache } from 'next/cache';
+import { getUserById } from '@/app/lib/data';
+
+export default async function Page({ params } }) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // 將使用者 ID 加入快取鍵
+  );
+}
+```
+
+此函式接受第三個可選物件來定義快取應如何重新驗證。它接受：
+
+- `tags`：Next.js 用來重新驗證快取的標籤陣列。
+- `revalidate`：快取應重新驗證的秒數。
+
+```tsx filename="app/page.tsx" highlight={6-9} switcher
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+```jsx filename="app/page.js" highlight={6-9} switcher
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+請參閱 [`unstable_cache` API 參考文件](/docs/app/api-reference/functions/unstable_cache)以了解更多。
+
+## `revalidateTag`
+
+`revalidateTag` 用於根據標籤重新驗證快取項目，並在事件發生後執行。要與 `fetch` 一起使用，請先用 `next.tags` 選項標記函式：
+
+```tsx filename="app/lib/data.ts" highlight={3-5} switcher
+export async function getUserById(id: string) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'],
+    },
+  })
+}
+```
+
+```jsx filename="app/lib/data.js" highlight={3-5} switcher
+export async function getUserById(id) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'],
+    },
+  })
+}
+```
+
+或者，您可以用 `tags` 選項標記 `unstable_cache` 函式：
+
+```tsx filename="app/lib/data.ts" highlight={6-8} switcher
+export const getUserById = unstable_cache(
+  async (id: string) => {
+    return db.query.users.findFirst({ where: eq(users.id, id) })
+  },
+  ['user'], // 若變數未作為參數傳遞則需要
+  {
+    tags: ['user'],
+  }
+)
+```
+
+```jsx filename="app/lib/data.js" highlight={6-8} switcher
+export const getUserById = unstable_cache(
+  async (id) => {
+    return db.query.users.findFirst({ where: eq(users.id, id) })
+  },
+  ['user'], // 若變數未作為參數傳遞則需要
+  {
+    tags: ['user'],
+  }
+)
+```
+
+然後，在[路由處理程式](/docs/app/api-reference/file-conventions/route)或伺服器動作中呼叫 `revalidateTag`：
+
+```tsx filename="app/lib/actions.ts" highlight={1} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // 變更資料
+  revalidateTag('user')
+}
+```
+
+```jsx filename="app/lib/actions.js" highlight={1} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id) {
+  // 變更資料
+  revalidateTag('user')
+}
+```
+
+您可以在多個函式中重複使用相同的標籤，以便一次性重新驗證所有相關快取。
+
+請參閱 [`revalidateTag` API 參考文件](/docs/app/api-reference/functions/revalidateTag)以了解更多。
+
+## `revalidatePath`
+
+`revalidatePath` 用於重新驗證路由並在事件發生後執行。要使用它，請在[路由處理程式](/docs/app/api-reference/file-conventions/route)或伺服器動作中呼叫：
+
+```tsx filename="app/lib/actions.ts" highlight={1} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // 變更資料
+  revalidatePath('/profile')
+```
+
+```jsx filename="app/lib/actions.js" highlight={1} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id) {
+  // 變更資料
+  revalidatePath('/profile')
+```
+
+請參閱 [`revalidatePath` API 參考文件](/docs/app/api-reference/functions/revalidatePath)以了解更多。

@@ -1,0 +1,252 @@
+---
+source-updated-at: 2025-06-08T05:18:03.000Z
+translation-updated-at: 2025-06-08T05:18:03.000Z
+title: Кэширование и ревалидация данных
+nav_title: Кэширование и ревалидация
+description: Узнайте, как кэшировать и обновлять данные в вашем приложении.
+related:
+  title: Справочник API
+  description: Подробнее о функциях, упомянутых на этой странице, можно узнать в справочнике API.
+  links:
+    - app/api-reference/functions/fetch
+    - app/api-reference/functions/unstable_cache
+    - app/api-reference/functions/revalidatePath
+    - app/api-reference/functions/revalidateTag
+---
+
+Кэширование — это техника хранения результатов запросов данных и других вычислений, чтобы последующие запросы тех же данных выполнялись быстрее, без повторного выполнения работы. Ревалидация позволяет обновлять записи в кэше без необходимости пересобирать всё приложение.
+
+Next.js предоставляет несколько API для работы с кэшированием и ревалидацией. Это руководство покажет, когда и как их использовать.
+
+- [`fetch`](#fetch)
+- [`unstable_cache`](#unstable_cache)
+- [`revalidatePath`](#revalidatepath)
+- [`revalidateTag`](#revalidatetag)
+
+## `fetch`
+
+По умолчанию запросы [`fetch`](/docs/app/api-reference/functions/fetch) не кэшируются. Вы можете кэшировать отдельные запросы, установив параметр `cache` в значение `'force-cache'`.
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+> **Полезно знать**: Хотя запросы `fetch` по умолчанию не кэшируются, Next.js будет [предварительно рендерить](/docs/app/getting-started/partial-prerendering#static-rendering) маршруты с запросами `fetch` и кэшировать HTML. Если вы хотите гарантировать, что маршрут будет [динамическим](/docs/app/getting-started/partial-prerendering#dynamic-rendering), используйте [API `connection`](/docs/app/api-reference/functions/connection).
+
+Чтобы обновить данные, возвращаемые запросом `fetch`, можно использовать параметр `next.revalidate`.
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+Это приведёт к обновлению данных через указанное количество секунд.
+
+Подробнее см. в [справочнике API `fetch`](/docs/app/api-reference/functions/fetch).
+
+## `unstable_cache`
+
+`unstable_cache` позволяет кэшировать результаты запросов к базе данных и других асинхронных функций. Чтобы использовать его, оберните `unstable_cache` вокруг функции. Например:
+
+```tsx filename="app/lib/data.ts swichter
+import { db } from '@/lib/db'
+export async function getUserById(id: string) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```jsx filename="app/lib/data.js" switcher
+import { db } from '@/lib/db'
+
+export async function getUserById(id) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```tsx filename="app/page.tsx" highlight={2,11,13} switcher
+import { unstable_cache } from 'next/cache'
+import { getUserById } from '@/app/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ userId: string }>
+}) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // добавляем ID пользователя в ключ кэша
+  )
+}
+```
+
+```jsx filename="app/page.jsx" highlight={2,7,9} switcher
+import { unstable_cache } from 'next/cache';
+import { getUserById } from '@/app/lib/data';
+
+export default async function Page({ params } }) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // добавляем ID пользователя в ключ кэша
+  );
+}
+```
+
+Функция принимает третий необязательный объект для определения способа обновления кэша. Он может содержать:
+
+- `tags`: массив тегов, используемых Next.js для обновления кэша.
+- `revalidate`: количество секунд, через которое кэш должен быть обновлён.
+
+```tsx filename="app/page.tsx" highlight={6-9} switcher
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+```jsx filename="app/page.js" highlight={6-9} switcher
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+Подробнее см. в [справочнике API `unstable_cache`](/docs/app/api-reference/functions/unstable_cache).
+
+## `revalidateTag`
+
+`revalidateTag` используется для обновления записей в кэше по тегу после определённого события. Чтобы использовать его с `fetch`, сначала пометьте функцию параметром `next.tags`:
+
+```tsx filename="app/lib/data.ts" highlight={3-5} switcher
+export async function getUserById(id: string) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'],
+    },
+  })
+}
+```
+
+```jsx filename="app/lib/data.js" highlight={3-5} switcher
+export async function getUserById(id) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'],
+    },
+  })
+}
+```
+
+Либо пометьте функцию `unstable_cache` параметром `tags`:
+
+```tsx filename="app/lib/data.ts" highlight={6-8} switcher
+export const getUserById = unstable_cache(
+  async (id: string) => {
+    return db.query.users.findFirst({ where: eq(users.id, id) })
+  },
+  ['user'], // Необходимо, если переменные не передаются как параметры
+  {
+    tags: ['user'],
+  }
+)
+```
+
+```jsx filename="app/lib/data.js" highlight={6-8} switcher
+export const getUserById = unstable_cache(
+  async (id) => {
+    return db.query.users.findFirst({ where: eq(users.id, id) })
+  },
+  ['user'], // Необходимо, если переменные не передаются как параметры
+  {
+    tags: ['user'],
+  }
+)
+```
+
+Затем вызовите `revalidateTag` в [обработчике маршрута (Route Handler)](/docs/app/api-reference/file-conventions/route) или серверном действии (Server Action):
+
+```tsx filename="app/lib/actions.ts" highlight={1} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Изменяем данные
+  revalidateTag('user')
+}
+```
+
+```jsx filename="app/lib/actions.js" highlight={1} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id) {
+  // Изменяем данные
+  revalidateTag('user')
+}
+```
+
+Один и тот же тег можно использовать в нескольких функциях, чтобы обновить их все одновременно.
+
+Подробнее см. в [справочнике API `revalidateTag`](/docs/app/api-reference/functions/revalidateTag).
+
+## `revalidatePath`
+
+`revalidatePath` используется для обновления маршрута после определённого события. Чтобы использовать его, вызовите его в [обработчике маршрута (Route Handler)](/docs/app/api-reference/file-conventions/route) или серверном действии (Server Action):
+
+```tsx filename="app/lib/actions.ts" highlight={1} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Изменяем данные
+  revalidatePath('/profile')
+```
+
+```jsx filename="app/lib/actions.js" highlight={1} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id) {
+  // Изменяем данные
+  revalidatePath('/profile')
+```
+
+Подробнее см. в [справочнике API `revalidatePath`](/docs/app/api-reference/functions/revalidatePath).

@@ -1,0 +1,283 @@
+---
+source-updated-at: 2025-06-08T05:18:03.000Z
+translation-updated-at: 2025-06-08T05:18:03.000Z
+title: Verwendung von Partial Prerendering
+nav_title: Partial Prerendering
+description: Erfahren Sie, wie Sie die Vorteile von statischem und dynamischem Rendering mit Partial Prerendering kombinieren können.
+version: experimental
+related:
+  title: Nächste Schritte
+  description: Erfahren Sie mehr über die Konfigurationsoption für Partial Prerendering.
+  links:
+    - app/api-reference/config/next-config-js/ppr
+---
+
+Partial Prerendering (PPR) ist eine Rendering-Strategie, die es ermöglicht, statische und dynamische Inhalte in derselben Route zu kombinieren. Dies verbessert die anfängliche Seitenleistung, während gleichzeitig personalisierte, dynamische Daten unterstützt werden.
+
+<Image
+  alt="Teilweise vorgerenderte Produktseite mit statischer Navigation und Produktinformationen sowie dynamischem Warenkorb und empfohlenen Produkten"
+  srcLight="/learn/light/thinking-in-ppr.png"
+  srcDark="/learn/dark/thinking-in-ppr.png"
+  width="1600"
+  height="632"
+/>
+
+Wenn ein Benutzer eine Route aufruft:
+
+- Sendet der Server eine **Shell** mit den statischen Inhalten, was einen schnellen initialen Ladevorgang gewährleistet.
+- Die Shell lässt **Lücken** für dynamische Inhalte, die asynchron nachgeladen werden.
+- Die dynamischen Lücken werden **parallel gestreamt**, was die gesamte Ladezeit der Seite reduziert.
+
+> **🎥 Video ansehen:** Warum PPR und wie es funktioniert → [YouTube (10 Minuten)](https://www.youtube.com/watch?v=MTcPrTIBkpA).
+
+## Wie funktioniert Partial Prerendering?
+
+Um Partial Prerendering zu verstehen, ist es hilfreich, die in Next.js verfügbaren Rendering-Strategien zu kennen.
+
+### Statisches Rendering
+
+Beim statischen Rendering wird HTML im Voraus generiert – entweder beim Build oder durch [Revalidierung](/docs/app/guides/incremental-static-regeneration). Das Ergebnis wird zwischengespeichert und für alle Benutzer und Anfragen gemeinsam genutzt.
+
+Bei Partial Prerendering prerendert Next.js eine **statische Shell** für eine Route. Diese kann das Layout und alle anderen Komponenten enthalten, die nicht von Anfragezeit-Daten abhängen.
+
+### Dynamisches Rendering
+
+Beim dynamischen Rendering wird HTML zur **Anfragezeit** generiert. Dies ermöglicht die Bereitstellung personalisierter Inhalte basierend auf Anfragezeit-Daten.
+
+Eine Komponente wird dynamisch, wenn sie die folgenden APIs verwendet:
+
+- [`cookies`](/docs/app/api-reference/functions/cookies)
+- [`headers`](/docs/app/api-reference/functions/headers)
+- [`connection`](/docs/app/api-reference/functions/connection)
+- [`draftMode`](/docs/app/api-reference/functions/draft-mode)
+- [`searchParams` prop](/docs/app/api-reference/file-conventions/page#searchparams-optional)
+- [`unstable_noStore`](/docs/app/api-reference/functions/unstable_noStore)
+- [`fetch`](/docs/app/api-reference/functions/fetch) mit `{ cache: 'no-store' }`
+
+Bei Partial Prerendering führt die Verwendung dieser APIs zu einem speziellen React-Fehler, der Next.js mitteilt, dass die Komponente nicht statisch gerendert werden kann, was zu einem Build-Fehler führt. Sie können eine [Suspense](#suspense)-Grenze verwenden, um Ihre Komponente zu umschließen und das Rendering auf die Laufzeit zu verschieben.
+
+### Suspense
+
+React [Suspense](https://react.dev/reference/react/Suspense) wird verwendet, um das Rendering von Teilen Ihrer Anwendung zu verzögern, bis eine bestimmte Bedingung erfüllt ist.
+
+Bei Partial Prerendering wird Suspense verwendet, um **dynamische Grenzen** in Ihrem Komponentenbaum zu markieren.
+
+Zum Build-Zeitpunkt prerendert Next.js die statischen Inhalte und die `fallback`-UI. Die dynamischen Inhalte werden **zurückgestellt**, bis der Benutzer die Route anfordert.
+
+Das Umschließen einer Komponente mit Suspense macht die Komponente selbst nicht dynamisch (das tun Ihre API-Aufrufe), sondern Suspense dient als Grenze, die dynamische Inhalte kapselt und [Streaming](#streaming) ermöglicht.
+
+```jsx filename="app/page.js"
+import { Suspense } from 'react'
+import StaticComponent from './StaticComponent'
+import DynamicComponent from './DynamicComponent'
+import Fallback from './Fallback'
+
+export const experimental_ppr = true
+
+export default function Page() {
+  return (
+    <>
+      <StaticComponent />
+      <Suspense fallback={<Fallback />}>
+        <DynamicComponent />
+      </Suspense>
+    </>
+  )
+}
+```
+
+### Streaming
+
+Streaming teilt die Route in Chunks auf und überträgt sie progressiv an den Client, sobald sie bereit sind. Dadurch kann der Benutzer Teile der Seite sofort sehen, bevor der gesamte Inhalt fertig gerendert wurde.
+
+<Image
+  alt="Diagramm einer teilweise gerenderten Seite auf dem Client mit Lade-UI für Chunks, die gestreamt werden."
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+Bei Partial Prerendering beginnen dynamische Komponenten, die in Suspense eingeschlossen sind, parallel vom Server zu streamen.
+
+<Image
+  alt="Diagramm der Parallelisierung von Routensegmenten während des Streamings, das das Abrufen, Rendering und Hydration einzelner Chunks zeigt."
+  srcLight="/docs/light/sequential-parallel-data-fetching.png"
+  srcDark="/docs/dark/sequential-parallel-data-fetching.png"
+  width="1600"
+  height="525"
+/>
+
+Um den Netzwerk-Overhead zu reduzieren, wird die vollständige Antwort – einschließlich statischem HTML und gestreamten dynamischen Teilen – in einer **einzelnen HTTP-Anfrage** gesendet. Dies vermeidet zusätzliche Roundtrips und verbessert sowohl den initialen Ladevorgang als auch die Gesamtleistung.
+
+## Aktivierung von Partial Prerendering
+
+Sie können PPR aktivieren, indem Sie die [`ppr`](https://rc.nextjs.org/docs/app/api-reference/next-config-js/ppr)-Option zu Ihrer `next.config.ts`-Datei hinzufügen:
+
+```ts filename="next.config.ts" highlight={5} switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    ppr: 'incremental',
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" highlight={4} switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    ppr: 'incremental',
+  },
+}
+```
+
+Der Wert `'incremental'` ermöglicht es Ihnen, PPR für bestimmte Routen zu verwenden:
+
+```tsx filename="/app/dashboard/layout.tsx"
+export const experimental_ppr = true
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  // ...
+}
+```
+
+```jsx filename="/app/dashboard/layout.js"
+export const experimental_ppr = true
+
+export default function Layout({ children }) {
+  // ...
+}
+```
+
+Routen, die `experimental_ppr` nicht haben, standardmäßig auf `false` und werden nicht mit PPR prerendert. Sie müssen PPR für jede Route explizit aktivieren.
+
+> **Gut zu wissen**:
+>
+> - `experimental_ppr` gilt für alle Kinder des Routensegments, einschließlich verschachtelter Layouts und Seiten. Sie müssen es nicht jeder Datei hinzufügen, sondern nur dem obersten Segment einer Route.
+> - Um PPR für Kindsegmente zu deaktivieren, können Sie `experimental_ppr` im Kindsegment auf `false` setzen.
+
+## Beispiele
+
+### Dynamische APIs
+
+Bei der Verwendung dynamischer APIs, die die eingehende Anfrage untersuchen müssen, wechselt Next.js zum dynamischen Rendering für die Route. Um PPR weiterhin zu verwenden, umschließen Sie die Komponente mit Suspense. Beispielsweise ist die `<User />`-Komponente dynamisch, weil sie die `cookies`-API verwendet:
+
+```jsx filename="app/user.js" switcher
+import { cookies } from 'next/headers'
+
+export async function User() {
+  const session = (await cookies()).get('session')?.value
+  return '...'
+}
+```
+
+```tsx filename="app/user.tsx" switcher
+import { cookies } from 'next/headers'
+
+export async function User() {
+  const session = (await cookies()).get('session')?.value
+  return '...'
+}
+```
+
+Die `<User />`-Komponente wird gestreamt, während alle anderen Inhalte innerhalb von `<Page />` prerendert werden und Teil der statischen Shell werden.
+
+```tsx filename="app/page.tsx" switcher
+import { Suspense } from 'react'
+import { User, AvatarSkeleton } from './user'
+
+export const experimental_ppr = true
+
+export default function Page() {
+  return (
+    <section>
+      <h1>Dies wird prerendert</h1>
+      <Suspense fallback={<AvatarSkeleton />}>
+        <User />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Suspense } from 'react'
+import { User, AvatarSkeleton } from './user'
+
+export const experimental_ppr = true
+
+export default function Page() {
+  return (
+    <section>
+      <h1>Dies wird prerendert</h1>
+      <Suspense fallback={<AvatarSkeleton />}>
+        <User />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+### Übergeben dynamischer Props
+
+Komponenten werden nur dann dynamisch, wenn der Wert abgerufen wird. Wenn Sie beispielsweise `searchParams` aus einer `<Page />`-Komponente lesen, können Sie diesen Wert als Prop an eine andere Komponente weitergeben:
+
+```tsx filename="app/page.tsx" switcher
+import { Table, TableSkeleton } from './table'
+import { Suspense } from 'react'
+
+export default function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort: string }>
+}) {
+  return (
+    <section>
+      <h1>Dies wird prerendert</h1>
+      <Suspense fallback={<TableSkeleton />}>
+        <Table searchParams={searchParams} />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+import { Table, TableSkeleton } from './table'
+import { Suspense } from 'react'
+
+export default function Page({ searchParams }) {
+  return (
+    <section>
+      <h1>Dies wird prerendert</h1>
+      <Suspense fallback={<TableSkeleton />}>
+        <Table searchParams={searchParams} />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+Innerhalb der Tabellenkomponente macht der Zugriff auf den Wert von `searchParams` die Komponente dynamisch, während der Rest der Seite prerendert wird.
+
+```tsx filename="app/table.tsx" switcher
+export async function Table({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort: string }>
+}) {
+  const sort = (await searchParams).sort === 'true'
+  return '...'
+}
+```
+
+```jsx filename="app/table.js" switcher
+export async function Table({ searchParams }) {
+  const sort = (await searchParams).sort === 'true'
+  return '...'
+}
+```
