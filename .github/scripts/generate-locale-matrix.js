@@ -205,7 +205,8 @@ function processAutoTrigger(localeConfig, changesJson) {
   // Check each locale dynamically from config
   for (const locale of Object.keys(localeConfig)) {
     if (isLocaleEnabled(localeConfig, locale)) {
-      const localeKey = locale.replace('-', '_'); // Convert locale key for changes JSON
+      // For changes JSON, use the locale name as-is (no conversion needed)
+      const localeKey = locale; // Keep original locale name for changes JSON key
       const localeChanged = changesJson[`${localeKey}_any_changed`] === 'true';
 
       if (coreChanged || localeChanged) {
