@@ -1,0 +1,466 @@
+---
+source-updated-at: 2025-06-08T05:18:05.000Z
+translation-updated-at: 2025-06-08T22:14:36.122Z
+title: الربط والتنقل
+description: تعرف على كيفية عمل الجلب المسبق (Prefetching)، التصيير المسبق (Prerendering)، والتنقل من جانب العميل في Next.js، وكيفية استخدام مكون Link.
+related:
+  links:
+    - app/api-reference/components/link
+    - app/api-reference/file-conventions/loading
+---
+
+في Next.js، يتم تصيير المسارات (routes) على الخادم افتراضيًا. هذا يعني غالبًا أن العميل يجب أن ينتظر ردًا من الخادم قبل أن يتم عرض المسار الجديد. يأتي Next.js مزودًا مدمجًا بـ[الجلب المسبق (Prefetching)](#prefetching)، [البث (Streaming)](#streaming)، و[الانتقالات من جانب العميل (Client-side transitions)](#client-side-transitions) مما يضمن بقاء التنقل سريعًا وسريع الاستجابة.
+
+يشرح هذا الدليل كيفية عمل التنقل في Next.js وكيف يمكنك تحسينه لـ[المسارات الديناميكية (dynamic routes)](#dynamic-routes-without-loadingtsx) و[الشبكات البطيئة (slow networks)](#slow-networks).
+
+## كيف يعمل التنقل
+
+لفهم كيفية عمل التنقل في Next.js، من المفيد أن تكون على دراية بالمفاهيم التالية:
+
+- [التصيير من جانب الخادم (Server Rendering)](#server-rendering)
+- [الجلب المسبق (Prefetching)](#prefetching)
+- [البث (Streaming)](#streaming)
+- [الانتقالات من جانب العميل (Client-side transitions)](#client-side-transitions)
+
+### التصيير من جانب الخادم
+
+في Next.js، [التخطيطات والصفحات (Layouts and Pages)](/docs/app/getting-started/layouts-and-pages) هي [مكونات خادم React (React Server Components)](https://react.dev/reference/rsc/server-components) افتراضيًا. عند التنقل الأولي واللاحق، يتم إنشاء [حمل مكون الخادم (Server Component Payload)](/docs/app/getting-started/server-and-client-components#how-do-server-and-client-components-work-in-nextjs) على الخادم قبل إرساله إلى العميل.
+
+هناك نوعان من التصيير من جانب الخادم، بناءً على وقت حدوثه:
+
+- **التصيير الثابت (Static Rendering أو Prerendering)**: يحدث وقت البناء أو أثناء [إعادة التحقق (revalidation)](/docs/app/getting-started/caching-and-revalidating) ويتم تخزين النتيجة مؤقتًا.
+- **التصيير الديناميكي (Dynamic Rendering)**: يحدث وقت الطلب استجابةً لطلب العميل.
+
+مقايضة التصيير من جانب الخادم هي أن العميل يجب أن ينتظر رد الخادم قبل أن يتم عرض المسار الجديد. يتعامل Next.js مع هذا التأخير عن طريق [الجلب المسبق (Prefetching)](#prefetching) للمسارات التي من المحتمل أن يزورها المستخدم وإجراء [انتقالات من جانب العميل (Client-side transitions)](#client-side-transitions).
+
+> **معلومة مفيدة**: يتم أيضًا إنشاء HTML للزيارة الأولية.
+
+### الجلب المسبق (Prefetching)
+
+الجلب المسبق هو عملية تحميل مسار في الخلفية قبل أن ينتقل إليه المستخدم. هذا يجعل التنقل بين المسارات في تطبيقك يبدو فوريًا، لأنه بحلول الوقت الذي ينقر فيه المستخدم على رابط، تكون بيانات تصيير المسار التالي متاحة بالفعل على جانب العميل.
+
+يقوم Next.js تلقائيًا بجلب المسارات المرتبطة بمكون [`<Link>`](/docs/app/api-reference/components/link) مسبقًا عندما تدخل في نطاق رؤية المستخدم.
+
+```tsx filename="app/layout.tsx" switcher
+import Link from 'next/link'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <nav>
+          {/* يتم الجلب المسبق عند تحويم المؤشر على الرابط أو دخوله نطاق الرؤية */}
+          <Link href="/blog">Blog</Link>
+          {/* لا يوجد جلب مسبق */}
+          <a href="/contact">Contact</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+import Link from 'next/link'
+
+export default function Layout() {
+  return (
+    <html>
+      <body>
+        <nav>
+          {/* يتم الجلب المسبق عند تحويم المؤشر على الرابط أو دخوله نطاق الرؤية */}
+          <Link href="/blog">Blog</Link>
+          {/* لا يوجد جلب مسبق */}
+          <a href="/contact">Contact</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+تعتمد كمية المسار التي يتم جلبها مسبقًا على ما إذا كان ثابتًا أو ديناميكيًا:
+
+- **المسار الثابت**: يتم جلب المسار بالكامل مسبقًا.
+- **المسار الديناميكي**: يتم تخطي الجلب المسبق، أو يتم جلب جزء من المسار مسبقًا إذا كان [`loading.tsx`](/docs/app/api-reference/file-conventions/loading) موجودًا.
+
+عن طريق تخطي أو جلب المسارات الديناميكية جزئيًا مسبقًا، يتجنب Next.js عملًا غير ضروري على الخادم للمسارات التي قد لا يزورها المستخدمون أبدًا. ومع ذلك، قد يعطي انتظار رد الخادم قبل التنقل انطباعًا للمستخدمين بأن التطبيق لا يستجيب.
+
+<Image
+  alt="Server Rendering without Streaming"
+  srcLight="/docs/light/server-rendering-without-streaming.png"
+  srcDark="/docs/dark/server-rendering-without-streaming.png"
+  width="1600"
+  height="748"
+/>
+
+لتحسين تجربة التنقل إلى المسارات الديناميكية، يمكنك استخدام [البث (Streaming)](#streaming).
+
+### البث (Streaming)
+
+يسمح البث للخادم بإرسال أجزاء من مسار ديناميكي إلى العميل بمجرد أن تصبح جاهزة، بدلاً من انتظار تصيير المسار بالكامل. هذا يعني أن المستخدمين يرون شيئًا ما عاجلاً، حتى إذا كانت أجزاء من الصفحة لا تزال قيد التحميل.
+
+بالنسبة للمسارات الديناميكية، يعني هذا أنه يمكن **جلبها مسبقًا جزئيًا**. أي أنه يمكن طلب التخطيطات المشتركة وهياكل التحميل مسبقًا.
+
+<Image
+  alt="How Server Rendering with Streaming Works"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+لاستخدام البث، قم بإنشاء `loading.tsx` في مجلد المسار الخاص بك:
+
+<Image
+  alt="loading.js special file"
+  srcLight="/docs/light/loading-special-file.png"
+  srcDark="/docs/dark/loading-special-file.png"
+  width="1600"
+  height="606"
+/>
+
+```tsx filename="app/dashboard/loading.tsx" switcher
+export default function Loading() {
+  // أضف واجهة مستخدم احتياطية سيتم عرضها أثناء تحميل المسار.
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/dashboard/loading.js" switcher
+export default function Loading() {
+  // أضف واجهة مستخدم احتياطية سيتم عرضها أثناء تحميل المسار.
+  return <LoadingSkeleton />
+}
+```
+
+خلف الكواليس، سيقوم Next.js تلقائيًا بلف محتويات `page.tsx` في حدود `<Suspense>`. سيتم عرض واجهة المستخدم الاحتياطية التي تم جلبها مسبقًا أثناء تحميل المسار، واستبدالها بالمحتوى الفعلي بمجرد أن يصبح جاهزًا.
+
+> **معلومة مفيدة**: يمكنك أيضًا استخدام [`<Suspense>`](https://react.dev/reference/react/Suspense) لإنشاء واجهة مستخدم تحميل للمكونات المتداخلة.
+
+فوائد `loading.tsx`:
+
+- تنقل فوري وردود فعل مرئية للمستخدم.
+- تبقى التخطيطات المشتركة قابلة للتفاعل والتنقل قابلًا للإيقاف.
+- تحسين مؤشرات Core Web Vitals: [TTFB](https://web.dev/articles/ttfb)، [FCP](https://web.dev/articles/fcp)، و[TTI](https://web.dev/articles/tti).
+
+لمزيد من تحسين تجربة التنقل، يقوم Next.js بإجراء [انتقال من جانب العميل (Client-side transition)](#client-side-transitions) باستخدام مكون `<Link>`.
+
+### الانتقالات من جانب العميل (Client-side transitions)
+
+تقليديًا، يؤدي التنقل إلى صفحة مخصصة من الخادم إلى تحميل كامل للصفحة. هذا يمسح الحالة، يعيد تعيين موضع التمرير، ويمنع التفاعل.
+
+يتجنب Next.js ذلك باستخدام الانتقالات من جانب العميل عبر مكون `<Link>`. بدلاً من إعادة تحميل الصفحة، يقوم بتحديث المحتوى ديناميكيًا عن طريق:
+
+- الحفاظ على أي تخطيطات مشتركة وواجهة مستخدم.
+- استبدال الصفحة الحالية بحالة التحميل التي تم جلبها مسبقًا أو صفحة جديدة إذا كانت متاحة.
+
+الانتقالات من جانب العميل هي ما يجعل التطبيقات المخصصة من الخادم تشعر وكأنها تطبيقات مخصصة من العميل. وعند اقترانها بـ[الجلب المسبق (Prefetching)](#prefetching) و[البث (Streaming)](#streaming)، فإنها تمكن من انتقالات سريعة، حتى للمسارات الديناميكية.
+
+## ما الذي يمكن أن يجعل الانتقالات بطيئة؟
+
+هذه التحسينات في Next.js تجعل التنقل سريعًا وسريع الاستجابة. ومع ذلك، في ظل ظروف معينة، قد لا تزال الانتقالات تشعر بأنها بطيئة. فيما يلي بعض الأسباب الشائعة وكيفية تحسين تجربة المستخدم:
+
+### المسارات الديناميكية بدون `loading.tsx`
+
+عند التنقل إلى مسار ديناميكي، يجب أن ينتظر العميل رد الخادم قبل عرض النتيجة. هذا قد يعطي المستخدمين انطباعًا بأن التطبيق لا يستجيب.
+
+نوصي بإضافة `loading.tsx` إلى المسارات الديناميكية لتمكين الجلب المسبق الجزئي، تشغيل التنقل الفوري، وعرض واجهة مستخدم تحميل أثناء تصيير المسار.
+
+```tsx filename="app/blog/[slug]/loading.tsx" switcher
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/blog/[slug]/loading.js" switcher
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+> **معلومة مفيدة**: في وضع التطوير، يمكنك استخدام أدوات تطوير Next.js لتحديد ما إذا كان المسار ثابتًا أو ديناميكيًا. راجع [`devIndicators`](/docs/app/api-reference/config/next-config-js/devIndicators) لمزيد من المعلومات.
+
+### الأجزاء الديناميكية بدون `generateStaticParams`
+
+إذا كان [الجزء الديناميكي (dynamic segment)](/docs/app/api-reference/file-conventions/dynamic-routes) يمكن تصييره مسبقًا ولكن لم يتم ذلك لأنه يفتقد [`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params)، فسيعود المسار إلى التصيير الديناميكي وقت الطلب.
+
+تأكد من أن المسار يتم إنشاؤه ثابتًا وقت البناء عن طريق إضافة `generateStaticParams`:
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  // ...
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+
+export default async function Page({ params }) {
+  const { slug } = await params
+  // ...
+}
+```
+
+### الشبكات البطيئة
+
+على الشبكات البطيئة أو غير المستقرة، قد لا يكتمل الجلب المسبق قبل أن ينقر المستخدم على رابط. هذا يمكن أن يؤثر على كل من المسارات الثابتة والديناميكية. في هذه الحالات، قد لا تظهر واجهة `loading.js` الاحتياطية على الفور لأنها لم يتم جلبها مسبقًا بعد.
+
+لتحسين الأداء الملحوظ، يمكنك استخدام [خطاف `useLinkStatus`](/docs/app/api-reference/functions/use-link-status) لعرض ردود فعل مرئية مضمنة للمستخدم (مثل المؤشرات الدوارة أو توهج النص على الرابط) أثناء وجود انتقال قيد التقدم.
+
+```tsx
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return pending ? (
+    <div role="status" aria-label="Loading" className="spinner" />
+  ) : null
+}
+```
+
+```tsx
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return pending ? (
+    <div role="status" aria-label="Loading" className="spinner" />
+  ) : null
+}
+```
+
+يمكنك "إزالة الارتعاش" لمؤشر التحميل عن طريق إضافة تأخير أولي للرسوم المتحركة (مثل 100 مللي ثانية) وبدء الرسوم المتحركة كغير مرئية (مثل `opacity: 0`). هذا يعني أن مؤشر التحميل سيظهر فقط إذا استغرق التنقل وقتًا أطول من التأخير المحدد.
+
+```css
+.spinner {
+  /* ... */
+  opacity: 0;
+  animation:
+    fadeIn 500ms 100ms forwards,
+    rotate 1s linear infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+```
+
+> **معلومة مفيدة**: يمكنك استخدام أنماط أخرى من ردود الفعل المرئية مثل شريط التقدم. عرض مثال [هنا](https://github.com/vercel/react-transition-progress).
+
+### تعطيل الجلب المسبق
+
+يمكنك إلغاء تفعيل الجلب المسبق عن طريق تعيين خاصية `prefetch` إلى `false` في مكون `<Link>`. هذا مفيد لتجنب استخدام موارد غير ضرورية عند تصيير قوائم كبيرة من الروابط (مثل جدول تمرير لا نهائي).
+
+```tsx
+<Link prefetch={false} href="/blog">
+  Blog
+</Link>
+```
+
+ومع ذلك، فإن تعطيل الجلب المسبق يأتي مع مقايضات:
+
+- **المسارات الثابتة**: سيتم جلبها فقط عندما ينقر المستخدم على الرابط.
+- **المسارات الديناميكية**: يجب تصييرها على الخادم أولاً قبل أن يتمكن العميل من التنقل إليها.
+
+لتقليل استخدام الموارد دون تعطيل الجلب المسبق بالكامل، يمكنك جلب المسارات مسبقًا عند التحويم فقط. هذا يحد من الجلب المسبق للمسارات التي من المرجح أن يزورها المستخدم، بدلاً من جميع الروابط في نطاق الرؤية.
+
+```tsx filename="app/ui/hover-prefetch-link.tsx" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+function HoverPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/ui/hover-prefetch-link.js" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+function HoverPrefetchLink({ href, children }) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+### عدم اكتمال الترطيب (Hydration)
+
+`<Link>` هو مكون عميل ويجب ترطيبه قبل أن يتمكن من جلب المسارات مسبقًا. في الزيارة الأولية، يمكن أن تؤخر الحزم الكبيرة من JavaScript الترطيب، مما يمنع بدء الجلب المسبق على الفور.
+
+يتعامل React مع هذا مع الترطيب الانتقائي ويمكنك تحسينه أكثر عن طريق:
+
+- استخدام مكون [`@next/bundle-analyzer`](/docs/app/guides/package-bundling#analyzing-javascript-bundles) لتحديد وتقليل حجم الحزمة عن طريق إزالة التبعيات الكبيرة.
+- نقل المنطق من العميل إلى الخادم حيثما أمكن. راجع وثائق [مكونات الخادم والعميل (Server and Client Components)](/docs/app/getting-started/server-and-client-components) للحصول على إرشادات.
+
+## أمثلة
+
+### واجهة برمجة التاريخ الأصلية (Native History API)
+
+يسمح لك Next.js باستخدام الطرق الأصلية [`window.history.pushState`](https://developer.mozilla.org/en-US/docs/Web/API/History/pushState) و[`window.history.replaceState`](https://developer.mozilla.org/en-US/docs/Web/API/History/replaceState) لتحديد سجل المتصفح دون إعادة تحميل الصفحة.
+
+تتكامل مكالمات `pushState` و`replaceState` مع موجه Next.js، مما يسمح لك بالمزامنة مع [`usePathname`](/docs/app/api-reference/functions/use-pathname) و[`useSearchParams`](/docs/app/api-reference/functions/use-search-params).
+
+#### `window.history.pushState`
+
+استخدمه لإضافة إدخال جديد إلى سجل المتصفح. يمكن للمستخدم التنقل للخلف إلى الحالة السابقة. على سبيل المثال، لفرز قائمة من المنتجات:
+
+```tsx fileName="app/ui/sort-products.tsx" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${params.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Sort Ascending</button>
+      <button onClick={() => updateSorting('desc')}>Sort Descending</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/sort-products.js" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${params.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Sort Ascending</button>
+      <button onClick={() => updateSorting('desc')}>Sort Descending</button>
+    </>
+  )
+}
+```
+
+#### `window.history.replaceState`
+
+استخدم هذه الدالة لاستبدال الإدخال الحالي في سجل التصفح (history stack) للمتصفح. لن يتمكن المستخدم من العودة إلى الحالة السابقة. على سبيل المثال، لتبديل لغة التطبيق:
+
+```tsx fileName="app/ui/locale-switcher.tsx" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export function LocaleSwitcher() {
+  const pathname = usePathname()
+
+  function switchLocale(locale: string) {
+    // مثال: '/en/about' أو '/fr/contact'
+    const newPath = `/${locale}${pathname}`
+    window.history.replaceState(null, '', newPath)
+  }
+
+  return (
+    <>
+      <button onClick={() => switchLocale('en')}>English</button>
+      <button onClick={() => switchLocale('fr')}>French</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/locale-switcher.js" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export function LocaleSwitcher() {
+  const pathname = usePathname()
+
+  function switchLocale(locale) {
+    // مثال: '/en/about' أو '/fr/contact'
+    const newPath = `/${locale}${pathname}`
+    window.history.replaceState(null, '', newPath)
+  }
+
+  return (
+    <>
+      <button onClick={() => switchLocale('en')}>English</button>
+      <button onClick={() => switchLocale('fr')}>French</button>
+    </>
+  )
+}
+```

@@ -1,0 +1,466 @@
+---
+source-updated-at: 2025-06-08T05:18:05.000Z
+translation-updated-at: 2025-06-08T20:57:41.489Z
+title: 連結與導航
+description: 了解 Next.js 中的預取 (prefetching)、預渲染 (prerendering) 和客戶端導航 (client-side navigation) 如何運作，以及如何使用 Link 元件。
+related:
+  links:
+    - app/api-reference/components/link
+    - app/api-reference/file-conventions/loading
+---
+
+在 Next.js 中，路由預設會在伺服器端渲染。這通常意味著客戶端必須等待伺服器回應後才能顯示新路由。Next.js 內建了 [預取功能 (prefetching)](#prefetching)、[串流 (streaming)](#streaming) 和 [客戶端轉場 (client-side transitions)](#client-side-transitions)，確保導航保持快速且響應靈敏。
+
+本指南將解釋 Next.js 中的導航運作原理，以及如何針對 [動態路由 (dynamic routes)](#dynamic-routes-without-loadingtsx) 和 [慢速網路 (slow networks)](#slow-networks) 進行優化。
+
+## 導航運作原理
+
+要理解 Next.js 中的導航運作方式，需要熟悉以下概念：
+
+- [伺服器渲染 (Server Rendering)](#server-rendering)
+- [預取 (Prefetching)](#prefetching)
+- [串流 (Streaming)](#streaming)
+- [客戶端轉場 (Client-side transitions)](#client-side-transitions)
+
+### 伺服器渲染
+
+在 Next.js 中，[版面配置 (Layouts) 和頁面 (Pages)](/docs/app/getting-started/layouts-and-pages) 預設為 [React 伺服器元件 (React Server Components)](https://react.dev/reference/rsc/server-components)。在初始和後續導航時，[伺服器元件負載 (Server Component Payload)](/docs/app/getting-started/server-and-client-components#how-do-server-and-client-components-work-in-nextjs) 會在伺服器端生成後才傳送至客戶端。
+
+根據發生的時機，伺服器渲染分為兩種：
+
+- **靜態渲染 (Static Rendering) 或預渲染 (Prerendering)**：在建置時或 [重新驗證 (revalidation)](/docs/app/getting-started/caching-and-revalidating) 期間進行，結果會被快取。
+- **動態渲染 (Dynamic Rendering)**：在客戶端請求時進行。
+
+伺服器渲染的代價是客戶端必須等待伺服器回應後才能顯示新路由。Next.js 透過 [預取 (prefetching)](#prefetching) 使用者可能造訪的路由和執行 [客戶端轉場 (client-side transitions)](#client-side-transitions) 來解決此延遲問題。
+
+> **小知識**：初始造訪時也會生成 HTML。
+
+### 預取
+
+預取是在使用者導航到某個路由前，先在背景載入該路由的過程。這使得應用程式中的路由導航感覺瞬間完成，因為當使用者點擊連結時，渲染下一個路由所需的資料已經在客戶端準備就緒。
+
+Next.js 會在使用者視窗中出現 [`<Link>` 元件](/docs/app/api-reference/components/link) 連結時自動預取這些路由。
+
+```tsx filename="app/layout.tsx" switcher
+import Link from 'next/link'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <nav>
+          {/* 當連結被懸停或進入視窗時預取 */}
+          <Link href="/blog">Blog</Link>
+          {/* 不進行預取 */}
+          <a href="/contact">Contact</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+import Link from 'next/link'
+
+export default function Layout() {
+  return (
+    <html>
+      <body>
+        <nav>
+          {/* 當連結被懸停或進入視窗時預取 */}
+          <Link href="/blog">Blog</Link>
+          {/* 不進行預取 */}
+          <a href="/contact">Contact</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+預取路由的範圍取決於它是靜態還是動態：
+
+- **靜態路由**：完整路由會被預取。
+- **動態路由**：預取會被跳過，或者如果存在 [`loading.tsx`](/docs/app/api-reference/file-conventions/loading)，則會部分預取。
+
+透過跳過或部分預取動態路由，Next.js 避免了伺服器為使用者可能永遠不會造訪的路由執行不必要的工作。然而，等待伺服器回應後才導航可能會讓使用者覺得應用程式沒有回應。
+
+<Image
+  alt="無串流的伺服器渲染"
+  srcLight="/docs/light/server-rendering-without-streaming.png"
+  srcDark="/docs/dark/server-rendering-without-streaming.png"
+  width="1600"
+  height="748"
+/>
+
+為了改善動態路由的導航體驗，可以使用 [串流 (streaming)](#streaming)。
+
+### 串流
+
+串流允許伺服器在動態路由的部分內容準備好時立即傳送至客戶端，而不是等待整個路由渲染完成。這意味著使用者可以更快看到某些內容，即使頁面的其他部分仍在載入中。
+
+對於動態路由，這意味著它們可以 **部分預取**。也就是說，共享的版面配置和載入骨架可以提前請求。
+
+<Image
+  alt="串流伺服器渲染運作方式"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+要使用串流，請在路由資料夾中建立 `loading.tsx`：
+
+<Image
+  alt="loading.js 特殊檔案"
+  srcLight="/docs/light/loading-special-file.png"
+  srcDark="/docs/dark/loading-special-file.png"
+  width="1600"
+  height="606"
+/>
+
+```tsx filename="app/dashboard/loading.tsx" switcher
+export default function Loading() {
+  // 新增在路由載入時顯示的備用 UI
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/dashboard/loading.js" switcher
+export default function Loading() {
+  // 新增在路由載入時顯示的備用 UI
+  return <LoadingSkeleton />
+}
+```
+
+在底層，Next.js 會自動將 `page.tsx` 的內容包裹在 `<Suspense>` 邊界中。預取的備用 UI 會在路由載入時顯示，並在內容準備就緒後替換為實際內容。
+
+> **小知識**：你也可以使用 [`<Suspense>`](https://react.dev/reference/react/Suspense) 為巢狀元件建立載入 UI。
+
+`loading.tsx` 的好處：
+
+- 使用者可以立即導航並獲得視覺回饋。
+- 共享的版面配置保持互動性，且導航可中斷。
+- 改善核心網頁指標 (Core Web Vitals)：[TTFB](https://web.dev/articles/ttfb)、[FCP](https://web.dev/articles/fcp) 和 [TTI](https://web.dev/articles/tti)。
+
+為了進一步改善導航體驗，Next.js 使用 `<Link>` 元件進行 [客戶端轉場 (client-side transitions)](#client-side-transitions)。
+
+### 客戶端轉場
+
+傳統上，導航到伺服器渲染的頁面會觸發完整頁面載入。這會清除狀態、重置滾動位置並阻斷互動性。
+
+Next.js 透過 `<Link>` 元件使用客戶端轉場來避免這種情況。它不會重新載入頁面，而是透過以下方式動態更新內容：
+
+- 保留任何共享的版面配置和 UI。
+- 將當前頁面替換為預取的載入狀態或可用的新頁面。
+
+客戶端轉場讓伺服器渲染的應用程式感覺像是客戶端渲染的應用程式。當與 [預取 (prefetching)](#prefetching) 和 [串流 (streaming)](#streaming) 搭配使用時，即使是動態路由也能實現快速轉場。
+
+## 什麼會導致轉場變慢？
+
+這些 Next.js 優化使導航變得快速且響應靈敏。然而，在某些情況下，轉場仍然可能感覺緩慢。以下是一些常見原因及如何改善使用者體驗：
+
+### 沒有 `loading.tsx` 的動態路由
+
+當導航到動態路由時，客戶端必須等待伺服器回應後才能顯示結果。這可能會讓使用者覺得應用程式沒有回應。
+
+我們建議在動態路由中加入 `loading.tsx`，以啟用部分預取、觸發立即導航並在路由渲染時顯示載入 UI。
+
+```tsx filename="app/blog/[slug]/loading.tsx" switcher
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/blog/[slug]/loading.js" switcher
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+> **小知識**：在開發模式下，你可以使用 Next.js 開發工具來識別路由是靜態還是動態。詳見 [`devIndicators`](/docs/app/api-reference/config/next-config-js/devIndicators)。
+
+### 沒有 `generateStaticParams` 的動態區段
+
+如果 [動態區段 (dynamic segment)](/docs/app/api-reference/file-conventions/dynamic-routes) 可以預渲染但因為缺少 [`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params) 而未執行，路由將在請求時回退到動態渲染。
+
+透過加入 `generateStaticParams` 確保路由在建置時靜態生成：
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  // ...
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+
+export default async function Page({ params }) {
+  const { slug } = await params
+  // ...
+}
+```
+
+### 慢速網路
+
+在慢速或不穩定的網路上，預取可能在使用者點擊連結前無法完成。這會影響靜態和動態路由。在這些情況下，`loading.js` 的備用 UI 可能不會立即顯示，因為它尚未被預取。
+
+為了改善感知效能，可以使用 [`useLinkStatus` 鉤子 (hook)](/docs/app/api-reference/functions/use-link-status) 在使用者進行轉場時顯示內嵌視覺回饋（如連結上的旋轉圖示或文字閃爍）。
+
+```tsx
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return pending ? (
+    <div role="status" aria-label="Loading" className="spinner" />
+  ) : null
+}
+```
+
+```tsx
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return pending ? (
+    <div role="status" aria-label="Loading" className="spinner" />
+  ) : null
+}
+```
+
+你可以透過加入初始動畫延遲（例如 100 毫秒）並以不可見狀態（例如 `opacity: 0`）開始動畫來「防抖」載入指示器。這意味著只有在導航時間超過指定延遲時才會顯示載入指示器。
+
+```css
+.spinner {
+  /* ... */
+  opacity: 0;
+  animation:
+    fadeIn 500ms 100ms forwards,
+    rotate 1s linear infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+```
+
+> **小知識**：你也可以使用其他視覺回饋模式，如進度條。查看範例 [這裡](https://github.com/vercel/react-transition-progress)。
+
+### 停用預取
+
+你可以透過將 `<Link>` 元件的 `prefetch` 屬性設為 `false` 來選擇停用預取。這在渲染大量連結（如無限滾動表格）時避免不必要的資源使用非常有用。
+
+```tsx
+<Link prefetch={false} href="/blog">
+  Blog
+</Link>
+```
+
+然而，停用預取會帶來以下權衡：
+
+- **靜態路由**：只有在使用者點擊連結時才會獲取。
+- **動態路由**：需要先在伺服器端渲染後，客戶端才能導航到它。
+
+為了減少資源使用而不完全停用預取，可以僅在懸停時預取。這將預取限制在使用者更可能造訪的路由，而不是視窗中的所有連結。
+
+```tsx filename="app/ui/hover-prefetch-link.tsx" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+function HoverPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/ui/hover-prefetch-link.js" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+function HoverPrefetchLink({ href, children }) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+### 水合未完成
+
+`<Link>` 是一個客戶端元件，必須在水合 (hydrate) 完成後才能預取路由。在初始造訪時，大型 JavaScript 套件可能會延遲水合，從而阻止預取立即開始。
+
+React 透過選擇性水合 (Selective Hydration) 來緩解此問題，你可以透過以下方式進一步改善：
+
+- 使用 [`@next/bundle-analyzer`](/docs/app/guides/package-bundling#analyzing-javascript-bundles) 外掛來識別並透過移除大型依賴項來減少套件大小。
+- 盡可能將邏輯從客戶端移至伺服器端。詳見 [伺服器和客戶端元件 (Server and Client Components)](/docs/app/getting-started/server-and-client-components) 文件。
+
+## 範例
+
+### 原生 History API
+
+Next.js 允許你使用原生的 [`window.history.pushState`](https://developer.mozilla.org/en-US/docs/Web/API/History/pushState) 和 [`window.history.replaceState`](https://developer.mozilla.org/en-US/docs/Web/API/History/replaceState) 方法來更新瀏覽器的歷史堆疊，而無需重新載入頁面。
+
+`pushState` 和 `replaceState` 呼叫會整合到 Next.js 路由器中，讓你與 [`usePathname`](/docs/app/api-reference/functions/use-pathname) 和 [`useSearchParams`](/docs/app/api-reference/functions/use-search-params) 同步。
+
+#### `window.history.pushState`
+
+使用它來新增一個新項目到瀏覽器的歷史堆疊中。使用者可以導航回先前的狀態。例如，對產品列表進行排序：
+
+```tsx fileName="app/ui/sort-products.tsx" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${params.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Sort Ascending</button>
+      <button onClick={() => updateSorting('desc')}>Sort Descending</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/sort-products.js" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${params.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Sort Ascending</button>
+      <button onClick={() => updateSorting('desc')}>Sort Descending</button>
+    </>
+  )
+}
+```
+
+#### `window.history.replaceState`
+
+使用此方法可以替換瀏覽器歷史記錄堆疊中的當前條目。使用者將無法導航回先前的狀態。例如，切換應用程式的語言設定：
+
+```tsx fileName="app/ui/locale-switcher.tsx" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export function LocaleSwitcher() {
+  const pathname = usePathname()
+
+  function switchLocale(locale: string) {
+    // 例如 '/en/about' 或 '/fr/contact'
+    const newPath = `/${locale}${pathname}`
+    window.history.replaceState(null, '', newPath)
+  }
+
+  return (
+    <>
+      <button onClick={() => switchLocale('en')}>English</button>
+      <button onClick={() => switchLocale('fr')}>French</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/locale-switcher.js" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export function LocaleSwitcher() {
+  const pathname = usePathname()
+
+  function switchLocale(locale) {
+    // 例如 '/en/about' 或 '/fr/contact'
+    const newPath = `/${locale}${pathname}`
+    window.history.replaceState(null, '', newPath)
+  }
+
+  return (
+    <>
+      <button onClick={() => switchLocale('en')}>English</button>
+      <button onClick={() => switchLocale('fr')}>French</button>
+    </>
+  )
+}
+```

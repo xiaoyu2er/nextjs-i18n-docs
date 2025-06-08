@@ -1,0 +1,466 @@
+---
+source-updated-at: 2025-06-08T05:18:05.000Z
+translation-updated-at: 2025-06-08T22:01:45.735Z
+title: Связывание и навигация
+description: Узнайте, как работают предварительная загрузка (prefetching), предварительный рендеринг (prerendering) и клиентская навигация в Next.js, а также как использовать компонент Link.
+related:
+  links:
+    - app/api-reference/components/link
+    - app/api-reference/file-conventions/loading
+---
+
+В Next.js маршруты по умолчанию рендерятся на сервере. Это часто означает, что клиенту приходится ждать ответа сервера перед отображением нового маршрута. Next.js включает встроенные функции [предварительной загрузки](#prefetching), [потоковой передачи](#streaming) и [клиентских переходов](#client-side-transitions), обеспечивая быструю и отзывчивую навигацию.
+
+Это руководство объясняет, как работает навигация в Next.js, и как её можно оптимизировать для [динамических маршрутов](#dynamic-routes-without-loadingtsx) и [медленных сетей](#slow-networks).
+
+## Как работает навигация
+
+Чтобы понять, как работает навигация в Next.js, полезно ознакомиться со следующими концепциями:
+
+- [Серверный рендеринг](#server-rendering)
+- [Предварительная загрузка](#prefetching)
+- [Потоковая передача](#streaming)
+- [Клиентские переходы](#client-side-transitions)
+
+### Серверный рендеринг
+
+В Next.js [Макеты и Страницы](/docs/app/getting-started/layouts-and-pages) по умолчанию являются [React Server Components](https://react.dev/reference/rsc/server-components). При первоначальной и последующей навигации [Полезная нагрузка серверного компонента](/docs/app/getting-started/server-and-client-components#how-do-server-and-client-components-work-in-nextjs) генерируется на сервере перед отправкой клиенту.
+
+Существует два типа серверного рендеринга в зависимости от времени его выполнения:
+
+- **Статический рендеринг (или предварительный рендеринг)** выполняется во время сборки или в процессе [ревалидации](/docs/app/getting-started/caching-and-revalidating), и результат кэшируется.
+- **Динамический рендеринг** выполняется во время запроса в ответ на клиентский запрос.
+
+Недостаток серверного рендеринга заключается в том, что клиент должен ждать ответа сервера перед отображением нового маршрута. Next.js решает эту проблему с помощью [предварительной загрузки](#prefetching) маршрутов, которые пользователь, скорее всего, посетит, и выполнения [клиентских переходов](#client-side-transitions).
+
+> **Полезно знать**: HTML также генерируется для первоначального посещения.
+
+### Предварительная загрузка (Prefetching)
+
+Предварительная загрузка — это процесс загрузки маршрута в фоновом режиме до того, как пользователь перейдёт на него. Это делает навигацию между маршрутами в вашем приложении мгновенной, потому что к моменту клика пользователя по ссылке данные для рендеринга следующего маршрута уже доступны на стороне клиента.
+
+Next.js автоматически предзагружает маршруты, связанные с [компонентом `<Link>`](/docs/app/api-reference/components/link), когда они попадают в область видимости пользователя.
+
+```tsx filename="app/layout.tsx" switcher
+import Link from 'next/link'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <nav>
+          {/* Предзагружается при наведении или попадании в область видимости */}
+          <Link href="/blog">Блог</Link>
+          {/* Без предзагрузки */}
+          <a href="/contact">Контакты</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+import Link from 'next/link'
+
+export default function Layout() {
+  return (
+    <html>
+      <body>
+        <nav>
+          {/* Предзагружается при наведении или попадании в область видимости */}
+          <Link href="/blog">Блог</Link>
+          {/* Без предзагрузки */}
+          <a href="/contact">Контакты</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+Объём предзагрузки маршрута зависит от того, является ли он статическим или динамическим:
+
+- **Статический маршрут**: загружается полностью.
+- **Динамический маршрут**: предзагрузка пропускается или выполняется частично, если присутствует [`loading.tsx`](/docs/app/api-reference/file-conventions/loading).
+
+Пропуская или частично предзагружая динамические маршруты, Next.js избегает ненужной работы на сервере для маршрутов, которые пользователь может никогда не посетить. Однако ожидание ответа сервера перед навигацией может создать у пользователя впечатление, что приложение не отвечает.
+
+<Image
+  alt="Серверный рендеринг без потоковой передачи"
+  srcLight="/docs/light/server-rendering-without-streaming.png"
+  srcDark="/docs/dark/server-rendering-without-streaming.png"
+  width="1600"
+  height="748"
+/>
+
+Для улучшения навигации по динамическим маршрутам можно использовать [потоковую передачу](#streaming).
+
+### Потоковая передача (Streaming)
+
+Потоковая передача позволяет серверу отправлять части динамического маршрута клиенту, как только они готовы, вместо ожидания полного рендеринга маршрута. Это означает, что пользователь видит что-то раньше, даже если части страницы ещё загружаются.
+
+Для динамических маршрутов это означает возможность **частичной предзагрузки**. То есть общие макеты и скелетоны загрузки могут быть запрошены заранее.
+
+<Image
+  alt="Как работает серверный рендеринг с потоковой передачей"
+  srcLight="/docs/light/server-rendering-with-streaming.png"
+  srcDark="/docs/dark/server-rendering-with-streaming.png"
+  width="1600"
+  height="785"
+/>
+
+Чтобы использовать потоковую передачу, создайте `loading.tsx` в папке маршрута:
+
+<Image
+  alt="Специальный файл loading.js"
+  srcLight="/docs/light/loading-special-file.png"
+  srcDark="/docs/dark/loading-special-file.png"
+  width="1600"
+  height="606"
+/>
+
+```tsx filename="app/dashboard/loading.tsx" switcher
+export default function Loading() {
+  // Добавьте запасной интерфейс, который будет показан во время загрузки маршрута.
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/dashboard/loading.js" switcher
+export default function Loading() {
+  // Добавьте запасной интерфейс, который будет показан во время загрузки маршрута.
+  return <LoadingSkeleton />
+}
+```
+
+Под капотом Next.js автоматически оборачивает содержимое `page.tsx` в границу `<Suspense>`. Запасной интерфейс будет показан во время загрузки маршрута и заменён на фактическое содержимое, когда оно будет готово.
+
+> **Полезно знать**: Вы также можете использовать [`<Suspense>`](https://react.dev/reference/react/Suspense) для создания загрузочного интерфейса вложенных компонентов.
+
+Преимущества `loading.tsx`:
+
+- Мгновенная навигация и визуальная обратная связь для пользователя.
+- Общие макеты остаются интерактивными, а навигация прерываемой.
+- Улучшенные Core Web Vitals: [TTFB](https://web.dev/articles/ttfb), [FCP](https://web.dev/articles/fcp) и [TTI](https://web.dev/articles/tti).
+
+Для дальнейшего улучшения навигации Next.js выполняет [клиентский переход](#client-side-transitions) с помощью компонента `<Link>`.
+
+### Клиентские переходы (Client-side transitions)
+
+Традиционно навигация на серверно-рендеренную страницу вызывает полную перезагрузку страницы. Это сбрасывает состояние, позицию прокрутки и блокирует интерактивность.
+
+Next.js избегает этого с помощью клиентских переходов через компонент `<Link>`. Вместо перезагрузки страницы он динамически обновляет содержимое:
+
+- Сохраняя общие макеты и интерфейс.
+- Заменяя текущую страницу на предзагруженное состояние загрузки или новую страницу, если она доступна.
+
+Клиентские переходы делают серверно-рендеренные приложения похожими на клиентские. А в сочетании с [предзагрузкой](#prefetching) и [потоковой передачей](#streaming) они обеспечивают быстрые переходы даже для динамических маршрутов.
+
+## Что может замедлить переходы?
+
+Эти оптимизации Next.js делают навигацию быстрой и отзывчивой. Однако при определённых условиях переходы всё равно могут казаться медленными. Вот распространённые причины и способы улучшить пользовательский опыт:
+
+### Динамические маршруты без `loading.tsx`
+
+При переходе на динамический маршрут клиент должен дождаться ответа сервера перед отображением результата. Это может создать у пользователя впечатление, что приложение не отвечает.
+
+Рекомендуем добавить `loading.tsx` к динамическим маршрутам, чтобы включить частичную предзагрузку, инициировать мгновенную навигацию и отображать загрузочный интерфейс во время рендеринга маршрута.
+
+```tsx filename="app/blog/[slug]/loading.tsx" switcher
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+```jsx filename="app/blog/[slug]/loading.js" switcher
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+> **Полезно знать**: В режиме разработки можно использовать Next.js Devtools для определения, является ли маршрут статическим или динамическим. Подробнее см. [`devIndicators`](/docs/app/api-reference/config/next-config-js/devIndicators).
+
+### Динамические сегменты без `generateStaticParams`
+
+Если [динамический сегмент](/docs/app/api-reference/file-conventions/dynamic-routes) можно предварительно отрендерить, но этого не происходит из-за отсутствия [`generateStaticParams`](/docs/app/api-reference/functions/generate-static-params), маршрут будет рендериться динамически во время запроса.
+
+Убедитесь, что маршрут статически генерируется во время сборки, добавив `generateStaticParams`:
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  // ...
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+
+export default async function Page({ params }) {
+  const { slug } = await params
+  // ...
+}
+```
+
+### Медленные сети
+
+В медленных или нестабильных сетях предзагрузка может не завершиться до клика пользователя по ссылке. Это может повлиять как на статические, так и на динамические маршруты. В таких случаях запасной вариант `loading.js` может не появиться сразу, так как он ещё не был предзагружен.
+
+Для улучшения воспринимаемой производительности можно использовать [хук `useLinkStatus`](/docs/app/api-reference/functions/use-link-status) для отображения встроенной визуальной обратной связи (например, спиннеров или мерцания текста на ссылке) во время перехода.
+
+```tsx
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return pending ? (
+    <div role="status" aria-label="Загрузка" className="spinner" />
+  ) : null
+}
+```
+
+```tsx
+'use client'
+
+import { useLinkStatus } from 'next/link'
+
+export default function LoadingIndicator() {
+  const { pending } = useLinkStatus()
+  return pending ? (
+    <div role="status" aria-label="Загрузка" className="spinner" />
+  ) : null
+}
+```
+
+Можно "дебаунсить" индикатор загрузки, добавив начальную задержку анимации (например, 100 мс) и начав анимацию как невидимую (например, `opacity: 0`). Это означает, что индикатор загрузки будет показан только если навигация занимает больше указанной задержки.
+
+```css
+.spinner {
+  /* ... */
+  opacity: 0;
+  animation:
+    fadeIn 500ms 100ms forwards,
+    rotate 1s linear infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+```
+
+> **Полезно знать**: Можно использовать другие шаблоны визуальной обратной связи, например, индикатор выполнения. Пример см. [здесь](https://github.com/vercel/react-transition-progress).
+
+### Отключение предзагрузки
+
+Можно отключить предзагрузку, установив свойство `prefetch` в `false` для компонента `<Link>`. Это полезно для избежания ненужного использования ресурсов при рендеринге больших списков ссылок (например, бесконечной таблицы).
+
+```tsx
+<Link prefetch={false} href="/blog">
+  Блог
+</Link>
+```
+
+Однако отключение предзагрузки имеет свои недостатки:
+
+- **Статические маршруты** будут загружаться только при клике пользователя по ссылке.
+- **Динамические маршруты** потребуют рендеринга на сервере перед навигацией клиента.
+
+Для уменьшения использования ресурсов без полного отключения предзагрузки можно загружать маршруты только при наведении. Это ограничивает предзагрузку маршрутами, которые пользователь с большей вероятностью посетит, а не всеми ссылками в области видимости.
+
+```tsx filename="app/ui/hover-prefetch-link.tsx" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+function HoverPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+```jsx filename="app/ui/hover-prefetch-link.js" switcher
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+function HoverPrefetchLink({ href, children }) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+### Гидратация не завершена
+
+`<Link>` — это клиентский компонент, который должен пройти гидратацию перед предзагрузкой маршрутов. При первоначальном посещении большие JavaScript-бандлы могут задержать гидратацию, препятствуя немедленному началу предзагрузки.
+
+React смягчает это с помощью Selective Hydration, и вы можете дополнительно улучшить ситуацию:
+
+- Используя плагин [`@next/bundle-analyzer`](/docs/app/guides/package-bundling#analyzing-javascript-bundles) для выявления и уменьшения размера бандла путём удаления больших зависимостей.
+- Перенося логику с клиента на сервер, где это возможно. См. документацию по [Серверным и клиентским компонентам](/docs/app/getting-started/server-and-client-components) для получения рекомендаций.
+
+## Примеры
+
+### Нативный History API
+
+Next.js позволяет использовать нативные методы [`window.history.pushState`](https://developer.mozilla.org/en-US/docs/Web/API/History/pushState) и [`window.history.replaceState`](https://developer.mozilla.org/en-US/docs/Web/API/History/replaceState) для обновления истории браузера без перезагрузки страницы.
+
+Вызовы `pushState` и `replaceState` интегрируются в маршрутизатор Next.js, позволяя синхронизироваться с [`usePathname`](/docs/app/api-reference/functions/use-pathname) и [`useSearchParams`](/docs/app/api-reference/functions/use-search-params).
+
+#### `window.history.pushState`
+
+Используйте для добавления новой записи в историю браузера. Пользователь может вернуться к предыдущему состоянию. Например, для сортировки списка продуктов:
+
+```tsx fileName="app/ui/sort-products.tsx" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${params.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Сортировать по возрастанию</button>
+      <button onClick={() => updateSorting('desc')}>Сортировать по убыванию</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/sort-products.js" switcher
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${params.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Сортировать по возрастанию</button>
+      <button onClick={() => updateSorting('desc')}>Сортировать по убыванию</button>
+    </>
+  )
+}
+```
+
+#### `window.history.replaceState`
+
+Используйте этот метод для замены текущей записи в стеке истории браузера. Пользователь не сможет вернуться к предыдущему состоянию. Например, для переключения локали приложения:
+
+```tsx fileName="app/ui/locale-switcher.tsx" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export function LocaleSwitcher() {
+  const pathname = usePathname()
+
+  function switchLocale(locale: string) {
+    // например, '/en/about' или '/fr/contact'
+    const newPath = `/${locale}${pathname}`
+    window.history.replaceState(null, '', newPath)
+  }
+
+  return (
+    <>
+      <button onClick={() => switchLocale('en')}>English</button>
+      <button onClick={() => switchLocale('fr')}>French</button>
+    </>
+  )
+}
+```
+
+```jsx fileName="app/ui/locale-switcher.js" switcher
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export function LocaleSwitcher() {
+  const pathname = usePathname()
+
+  function switchLocale(locale) {
+    // например, '/en/about' или '/fr/contact'
+    const newPath = `/${locale}${pathname}`
+    window.history.replaceState(null, '', newPath)
+  }
+
+  return (
+    <>
+      <button onClick={() => switchLocale('en')}>English</button>
+      <button onClick={() => switchLocale('fr')}>French</button>
+    </>
+  )
+}
+```
