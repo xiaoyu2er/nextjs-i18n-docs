@@ -131,6 +131,7 @@ export async function generateMetadata(props: {
     title: page.data.title,
     description: page.data.description,
     pathname: page.url,
-    image: `https://nextjs.org/api/docs-og?title=${page.data.title}`,
+    // Use the default image for the docs page
+    // image: `https://nextjs.org/api/docs-og?title=${page.data.title}`,
   });
 }

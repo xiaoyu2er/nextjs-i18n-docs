@@ -62,7 +62,7 @@ export function DocsLayout({
             options={[
               {
                 title: t('version.latest.title'),
-                description: '15.3.2',
+                description: '15.3.3',
                 icon: <NextLastedVersionIcon />,
                 url: '/docs/',
               },
