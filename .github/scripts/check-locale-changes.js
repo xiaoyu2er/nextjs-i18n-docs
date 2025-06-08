@@ -38,9 +38,7 @@ function usage() {
   );
   console.log('');
   console.log('Arguments:');
-  console.log(
-    "  trigger-type     Type of trigger: 'manual', 'auto', or 'docs-pr'",
-  );
+  console.log("  trigger-type     Type of trigger: 'manual' or 'auto'");
   console.log(
     '  manual-locales   Comma-separated list of locales (optional, for manual trigger)',
   );
@@ -280,7 +278,7 @@ function processManualTrigger(localeConfig, manualLocales) {
 }
 
 /**
- * Process automatic/docs-pr trigger
+ * Process automatic trigger
  */
 function processAutoTrigger(localeConfig, changes) {
   let matrixInclude = [];
@@ -398,10 +396,8 @@ function main() {
     usage();
   }
 
-  if (!['manual', 'auto', 'docs-pr'].includes(triggerType)) {
-    console.error(
-      "Error: Invalid trigger-type. Must be 'manual', 'auto', or 'docs-pr'",
-    );
+  if (!['manual', 'auto'].includes(triggerType)) {
+    console.error("Error: Invalid trigger-type. Must be 'manual' or 'auto'");
     usage();
   }
 
@@ -419,7 +415,7 @@ function main() {
     if (triggerType === 'manual') {
       result = processManualTrigger(localeConfig, manualLocales);
     } else {
-      // For auto and docs-pr triggers, generate files config and detect changes
+      // For auto triggers, generate files config and detect changes
       filesYaml = generateFilesConfig(localeConfig);
       log('Generated files configuration for change detection');
 

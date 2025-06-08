@@ -2,7 +2,7 @@ name: 'Check Locale Changes'
 description: 'Check which enabled locales have changes and generate deployment matrix'
 inputs:
   trigger-type:
-    description: 'Type of trigger: "manual", "auto", or "docs-pr"'
+    description: 'Type of trigger: "manual" or "auto"'
     required: true
   manual-locales:
     description: 'Comma-separated list of locales for manual trigger (optional)'
@@ -11,17 +11,73 @@ inputs:
 outputs:
   matrix-include:
     description: 'JSON array of locales to deploy with their config'
-    value: ${{ steps.check-locales.outputs.matrix-include }}
+    value: ${{ steps.generate-matrix.outputs.include }}
   has-changes:
     description: 'Whether any enabled locales have changes'
-    value: ${{ steps.check-locales.outputs.has-changes }}
+    value: ${{ steps.generate-matrix.outputs.has-changes }}
 
 runs:
   using: 'composite'
   steps:
-    - name: Check locale changes and generate matrix
-      id: check-locales
+    - name: Generate dynamic files config (for auto triggers)
+      if: inputs.trigger-type == 'auto'
+      id: generate-files-config
       shell: bash
       run: |
-        # Use the unified Node.js script to handle everything
-        node .github/scripts/check-locale-changes.js "${{ inputs.trigger-type }}" "${{ inputs.manual-locales }}" "true"
+        # Use the dedicated script to generate files config
+        files_yaml=$(node .github/scripts/generate-files-config.js)
+        
+        echo "Generated files_yaml:"
+        echo "$files_yaml"
+        
+        # Save to output for next step
+        {
+          echo "files_yaml<<EOF"
+          echo "$files_yaml"
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+
+    - name: Get changed files (for auto triggers)
+      if: inputs.trigger-type == 'auto'
+      id: changes
+      uses: tj-actions/changed-files@v41
+      with:
+        files_yaml: ${{ steps.generate-files-config.outputs.files_yaml }}
+
+    - name: Generate deployment matrix
+      id: generate-matrix
+      shell: bash
+      run: |
+        # Prepare arguments for the matrix generation script
+        trigger_type="${{ inputs.trigger-type }}"
+        manual_locales="${{ inputs.manual-locales }}"
+        
+        if [ "$trigger_type" == "manual" ]; then
+          # For manual trigger, we don't need changes JSON
+          output=$(node .github/scripts/generate-locale-matrix.js "$trigger_type" "$manual_locales")
+        else
+          # For auto triggers, create a minimal JSON with only the boolean change indicators
+          changes_json=$(cat << 'EOF'
+        {
+          "core_any_changed": "${{ steps.changes.outputs.core_any_changed }}",
+          "ar_any_changed": "${{ steps.changes.outputs.ar_any_changed }}",
+          "de_any_changed": "${{ steps.changes.outputs.de_any_changed }}",
+          "en_any_changed": "${{ steps.changes.outputs.en_any_changed }}",
+          "es_any_changed": "${{ steps.changes.outputs.es_any_changed }}",
+          "fr_any_changed": "${{ steps.changes.outputs.fr_any_changed }}",
+          "ja_any_changed": "${{ steps.changes.outputs.ja_any_changed }}",
+          "ru_any_changed": "${{ steps.changes.outputs.ru_any_changed }}",
+          "zh-hans_any_changed": "${{ steps.changes.outputs.zh-hans_any_changed }}",
+          "zh-hant_any_changed": "${{ steps.changes.outputs.zh-hant_any_changed }}"
+        }
+        EOF
+          )
+          
+          temp_file=$(mktemp)
+          echo "$changes_json" > "$temp_file"
+          output=$(node .github/scripts/generate-locale-matrix.js "$trigger_type" "" "$temp_file")
+          rm -f "$temp_file"
+        fi
+        
+        # Parse the output (the script outputs two lines: include= and has-changes=)
+        echo "$output" >> $GITHUB_OUTPUT
