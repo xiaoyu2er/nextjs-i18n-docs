@@ -1,19 +1,7 @@
-// Import locale configuration
 import { LOCALES } from '@next-i18n/const';
+import { devError, devLog, devWarn } from './utils';
 
-// Debug logging utility
-const DEBUG_KEY = 'next-i18n-debug';
-function debugLog(...args: unknown[]) {
-  if (localStorage.getItem(DEBUG_KEY) === 'true') {
-    console.log('[DEBUG]', ...args);
-  }
-}
-
-// Log script initialization
-console.log('🌐 Next.js Translation Helper loaded (React-compatible version)');
-debugLog(
-  'Debug mode enabled. Use localStorage.removeItem("next-i18n-debug") to disable.',
-);
+devLog('🌐 Next.js Translation Helper loaded (React-compatible version)');
 
 // Utility function to wait for element with retries
 function waitForLearnButton(callback: () => void, maxAttempts = 30) {
@@ -27,10 +15,10 @@ function waitForLearnButton(callback: () => void, maxAttempts = 30) {
         attempts++;
         setTimeout(check, 200);
       } else {
-        console.log('⚠️ Learn button not found after maximum attempts');
+        devLog('⚠️ Learn button not found after maximum attempts');
       }
     } catch (error) {
-      console.warn('Error checking for Learn button:', error);
+      devWarn('Error checking for Learn button:', error);
     }
   };
   check();
@@ -172,10 +160,10 @@ function createTranslationDropdown() {
       try {
         const currentPath = window.location.pathname;
         const targetUrl = new URL(currentPath, locale.url).href;
-        console.log(`🌐 Navigating to ${locale.nativeName}: ${targetUrl}`);
+        devLog(`🌐 Navigating to ${locale.nativeName}: ${targetUrl}`);
         window.location.href = targetUrl;
       } catch (error) {
-        console.error('Error navigating to locale:', error);
+        devError('Error navigating to locale:', error);
         // Fallback to just the domain
         window.location.href = locale.url;
       }
@@ -258,15 +246,13 @@ function addTranslationButton() {
   for (const selector of learnButtonSelectors) {
     learnButton = document.querySelector(selector);
     if (learnButton) {
-      console.log(`🎯 Found Learn button with selector: ${selector}`);
-      debugLog('Learn button element:', learnButton);
+      devLog(`🎯 Found Learn button with selector: ${selector}`);
       break;
     }
   }
 
   if (!learnButton) {
-    debugLog('Learn button not found with any selector:', learnButtonSelectors);
-    console.log('⚠️ Learn button not found, will retry...');
+    devLog('⚠️ Learn button not found, will retry...');
     return;
   }
 
@@ -276,8 +262,7 @@ function addTranslationButton() {
       '.next-i18n-translate-container',
     );
     if (existingButton) {
-      debugLog('Translation button already exists, skipping');
-      console.log('✅ Translation button already exists');
+      devLog('✅ Translation button already exists');
       return;
     }
 
@@ -286,7 +271,7 @@ function addTranslationButton() {
     // Try multiple insertion strategies
     const parentNode = learnButton.parentNode;
     if (!parentNode) {
-      console.error('❌ Learn button has no parent node');
+      devError('❌ Learn button has no parent node');
       return;
     }
 
@@ -298,7 +283,7 @@ function addTranslationButton() {
       parentNode.appendChild(translationDropdown);
     }
 
-    console.log('✅ Translation button added successfully');
+    devLog('✅ Translation button added successfully');
 
     // Verify it was actually added and stays there
     setTimeout(() => {
@@ -306,52 +291,50 @@ function addTranslationButton() {
         '.next-i18n-translate-container',
       );
       if (!verifyButton) {
-        console.warn(
+        devWarn(
           '⚠️ Translation button was removed shortly after adding, React might be re-rendering',
         );
         // Try one more time after a longer delay
         setTimeout(() => {
-          console.log(
+          devLog(
             '🔄 Attempting to re-add translation button after React stabilization',
           );
           addTranslationButton();
         }, 1000);
       } else {
-        console.log('🎉 Translation button is stable and working!');
+        devLog('🎉 Translation button is stable and working!');
       }
     }, 500); // Wait 500ms to verify stability
   } catch (error) {
-    console.error('❌ Error adding translation button:', error);
+    devError('❌ Error adding translation button:', error);
   }
 }
 
 // Initialize the script
-console.log('🚀 Initializing Next.js Translation Helper...');
+devLog('🚀 Initializing Next.js Translation Helper...');
 
 // Initialize immediately and set up monitoring
 function initializeScript() {
-  console.log('📍 Current URL:', window.location.href);
-  console.log('📍 Document ready state:', document.readyState);
+  devLog('📍 Current URL:', window.location.href);
+  devLog('📍 Document ready state:', document.readyState);
 
   // Wait for React to finish initial rendering before adding our button
-  console.log('⏳ Waiting for React to stabilize...');
+  devLog('⏳ Waiting for React to stabilize...');
   setTimeout(() => {
-    console.log('🎬 React should be stable now, adding translation button');
+    devLog('🎬 React should be stable now, adding translation button');
     addTranslationButton();
 
     // If it still didn't work, wait for the Learn button to appear
     setTimeout(() => {
       if (!document.querySelector('.next-i18n-translate-container')) {
-        console.log('🔄 First attempt failed, trying again...');
+        devLog('🔄 First attempt failed, trying again...');
         waitForLearnButton(() => {
-          console.log(
-            '🎯 Learn button found, attempting to add translation button',
-          );
+          devLog('🎯 Learn button found, attempting to add translation button');
           addTranslationButton();
         });
       }
     }, 500);
-  }, 2000); // Wait 2 seconds for React to stabilize
+  }, 1000); // Wait 1 seconds for React to stabilize
 }
 
 // Run when DOM is ready
@@ -360,120 +343,3 @@ if (document.readyState === 'loading') {
 } else {
   initializeScript();
 }
-
-// Handle React re-renders and SPA navigation
-let lastUrl = location.href;
-let checkInterval: number;
-
-// More intelligent checking for React re-renders
-function startPeriodicCheck() {
-  if (checkInterval) {
-    clearInterval(checkInterval);
-  }
-
-  let checkCount = 0;
-  let missCount = 0;
-
-  checkInterval = window.setInterval(() => {
-    checkCount++;
-
-    // Check if we're still on nextjs.org
-    if (!window.location.href.includes('nextjs.org')) {
-      debugLog('Not on nextjs.org anymore, stopping periodic check');
-      clearInterval(checkInterval);
-      return;
-    }
-
-    // Check if the Learn button exists but our button doesn't
-    const learnButton = document.querySelector('a[href="/learn"]');
-    const ourButton = document.querySelector('.next-i18n-translate-container');
-
-    debugLog('Periodic check:', {
-      count: checkCount,
-      learnButton: !!learnButton,
-      ourButton: !!ourButton,
-      missCount,
-    });
-
-    if (learnButton && !ourButton) {
-      missCount++;
-      console.log('🔄 React re-render detected, re-adding translation button');
-      addTranslationButton();
-    } else if (ourButton) {
-      // Reset miss count if button is present
-      missCount = 0;
-    }
-
-    // If we haven't had issues for a while, reduce check frequency
-    if (checkCount > 20 && missCount === 0) {
-      clearInterval(checkInterval);
-      // Check less frequently after initial stability
-      checkInterval = window.setInterval(() => {
-        const learnBtn = document.querySelector('a[href="/learn"]');
-        const ourBtn = document.querySelector('.next-i18n-translate-container');
-        if (learnBtn && !ourBtn) {
-          console.log(
-            '🔄 Late React re-render detected, re-adding translation button',
-          );
-          addTranslationButton();
-        }
-      }, 2000); // Check every 2 seconds after stabilization
-      console.log('🎯 Switching to low-frequency monitoring');
-    }
-  }, 500); // Check every 500ms initially
-}
-
-// Enhanced mutation observer for React apps
-const observer = new MutationObserver((mutations) => {
-  const url = location.href;
-  let shouldRecheck = false;
-
-  // Check for URL changes (SPA navigation)
-  if (url !== lastUrl) {
-    lastUrl = url;
-    shouldRecheck = true;
-    console.log('🔄 URL changed, rechecking translation button');
-    debugLog('URL change:', { from: lastUrl, to: url });
-  }
-
-  // Check for DOM changes that might remove our button
-  for (const mutation of mutations) {
-    if (mutation.type === 'childList') {
-      for (const node of mutation.removedNodes) {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const element = node as Element;
-          // If our button or its container was removed, re-add it
-          if (
-            element.classList?.contains('next-i18n-translate-container') ||
-            element.querySelector?.('.next-i18n-translate-container')
-          ) {
-            shouldRecheck = true;
-            console.log('🔄 Translation button removed by React, will re-add');
-          }
-        }
-      }
-    }
-  }
-
-  if (shouldRecheck) {
-    // Longer debounce to avoid interfering with React's rendering cycle
-    setTimeout(addTranslationButton, 300);
-  }
-});
-
-observer.observe(document, {
-  subtree: true,
-  childList: true,
-  attributes: false, // Don't watch attributes to reduce noise
-});
-
-// Start the periodic check
-startPeriodicCheck();
-
-// Clean up on page unload
-window.addEventListener('beforeunload', () => {
-  if (checkInterval) {
-    clearInterval(checkInterval);
-  }
-  observer.disconnect();
-});
