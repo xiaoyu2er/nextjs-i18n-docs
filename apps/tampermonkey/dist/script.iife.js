@@ -1,0 +1,15 @@
+// ==UserScript==
+// @name         next-i18n-docs tampermonkey
+// @namespace    https://nextjs.org/
+// @version      0.0.1
+// @description  
+// @author       
+// @match        *://*
+// @grant        GM_xmlhttpRequest
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+  "use strict";
+  console.log("Tampermonkey script loaded");
+})();
