@@ -21,7 +21,7 @@ export default function HomePage() {
           <h1 className="text-4xl md:text-6xl font-extrabold mb-4 text-fd-foreground leading-tight">
             {t('title')}
           </h1>
-          <div className="text-lg md:text-xl text-fd-muted-foreground max-w-3xl mb-8 leading-relaxed">
+          <div className="mx-auto text-lg md:text-xl text-fd-muted-foreground max-w-3xl mb-8 leading-relaxed">
             {t.rich('subtitle', {
               strong: (chunks) => (
                 <strong className="font-semibold text-fd-foreground">
