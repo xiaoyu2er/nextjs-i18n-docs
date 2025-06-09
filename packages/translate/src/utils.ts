@@ -18,6 +18,7 @@ interface LangConfig {
 interface CheckFileUpdateParams {
   sourcePath: string;
   targetPath: string;
+  model?: DeepSeekModel;
 }
 
 interface BuildTranslationContextParams {
@@ -60,6 +61,7 @@ export function getLastModifiedTimeFromGit(filePath: string): Date {
 export async function getDocUpdateStatus({
   sourcePath,
   targetPath,
+  model = 'deepseek-chat',
 }: CheckFileUpdateParams): Promise<{
   shouldUpdate: boolean;
   chunks: 'N/A' | number;
@@ -75,8 +77,8 @@ export async function getDocUpdateStatus({
   }
 
   const sourceContent = await fs$.readFile(sourcePath, 'utf8');
-  const chunks = needsChunking(sourceContent)
-    ? splitIntoChunks(sourceContent).length
+  const chunks = needsChunking(sourceContent, model)
+    ? splitIntoChunks(sourceContent, model).length
     : 1;
 
   try {
@@ -179,7 +181,9 @@ export async function translateDoc({
   model = 'deepseek-chat',
 }: TranslateDocumentFileParams) {
   // Create directory if it doesn't exist
-  logger.debug(`Translating ${sourcePath} to ${targetPath}`);
+  logger.debug(
+    `Translating ${sourcePath} to ${targetPath} using model ${model}`,
+  );
   await fs$.mkdir(path.dirname(targetPath), { recursive: true });
 
   // Read source file

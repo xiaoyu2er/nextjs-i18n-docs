@@ -49,7 +49,7 @@ export async function main({
 
   logger.divider();
   logger.info(
-    `Translation for ${docsRoot} in languages: ${LANGUAGES.join(', ')} started!`,
+    `Translation for ${docsRoot} in languages: ${LANGUAGES.join(', ')} using ${model} started!`,
   );
 
   // Normalize paths and prepare patterns
@@ -157,6 +157,7 @@ export async function main({
       const { shouldUpdate, reason, chunks } = await getDocUpdateStatus({
         sourcePath,
         targetPath,
+        model,
       });
 
       if (verbose) {
