@@ -2,7 +2,7 @@
 // @name         Next.js i18n Tampermonkey Script
 // @namespace    https://github.com/xiaoyu2er/nextjs-i18n-docs
 // @website      https://github.com/xiaoyu2er/nextjs-i18n-docs
-// @version      0.0.1
+// @version      0.0.2
 // @updateURL    https://raw.githubusercontent.com/xiaoyu2er/nextjs-i18n-docs/refs/heads/dev/apps/tampermonkey/dist/script.iife.js
 // @downloadURL    https://raw.githubusercontent.com/xiaoyu2er/nextjs-i18n-docs/refs/heads/dev/apps/tampermonkey/dist/script.iife.js
 // @description  Adds a translation button to nextjs.org with links to community-maintained translated documentation
@@ -115,22 +115,21 @@
   );
   function devLog(...args) {
   }
-  function devWarn(...args) {
-  }
-  function devError(...args) {
-  }
-  function waitForLearnButton(callback, maxAttempts = 30) {
+  function waitForTargetButton(callback, maxAttempts = 30) {
     let attempts = 0;
     const check = () => {
       try {
         const learnButton = document.querySelector('a[href="/learn"]');
-        if (learnButton) {
+        const searchButton = document.querySelector('button[aria-label="Search documentation"]');
+        if (learnButton || searchButton) {
           callback();
-        } else if (attempts < maxAttempts) {
+          return;
+        }
+        if (attempts < maxAttempts) {
           attempts++;
           setTimeout(check, 200);
         } else {
-          devLog("⚠️ Learn button not found after maximum attempts");
+          devLog("⚠️ Neither Learn button nor Search button found after maximum attempts");
         }
       } catch (error) {
       }
@@ -298,6 +297,8 @@
     return container;
   }
   function addTranslationButton() {
+    var _a, _b;
+    let addedCount = 0;
     const learnButtonSelectors = [
       'a[href="/learn"]',
       'a[href*="/learn"]',
@@ -311,57 +312,89 @@
         break;
       }
     }
-    if (!learnButton) {
-      return;
+    if (learnButton) {
+      const existingLearnButton = (_a = learnButton.parentNode) == null ? void 0 : _a.querySelector(".next-i18n-translate-container");
+      if (!existingLearnButton) {
+        try {
+          const translationDropdown = createTranslationDropdown();
+          translationDropdown.setAttribute("data-placement", "learn-button");
+          const parentNode = learnButton.parentNode;
+          if (parentNode) {
+            if (learnButton.nextSibling) {
+              parentNode.insertBefore(translationDropdown, learnButton.nextSibling);
+            } else {
+              parentNode.appendChild(translationDropdown);
+            }
+            devLog("✅ Translation button added next to Learn button");
+            addedCount++;
+          }
+        } catch (error) {
+        }
+      }
     }
-    try {
-      const existingButton = document.querySelector(
-        ".next-i18n-translate-container"
-      );
-      if (existingButton) {
-        devLog("✅ Translation button already exists");
-        return;
+    const searchButtonSelectors = [
+      'button[aria-label="Search documentation"]',
+      "button.navbar_search__dZT2b",
+      'button[data-variant="small"]'
+    ];
+    let searchButton = null;
+    for (const selector of searchButtonSelectors) {
+      try {
+        searchButton = document.querySelector(selector);
+        if (searchButton) {
+          devLog(`🔍 Found Search button with selector: ${selector}`);
+          break;
+        }
+      } catch (error) {
       }
-      const translationDropdown = createTranslationDropdown();
-      const parentNode = learnButton.parentNode;
-      if (!parentNode) {
-        devError("❌ Learn button has no parent node");
-        return;
+    }
+    if (searchButton) {
+      const existingSearchButton = (_b = searchButton.parentNode) == null ? void 0 : _b.querySelector(".next-i18n-translate-container");
+      if (!existingSearchButton) {
+        try {
+          const translationDropdown = createTranslationDropdown();
+          translationDropdown.setAttribute("data-placement", "search-button");
+          const parentNode = searchButton.parentNode;
+          if (parentNode) {
+            if (searchButton.nextSibling) {
+              parentNode.insertBefore(translationDropdown, searchButton.nextSibling);
+            } else {
+              parentNode.appendChild(translationDropdown);
+            }
+            devLog("✅ Translation button added next to Search button");
+            addedCount++;
+          }
+        } catch (error) {
+        }
       }
-      if (learnButton.nextSibling) {
-        parentNode.insertBefore(translationDropdown, learnButton.nextSibling);
-      } else {
-        parentNode.appendChild(translationDropdown);
-      }
-      devLog("✅ Translation button added successfully");
+    }
+    if (addedCount === 0 && !learnButton && !searchButton) {
+      return false;
+    }
+    if (addedCount > 0) {
       setTimeout(() => {
-        const verifyButton = document.querySelector(
+        const verifyButtons = document.querySelectorAll(
           ".next-i18n-translate-container"
         );
-        if (!verifyButton) {
-          devWarn(
-            "⚠️ Translation button was removed shortly after adding, React might be re-rendering"
-          );
+        if (verifyButtons.length === 0) {
           setTimeout(() => {
-            devLog(
-              "🔄 Attempting to re-add translation button after React stabilization"
-            );
             addTranslationButton();
           }, 1e3);
         } else {
-          devLog("🎉 Translation button is stable and working!");
+          devLog(`🎉 ${verifyButtons.length} translation button(s) are stable and working!`);
         }
       }, 500);
-    } catch (error) {
     }
+    return addedCount > 0;
   }
   function initializeScript() {
     setTimeout(() => {
       addTranslationButton();
       setTimeout(() => {
-        if (!document.querySelector(".next-i18n-translate-container")) {
-          waitForLearnButton(() => {
-            devLog("🎯 Learn button found, attempting to add translation button");
+        const existingButtons = document.querySelectorAll(".next-i18n-translate-container");
+        if (existingButtons.length === 0) {
+          waitForTargetButton(() => {
+            devLog("🎯 Target button found, attempting to add translation button");
             addTranslationButton();
           });
         }

@@ -4,21 +4,32 @@ import { devError, devLog, devWarn } from './utils';
 devLog('🌐 Next.js Translation Helper loaded (React-compatible version)');
 
 // Utility function to wait for element with retries
-function waitForLearnButton(callback: () => void, maxAttempts = 30) {
+function waitForTargetButton(callback: () => void, maxAttempts = 30) {
   let attempts = 0;
   const check = () => {
     try {
+      // Check for Learn button first
       const learnButton = document.querySelector('a[href="/learn"]');
-      if (learnButton) {
+      // Also check for search button
+      const searchButton = document.querySelector(
+        'button[aria-label="Search documentation"]',
+      );
+
+      if (learnButton || searchButton) {
         callback();
-      } else if (attempts < maxAttempts) {
+        return;
+      }
+
+      if (attempts < maxAttempts) {
         attempts++;
         setTimeout(check, 200);
       } else {
-        devLog('⚠️ Learn button not found after maximum attempts');
+        devLog(
+          '⚠️ Neither Learn button nor Search button found after maximum attempts',
+        );
       }
     } catch (error) {
-      devWarn('Error checking for Learn button:', error);
+      devWarn('Error checking for target buttons:', error);
     }
   };
   check();
@@ -233,9 +244,11 @@ function createTranslationDropdown() {
   return container;
 }
 
-// Find and add the translation button
+// Find and add the translation button(s)
 function addTranslationButton() {
-  // Multiple selectors to find the Learn button (in case HTML structure changes)
+  let addedCount = 0;
+
+  // Strategy 1: Add next to the Learn button (desktop)
   const learnButtonSelectors = [
     'a[href="/learn"]',
     'a[href*="/learn"]',
@@ -244,8 +257,6 @@ function addTranslationButton() {
   ];
 
   let learnButton: Element | null = null;
-
-  // Try each selector
   for (const selector of learnButtonSelectors) {
     learnButton = document.querySelector(selector);
     if (learnButton) {
@@ -254,63 +265,125 @@ function addTranslationButton() {
     }
   }
 
-  if (!learnButton) {
-    devLog('⚠️ Learn button not found, will retry...');
-    return;
-  }
-
-  try {
-    // Check if translation button already exists
-    const existingButton = document.querySelector(
+  if (learnButton) {
+    // Check if translation button already exists next to learn button
+    const existingLearnButton = learnButton.parentNode?.querySelector(
       '.next-i18n-translate-container',
     );
-    if (existingButton) {
-      devLog('✅ Translation button already exists');
-      return;
-    }
+    if (!existingLearnButton) {
+      try {
+        const translationDropdown = createTranslationDropdown();
+        translationDropdown.setAttribute('data-placement', 'learn-button');
 
-    const translationDropdown = createTranslationDropdown();
-
-    // Try multiple insertion strategies
-    const parentNode = learnButton.parentNode;
-    if (!parentNode) {
-      devError('❌ Learn button has no parent node');
-      return;
-    }
-
-    // Strategy 1: Insert after the Learn button
-    if (learnButton.nextSibling) {
-      parentNode.insertBefore(translationDropdown, learnButton.nextSibling);
+        const parentNode = learnButton.parentNode;
+        if (parentNode) {
+          if (learnButton.nextSibling) {
+            parentNode.insertBefore(
+              translationDropdown,
+              learnButton.nextSibling,
+            );
+          } else {
+            parentNode.appendChild(translationDropdown);
+          }
+          devLog('✅ Translation button added next to Learn button');
+          addedCount++;
+        }
+      } catch (error) {
+        devError(
+          '❌ Error adding translation button next to Learn button:',
+          error,
+        );
+      }
     } else {
-      // Strategy 2: Append to parent if it's the last child
-      parentNode.appendChild(translationDropdown);
+      devLog('✅ Translation button already exists next to Learn button');
     }
+  }
 
-    devLog('✅ Translation button added successfully');
+  // Strategy 2: Add next to the search button (mobile)
+  const searchButtonSelectors = [
+    'button[aria-label="Search documentation"]',
+    'button.navbar_search__dZT2b',
+    'button[data-variant="small"]',
+  ];
 
-    // Verify it was actually added and stays there
+  let searchButton: Element | null = null;
+  for (const selector of searchButtonSelectors) {
+    try {
+      searchButton = document.querySelector(selector);
+      if (searchButton) {
+        devLog(`🔍 Found Search button with selector: ${selector}`);
+        break;
+      }
+    } catch (error) {
+      // Skip invalid selectors
+    }
+  }
+
+  if (searchButton) {
+    // Check if translation button already exists next to search button
+    const existingSearchButton = searchButton.parentNode?.querySelector(
+      '.next-i18n-translate-container',
+    );
+    if (!existingSearchButton) {
+      try {
+        const translationDropdown = createTranslationDropdown();
+        translationDropdown.setAttribute('data-placement', 'search-button');
+
+        const parentNode = searchButton.parentNode;
+        if (parentNode) {
+          if (searchButton.nextSibling) {
+            parentNode.insertBefore(
+              translationDropdown,
+              searchButton.nextSibling,
+            );
+          } else {
+            parentNode.appendChild(translationDropdown);
+          }
+          devLog('✅ Translation button added next to Search button');
+          addedCount++;
+        }
+      } catch (error) {
+        devError(
+          '❌ Error adding translation button next to Search button:',
+          error,
+        );
+      }
+    } else {
+      devLog('✅ Translation button already exists next to Search button');
+    }
+  }
+
+  if (addedCount === 0 && !learnButton && !searchButton) {
+    devLog('⚠️ Neither Learn button nor Search button found, will retry...');
+    return false;
+  }
+
+  // Verify buttons were actually added and stay there
+  if (addedCount > 0) {
     setTimeout(() => {
-      const verifyButton = document.querySelector(
+      const verifyButtons = document.querySelectorAll(
         '.next-i18n-translate-container',
       );
-      if (!verifyButton) {
+      if (verifyButtons.length === 0) {
         devWarn(
-          '⚠️ Translation button was removed shortly after adding, React might be re-rendering',
+          '⚠️ Translation buttons were removed shortly after adding, React might be re-rendering',
         );
         // Try one more time after a longer delay
         setTimeout(() => {
           devLog(
-            '🔄 Attempting to re-add translation button after React stabilization',
+            '🔄 Attempting to re-add translation buttons after React stabilization',
           );
           addTranslationButton();
         }, 1000);
       } else {
-        devLog('🎉 Translation button is stable and working!');
+        devLog(
+          `🎉 ${verifyButtons.length} translation button(s) are stable and working!`,
+        );
       }
     }, 500); // Wait 500ms to verify stability
-  } catch (error) {
-    devError('❌ Error adding translation button:', error);
   }
+
+  return addedCount > 0;
 }
 
 // Initialize the script
@@ -327,12 +400,17 @@ function initializeScript() {
     devLog('🎬 React should be stable now, adding translation button');
     addTranslationButton();
 
-    // If it still didn't work, wait for the Learn button to appear
+    // If it still didn't work, wait for target buttons to appear
     setTimeout(() => {
-      if (!document.querySelector('.next-i18n-translate-container')) {
+      const existingButtons = document.querySelectorAll(
+        '.next-i18n-translate-container',
+      );
+      if (existingButtons.length === 0) {
         devLog('🔄 First attempt failed, trying again...');
-        waitForLearnButton(() => {
-          devLog('🎯 Learn button found, attempting to add translation button');
+        waitForTargetButton(() => {
+          devLog(
+            '🎯 Target button found, attempting to add translation button',
+          );
           addTranslationButton();
         });
       }
