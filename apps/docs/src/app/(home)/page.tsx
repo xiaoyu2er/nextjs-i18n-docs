@@ -1,3 +1,4 @@
+import { createMetadata } from '@/lib/metadata';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 
@@ -118,4 +119,10 @@ export default function HomePage() {
       </section>
     </main>
   );
+}
+
+export async function generateMetadata() {
+  return createMetadata({
+    pathname: '/',
+  });
 }

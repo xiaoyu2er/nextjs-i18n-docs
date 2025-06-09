@@ -124,12 +124,26 @@ export const parseDocId = (id: string) => {
     whereTag,
   };
 };
-
-export function getDocUrl(slug: string[] | string | undefined) {
-  if (typeof slug === 'string') {
-    return `/docs/${slug}`;
+export function removeTrailingSlash(url: string) {
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+export function removeLeadingSlash(url: string) {
+  return url.startsWith('/') ? url.slice(1) : url;
+}
+export function getDocUrl(slugs: string[] | string | undefined) {
+  if (!slugs || slugs === '/') {
+    return '/docs';
   }
-  return `/docs/${(slug || []).join('/')}`;
+  if (typeof slugs === 'string') {
+    return removeTrailingSlash(`/docs/${removeLeadingSlash(slugs)}`);
+  }
+  return removeTrailingSlash(
+    `/docs/${(
+      slugs.map((slug) => {
+        return slug.replace(/^\d\d-/, '');
+      })
+    ).join('/')}`,
+  );
 }
 
 export function getLearnUrl(slug: string[] | string | undefined) {

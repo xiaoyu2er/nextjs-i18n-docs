@@ -7,6 +7,7 @@ import * as icons from '@/mdx/Icon';
 import { loader } from 'fumadocs-core/source';
 import { createMDXSource } from 'fumadocs-mdx';
 import { createElement } from 'react';
+import { getDocUrl } from './utils';
 
 // See https://fumadocs.dev//docs/headless/source-api for more info
 export const docs = loader({
@@ -18,14 +19,7 @@ export const docs = loader({
       return createElement(icons[icon as keyof typeof icons]);
   },
   url(slugs) {
-    // remove \d\d- from slug
-    const url = `/docs/${slugs
-      .map((slug) => {
-        return slug.replace(/^\d\d-/, '');
-      })
-      .join('/')}`;
-
-    return url;
+    return getDocUrl(slugs);
   },
   // https://fumadocs.dev/docs/headless/source-api#page-tree-1
   pageTree: {

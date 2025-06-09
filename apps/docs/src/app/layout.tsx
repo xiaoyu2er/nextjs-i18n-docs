@@ -1,4 +1,4 @@
-import { NextIntlClientProvider, hasLocale } from 'next-intl';
+import { NextIntlClientProvider } from 'next-intl';
 import './global.css';
 import { Provider } from '@/app/provider';
 
@@ -11,7 +11,6 @@ import { getLangDir } from 'rtl-detect';
 
 export async function generateMetadata() {
   const t = await getTranslations('meta');
-
   return createMetadata({
     title: {
       template: `%s | ${t('title')}`,
