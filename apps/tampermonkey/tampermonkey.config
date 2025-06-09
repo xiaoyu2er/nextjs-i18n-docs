@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name         Next.js i18n Tampermonkey Script
 // @namespace    https://github.com/xiaoyu2er/nextjs-i18n-docs
+// @website      https://github.com/xiaoyu2er/nextjs-i18n-docs
 // @version      0.0.1
 // @updateURL    https://raw.githubusercontent.com/xiaoyu2er/nextjs-i18n-docs/refs/heads/dev/apps/tampermonkey/dist/script.iife.js
 // @downloadURL    https://raw.githubusercontent.com/xiaoyu2er/nextjs-i18n-docs/refs/heads/dev/apps/tampermonkey/dist/script.iife.js
