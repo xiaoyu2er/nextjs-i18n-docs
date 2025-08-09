@@ -29,7 +29,9 @@ turndownService.addRule('in-this-chapter', {
   filter: (node) => {
     return (
       node.nodeName === 'DIV' &&
-      node.className.includes('in-this-chapter_wrapper')
+      // in-this-chapter-module__p7uO0q__wrapper
+      node.className.includes('in-this-chapter-module') &&
+      node.className.includes('__wrapper')
     );
   },
   replacement: (content, node, options) => {
@@ -73,7 +75,7 @@ export function modifyCodeBlocks(main: Element) {
 
   for (const codeBlock of codeBlocks) {
     const fileNameNode = codeBlock.querySelector(
-      '[class^="code-block_filename"',
+      '[class*="code-block-module"][class*="__filenameP"]',
     );
     const fileName = fileNameNode?.textContent || '';
 
