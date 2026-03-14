@@ -24,7 +24,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
-import { assemble } from './assembler';
+import {
+  NEEDS_TRANSLATION_END,
+  NEEDS_TRANSLATION_START,
+  assemble,
+} from './assembler';
 import { executeInBatches } from './batch';
 import { TranslationCache } from './cache';
 import { validateMdx } from './mdx-validator';
@@ -157,8 +161,18 @@ async function translateFile(
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
   fs.writeFileSync(finalPath, validateResult.correctedContent, 'utf8');
 
+  // Strip any leftover NEEDS_TRANSLATION markers (model didn't remove them)
+  let finalContent = validateResult.correctedContent;
+  if (finalContent.includes(NEEDS_TRANSLATION_START)) {
+    finalContent = finalContent
+      .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
+      .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
+    // Re-write the file with cleaned content
+    fs.writeFileSync(finalPath, finalContent, 'utf8');
+  }
+
   // Validate MDX
-  const mdxResult = validateMdx(validateResult.correctedContent);
+  const mdxResult = validateMdx(finalContent);
 
   return {
     status: 'translated',
