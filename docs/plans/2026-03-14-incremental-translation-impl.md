@@ -14,6 +14,96 @@
 
 ---
 
+## Phase 0: Download Latest Docs Locally
+
+### Task 0: Create `sync-docs-local.sh` — download latest Next.js docs
+
+**TDD scenario:** Trivial script — manual verification.
+
+This replicates what `sync-docs.yml` does in CI, but for local use. It downloads docs from Next.js official repo into a temp directory, then replaces `content/en/docs/`. Blog and learn are handled by the existing crawler separately.
+
+**Files:**
+- Create: `scripts/sync-docs-local.sh`
+
+**Step 1: Create the script**
+
+```bash
+#!/usr/bin/env bash
+# scripts/sync-docs-local.sh
+# Download latest Next.js docs locally (replicates sync-docs.yml CI workflow)
+#
+# Usage: bash scripts/sync-docs-local.sh
+#
+# What it does:
+#   1. Clones Next.js repo (canary, v14, v13) into temp dirs
+#   2. Rsyncs docs into apps/docs/content/en/docs/
+#   3. Cleans up temp dirs
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONTENT_EN="$PROJECT_ROOT/apps/docs/content/en/docs"
+TMP_DIR=$(mktemp -d)
+
+echo "📦 Downloading Next.js docs to temp: $TMP_DIR"
+
+# Canary (latest)
+echo "⏳ Cloning canary branch..."
+git clone --depth 1 --branch canary --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-canary" 2>/dev/null
+mkdir -p "$CONTENT_EN"
+rsync -av --delete "$TMP_DIR/nextjs-canary/docs/" "$CONTENT_EN/" --exclude="13" --exclude="14"
+echo "✅ Canary docs synced"
+
+# v14
+echo "⏳ Cloning v14.2.28..."
+git clone --depth 1 --branch v14.2.28 --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v14" 2>/dev/null
+mkdir -p "$CONTENT_EN/14"
+rsync -av --delete "$TMP_DIR/nextjs-v14/docs/" "$CONTENT_EN/14/"
+echo "✅ v14 docs synced"
+
+# v13
+echo "⏳ Cloning v13.5.11..."
+git clone --depth 1 --branch v13.5.11 --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v13" 2>/dev/null
+mkdir -p "$CONTENT_EN/13"
+rsync -av --delete "$TMP_DIR/nextjs-v13/docs/" "$CONTENT_EN/13/"
+echo "✅ v13 docs synced"
+
+# Cleanup
+rm -rf "$TMP_DIR"
+echo ""
+echo "🎉 Done. English docs updated in: $CONTENT_EN"
+echo "   Run 'pnpm build:packages && node packages/crawler/dist/index.js' to sync blog & learn."
+```
+
+**Step 2: Make executable and run**
+
+```bash
+chmod +x scripts/sync-docs-local.sh
+bash scripts/sync-docs-local.sh
+```
+
+Expected: Downloads ~3 repos, rsyncs into `content/en/docs/`. Takes 1-2 minutes.
+
+**Step 3: Verify**
+
+```bash
+git -C apps/docs/content/en/docs status --short | head -20
+```
+
+Check if there are any changes compared to current content.
+
+**Step 4: Commit the script (not the doc changes)**
+
+```bash
+git add scripts/sync-docs-local.sh
+git commit -m "feat: add local docs sync script"
+```
+
+> **Note:** Don't commit the downloaded doc changes yet. For the prototype we just need the script ready. If docs changed, you can commit separately or discard with `git checkout apps/docs/content/en/`.
+
+---
+
 ## Phase A: Core Pipeline (parse → hash → assemble)
 
 ### Task 1: Add remark dependency to translate package
