@@ -47,7 +47,7 @@ function parseArgs(argv: string[]) {
     ),
     cacheDir: path.resolve(
       PROJECT_ROOT,
-      getOpt('cache-dir', 'tmp/pipeline-output/cache'),
+      getOpt('cache-dir', 'apps/docs/translation-cache'),
     ),
     apiKey: getOpt('api-key', ''),
     apiType: getOpt('api-type', 'pi') as 'openai' | 'anthropic' | 'pi',
