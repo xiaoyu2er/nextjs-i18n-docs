@@ -30,6 +30,17 @@ import { validateMdx } from './mdx-validator';
 import { needsTranslation, translateAssembled } from './translator';
 import { validate } from './validator';
 
+function formatDuration(ms: number): string {
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const remainSecs = secs % 60;
+  if (mins < 60) return `${mins}m${remainSecs}s`;
+  const hours = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  return `${hours}h${remainMins}m`;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
@@ -188,14 +199,33 @@ async function main() {
   let totalDiffs = 0;
   let totalMdxErrors = 0;
   const mdxErrorFiles: string[] = [];
+  const startTime = Date.now();
+  const fileTimes: number[] = [];
 
   for (let i = 0; i < filesToProcess.length; i++) {
     const relPath = filesToProcess[i];
     const sourcePath = path.join(opts.docsRoot, relPath);
     const progress = `[${i + 1}/${filesToProcess.length}]`;
 
+    const fileStart = Date.now();
     try {
       const result = await translateFile(sourcePath, relPath, opts, cache);
+
+      const fileElapsed = Date.now() - fileStart;
+      fileTimes.push(fileElapsed);
+
+      // Calculate ETA
+      const elapsed = Date.now() - startTime;
+      const remaining = filesToProcess.length - (i + 1);
+      const avgTime =
+        fileTimes.filter((t) => t > 100).length > 0
+          ? fileTimes.filter((t) => t > 100).reduce((a, b) => a + b, 0) /
+            fileTimes.filter((t) => t > 100).length
+          : 0;
+      const eta = remaining * avgTime;
+      const elapsedStr = formatDuration(elapsed);
+      const etaStr = remaining > 0 && avgTime > 0 ? formatDuration(eta) : '-';
+      const timeInfo = `[${elapsedStr} elapsed, ETA ${etaStr}]`;
 
       const mdxStatus =
         result.mdxErrors.length > 0
@@ -214,7 +244,7 @@ async function main() {
         totalNewTranslations += result.newTranslations;
         totalDiffs += result.diffs;
         console.log(
-          `${progress} 🔤 ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})${mdxStatus}`,
+          `${progress} 🔤 ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})${mdxStatus} ${timeInfo}`,
         );
 
         // Save cache after each translation
@@ -247,6 +277,7 @@ async function main() {
     }
   }
   console.log(`   Cache size: ${cache.stats(opts.lang).size} entries`);
+  console.log(`   Total time: ${formatDuration(Date.now() - startTime)}`);
   console.log(`   Output: ${path.join(opts.outputDir, opts.lang)}`);
 }
 

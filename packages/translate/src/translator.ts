@@ -64,6 +64,15 @@ RULES:
 6. For frontmatter (YAML between ---), translate title/description values but keep keys unchanged
 7. NEVER start a frontmatter value with backticks, quotes, or special characters
 
+CRITICAL TAG RULES:
+8. All HTML/JSX tags MUST remain balanced. For every opening tag there must be a matching closing tag:
+   - <AppOnly> must have </AppOnly>
+   - <PagesOnly> must have </PagesOnly>
+   - <details> must have </details>
+   - <div ...> must have </div>
+9. Do NOT add or remove any HTML/JSX tags. Keep the exact same number of opening and closing tags as the input.
+10. Before outputting, verify: count every <AppOnly> and </AppOnly>, <PagesOnly> and </PagesOnly>, <details> and </details> — they MUST match.
+
 OUTPUT: Return the complete file with translations applied and markers removed. Nothing else.`;
 
   if (opts.docsContext) {
