@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
 import { assemble } from './assembler';
 import { TranslationCache } from './cache';
+import { validateMdx } from './mdx-validator';
 import { needsTranslation, translateAssembled } from './translator';
 import { validate } from './validator';
 
@@ -83,6 +84,7 @@ async function translateFile(
   status: 'cached' | 'translated' | 'skipped';
   newTranslations: number;
   diffs: number;
+  mdxErrors: string[];
 }> {
   const sourceContent = fs.readFileSync(sourcePath, 'utf8');
   const assembleResult = assemble(sourceContent, opts.lang, cache);
@@ -92,11 +94,18 @@ async function translateFile(
     const finalPath = path.join(opts.outputDir, opts.lang, relPath);
     fs.mkdirSync(path.dirname(finalPath), { recursive: true });
     fs.writeFileSync(finalPath, assembleResult.content, 'utf8');
-    return { status: 'cached', newTranslations: 0, diffs: 0 };
+
+    const mdxResult = validateMdx(assembleResult.content);
+    return {
+      status: 'cached',
+      newTranslations: 0,
+      diffs: 0,
+      mdxErrors: mdxResult.errors.map((e) => e.message),
+    };
   }
 
   if (opts.dryRun || !needsTranslation(assembleResult.content)) {
-    return { status: 'skipped', newTranslations: 0, diffs: 0 };
+    return { status: 'skipped', newTranslations: 0, diffs: 0, mdxErrors: [] };
   }
 
   // Translate
@@ -136,10 +145,14 @@ async function translateFile(
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
   fs.writeFileSync(finalPath, validateResult.correctedContent, 'utf8');
 
+  // Validate MDX
+  const mdxResult = validateMdx(validateResult.correctedContent);
+
   return {
     status: 'translated',
     newTranslations: validateResult.newTranslations,
     diffs: validateResult.diffs.length,
+    mdxErrors: mdxResult.errors.map((e) => e.message),
   };
 }
 
@@ -173,6 +186,8 @@ async function main() {
   let totalSkipped = 0;
   let totalNewTranslations = 0;
   let totalDiffs = 0;
+  let totalMdxErrors = 0;
+  const mdxErrorFiles: string[] = [];
 
   for (let i = 0; i < filesToProcess.length; i++) {
     const relPath = filesToProcess[i];
@@ -182,15 +197,24 @@ async function main() {
     try {
       const result = await translateFile(sourcePath, relPath, opts, cache);
 
+      const mdxStatus =
+        result.mdxErrors.length > 0
+          ? ` ⚠️ MDX: ${result.mdxErrors.join('; ')}`
+          : '';
+      if (result.mdxErrors.length > 0) {
+        totalMdxErrors += result.mdxErrors.length;
+        mdxErrorFiles.push(relPath);
+      }
+
       if (result.status === 'cached') {
         totalCached++;
-        console.log(`${progress} ✅ ${relPath} (all cached)`);
+        console.log(`${progress} ✅ ${relPath} (all cached)${mdxStatus}`);
       } else if (result.status === 'translated') {
         totalTranslated++;
         totalNewTranslations += result.newTranslations;
         totalDiffs += result.diffs;
         console.log(
-          `${progress} 🔤 ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})`,
+          `${progress} 🔤 ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})${mdxStatus}`,
         );
 
         // Save cache after each translation
@@ -216,6 +240,12 @@ async function main() {
   console.log(`   Skipped: ${totalSkipped}`);
   console.log(`   New translations cached: ${totalNewTranslations}`);
   console.log(`   Diffs: ${totalDiffs}`);
+  console.log(`   MDX errors: ${totalMdxErrors}`);
+  if (mdxErrorFiles.length > 0) {
+    for (const f of mdxErrorFiles) {
+      console.log(`     ⚠️  ${f}`);
+    }
+  }
   console.log(`   Cache size: ${cache.stats(opts.lang).size} entries`);
   console.log(`   Output: ${path.join(opts.outputDir, opts.lang)}`);
 }
