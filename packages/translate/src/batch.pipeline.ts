@@ -209,6 +209,9 @@ async function main() {
 
     const fileStart = Date.now();
     try {
+      // Show which file is being processed before the API call
+      process.stdout.write(`${progress} ⏳ ${relPath}...`);
+
       const result = await translateFile(sourcePath, relPath, opts, cache);
 
       const fileElapsed = Date.now() - fileStart;
@@ -236,6 +239,9 @@ async function main() {
         mdxErrorFiles.push(relPath);
       }
 
+      // Clear the "⏳" line
+      process.stdout.write('\r\x1b[K');
+
       if (result.status === 'cached') {
         totalCached++;
         console.log(`${progress} ✅ ${relPath} (all cached)${mdxStatus}`);
@@ -254,6 +260,7 @@ async function main() {
         console.log(`${progress} ⏭️  ${relPath} (skipped)`);
       }
     } catch (err) {
+      process.stdout.write('\r\x1b[K');
       console.error(
         `${progress} ❌ ${relPath}: ${err instanceof Error ? err.message : err}`,
       );
