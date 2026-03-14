@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
 import { assemble } from './assembler';
+import { executeInBatches } from './batch';
 import { TranslationCache } from './cache';
 import { validateMdx } from './mdx-validator';
 import { needsTranslation, translateAssembled } from './translator';
@@ -198,74 +199,109 @@ async function main() {
   let totalNewTranslations = 0;
   let totalDiffs = 0;
   let totalMdxErrors = 0;
+  let totalErrors = 0;
   const mdxErrorFiles: string[] = [];
   const startTime = Date.now();
   const fileTimes: number[] = [];
+  let completed = 0;
 
-  for (let i = 0; i < filesToProcess.length; i++) {
-    const relPath = filesToProcess[i];
+  // Separate cached files (instant) from files needing translation (API calls)
+  const cachedFiles: string[] = [];
+  const translateFiles: string[] = [];
+
+  for (const relPath of filesToProcess) {
     const sourcePath = path.join(opts.docsRoot, relPath);
-    const progress = `[${i + 1}/${filesToProcess.length}]`;
+    const sourceContent = fs.readFileSync(sourcePath, 'utf8');
+    const assembleResult = assemble(sourceContent, opts.lang, cache);
 
-    const fileStart = Date.now();
-    try {
-      // Show which file is being processed before the API call
-      process.stdout.write(`${progress} ⏳ ${relPath}...`);
+    if (assembleResult.allCached) {
+      cachedFiles.push(relPath);
+      // Write immediately
+      const finalPath = path.join(opts.outputDir, opts.lang, relPath);
+      fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+      fs.writeFileSync(finalPath, assembleResult.content, 'utf8');
 
-      const result = await translateFile(sourcePath, relPath, opts, cache);
-
-      const fileElapsed = Date.now() - fileStart;
-      fileTimes.push(fileElapsed);
-
-      // Calculate ETA
-      const elapsed = Date.now() - startTime;
-      const remaining = filesToProcess.length - (i + 1);
-      const avgTime =
-        fileTimes.filter((t) => t > 100).length > 0
-          ? fileTimes.filter((t) => t > 100).reduce((a, b) => a + b, 0) /
-            fileTimes.filter((t) => t > 100).length
-          : 0;
-      const eta = remaining * avgTime;
-      const elapsedStr = formatDuration(elapsed);
-      const etaStr = remaining > 0 && avgTime > 0 ? formatDuration(eta) : '-';
-      const timeInfo = `[${elapsedStr} elapsed, ETA ${etaStr}]`;
-
+      const mdxResult = validateMdx(assembleResult.content);
       const mdxStatus =
-        result.mdxErrors.length > 0
-          ? ` ⚠️ MDX: ${result.mdxErrors.join('; ')}`
+        mdxResult.errors.length > 0
+          ? ` ⚠️ MDX: ${mdxResult.errors.map((e) => e.message).join('; ')}`
           : '';
-      if (result.mdxErrors.length > 0) {
-        totalMdxErrors += result.mdxErrors.length;
+      if (mdxResult.errors.length > 0) {
+        totalMdxErrors += mdxResult.errors.length;
         mdxErrorFiles.push(relPath);
       }
-
-      // Clear the "⏳" line
-      process.stdout.write('\r\x1b[K');
-
-      if (result.status === 'cached') {
-        totalCached++;
-        console.log(`${progress} ✅ ${relPath} (all cached)${mdxStatus}`);
-      } else if (result.status === 'translated') {
-        totalTranslated++;
-        totalNewTranslations += result.newTranslations;
-        totalDiffs += result.diffs;
-        console.log(
-          `${progress} 🔤 ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})${mdxStatus} ${timeInfo}`,
-        );
-
-        // Save cache after each translation
-        cache.save(opts.lang);
-      } else {
-        totalSkipped++;
-        console.log(`${progress} ⏭️  ${relPath} (skipped)`);
-      }
-    } catch (err) {
-      process.stdout.write('\r\x1b[K');
-      console.error(
-        `${progress} ❌ ${relPath}: ${err instanceof Error ? err.message : err}`,
+      totalCached++;
+      completed++;
+      console.log(
+        `[${completed}/${filesToProcess.length}] ✅ ${relPath} (all cached)${mdxStatus}`,
       );
+    } else {
+      translateFiles.push(relPath);
     }
   }
+
+  console.log(
+    `\n📦 ${cachedFiles.length} files from cache, ${translateFiles.length} files need translation (concurrency: ${opts.concurrency})\n`,
+  );
+
+  // Translate files with concurrency
+  await executeInBatches(
+    translateFiles,
+    async (relPath) => {
+      const sourcePath = path.join(opts.docsRoot, relPath);
+      const fileStart = Date.now();
+
+      completed++;
+      const progress = `[${completed}/${filesToProcess.length}]`;
+      console.log(`${progress} ⏳ ${relPath}...`);
+
+      try {
+        const result = await translateFile(sourcePath, relPath, opts, cache);
+
+        const fileElapsed = Date.now() - fileStart;
+        fileTimes.push(fileElapsed);
+
+        const elapsed = Date.now() - startTime;
+        const remaining = filesToProcess.length - completed;
+        const avgTime =
+          fileTimes.length > 0
+            ? fileTimes.reduce((a, b) => a + b, 0) / fileTimes.length
+            : 0;
+        const eta = remaining * (avgTime / opts.concurrency);
+        const elapsedStr = formatDuration(elapsed);
+        const etaStr = remaining > 0 && avgTime > 0 ? formatDuration(eta) : '-';
+        const timeInfo = `[${elapsedStr} elapsed, ETA ${etaStr}]`;
+
+        const mdxStatus =
+          result.mdxErrors.length > 0
+            ? ` ⚠️ MDX: ${result.mdxErrors.join('; ')}`
+            : '';
+        if (result.mdxErrors.length > 0) {
+          totalMdxErrors += result.mdxErrors.length;
+          mdxErrorFiles.push(relPath);
+        }
+
+        if (result.status === 'translated') {
+          totalTranslated++;
+          totalNewTranslations += result.newTranslations;
+          totalDiffs += result.diffs;
+          console.log(
+            `${progress} 🔤 ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})${mdxStatus} ${timeInfo}`,
+          );
+          cache.save(opts.lang);
+        } else {
+          totalSkipped++;
+          console.log(`${progress} ⏭️  ${relPath} (skipped)`);
+        }
+      } catch (err) {
+        totalErrors++;
+        console.error(
+          `${progress} ❌ ${relPath}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    },
+    opts.concurrency,
+  );
 
   // Final cache save
   cache.save(opts.lang);
@@ -276,6 +312,7 @@ async function main() {
   console.log(`   Translated: ${totalTranslated}`);
   console.log(`   Skipped: ${totalSkipped}`);
   console.log(`   New translations cached: ${totalNewTranslations}`);
+  console.log(`   Errors: ${totalErrors}`);
   console.log(`   Diffs: ${totalDiffs}`);
   console.log(`   MDX errors: ${totalMdxErrors}`);
   if (mdxErrorFiles.length > 0) {
