@@ -233,7 +233,7 @@ async function main() {
       totalCached++;
       completed++;
       console.log(
-        `[${completed}/${filesToProcess.length}] ✅ ${relPath} (all cached)${mdxStatus}`,
+        `[${completed}/${filesToProcess.length}] 💾 ${relPath} (all cached)${mdxStatus}`,
       );
     } else {
       translateFiles.push(relPath);
@@ -286,7 +286,7 @@ async function main() {
           totalNewTranslations += result.newTranslations;
           totalDiffs += result.diffs;
           console.log(
-            `${progress} 🔤 ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})${mdxStatus} ${timeInfo}`,
+            `${progress} ✅ ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})${mdxStatus} ${timeInfo}`,
           );
           cache.save(opts.lang);
         } else {
