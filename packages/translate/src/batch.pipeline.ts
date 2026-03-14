@@ -52,7 +52,7 @@ function parseArgs(argv: string[]) {
     ),
     cacheDir: path.resolve(
       PROJECT_ROOT,
-      getOpt('cache-dir', 'tmp/batch-output/cache'),
+      getOpt('cache-dir', 'apps/docs/translation-cache'),
     ),
     lang: getOpt('lang', 'zh-hans'),
     langName: getOpt('lang-name', 'Simplified Chinese'),
