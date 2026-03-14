@@ -82,12 +82,8 @@ function parseArgs(argv: string[]) {
     provider: getOpt('provider', ''),
     concurrency: Number.parseInt(getOpt('concurrency', '1'), 10),
     dryRun: hasFlag('dry-run'),
-    guide: getOpt(
-      'guide',
-      `- For technical terms that should not be fully translated, use the format: "中文翻译 (English term)"
-- Add a space between Chinese characters and English words/symbols
-- Maintain consistent translations for common terms`,
-    ),
+    guide: getOpt('guide', ''),
+    configPath: getOpt('config', 'apps/docs/translation.config.mjs'),
   };
 }
 
@@ -135,6 +131,7 @@ async function translateFile(
     model: opts.model || undefined,
     provider: opts.provider || undefined,
     docsContext:
+      opts.docsContext ||
       'Next.js is a React framework for building full-stack web applications.',
   });
 
@@ -183,7 +180,29 @@ async function translateFile(
 }
 
 async function main() {
-  const opts = parseArgs(process.argv);
+  const opts = parseArgs(process.argv) as ReturnType<typeof parseArgs> & {
+    docsContext?: string;
+  };
+
+  // Load language config from translation.config.mjs if no guide provided
+  if (!opts.guide) {
+    try {
+      const configPath = path.resolve(PROJECT_ROOT, opts.configPath);
+      const config = (await import(configPath)).default;
+      const langConfig = config.langs?.[opts.lang];
+      if (langConfig) {
+        if (opts.langName === 'Simplified Chinese') {
+          opts.langName = langConfig.name;
+        }
+        opts.guide = langConfig.guide || '';
+      }
+      if (config.docsContext) {
+        opts.docsContext = config.docsContext;
+      }
+    } catch {
+      // Config not found, use defaults
+    }
+  }
 
   console.log('\n📦 Batch Translation Pipeline');
   console.log(`   Source: ${opts.docsRoot}`);
