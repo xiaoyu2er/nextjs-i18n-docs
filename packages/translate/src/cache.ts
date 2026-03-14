@@ -1,9 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+interface CacheEntry {
+  v: string;
+  /** Source locations: "relative/path/to/file.mdx:lineNumber" */
+  src: string[];
+}
+
 export class TranslationCache {
   private cacheDir: string;
-  private data: Map<string, Map<string, string>> = new Map();
+  private data: Map<string, Map<string, CacheEntry>> = new Map();
 
   constructor(cacheDir: string) {
     this.cacheDir = cacheDir;
@@ -17,18 +23,25 @@ export class TranslationCache {
 
     if (fs.existsSync(filePath)) {
       const lines = fs.readFileSync(filePath, 'utf8').split('\n');
-      const map = new Map<string, string>();
+      const map = new Map<string, CacheEntry>();
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         const entry = JSON.parse(trimmed);
-        map.set(entry.k, entry.v);
+        map.set(entry.k, {
+          v: entry.v,
+          src: entry.src ?? [],
+        });
       }
       this.data.set(lang, map);
     } else if (fs.existsSync(jsonPath)) {
       // Migrate from old JSON format
       const raw = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-      this.data.set(lang, new Map(Object.entries(raw)));
+      const map = new Map<string, CacheEntry>();
+      for (const [k, v] of Object.entries(raw)) {
+        map.set(k, { v: v as string, src: [] });
+      }
+      this.data.set(lang, map);
     }
   }
 
@@ -39,8 +52,14 @@ export class TranslationCache {
     const langData = this.data.get(lang);
     if (langData) {
       const lines: string[] = [];
-      for (const [k, v] of langData) {
-        lines.push(JSON.stringify({ k, v }));
+      for (const [k, entry] of langData) {
+        lines.push(
+          JSON.stringify({
+            k,
+            v: entry.v,
+            ...(entry.src.length > 0 ? { src: entry.src } : {}),
+          }),
+        );
       }
       fs.writeFileSync(filePath, `${lines.join('\n')}\n`, 'utf8');
     }
@@ -48,7 +67,7 @@ export class TranslationCache {
 
   /** Get a cached translation */
   get(lang: string, md5: string): string | undefined {
-    return this.data.get(lang)?.get(md5);
+    return this.data.get(lang)?.get(md5)?.v;
   }
 
   /** Set a cached translation */
@@ -56,7 +75,40 @@ export class TranslationCache {
     if (!this.data.has(lang)) {
       this.data.set(lang, new Map());
     }
-    this.data.get(lang)?.set(md5, translation);
+    const existing = this.data.get(lang)?.get(md5);
+    this.data.get(lang)?.set(md5, {
+      v: translation,
+      src: existing?.src ?? [],
+    });
+  }
+
+  /**
+   * Update source locations for a md5 hash.
+   * Call this during parse/assemble to track where each node appears.
+   * @param filePath relative path like "docs/01-app/installation.mdx"
+   * @param line 1-based line number
+   */
+  updateSource(
+    lang: string,
+    md5: string,
+    filePath: string,
+    line: number,
+  ): void {
+    const entry = this.data.get(lang)?.get(md5);
+    if (!entry) return;
+    const loc = `${filePath}:${line}`;
+    if (!entry.src.includes(loc)) {
+      entry.src.push(loc);
+    }
+  }
+
+  /** Clear all source locations (call before a full rebuild) */
+  clearSources(lang: string): void {
+    const langData = this.data.get(lang);
+    if (!langData) return;
+    for (const entry of langData.values()) {
+      entry.src = [];
+    }
   }
 
   /** Delete a cached translation */
@@ -65,7 +117,7 @@ export class TranslationCache {
   }
 
   /** Iterate all entries for a language */
-  entries(lang: string): IterableIterator<[string, string]> {
+  entries(lang: string): IterableIterator<[string, CacheEntry]> {
     return (this.data.get(lang) ?? new Map()).entries();
   }
 

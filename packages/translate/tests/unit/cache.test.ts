@@ -100,6 +100,39 @@ describe('TranslationCache', () => {
     expect(entries).toHaveLength(2);
   });
 
+  it('should track source locations', () => {
+    const cache = new TranslationCache(tmpDir);
+    cache.set('zh-hans', 'h1', 'v1');
+    cache.updateSource('zh-hans', 'h1', 'docs/installation.mdx', 12);
+    cache.updateSource('zh-hans', 'h1', 'docs/14/installation.mdx', 12);
+    cache.save('zh-hans');
+
+    const cache2 = new TranslationCache(tmpDir);
+    cache2.load('zh-hans');
+    const entry = [...cache2.entries('zh-hans')].find(([k]) => k === 'h1');
+    expect(entry).toBeDefined();
+    expect(entry?.[1].src).toContain('docs/installation.mdx:12');
+    expect(entry?.[1].src).toContain('docs/14/installation.mdx:12');
+  });
+
+  it('should not duplicate source locations', () => {
+    const cache = new TranslationCache(tmpDir);
+    cache.set('zh-hans', 'h1', 'v1');
+    cache.updateSource('zh-hans', 'h1', 'docs/foo.mdx', 5);
+    cache.updateSource('zh-hans', 'h1', 'docs/foo.mdx', 5);
+    const entry = [...cache.entries('zh-hans')].find(([k]) => k === 'h1');
+    expect(entry?.[1].src).toHaveLength(1);
+  });
+
+  it('should clear sources', () => {
+    const cache = new TranslationCache(tmpDir);
+    cache.set('zh-hans', 'h1', 'v1');
+    cache.updateSource('zh-hans', 'h1', 'docs/foo.mdx', 5);
+    cache.clearSources('zh-hans');
+    const entry = [...cache.entries('zh-hans')].find(([k]) => k === 'h1');
+    expect(entry?.[1].src).toHaveLength(0);
+  });
+
   it('should prune unused entries', () => {
     const cache = new TranslationCache(tmpDir);
     cache.set('zh-hans', 'used1', 'v1');
