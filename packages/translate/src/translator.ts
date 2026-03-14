@@ -1,8 +1,12 @@
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { NEEDS_TRANSLATION_START } from './assembler';
 
-type ApiType = 'openai' | 'anthropic';
+type ApiType = 'openai' | 'anthropic' | 'pi';
 
 interface TranslateOptions {
   /** Assembled file content with NEEDS_TRANSLATION markers */
@@ -13,18 +17,20 @@ interface TranslateOptions {
   guide?: string;
   /** Documentation context */
   docsContext?: string;
-  /** API type: 'openai' or 'anthropic' */
+  /** API type: 'openai', 'anthropic', or 'pi' */
   apiType?: ApiType;
-  /** API base URL */
+  /** API base URL (for openai/anthropic) */
   apiBaseUrl?: string;
-  /** API key (falls back to env vars) */
+  /** API key (for openai/anthropic, falls back to env vars) */
   apiKey?: string;
   /** Model name */
   model?: string;
+  /** Provider name (for pi mode) */
+  provider?: string;
 }
 
 /**
- * Strip <think>...</think> blocks from model output (reasoning models like MiniMax-M2.5).
+ * Strip <think>...</think> blocks from model output (reasoning models).
  */
 export function stripThinkingBlock(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>\s*/g, '').trim();
@@ -69,6 +75,51 @@ OUTPUT: Return the complete file with translations applied and markers removed. 
   }
 
   return prompt;
+}
+
+/**
+ * Translate via pi CLI in print mode.
+ * Uses pi's auth and model registry — no API key management needed.
+ */
+function translateWithPi(opts: TranslateOptions, systemPrompt: string): string {
+  // Write assembled content to temp file for @file reference
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-translate-'));
+  const contentFile = path.join(tmpDir, 'content.mdx');
+  fs.writeFileSync(contentFile, opts.assembledContent, 'utf8');
+
+  try {
+    const args = [
+      '-p',
+      '--no-tools',
+      '--no-extensions',
+      '--no-skills',
+      '--no-prompt-templates',
+      '--no-session',
+    ];
+
+    if (opts.provider) {
+      args.push('--provider', opts.provider);
+    }
+    if (opts.model) {
+      args.push('--model', opts.model);
+    }
+
+    args.push('--system-prompt', systemPrompt);
+    args.push(`@${contentFile}`);
+    args.push(
+      'Translate the file above according to the system prompt instructions. Output only the translated file.',
+    );
+
+    const result = execFileSync('pi', args, {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024, // 10MB
+      timeout: 5 * 60 * 1000, // 5 min
+    });
+
+    return stripThinkingBlock(result);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -133,7 +184,7 @@ async function translateWithOpenAI(
       { role: 'system', content: systemPrompt },
       { role: 'user', content: opts.assembledContent },
     ],
-    max_tokens: 16384,
+    max_tokens: 8192,
   });
 
   const content = response.choices?.[0]?.message?.content;
@@ -145,8 +196,8 @@ async function translateWithOpenAI(
 }
 
 /**
- * Translate assembled content by calling a translation API.
- * Supports both OpenAI-compatible and Anthropic APIs.
+ * Translate assembled content.
+ * Supports: 'pi' (pi CLI), 'openai' (OpenAI-compatible), 'anthropic' (Anthropic API).
  */
 export async function translateAssembled(
   opts: TranslateOptions,
@@ -157,8 +208,11 @@ export async function translateAssembled(
     docsContext: opts.docsContext,
   });
 
-  const apiType = opts.apiType ?? 'anthropic';
+  const apiType = opts.apiType ?? 'pi';
 
+  if (apiType === 'pi') {
+    return translateWithPi(opts, systemPrompt);
+  }
   if (apiType === 'anthropic') {
     return translateWithAnthropic(opts, systemPrompt);
   }

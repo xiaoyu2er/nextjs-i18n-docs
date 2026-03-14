@@ -50,6 +50,10 @@ function parseArgs(argv: string[]) {
       getOpt('cache-dir', 'tmp/pipeline-output/cache'),
     ),
     apiKey: getOpt('api-key', ''),
+    apiType: getOpt('api-type', 'pi') as 'openai' | 'anthropic' | 'pi',
+    apiBaseUrl: getOpt('api-base-url', ''),
+    model: getOpt('model', ''),
+    provider: getOpt('provider', ''),
     dryRun: hasFlag('dry-run'),
     guide: getOpt(
       'guide',
@@ -126,16 +130,17 @@ async function main() {
 
   // 4. Translate
   console.log(
-    `\n🤖 Translating ${assembleResult.uncachedCount} nodes via MiniMax API...`,
+    `\n🤖 Translating ${assembleResult.uncachedCount} nodes via ${opts.apiType}...`,
   );
   const translatedContent = await translateAssembled({
     assembledContent: assembleResult.content,
     langName: opts.langName,
     guide: opts.guide,
-    apiType: 'openai',
-    apiBaseUrl: 'https://api.minimax.io/v1',
-    apiKey: opts.apiKey,
-    model: 'MiniMax-M2.1',
+    apiType: opts.apiType,
+    apiBaseUrl: opts.apiBaseUrl || undefined,
+    apiKey: opts.apiKey || undefined,
+    model: opts.model || undefined,
+    provider: opts.provider || undefined,
     docsContext:
       'Next.js is a React framework for building full-stack web applications.',
   });
