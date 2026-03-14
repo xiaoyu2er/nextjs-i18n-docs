@@ -94,7 +94,23 @@ function main() {
     `   Dedup rate: ${Math.round((1 - md5Map.size / totalNodes) * 100)}%`,
   );
   console.log(`   Shared across files: ${multiFile}`);
+  // Generate readable index
+  const indexPath = path.join(CACHE_DIR, 'en.index.md');
+  const indexLines = ['# English Source Index', ''];
+  for (const [k, entry] of md5Map) {
+    if (entry.src.length === 0) continue;
+    const preview = entry.v.split('\n')[0].substring(0, 80);
+    indexLines.push(`## \`${k.substring(0, 8)}\` ${preview}`);
+    indexLines.push('');
+    for (const src of entry.src) {
+      indexLines.push(`- ${src}`);
+    }
+    indexLines.push('');
+  }
+  fs.writeFileSync(indexPath, indexLines.join('\n'), 'utf8');
+
   console.log(`   Written to: ${enPath}`);
+  console.log(`   Index: ${indexPath}`);
 }
 
 main();

@@ -53,16 +53,32 @@ export class TranslationCache {
     if (langData) {
       const lines: string[] = [];
       for (const [k, entry] of langData) {
-        lines.push(
-          JSON.stringify({
-            k,
-            v: entry.v,
-            ...(entry.src.length > 0 ? { src: entry.src } : {}),
-          }),
-        );
+        lines.push(JSON.stringify({ k, v: entry.v }));
       }
       fs.writeFileSync(filePath, `${lines.join('\n')}\n`, 'utf8');
     }
+  }
+
+  /** Export a readable markdown index for IDE navigation */
+  exportIndex(lang: string): void {
+    const langData = this.data.get(lang);
+    if (!langData) return;
+
+    const indexPath = path.join(this.cacheDir, `${lang}.index.md`);
+    const lines: string[] = [`# Translation Index (${lang})`, ''];
+
+    for (const [k, entry] of langData) {
+      if (entry.src.length === 0) continue;
+      const preview = entry.v.split('\n')[0].substring(0, 80);
+      lines.push(`## \`${k.substring(0, 8)}\` ${preview}`);
+      lines.push('');
+      for (const src of entry.src) {
+        lines.push(`- ${src}`);
+      }
+      lines.push('');
+    }
+
+    fs.writeFileSync(indexPath, lines.join('\n'), 'utf8');
   }
 
   /** Get a cached translation */
