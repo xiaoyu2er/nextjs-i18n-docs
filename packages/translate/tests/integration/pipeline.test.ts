@@ -84,7 +84,7 @@ describe('pipeline integration', () => {
   describe('image.mdx (edge cases)', () => {
     const filePath = path.join(
       DOCS_ROOT,
-      'docs/01-app/05-api-reference/02-components/image.mdx',
+      'docs/01-app/03-api-reference/02-components/image.mdx',
     );
 
     it('should parse without errors', () => {

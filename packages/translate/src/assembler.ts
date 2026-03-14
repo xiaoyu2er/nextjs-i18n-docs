@@ -31,6 +31,8 @@ export function assemble(
   rawContent: string,
   lang: string,
   cache: TranslationCache,
+  /** Relative file path for source tracking (e.g. "docs/01-app/installation.mdx") */
+  sourceFilePath?: string,
 ): AssembleResult {
   const normalizedContent = normalize(rawContent);
   const nodes = parseMdx(rawContent);
@@ -48,6 +50,14 @@ export function assemble(
     if (node.needsTranslation) {
       totalTranslatable++;
       const cached = node.md5 ? cache.get(lang, node.md5) : undefined;
+
+      // Track source location
+      if (node.md5 && sourceFilePath) {
+        const line = normalizedContent
+          .substring(0, node.startOffset)
+          .split('\n').length;
+        cache.updateSource(lang, node.md5, sourceFilePath, line);
+      }
 
       if (cached) {
         result += cached;

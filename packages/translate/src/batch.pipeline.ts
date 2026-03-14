@@ -99,7 +99,7 @@ async function translateFile(
   mdxErrors: string[];
 }> {
   const sourceContent = fs.readFileSync(sourcePath, 'utf8');
-  const assembleResult = assemble(sourceContent, opts.lang, cache);
+  const assembleResult = assemble(sourceContent, opts.lang, cache, relPath);
 
   if (assembleResult.allCached) {
     // Write directly from cache
@@ -222,6 +222,8 @@ async function main() {
   try {
     cache.load(opts.lang);
     console.log(`📦 Cache loaded: ${cache.stats(opts.lang).size} entries`);
+    // Clear source locations for fresh rebuild
+    cache.clearSources(opts.lang);
   } catch {
     console.log('📦 No existing cache');
   }
@@ -245,7 +247,7 @@ async function main() {
   for (const relPath of filesToProcess) {
     const sourcePath = path.join(opts.docsRoot, relPath);
     const sourceContent = fs.readFileSync(sourcePath, 'utf8');
-    const assembleResult = assemble(sourceContent, opts.lang, cache);
+    const assembleResult = assemble(sourceContent, opts.lang, cache, relPath);
 
     if (assembleResult.allCached) {
       cachedFiles.push(relPath);
