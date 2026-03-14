@@ -61,7 +61,12 @@ RULES:
 3. Keep ALL other content (already translated text, code blocks, HTML tags) EXACTLY as-is — do not modify a single character
 4. Preserve all Markdown formatting, heading levels, links, inline code
 5. Keep code blocks, file paths, URLs, variable names unchanged
-6. For frontmatter (YAML between ---), translate title/description values but keep keys unchanged
+6. For frontmatter (YAML between ---):
+   - Translate ONLY the values, keep all keys unchanged
+   - Keep the exact same keys in the exact same order
+   - Do NOT add or remove any frontmatter fields
+   - Do NOT wrap values in quotes unless the original had quotes
+   - Keep the --- delimiters exactly as-is
 7. NEVER start a frontmatter value with backticks, quotes, or special characters
 
 CRITICAL TAG RULES:
