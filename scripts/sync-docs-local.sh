@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 # scripts/sync-docs-local.sh
-# Download latest Next.js docs locally (replicates sync-docs.yml CI workflow)
+# Download latest Next.js docs locally.
+# Auto-resolves versions from git tags, then syncs all versions (13+).
 #
 # Usage: bash scripts/sync-docs-local.sh
-#
-# What it does:
-#   1. Clones Next.js repo (canary, v14, v13) into temp dirs
-#   2. Rsyncs docs into apps/docs/content/en/docs/
-#   3. Cleans up temp dirs
 
 set -euo pipefail
 
@@ -16,38 +12,54 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONTENT_EN="$PROJECT_ROOT/apps/docs/content/en/docs"
 TMP_DIR=$(mktemp -d)
 
-echo "📦 Downloading Next.js docs to temp: $TMP_DIR"
+cd "$PROJECT_ROOT"
 
-# Canary (latest)
-echo "⏳ Cloning canary branch..."
-git clone --depth 1 --branch canary --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-canary" 2>/dev/null
-mkdir -p "$CONTENT_EN"
-rsync -av --delete "$TMP_DIR/nextjs-canary/docs/" "$CONTENT_EN/" --exclude="13" --exclude="14" --exclude="15"
-echo "✅ Canary docs synced"
+# Step 1: Resolve versions
+echo "🔍 Resolving Next.js versions..."
+bash scripts/resolve-versions.sh
+echo ""
 
-# v15
-echo "⏳ Cloning v15.5.12..."
-git clone --depth 1 --branch v15.5.12 --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v15" 2>/dev/null
-mkdir -p "$CONTENT_EN/15"
-rsync -av --delete "$TMP_DIR/nextjs-v15/docs/" "$CONTENT_EN/15/"
-echo "✅ v15 docs synced"
+VERSIONS_FILE="$PROJECT_ROOT/.github/nextjs-versions.json"
+LATEST_MAJOR=$(python3 -c "import json; print(json.load(open('$VERSIONS_FILE'))['latestMajor'])")
 
-# v14
-echo "⏳ Cloning v14.2.35..."
-git clone --depth 1 --branch v14.2.35 --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v14" 2>/dev/null
-mkdir -p "$CONTENT_EN/14"
-rsync -av --delete "$TMP_DIR/nextjs-v14/docs/" "$CONTENT_EN/14/"
-echo "✅ v14 docs synced"
+echo "📦 Downloading docs to temp: $TMP_DIR"
+echo ""
 
-# v13
-echo "⏳ Cloning v13.5.11..."
-git clone --depth 1 --branch v13.5.11 --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v13" 2>/dev/null
-mkdir -p "$CONTENT_EN/13"
-rsync -av --delete "$TMP_DIR/nextjs-v13/docs/" "$CONTENT_EN/13/"
-echo "✅ v13 docs synced"
+# Step 2: Sync each version
+python3 -c "
+import json
+data = json.load(open('$VERSIONS_FILE'))
+for major, version in sorted(data['versions'].items(), key=lambda x: int(x[0])):
+    print(f'{major} {version}')
+" | while read -r major version; do
+  echo "⏳ Cloning v$version..."
+  git clone --depth 1 --branch "v$version" --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v$major" 2>/dev/null
+
+  if [ "$major" = "$LATEST_MAJOR" ]; then
+    # Latest version → root docs/ (exclude old version dirs)
+    mkdir -p "$CONTENT_EN"
+    EXCLUDES=$(python3 -c "
+import json
+data = json.load(open('$VERSIONS_FILE'))
+for m in data['versions']:
+    if m != '$LATEST_MAJOR':
+        print('--exclude=' + m, end=' ')
+")
+    rsync -av --delete "$TMP_DIR/nextjs-v$major/docs/" "$CONTENT_EN/" $EXCLUDES
+  else
+    # Historical version → docs/{major}/
+    mkdir -p "$CONTENT_EN/$major"
+    rsync -av --delete "$TMP_DIR/nextjs-v$major/docs/" "$CONTENT_EN/$major/"
+  fi
+
+  echo "✅ v$major (v$version) synced"
+  echo ""
+done
 
 # Cleanup
 rm -rf "$TMP_DIR"
-echo ""
+
 echo "🎉 Done. English docs updated in: $CONTENT_EN"
+echo "   Versions: $(cat "$VERSIONS_FILE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(', '.join(f'v{k}={v}' for k,v in sorted(d['versions'].items(), key=lambda x: int(x[0]))))")"
+echo ""
 echo "   Run 'pnpm build:packages && node packages/crawler/dist/index.js' to sync blog & learn."
