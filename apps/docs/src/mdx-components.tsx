@@ -5,6 +5,7 @@ import type { MDXComponents } from 'mdx/types';
 import { Image as BlogImage } from './mdx/BlogImage';
 import { Check, Cross } from './mdx/Check';
 import { Image } from './mdx/Image';
+import { Video } from './mdx/Video';
 
 // use this function to get MDX components, you will need it for rendering MDX
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
@@ -17,6 +18,7 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     Check,
     Tab,
     Tabs,
+    Video,
     ...components,
   };
 }
