@@ -340,7 +340,7 @@ async function main() {
 
   // Final cache save
   cache.save(opts.lang);
-  cache.exportIndex(opts.lang);
+  cache.exportIndex(opts.lang, path.relative(PROJECT_ROOT, opts.docsRoot));
 
   console.log(`\n${'='.repeat(60)}`);
   console.log('📊 Summary:');

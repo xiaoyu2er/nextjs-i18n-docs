@@ -60,7 +60,7 @@ export class TranslationCache {
   }
 
   /** Export a readable markdown index for IDE navigation */
-  exportIndex(lang: string): void {
+  exportIndex(lang: string, docsRoot?: string): void {
     const langData = this.data.get(lang);
     if (!langData) return;
 
@@ -70,10 +70,12 @@ export class TranslationCache {
     for (const [k, entry] of langData) {
       if (entry.src.length === 0) continue;
       const preview = entry.v.split('\n')[0].substring(0, 80);
-      lines.push(`## \`${k.substring(0, 8)}\` ${preview}`);
+      lines.push(`## \`${k}\` ${preview}`);
       lines.push('');
       for (const src of entry.src) {
-        lines.push(`- ${src}`);
+        const [filePath, line] = src.split(':');
+        const relPath = docsRoot ? `${docsRoot}/${filePath}` : filePath;
+        lines.push(`- [${src}](${relPath}#L${line})`);
       }
       lines.push('');
     }
