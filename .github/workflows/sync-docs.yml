@@ -34,41 +34,42 @@ jobs:
           VERSIONS_FILE=".github/nextjs-versions.json"
           LATEST_MAJOR=$(python3 -c "import json; print(json.load(open('$VERSIONS_FILE'))['latestMajor'])")
 
-          # Read each version
-          python3 -c "
-          import json
-          data = json.load(open('$VERSIONS_FILE'))
-          for major, version in sorted(data['versions'].items(), key=lambda x: int(x[0])):
-              print(f'{major} {version}')
-          " | while read -r major version; do
-            echo ""
-            echo "⏳ Syncing v$major (v$version)..."
-
-            git clone --depth 1 --branch "v$version" --single-branch https://github.com/vercel/next.js.git "nextjs-v$major" 2>/dev/null
-
-            if [ "$major" = "$LATEST_MAJOR" ]; then
-              # Latest version goes to root docs/ (exclude old version dirs)
-              EXCLUDES=""
-              python3 -c "
+          # Build excludes for the latest version rsync
+          EXCLUDES=$(python3 -c "
           import json
           data = json.load(open('$VERSIONS_FILE'))
           for m in data['versions']:
               if m != '$LATEST_MAJOR':
-                  print(m)
-              " | while read -r exclude_major; do
-                EXCLUDES="$EXCLUDES --exclude=$exclude_major"
-              done
-              mkdir -p apps/docs/content/en/docs
-              rsync -av --delete "nextjs-v$major/docs/" apps/docs/content/en/docs/ $EXCLUDES
-            else
-              # Historical versions go to docs/{major}/
-              mkdir -p "apps/docs/content/en/docs/$major"
-              rsync -av --delete "nextjs-v$major/docs/" "apps/docs/content/en/docs/$major/"
-            fi
+                  print('--exclude=' + m, end=' ')
+          ")
+          echo "Excludes for latest: $EXCLUDES"
 
+          # Sync historical versions first (to their own directories)
+          python3 -c "
+          import json
+          data = json.load(open('$VERSIONS_FILE'))
+          for major, version in sorted(data['versions'].items(), key=lambda x: int(x[0])):
+              if major != '$LATEST_MAJOR':
+                  print(f'{major} {version}')
+          " | while read -r major version; do
+            echo ""
+            echo "⏳ Syncing v$major (v$version) → docs/$major/"
+            git clone --depth 1 --branch "v$version" --single-branch https://github.com/vercel/next.js.git "nextjs-v$major" 2>/dev/null
+            mkdir -p "apps/docs/content/en/docs/$major"
+            rsync -av --delete "nextjs-v$major/docs/" "apps/docs/content/en/docs/$major/"
             rm -rf "nextjs-v$major"
             echo "✅ v$major synced"
           done
+
+          # Sync latest version last (to root docs/, excluding historical dirs)
+          LATEST_VERSION=$(python3 -c "import json; print(json.load(open('$VERSIONS_FILE'))['latest'])")
+          echo ""
+          echo "⏳ Syncing v$LATEST_MAJOR (v$LATEST_VERSION) → docs/ (latest)"
+          git clone --depth 1 --branch "v$LATEST_VERSION" --single-branch https://github.com/vercel/next.js.git "nextjs-v$LATEST_MAJOR" 2>/dev/null
+          mkdir -p apps/docs/content/en/docs
+          rsync -av --delete "nextjs-v$LATEST_MAJOR/docs/" apps/docs/content/en/docs/ $EXCLUDES
+          rm -rf "nextjs-v$LATEST_MAJOR"
+          echo "✅ v$LATEST_MAJOR (latest) synced"
 
       - name: Setup Tools
         uses: ./.github/actions/setup
@@ -98,8 +99,7 @@ jobs:
           body: |
             This PR updates the Next.js English documentation from the official Next.js repository.
 
-            Versions synced (auto-resolved from git tags):
-            $(cat .github/nextjs-versions.json)
+            Versions synced (auto-resolved from git tags).
 
             After merging, run the **Translate Documentation** workflow to update translations.
           branch: docs/sync-nextjs-documentation
