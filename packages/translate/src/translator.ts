@@ -1,5 +1,8 @@
+import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { NEEDS_TRANSLATION_START } from './assembler';
+
+type ApiType = 'openai' | 'anthropic';
 
 interface TranslateOptions {
   /** Assembled file content with NEEDS_TRANSLATION markers */
@@ -10,10 +13,21 @@ interface TranslateOptions {
   guide?: string;
   /** Documentation context */
   docsContext?: string;
-  /** OpenAI-compatible API base URL */
+  /** API type: 'openai' or 'anthropic' */
+  apiType?: ApiType;
+  /** API base URL */
   apiBaseUrl?: string;
+  /** API key (falls back to env vars) */
+  apiKey?: string;
   /** Model name */
   model?: string;
+}
+
+/**
+ * Strip <think>...</think> blocks from model output (reasoning models like MiniMax-M2.5).
+ */
+export function stripThinkingBlock(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>\s*/g, '').trim();
 }
 
 /**
@@ -58,28 +72,57 @@ OUTPUT: Return the complete file with translations applied and markers removed. 
 }
 
 /**
- * Translate assembled content by calling an OpenAI-compatible API.
- * Only translates sections wrapped in NEEDS_TRANSLATION markers.
+ * Translate via Anthropic Messages API (used by MiniMax, Claude, etc.)
  */
-export async function translateAssembled(
+async function translateWithAnthropic(
   opts: TranslateOptions,
+  systemPrompt: string,
 ): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey =
+    opts.apiKey ?? process.env.ANTHROPIC_API_KEY ?? process.env.MINIMAX_API_KEY;
   if (!apiKey) {
     throw new Error(
-      'OPENAI_API_KEY is not set. Set it to use the translation API.',
+      'No API key found. Set apiKey option, ANTHROPIC_API_KEY, or MINIMAX_API_KEY.',
     );
+  }
+
+  const client = new Anthropic({
+    baseURL: opts.apiBaseUrl ?? 'https://api.minimax.io/anthropic',
+    apiKey,
+  });
+
+  const model = opts.model ?? 'MiniMax-M2.1';
+
+  const response = await client.messages.create({
+    model,
+    max_tokens: 16384,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: opts.assembledContent }],
+  });
+
+  const textBlock = response.content.find((b) => b.type === 'text');
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('Empty response from Anthropic API');
+  }
+
+  return stripThinkingBlock(textBlock.text);
+}
+
+/**
+ * Translate via OpenAI-compatible API (used by DeepSeek, etc.)
+ */
+async function translateWithOpenAI(
+  opts: TranslateOptions,
+  systemPrompt: string,
+): Promise<string> {
+  const apiKey = opts.apiKey ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('No API key found. Set apiKey option or OPENAI_API_KEY.');
   }
 
   const client = new OpenAI({
     baseURL: opts.apiBaseUrl ?? 'https://api.deepseek.com',
     apiKey,
-  });
-
-  const systemPrompt = buildPrompt({
-    langName: opts.langName,
-    guide: opts.guide,
-    docsContext: opts.docsContext,
   });
 
   const model = opts.model ?? 'deepseek-chat';
@@ -95,8 +138,29 @@ export async function translateAssembled(
 
   const content = response.choices?.[0]?.message?.content;
   if (!content) {
-    throw new Error('Empty response from translation API');
+    throw new Error('Empty response from OpenAI API');
   }
 
-  return content;
+  return stripThinkingBlock(content);
+}
+
+/**
+ * Translate assembled content by calling a translation API.
+ * Supports both OpenAI-compatible and Anthropic APIs.
+ */
+export async function translateAssembled(
+  opts: TranslateOptions,
+): Promise<string> {
+  const systemPrompt = buildPrompt({
+    langName: opts.langName,
+    guide: opts.guide,
+    docsContext: opts.docsContext,
+  });
+
+  const apiType = opts.apiType ?? 'anthropic';
+
+  if (apiType === 'anthropic') {
+    return translateWithAnthropic(opts, systemPrompt);
+  }
+  return translateWithOpenAI(opts, systemPrompt);
 }
