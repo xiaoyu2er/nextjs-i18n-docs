@@ -2,36 +2,21 @@ name: Translate Documentation
 
 on:
   # schedule:
-  #   - cron:
-  #       '0 20 * * *' # Daily at 20:00 UTC (DeepSeek API off-peak pricing window 16:30-00:30 UTC)
-  #       # Pacific Time: 1:00 PM PDT / 12:00 PM PST
-  #       # Off-peak window in PT: ~9:30 AM to 5:30 PM PDT / ~8:30 AM to 4:30 PM PST
-  # push:
-  #   # Run when merging from official repo to check if translations are outdated
-  #   branches:
-  #     - main
-  workflow_dispatch: # Allow manual triggering
+  #   - cron: '0 20 * * *'
+  workflow_dispatch:
     inputs:
-      pr_branch:
-        description: 'Branch name for the pull request'
-        required: false
-        type: string
-        default: 'docs/update-translations'
-      list_only:
-        description: 'Only list file status without updating docs'
-        required: false
-        type: boolean
-        default: false
       target_language:
-        description: 'Specify the target language code for translation (e.g., "zh-hans", "fr", "es")'
+        description: 'Target language code (e.g., "zh-hans", "ja"). Leave empty for zh-hans.'
         required: false
         type: string
+        default: 'zh-hans'
       pattern:
-        description: 'File pattern to match for updating (e.g., "*.mdx" or "docs/**/*.mdx")'
+        description: 'File pattern (e.g., "docs/01-app/**/*.mdx"). Leave empty for all.'
         required: false
         type: string
+        default: '**/*.mdx'
       max_files:
-        description: 'Maximum number of files to process in one batch (per language)'
+        description: 'Maximum number of files to process'
         required: false
         type: number
       concurrency:
@@ -40,19 +25,26 @@ on:
         type: number
         default: 10
       model:
-        description: 'DeepSeek model to use'
-        required: false
-        type: choice
-        options:
-          - deepseek-chat
-          - deepseek-reasoner
-        default: deepseek-chat
-      custom_arguments:
-        description: 'Additional custom arguments to pass to the translation package command'
+        description: 'Model to use for translation'
         required: false
         type: string
+        default: 'openrouter/hunter-alpha'
+      skip_sync:
+        description: 'Skip downloading latest docs (translate current content/en/)'
+        required: false
+        type: boolean
+        default: false
+      skip_replace:
+        description: 'Skip replacing content/{lang}/ (keep output in tmp/)'
+        required: false
+        type: boolean
+        default: false
+      pr_branch:
+        description: 'Branch name for the pull request'
+        required: false
+        type: string
+        default: 'docs/update-translations'
 
-# Add permissions needed for creating PRs
 permissions:
   contents: write
   pull-requests: write
@@ -60,53 +52,80 @@ permissions:
 jobs:
   translate:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
-      # Check if API key is available
       - name: Check API key
-        id: check-api-key
         env:
-          API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           if [ -z "$API_KEY" ]; then
-            echo "OPENAI_API_KEY secret is not set. Skipping translation."
+            echo "::error::OPENROUTER_API_KEY secret is not set."
             exit 1
-          else
-            echo "OPENAI_API_KEY secret is available. Proceeding with translation."
           fi
 
-      # Checkout the repository first to access local actions
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all history for proper timestamp lookup
-          
-      # Use the translate-docs-action
-      - name: Translate documentation
-        uses: ./.github/actions/translate-docs
+          fetch-depth: 0
+
+      - name: Setup Tools
+        uses: ./.github/actions/setup
+
+      - name: Run sync and translate
+        run: |
+          ARGS=""
+
+          if [ "${{ inputs.skip_sync }}" = "true" ]; then
+            ARGS="$ARGS --skip-sync"
+          fi
+
+          if [ "${{ inputs.skip_replace }}" = "true" ]; then
+            ARGS="$ARGS --skip-replace"
+          fi
+
+          ARGS="$ARGS --lang ${{ inputs.target_language || 'zh-hans' }}"
+          ARGS="$ARGS --pattern '${{ inputs.pattern || '**/*.mdx' }}'"
+          ARGS="$ARGS --concurrency ${{ inputs.concurrency || '10' }}"
+          ARGS="$ARGS --api-type openai"
+          ARGS="$ARGS --api-base-url https://openrouter.ai/api/v1"
+          ARGS="$ARGS --api-key $OPENROUTER_API_KEY"
+          ARGS="$ARGS --model ${{ inputs.model || 'openrouter/hunter-alpha' }}"
+
+          if [ -n "${{ inputs.max_files }}" ]; then
+            ARGS="$ARGS --max ${{ inputs.max_files }}"
+          fi
+
+          bash scripts/sync-and-translate.sh $ARGS
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Check for modifications
+        id: check-changes
+        run: |
+          if [[ $(git status --porcelain | wc -l) -gt 0 ]]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.check-changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v5
         with:
-          # Required inputs
-          api_key: ${{ secrets.OPENAI_API_KEY }}
-          # Optional inputs with their default values shown
-          github_token: ${{ secrets.PAT_TOKEN }}  # Use PAT instead of GITHUB_TOKEN
-          pr_branch: ${{ github.event.inputs.pr_branch || 'docs/update-translations' }}
-          # Translation-specific inputs
-          list_only: ${{ github.event.inputs.list_only }}
-          target_language: ${{ github.event.inputs.target_language }}
-          pattern: ${{ github.event.inputs.pattern }}
-          max_files: ${{ github.event.inputs.max_files }}
-          concurrency: ${{ github.event.inputs.concurrency }}
-          model: ${{ github.event.inputs.model }}
-          custom_arguments: ${{ github.event.inputs.custom_arguments }}
-          # translation_command: 'pnpm run translate'
-          base_branch: 'dev'
-          # pr_branch: 'docs/update-translations'
-          # pr_title: 'Update translations'
-          # The following uses YAML pipe syntax for multi-line strings
-          # pr_body: |
-          #   This PR updates the documentation translations automatically.
-          #
-          #   Generated by the translate workflow.
-          # commit_message: 'docs: update documentation translations'
-          # add_paths: 'apps/docs/content/**'
-          enable_formatting: 'false'
-          # format_command: 'pnpm prettier:write'
+          token: ${{ secrets.PAT_TOKEN }}
+          commit-message: "docs: update translations (${{ inputs.target_language || 'zh-hans' }})"
+          title: "docs: update translations (${{ inputs.target_language || 'zh-hans' }})"
+          body: |
+            This PR updates documentation translations using the incremental MD5-cached pipeline.
+
+            - Language: ${{ inputs.target_language || 'zh-hans' }}
+            - Model: ${{ inputs.model || 'openrouter/hunter-alpha' }}
+            - Pattern: ${{ inputs.pattern || '**/*.mdx' }}
+
+            Translation cache is updated in `apps/docs/translation-cache/`.
+          branch: ${{ inputs.pr_branch || 'docs/update-translations' }}
+          delete-branch: true
+          base: dev
+          add-paths: |
+            apps/docs/content/
+            apps/docs/translation-cache/
