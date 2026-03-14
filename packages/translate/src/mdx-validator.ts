@@ -39,12 +39,18 @@ export function validateMdx(content: string): MdxValidationResult {
     });
   }
 
-  // 2. Balanced JSX tags
+  // 2. Balanced JSX tags — only check tags that appear on their own line
+  //    (not tags mentioned inside paragraph text like "expanded `<details>` elements")
+  const lines = content.split('\n');
   for (const tag of BALANCED_TAGS) {
-    const openRegex = new RegExp(`<${tag}[\\s>]`, 'g');
-    const closeRegex = new RegExp(`</${tag}>`, 'g');
-    const openCount = (content.match(openRegex) || []).length;
-    const closeCount = (content.match(closeRegex) || []).length;
+    const openRegex = new RegExp(`^\\s*<${tag}[\\s>]`, '');
+    const closeRegex = new RegExp(`^\\s*</${tag}>\\s*$`, '');
+    let openCount = 0;
+    let closeCount = 0;
+    for (const line of lines) {
+      if (openRegex.test(line)) openCount++;
+      if (closeRegex.test(line)) closeCount++;
+    }
 
     if (openCount !== closeCount) {
       errors.push({
