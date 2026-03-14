@@ -100,10 +100,11 @@ function main() {
   for (const [k, entry] of md5Map) {
     if (entry.src.length === 0) continue;
     const preview = entry.v.split('\n')[0].substring(0, 80);
-    indexLines.push(`## \`${k.substring(0, 8)}\` ${preview}`);
+    indexLines.push(`## \`${k}\` ${preview}`);
     indexLines.push('');
     for (const src of entry.src) {
-      indexLines.push(`- ${src}`);
+      const [filePath, line] = src.split(':');
+      indexLines.push(`- [${src}](apps/docs/content/en/${filePath}#L${line})`);
     }
     indexLines.push('');
   }
