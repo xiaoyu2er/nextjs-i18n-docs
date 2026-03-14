@@ -113,7 +113,7 @@ function translateWithPi(opts: TranslateOptions, systemPrompt: string): string {
     const result = execFileSync('pi', args, {
       encoding: 'utf8',
       maxBuffer: 10 * 1024 * 1024, // 10MB
-      timeout: 5 * 60 * 1000, // 5 min
+      timeout: 15 * 60 * 1000, // 15 min
     });
 
     return stripThinkingBlock(result);
