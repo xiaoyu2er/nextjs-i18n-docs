@@ -69,7 +69,7 @@ function parseArgs(argv: string[]) {
     ),
     cacheDir: path.resolve(
       PROJECT_ROOT,
-      getOpt('cache-dir', 'apps/docs/translation-cache'),
+      getOpt('cache-dir', 'apps/docs/cache'),
     ),
     lang: getOpt('lang', 'zh-hans'),
     langName: getOpt('lang-name', 'Simplified Chinese'),
@@ -340,7 +340,7 @@ async function main() {
 
   // Final cache save
   cache.save(opts.lang);
-  cache.exportIndex(opts.lang, path.relative(PROJECT_ROOT, opts.docsRoot));
+  cache.exportIndex(opts.lang);
 
   console.log(`\n${'='.repeat(60)}`);
   console.log('📊 Summary:');
