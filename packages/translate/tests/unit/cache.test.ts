@@ -100,19 +100,26 @@ describe('TranslationCache', () => {
     expect(entries).toHaveLength(2);
   });
 
-  it('should track source locations', () => {
+  it('should track source locations in memory and export to index', () => {
     const cache = new TranslationCache(tmpDir);
     cache.set('zh-hans', 'h1', 'v1');
     cache.updateSource('zh-hans', 'h1', 'docs/installation.mdx', 12);
     cache.updateSource('zh-hans', 'h1', 'docs/14/installation.mdx', 12);
-    cache.save('zh-hans');
 
-    const cache2 = new TranslationCache(tmpDir);
-    cache2.load('zh-hans');
-    const entry = [...cache2.entries('zh-hans')].find(([k]) => k === 'h1');
-    expect(entry).toBeDefined();
+    const entry = [...cache.entries('zh-hans')].find(([k]) => k === 'h1');
     expect(entry?.[1].src).toContain('docs/installation.mdx:12');
     expect(entry?.[1].src).toContain('docs/14/installation.mdx:12');
+
+    cache.exportIndex('zh-hans');
+    const index = fs.readFileSync(
+      path.join(tmpDir, 'zh-hans.index.md'),
+      'utf8',
+    );
+    expect(index).toContain('docs/installation.mdx:12');
+
+    cache.save('zh-hans');
+    const jsonl = fs.readFileSync(path.join(tmpDir, 'zh-hans.jsonl'), 'utf8');
+    expect(jsonl).not.toContain('"src"');
   });
 
   it('should not duplicate source locations', () => {
