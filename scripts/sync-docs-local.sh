@@ -22,12 +22,19 @@ echo "📦 Downloading Next.js docs to temp: $TMP_DIR"
 echo "⏳ Cloning canary branch..."
 git clone --depth 1 --branch canary --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-canary" 2>/dev/null
 mkdir -p "$CONTENT_EN"
-rsync -av --delete "$TMP_DIR/nextjs-canary/docs/" "$CONTENT_EN/" --exclude="13" --exclude="14"
+rsync -av --delete "$TMP_DIR/nextjs-canary/docs/" "$CONTENT_EN/" --exclude="13" --exclude="14" --exclude="15"
 echo "✅ Canary docs synced"
 
+# v15
+echo "⏳ Cloning v15.5.12..."
+git clone --depth 1 --branch v15.5.12 --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v15" 2>/dev/null
+mkdir -p "$CONTENT_EN/15"
+rsync -av --delete "$TMP_DIR/nextjs-v15/docs/" "$CONTENT_EN/15/"
+echo "✅ v15 docs synced"
+
 # v14
-echo "⏳ Cloning v14.2.28..."
-git clone --depth 1 --branch v14.2.28 --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v14" 2>/dev/null
+echo "⏳ Cloning v14.2.35..."
+git clone --depth 1 --branch v14.2.35 --single-branch https://github.com/vercel/next.js.git "$TMP_DIR/nextjs-v14" 2>/dev/null
 mkdir -p "$CONTENT_EN/14"
 rsync -av --delete "$TMP_DIR/nextjs-v14/docs/" "$CONTENT_EN/14/"
 echo "✅ v14 docs synced"
