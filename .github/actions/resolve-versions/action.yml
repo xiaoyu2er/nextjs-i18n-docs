@@ -1,0 +1,84 @@
+name: "Resolve Next.js Versions"
+description: "Fetch latest patch version for each Next.js major version (13+) and write to a config file"
+
+inputs:
+  output_file:
+    description: "Path to write versions config"
+    required: false
+    default: ".github/nextjs-versions.json"
+
+outputs:
+  latest:
+    description: "Latest version (canary branch tag)"
+    value: ${{ steps.resolve.outputs.latest }}
+  versions_json:
+    description: "JSON object of all versions"
+    value: ${{ steps.resolve.outputs.versions_json }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve versions from git tags
+      id: resolve
+      shell: bash
+      run: |
+        echo "Fetching Next.js release tags..."
+
+        # Get latest patch version for each major.minor from v13+
+        VERSIONS=$(git ls-remote --tags https://github.com/vercel/next.js.git \
+          | grep -E 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+          | sed 's|.*refs/tags/v||' \
+          | sort -t. -k1,1n -k2,2n -k3,3n \
+          | awk -F. '{versions[$1]=$0} END {for (k in versions) if (k+0 >= 13) print k, versions[k]}' \
+          | sort -t' ' -k1,1n)
+
+        # Parse into variables
+        LATEST=""
+        JSON_ENTRIES=""
+        while read -r major version; do
+          echo "  v$major latest: v$version"
+          if [ -z "$LATEST" ] || [ "$major" -gt "$(echo "$LATEST" | cut -d. -f1)" ]; then
+            LATEST="$version"
+          fi
+          if [ -n "$JSON_ENTRIES" ]; then
+            JSON_ENTRIES="$JSON_ENTRIES,"
+          fi
+          JSON_ENTRIES="$JSON_ENTRIES\"$major\":\"$version\""
+        done <<< "$VERSIONS"
+
+        VERSIONS_JSON="{${JSON_ENTRIES}}"
+        LATEST_MAJOR=$(echo "$LATEST" | cut -d. -f1)
+
+        echo ""
+        echo "Latest: v$LATEST (v$LATEST_MAJOR)"
+        echo "All versions: $VERSIONS_JSON"
+
+        # Write config file
+        cat > "${{ inputs.output_file }}" << EOF
+        {
+          "latest": "$LATEST",
+          "latestMajor": "$LATEST_MAJOR",
+          "versions": $VERSIONS_JSON
+        }
+        EOF
+
+        # Clean up whitespace from heredoc
+        python3 -c "
+        import json
+        with open('${{ inputs.output_file }}') as f:
+            data = json.load(f)
+        with open('${{ inputs.output_file }}', 'w') as f:
+            json.dump(data, f, indent=2)
+            f.write('\n')
+        "
+
+        echo "Written to ${{ inputs.output_file }}"
+        cat "${{ inputs.output_file }}"
+
+        # Set outputs
+        echo "latest=$LATEST" >> $GITHUB_OUTPUT
+        echo "versions_json=$VERSIONS_JSON" >> $GITHUB_OUTPUT
+
+branding:
+  icon: "tag"
+  color: "blue"
