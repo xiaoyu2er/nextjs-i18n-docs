@@ -1,0 +1,397 @@
+---
+title: Next.js 9.5
+description: >-
+  Next.js 9.5 introduces Stable Incremental Static Regeneration, Custom Base
+  Path, Redirects and Rewrites, Webpack 5 Beta, and more!
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Joe Haddad
+    image: /static/team/timer.jpg
+  - name: Luis Alvarez
+    image: /static/team/lfades.jpg
+  - name: Shu Uesugi
+    image: /static/team/chibicode.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2020-07-27T16:23:33.431Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-5/twitter-card.png
+---
+
+We are excited today to introduce Next.js 9.5, featuring:
+
+*   **[Stable Incremental Static Regeneration](#stable-incremental-static-regeneration)**: re-build static pages after you've deployed, in milliseconds
+*   **[Customizable Base Path](#customizable-base-path)**: easily host Next.js projects on subpaths of your domain
+*   **[Support for Rewrites, Redirects, and Headers](#support-for-rewrites-redirects-and-headers)**: rewrite vanity URLs, redirect old URLs, and add headers to static pages
+*   **[Optional Trailing Slash in URLs](#optional-trailing-slash-in-urls)**: consistently enforce the absence or presence of a trailing slash
+*   **[Persistent Caching for Page Bundles](#persistent-caching-for-page-bundles)**: unchanged pages' JavaScript files now carry forward across builds
+*   **[Fast Refresh Enhancements](#fast-refresh-enhancements)**: improved reliability of the Next.js live-editing experience
+*   **[Production React Profiling](#production-react-profiling)**: a new flag to measure your project's "cost" of rendering
+*   **[Optional Catch All Routes](#optional-catch-all-routes)**: dynamic routes now provide more flexibility for SEO-driven use-cases
+*   **[Webpack 5 Support (beta)](#webpack-5-support-beta)**: optionally opt-into the next version of webpack 5 for improved build size and speed
+
+[Stable Incremental Static Regeneration](#stable-incremental-static-regeneration)
+---------------------------------------------------------------------------------
+
+Next.js introduced [Static Site Generation methods in 9.3](https://nextjs.org/blog/next-9-3#next-gen-static-site-generation-ssg-support) with a clear goal in mind: we should get [the benefits of static](https://rauchg.com/2020/2019-in-review#static-is-the-new-dynamic) (always fast, always online, [globally replicated](https://rauchg.com/2020/static-hoisting#hoist-to-the-edge)), but with excellent support for dynamic data, which Next.js is known for.
+
+To get the best of both worlds, Next.js introduced **Incremental Static Generation**, updating static content after you have already built your site. By using the [`fallback: true` option in `getStaticPaths`](/docs/api-reference/data-fetching/get-static-paths#fallback-false), you can **register** **new static pages** **at _runtime_**.
+
+Next.js can statically pre-render an infinite number of pages this way, on-demand, no matter how large your dataset is.
+
+Today, we are announcing the _general availability_ of **Incremental Static Re-generation**, which is a mechanism **to update _existing_ pages**, by re-rendering them in the background as traffic comes in.
+
+Inspired by [stale-while-revalidate](https://tools.ietf.org/html/rfc5861), background regeneration ensures traffic is served uninterruptedly, always from static storage, and the newly built page is pushed only _after it's done generating_.
+
+```
+export async function getStaticProps() {
+  return {
+    props: await getDataFromCMS(),
+    // we will attempt to re-generate the page:
+    // - when a request comes in
+    // - at most once every second
+    revalidate: 1,
+  };
+}
+```
+
+> The revalidate flag is the number of seconds during which at most one generation will happen, to prevent a [https://en.wikipedia.org/wiki/Cache\_stampede](https://en.wikipedia.org/wiki/Cache_stampede).
+
+Unlike traditional SSR, Incremental Static Regeneration ensures you retain the benefits of static:
+
+*   No spikes in latency. Pages are served consistently fast.
+*   Pages never go offline. If the background page re-generation fails, the old page remains unaltered.
+*   Low database and backend load. Pages are re-computed at most once \`concurrently.
+
+Both incremental features (adding pages and lazily updating them), as well as [preview mode](/docs/pages/building-your-application/configuring/preview-mode), are now stable and already fully supported by both `next start` and the [Vercel edge platform](https://vercel.com) out of the box.
+
+To showcase this new feature we have created an example showing regenerating a static page that shows the count of various GitHub reactions of a specific issue: [https://reactions-demo.vercel.app/](https://reactions-demo.vercel.app/)
+
+![After the first visit following our emoji reaction, a new page generation kicks off in the background. Every single request throughout is served from static cache.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-5/reactions-demo.gif)
+
+After the first visit following our emoji reaction, a new page generation kicks off in the background. Every single request throughout is served from static cache.
+
+Up next, we will be working on a supplemental RFC to address two additional incremental static generation capabilities:
+
+*   Re-generating and invalidating multiple pages at once (like your blog index and a certain blog post)
+*   Re-generating by listening to events (like CMS webhooks), ahead of user traffic
+
+For more details, check out [the `getStaticProps` documentation](/docs/pages/building-your-application/data-fetching#getstaticprops-static-generation).
+
+[Customizable Base Path](#customizable-base-path)
+-------------------------------------------------
+
+Next.js projects are not always served from the root a domain. Sometimes you might want to host your Next.js project under a subpath like `/docs` so that the Next.js project only covers that subsection of the domain.
+
+While this has been possible so far, it was at the expense of quite a bit of extra configuration. For example, adding the prefix to every single `<Link>` and making sure Next.js was serving the JavaScript bundles from the right path.
+
+To address this pain point, we're introducing a new configuration option. `basePath` allows you to easily host your Next.js project on a subpath of your domain.
+
+To get started using `basePath` you can add it to `next.config.js`:
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+};
+```
+
+After configuring the `basePath` your project will automatically be routed from the provided path. In this case, `/docs`.
+
+When linking to other pages in the project with `next/link` or `next/router` the `basePath` will be automatically prefixed. This allows you to change the `basePath` without changing your project.
+
+An example of this would be using `next/link` to route to another page:
+
+```
+import Link from 'next/link';
+ 
+export default function HomePage() {
+  return (
+    <>
+      <Link href="/documentation-page">
+        <a>Documentation page</a>
+      </Link>
+    </>
+  );
+}
+```
+
+Using `next/link` in this way will result in the following HTML rendered to the web browser:
+
+```
+<a href="/docs/documentation-page">Documentation page</a>
+```
+
+For more details, check out [the `basePath` documentation](/docs/pages/api-reference/next-config-js/basePath).
+
+[Support for Rewrites, Redirects, and Headers](#support-for-rewrites-redirects-and-headers)
+-------------------------------------------------------------------------------------------
+
+### [Rewrites](#rewrites)
+
+When building a Next.js project you might want to proxy certain routes to another URL. For example, if you want to incrementally adopt Next.js into your stack you would want to route pages that exist in your Next.js project and then everything that was not matched to the old project that you're migrating off of.
+
+With Next.js 9.5 we're introducing a new configuration option named `rewrites`, which allows you to map an incoming request path to a different destination path, including external URLs.
+
+For example, you might want to rewrite a certain route to `example.com`:
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      { source: '/backend/:path*', destination: 'https://example.com/:path*' },
+    ];
+  },
+};
+```
+
+In this case, all paths under `/backend` would be routed to `example.com`.
+
+You can also check if your Next.js project routes matched and then rewrite to the previous project if there is no match. This is incredibly useful for **incremental adoption of Next.js**:
+
+```
+module.exports = {
+  async rewrites() {
+    return [
+      // check if Next.js project routes match before we attempt proxying
+      {
+        source: '/:path*',
+        destination: '/:path*',
+      },
+      {
+        source: '/:path*',
+        destination: `https://example.com/:path*`,
+      },
+    ];
+  },
+};
+```
+
+In this case, we first match all paths. If none match we proxy to `example.com` which would be the previous project.
+
+To learn more about `rewrites` feature check out the [rewrites documentation](/docs/pages/api-reference/next-config-js/rewrites).
+
+### [Redirects](#redirects)
+
+Most websites need at least some redirects. Especially when changing the structure of your project routes. For example, when moving `/blog` to `/news` or similar transitions.
+
+Previously having a list of redirects in your Next.js project required setting up a custom server or a custom `_error` page to check if there are redirects set for the route. However, this came at the expense of invalidating key static and serverless optimizations (by having a server) or wasn't ergonomic enough.
+
+Starting from Next.js 9.5 you are now able to create a list of redirects in `next.config.js` under the `redirects` key:
+
+```js filename="next.config.js"
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+    ];
+  },
+};
+```
+
+To learn more about `redirects` feature check out the [redirects documentation](/docs/pages/api-reference/next-config-js/redirects).
+
+### [Headers](#headers)
+
+Next.js allows you to build hybrid projects that use both Static Generation and Server-Side Rendering. With Server-Side rendering, you can set headers for the incoming request. For static pages, setting headers was not possible until now.
+
+We now have introduced a `headers` property in `next.config.js` that applies to all Next.js routes:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Feature-Policy',
+            // Disable microphone and geolocation
+            value: "microphone 'none'; geolocation 'none'",
+          },
+        ],
+      },
+    ];
+  },
+};
+```
+
+The `headers` option allows you to set commonly needed headers like [`Feature-Policy`](https://developer.mozilla.org/docs/Web/HTTP/Headers/Feature-Policy) and [`Content-Security-Policy`](https://developer.mozilla.org/docs/Web/HTTP/CSP).
+
+To learn more about `headers` feature check out the [headers documentation](/docs/pages/api-reference/next-config-js/headers).
+
+[Optional Trailing Slash in URLs](#optional-trailing-slash-in-urls)
+-------------------------------------------------------------------
+
+When Next.js was introduced 3 years ago, its default behavior was for all URLs with a trailing slash to always return a 404 page.
+
+While effective, some users have requested the ability to change this behavior. For example, when migrating an existing project to Next.js that previously always had trailing slashes enforced.
+
+With Next.js 9.5 we have introduced a new option called `trailingSlash` to `next.config.js`.
+
+This new option ensures Next.js is automatically handling the trailing slash behavior:
+
+*   Automatically redirect trailing slash URLs to the URL without the trailing slash, for example: `/about/` to `/about`
+*   When `trailingSlash` is set to `true` the URL without trailing slash will be redirected to the URL with a trailing slash, for example: `/about` to `/about/`
+*   Ensures `next/link` has the trailing slash automatically applied/removed to avoid needless redirects.
+
+```js filename="next.config.js"
+module.exports = {
+  // Force a trailing slash, the default value is no trailing slash (false)
+  trailingSlash: true,
+};
+```
+
+To learn more about the `trailingSlash` feature check out the [trailingSlash documentation](/docs/pages/api-reference/next-config-js/trailingSlash)
+
+[Persistent Caching for Page Bundles](#persistent-caching-for-page-bundles)
+---------------------------------------------------------------------------
+
+When writing Next.js pages, the creation of all script bundles, CSS stylesheets, and HTML is fully automatic and abstracted away from you. If you inspect the generated `<script>` tags before Next.js 9.5, you'll notice their URLs follow a pattern like this:
+
+```
+/_next/static/ovgxWYrvKyjnlM15qtz7h/pages/about.js
+```
+
+The path segment `ovgxWYrvKyjnlM15qtz7h` above is what we called the _build ID_. While these files were easily cacheable at the edge and on the user's machine, after re-building your app, the build ID would change and all caches would be busted.
+
+For most projects this trade-off was fine, however, we wanted to optimize this behavior even further by no longer invalidating the browser cache for pages that had not been changed.
+
+The introduction of the [improved code-splitting strategy in Next.js 9.2](https://nextjs.org/blog/next-9-2#improved-code-splitting-strategy) that was developed in collaboration with the Google Chrome team laid some groundwork for these improvements to the Next.js page bundle generation.
+
+Starting with Next.js 9.5 **all page JavaScript bundles will use content hashes instead of the build ID**. This allows for pages that have not changed between deploys to remain in the browser and edge cache without needing to be downloaded again.
+
+In contrast, the URL pattern after these changes looks something like:
+
+```
+/_next/static/chunks/pages/about.qzfS4o5gIEXRME6sTEahL.js
+```
+
+Instead of a global build ID, the `qzfS4o5gIEXRME6sTEahL` portion is a deterministic hash of the `about.js` bundle, which will be stable insomuch the code for that section of your site doesn't change. Further, **it's now cached long-term across re-deploys** via `Cache-Control: public,max-age=31536000,immutable` which Next.js automatically sets for you.
+
+[Fast Refresh Enhancements](#fast-refresh-enhancements)
+-------------------------------------------------------
+
+We [introduced Fast Refresh in Next.js 9.4](https://nextjs.org/blog/next-9-4#fast-refresh), a new hot reloading experience that gives you instantaneous feedback on edits made to your React components.
+
+Next.js 9.5 further refines our Fast Refresh implementation and gives you the tools you need to succeed:
+
+*   **Easy to understand errors**: All compile and runtime errors were updated to [only show **relevant information, including a code frame** of whatever code caused the error](https://twitter.com/timer150/status/1263689549898829829).
+*   **Development-time tips to keep component state**: Next.js now provides you with helpful tips to ensure Fast Refresh will keep your component state in as many scenarios as possible. Each tip Next.js provides is **fully actionable** and accompanied by a before and after example!
+*   **Warnings when component state is reset**: We'll now print a detailed warning when Next.js is unable to keep component state after a file is edited. This warning will help you diagnose why the project had to reset component state, allowing you to fix it and utilize Fast Refresh to its full potential.
+*   **New documentation**: We've [added extensive documentation](/docs/architecture/fast-refresh) that explains what Fast Refresh is, how it works, and what to expect! The documentation will also teach you how to better leverage Fast Refresh by explaining how its error recovery works.
+*   **User-code troubleshooting guide**: The new documentation also includes [common troubleshooting steps and tips](/docs/architecture/fast-refresh#tips) on how to get the most out of Fast Refresh in development.
+
+[Production React Profiling](#production-react-profiling)
+---------------------------------------------------------
+
+React introduced the [Profiler API](https://github.com/reactjs/rfcs/pull/51) a while ago which allows you to track down performance issues in your React components. While this feature works automatically in development it requires a separate version of ReactDOM to be used to profile in production.
+
+With Next.js 9.5, you can now **enable production profiling for React** with the `--profile` flag in `next build`:
+
+```
+next build --profile
+```
+
+After that, you can use the profiler in the same way as you would in development.
+
+To learn more about profiling React you can read [the post on the React Profiler by the React team](https://reactjs.org/blog/2018/09/10/introducing-the-react-profiler.html). Special thanks to [TODOrTotev](https://github.com/TodorTotev) and [@darshkpatel](https://github.com/darshkpatel) for contributing this feature.
+
+[Optional Catch All Routes](#optional-catch-all-routes)
+-------------------------------------------------------
+
+Next.js 9.2 added [support for catch-all dynamic routes](https://nextjs.org/blog/next-9-2#catch-all-dynamic-routes) which have been widely adopted by the community for various use cases. Catch-all routes give you the flexibility to create highly dynamic routing structures powered by Headless CMS, GraphQL APIs, filesystem, etc.
+
+In listening to feedback, we heard users wanted to have even more flexibility to _match the root-most level of a route_. Today, we're happy to unveil **optional catch-all dynamic routes** for these advanced scenarios.
+
+To create an optional catch-all route, you can create a page using the `[[...slug]]` syntax.
+
+For example, `pages/blog/[[...slug]].js` will match `/blog`, as well as any route underneath it, such as: `/blog/a`, `/blog/a/b/c`, and so on.
+
+Like catch-all routes, `slug` will be provided in the [router query object](/docs/pages/api-reference/functions/use-router#router-object) as an array of path parts. So, for the path `/blog/foo/bar`, the query object will be `{ slug: ['foo', 'bar'] }`. For the path `/blog`, the query object will omit the slug key: `{ }`.
+
+You can [learn more about optional catch all routes in our documentation](/docs/pages/building-your-application/routing/dynamic-routes#optional-catch-all-routes).
+
+[Webpack 5 Support (beta)](#webpack-5-support-beta)
+---------------------------------------------------
+
+Webpack 5 is currently in beta. It includes some major improvements:
+
+*   [Improved Tree-Shaking](https://github.com/webpack/changelog-v5#nested-tree-shaking): Nested exports, inner-module, and CommonJS are tree shaken
+*   [Persistent Caching](https://github.com/webpack/changelog-v5#persistent-caching): Allows for reuse of work from previous builds
+*   [Deterministic chunk and module ids](https://github.com/webpack/changelog-v5#deterministic-chunk-and-module-ids): solves cases where webpack module ids would change between builds
+
+We're excited today to announce the beta availability of webpack 5 for Next.js.
+
+To try out webpack 5 you can use [Yarn resolutions](https://classic.yarnpkg.com/en/docs/selective-version-resolutions/) in your `package.json`:
+
+```json filename="package.json"
+{
+  "resolutions": {
+    "webpack": "^5.0.0-beta.30"
+  }
+}
+```
+
+The Webpack 5 beta has already been rolled out to [nextjs.org](http://nextjs.org) and [vercel.com](https://vercel.com) in production. We encourage you to try it out in a progressive manner and report back your findings on [GitHub](https://github.com/vercel/next.js/issues/13341).
+
+### [Compilation infrastructure improvements](#compilation-infrastructure-improvements)
+
+To support webpack 5 we have rewritten a lot of the compilation pipeline to be more tailored to Next.js:
+
+*   Next.js no longer relies on `webpack-hot-middleware` and `webpack-dev-middleware`, instead we now use webpack directly and optimize specifically for Next.js projects. This translates into a simpler architecture and faster development compilation.
+*   [On-demand-entries](https://nextjs.org/blog/next-8#improved-on-demand-entries), which is the system Next.js has to allow it to compile on the pages that you visit at a given time during development, has also been rewritten and is now even more reliable by leveraging new webpack behavior specifically tailored for our use case.
+*   [React Fast Refresh and the Next.js Error Overlay](https://nextjs.org/blog/next-9-4#fast-refresh) are now fully compatible with webpack 5
+*   Disk caching will be enabled in a future beta release.
+
+### [Backwards compatibility](#backwards-compatibility)
+
+We are always committed to ensuring that Next.js is backwards compatible with previous versions.
+
+Webpack 4 will continue to be fully supported. We are working closely with the webpack team to ensure the migration from webpack 4 to 5 is as smooth as possible.
+
+If your Next.js project has no custom webpack configuration, no project changes will be needed to fully leverage webpack 5.
+
+**Important:** if your project has [custom webpack configuration](/docs/pages/api-reference/next-config-js/webpack), some changes might be needed to transition to webpack 5. We recommend keeping an eye out for our migration instructions or minimize your usage of webpack extensions altogether for seamless future upgrades.
+
+### [Improved file watching on macOS](#improved-file-watching-on-macos)
+
+We recently found an issue with webpack where file watching on macOS would stop after making a few changes to your code. You'd have to restart your project manually to see updates again. After a few changes, the cycle would repeat.
+
+Furthermore, we found that this issue didn't just happen in Next.js projects but all projects and frameworks that build on top of webpack.
+
+After several days of debugging the issue, we tracked down its root cause to the file watching implementation that webpack uses called chokidar, which is a file watching implementation widely used in the Node.js ecosystem.
+
+We sent a [patch to chokidar](https://github.com/paulmillr/chokidar/pull/1018) to fix the issue. After the patch was released we worked with [Tobias Koppers](https://github.com/sokra) to roll out this patch in a [new webpack version](https://github.com/webpack/webpack/releases/tag/v4.44.0).
+
+This patched webpack version is automatically used when you upgrade to Next.js 9.5.
+
+[Conclusion](#conclusion)
+-------------------------
+
+We're excited to see the continued growth in Next.js adoption:
+
+*   We have had over **1,200** independent contributors\*\*,\*\* with over **135** new contributors since the 9.4 release.
+*   On GitHub, the project has been starred over **51,100** times.
+
+Join the Next.js community on [GitHub Discussions](https://github.com/vercel/next.js/discussions). Discussions is a community space that allows you to connect with other Next.js users and freely ask questions or share your work.
+
+For example, you might want to start by [sharing your project URL](https://github.com/vercel/next.js/discussions/10640) with everyone.
+
+If you want to give back but unsure how, we encourage you to try experimental features like our Webpack support and report back your findings!
+
+### [Credits](#credits)
+
+We are thankful to our community, including all the external feedback and contributions that helped shape this release.
+
+Special thanks to [Jan Potoms](https://github.com/janpot), a long-time Next.js community member who contributed to multiple features in this release.
+
+Special thanks to [Tobias Koppers](https://twitter.com/wsokra), the author of webpack, who helped land webpack 5 support in Next.js.
+
+This release was brought to you by the contributions of: @chandan-reddy-k, @Timer, @aralroca, @artemisart, @sospedra, @prateekbh, @Prioe, @Janpot, @merceyz, @ijjk, @PavelK27, @marbiano, @MichelleLucero, @thorsten-stripe, @TODOrTotev, @Skn0tt, @lfades, @timneutkens, @akhila-ariyachandra, @chibicode, @rafaelalmeidatk, @kirill-konshin, @jamesvidler, @JeffersonBledsoe, @tylev, @jamesmosier, @filipemarins, @Remeic, @vvo, @timothyis, @jazibsawar, @coetry, @adam-zacharski, @danwilliams, @tywmick, @matamatanot, @goldins, @mvllow, @its-tayo, @sshyam-gupta, @wilbert-abreu, @sebastianbenz, @jaydenseric, @developit, @dylanjha, @darshkpatel, @spinks, @stefanprobst, @moh12594, @jasonmerino, @cristiand391, @HyunSangHan, @mcsdevv, @M1ck0, @hydRAnger, @alexej-d, @valmassoi, @motleydev, @eKhattak, @jpedroschmitz, @JerryGoyal, @bowen31337, @phillip055, @balazsorban44, @chuabingquan, @youhosi, @andresz1, @bell-steven, @areai51, @Wssn, @ndom91, @anthonyshort, @zxzl, @jbowes, @IamLizu, @PascalPixel, @ralphilius, @ysun62, @muslax, @elsigh, @AsherFoster, @botv, @tomdohnal, @christianalfoni, @tomasztunik, @gsimone, @illuminist, @jplew, @OskarKaminski, @RickyAbell, @steph-query, @ericgoe, @MalvinJay, @cristianbote, @Ashikpaul, @jensmeindertsma, @amorriscode, @abhik-b, @awareness481, @LukasPolak, @arvigeus, @romMidnight, @jackyef, @drumm2k, @kuldeepkeshwar, @bogy0, @Belco90, @wawjr3d, @tanmaylaud, @SarKurd, @kevinsproles, @dstotijn, @styfle, @blackwright, @BrunoBernardino, @heyAyushh, @Necmttn, @TrySound, @obedparla, @NyashaNziramasanga, @tonyspiro, @kukicado, @ceorourke, @MehediH, @robintom, @karlhorky, and @tcK1!

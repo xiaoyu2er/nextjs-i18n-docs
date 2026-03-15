@@ -1,0 +1,169 @@
+---
+/**
+ * Custom MarkdownContent that appends child page cards on index (group) pages.
+ * Finds the current page's group in the sidebar and renders its children as cards.
+ */
+import '@astrojs/starlight/style/markdown.css';
+import { getCollection } from 'astro:content';
+
+type SidebarLink = { type: 'link'; label: string; href: string; isCurrent: boolean; badge?: any; attrs: Record<string, any> };
+type SidebarGroup = { type: 'group'; label: string; entries: SidebarEntry[]; collapsed: boolean; badge?: any };
+type SidebarEntry = SidebarLink | SidebarGroup;
+
+const { sidebar, entry } = Astro.locals.starlightRoute;
+const pathname = Astro.url.pathname;
+
+// Build a map of href → description from the content collection
+const allDocs = await getCollection('docs');
+const descriptionMap = new Map<string, string>();
+for (const doc of allDocs) {
+  if (doc.data.description) {
+    // doc.id is like "docs/app/getting-started/installation" or "zh-hans/docs/app/..."
+    // Convert to href: /docs/app/getting-started/installation/
+    const href = '/' + doc.id.replace(/\/index$/, '') + '/';
+    descriptionMap.set(href, doc.data.description);
+  }
+}
+
+// Determine if this is an index page (group landing page)
+// Index pages have slugs ending with the directory name (no sub-path after the group)
+const filePath = entry.filePath || '';
+const isIndex = filePath.endsWith('/index.mdx') || filePath.endsWith('/index.md');
+
+/**
+ * Find child entries for the current page by matching its href in the sidebar tree.
+ */
+function findChildEntries(entries: SidebarEntry[], targetHref: string): SidebarEntry[] | null {
+  for (const entry of entries) {
+    if (entry.type === 'group') {
+      // Check if this group's index matches (first link child with matching href)
+      const firstLink = entry.entries.find((e) => e.type === 'link') as SidebarLink | undefined;
+      if (firstLink && firstLink.href === targetHref) {
+        // Return the rest of the entries (excluding the index link itself)
+        return entry.entries.filter((e) => e !== firstLink);
+      }
+      // Recurse into sub-groups
+      const found = findChildEntries(entry.entries, targetHref);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Collect all direct children (links and group headers) for card display.
+ */
+interface CardInfo {
+  label: string;
+  href: string;
+  description?: string;
+  isGroup: boolean;
+}
+
+function collectCards(entries: SidebarEntry[]): CardInfo[] {
+  return entries.map((entry) => {
+    if (entry.type === 'link') {
+      return {
+        label: entry.label,
+        href: entry.href,
+        description: descriptionMap.get(entry.href),
+        isGroup: false,
+      };
+    }
+    // For groups, prefer the index entry label (from nav_title/title frontmatter),
+    // fallback to the group label assigned by Starlight
+    const firstLink = entry.entries.find((e) => e.type === 'link') as SidebarLink | undefined;
+    const allLinks = flattenLinks(entry.entries);
+    const href = firstLink?.href || allLinks[0]?.href || '#';
+    return {
+      label: firstLink?.label || entry.label,
+      href,
+      description: descriptionMap.get(href),
+      isGroup: true,
+    };
+  });
+}
+
+function flattenLinks(entries: SidebarEntry[]): SidebarLink[] {
+  return entries.flatMap((e) => e.type === 'link' ? [e] : flattenLinks(e.entries));
+}
+
+const childEntries = isIndex ? findChildEntries(sidebar, pathname) : null;
+const cards = childEntries ? collectCards(childEntries) : [];
+---
+
+<div class="sl-markdown-content">
+  <slot />
+  {cards.length > 0 && (
+    <div class="index-cards">
+      {cards.map((card) => (
+        <a href={card.href} class="index-card">
+          <div class="index-card-content">
+            <span class="index-card-label">{card.label}</span>
+            {card.description && (
+              <span class="index-card-desc">{card.description}</span>
+            )}
+          </div>
+          <svg class="index-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      ))}
+    </div>
+  )}
+</div>
+
+<style>
+  .index-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+    gap: 0.75rem;
+    margin-top: 2rem;
+  }
+  a.index-card {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    text-decoration: none;
+    color: var(--sl-color-white);
+    background-color: var(--sl-color-bg);
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  a.index-card:hover {
+    border-color: var(--sl-color-text-accent);
+    background-color: var(--sl-color-gray-7, var(--sl-color-gray-6));
+  }
+  .index-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .index-card-label {
+    font-weight: 600;
+    font-size: var(--sl-text-base);
+  }
+  .index-card-desc {
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .index-card-arrow {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+    color: var(--sl-color-gray-3);
+    transition: color 0.15s, transform 0.15s;
+  }
+  a.index-card:hover .index-card-arrow {
+    color: var(--sl-color-text-accent);
+    transform: translateX(2px);
+  }
+</style>
