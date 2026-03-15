@@ -63,20 +63,32 @@ export function getAllStaticRoutes(): StaticRoute[] {
 export function getRoutesByType() {
   const allRoutes = getAllStaticRoutes();
 
+  // Deduplicate routes by URL (cross-version pages may produce same URL)
+  const seen = new Set<string>();
+  const uniqueRoutes = allRoutes.filter((route) => {
+    if (seen.has(route.url)) return false;
+    seen.add(route.url);
+    return true;
+  });
+
   return {
-    '/docs/13': allRoutes.filter(
+    '/docs/13': uniqueRoutes.filter(
       (route) => route.type === 'docs' && route.url.startsWith('/docs/13'),
     ),
-    '/docs/14': allRoutes.filter(
+    '/docs/14': uniqueRoutes.filter(
       (route) => route.type === 'docs' && route.url.startsWith('/docs/14'),
     ),
-    '/docs': allRoutes.filter(
+    '/docs/15': uniqueRoutes.filter(
+      (route) => route.type === 'docs' && route.url.startsWith('/docs/15'),
+    ),
+    '/docs': uniqueRoutes.filter(
       (route) =>
         route.type === 'docs' &&
         !route.url.startsWith('/docs/13') &&
-        !route.url.startsWith('/docs/14'),
+        !route.url.startsWith('/docs/14') &&
+        !route.url.startsWith('/docs/15'),
     ),
-    '/blog': allRoutes.filter((route) => route.type === 'blog'),
-    '/learn': allRoutes.filter((route) => route.type === 'learn'),
+    '/blog': uniqueRoutes.filter((route) => route.type === 'blog'),
+    '/learn': uniqueRoutes.filter((route) => route.type === 'learn'),
   };
 }
