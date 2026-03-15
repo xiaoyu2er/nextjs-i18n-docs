@@ -1,0 +1,371 @@
+---
+/**
+ * Custom Sidebar with:
+ * - Router switcher (App Router / Pages Router) for docs
+ * - Version switcher (Latest / v15 / v14 / v13) for docs
+ * - Section-filtered sidebar content
+ * - Clean group labels (title case, no duplicate index entries)
+ */
+import MobileMenuFooter from 'virtual:starlight/components/MobileMenuFooter';
+import SidebarPersister from '@astrojs/starlight/components/SidebarPersister.astro';
+import SidebarSublist from './SidebarSublist.astro';
+
+const { sidebar } = Astro.locals.starlightRoute;
+const pathname = Astro.url.pathname;
+
+const isLearn = pathname.startsWith('/learn') || pathname.match(/^\/[a-z-]+\/learn/);
+const isBlog = pathname.startsWith('/blog') || pathname.match(/^\/[a-z-]+\/blog/);
+const isDocs = !isLearn && !isBlog;
+
+const isPages = pathname.includes('/pages/') || pathname.includes('/pages');
+const routerType = isPages ? 'pages' : 'app';
+
+// Map of group label → href for clickable group headers
+const groupHrefMap = new Map<string, string>();
+
+/**
+ * Fix sidebar group labels and remove duplicate index entries.
+ * When a group's first link has the same label as the group name,
+ * remove that link and store its href in groupHrefMap.
+ */
+function fixLabels(entries: typeof sidebar): typeof sidebar {
+  return entries.map((entry) => {
+    if (entry.type !== 'group') return entry;
+
+    const fixedEntries = fixLabels(entry.entries);
+
+    // Find the first link (index entry) in this group
+    const firstLink = fixedEntries.find((e) => e.type === 'link');
+    const indexLabel = firstLink?.type === 'link' ? firstLink.label : null;
+    const indexHref = firstLink?.type === 'link' ? firstLink.href : null;
+
+    // Determine best label for group
+    const label = indexLabel || toTitleCase(entry.label);
+
+    // Remove index entry if its label matches the group label
+    const shouldRemoveIndex = firstLink && indexLabel &&
+      (indexLabel === label || indexLabel === toTitleCase(entry.label) || indexLabel === entry.label);
+
+    const cleanedEntries = shouldRemoveIndex
+      ? fixedEntries.filter((e) => e !== firstLink)
+      : fixedEntries;
+
+    // Store href for clickable group header
+    if (shouldRemoveIndex && indexHref) {
+      groupHrefMap.set(label, indexHref);
+    }
+
+    return {
+      ...entry,
+      label,
+      entries: cleanedEntries,
+    };
+  });
+}
+
+function toTitleCase(slug: string): string {
+  const special: Record<string, string> = {
+    'api-reference': 'API Reference',
+    'cli': 'CLI',
+    'css': 'CSS',
+    'seo': 'SEO',
+    'mdx': 'MDX',
+    'next-config-js': 'next.config.js',
+    'use-cache': 'use cache',
+    'use-client': 'use client',
+    'use-server': 'use server',
+  };
+  if (special[slug]) return special[slug];
+  return slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// Filter sidebar
+const learnSections = ['Learn'];
+
+// Detect if this is a versioned worker (sidebar has "vXX Documentation" but no "App Router")
+const isVersioned = !sidebar.some((item) => item.label === 'App Router');
+
+let filteredSidebar = sidebar;
+if (isBlog) {
+  filteredSidebar = [];
+} else if (isLearn) {
+  filteredSidebar = fixLabels(sidebar.filter((item) => learnSections.includes(item.label)));
+} else if (isVersioned) {
+  // Versioned workers: flatten the single top-level group, then filter by router
+  const topGroup = sidebar.find((item) => item.type === 'group' && 'entries' in item);
+  const entries = topGroup && 'entries' in topGroup ? topGroup.entries : sidebar;
+
+  // Group labels may be directory names (e.g. "app") or explicit (e.g. "App Router")
+  const routerLabels = routerType === 'pages'
+    ? ['Pages Router', 'pages']
+    : ['App Router', 'app'];
+  const sharedLabels = ['Architecture', 'architecture', 'Community', 'community'];
+
+  const routerGroup = entries.find((item) => routerLabels.includes(item.label));
+  const sharedSections = entries.filter((item) => sharedLabels.includes(item.label));
+  const routerEntries = routerGroup && 'entries' in routerGroup
+    ? routerGroup.entries.filter((e) =>
+        !(e.type === 'link' && routerLabels.includes(e.label))
+      )
+    : [];
+  filteredSidebar = fixLabels([
+    ...routerEntries,
+    ...sharedSections,
+  ]);
+} else {
+  const activeRouter = routerType === 'pages' ? 'Pages Router' : 'App Router';
+  const routerGroup = sidebar.find((item) => item.label === activeRouter);
+  const sharedSections = sidebar.filter((item) =>
+    item.label === 'Architecture' || item.label === 'Community'
+  );
+  // Get router group entries, excluding the router's own index entry
+  const routerEntries = routerGroup && 'entries' in routerGroup
+    ? routerGroup.entries.filter((e) =>
+        !(e.type === 'link' && (e.label === activeRouter || e.href === `/docs/${routerType}/`))
+      )
+    : [];
+  filteredSidebar = fixLabels([
+    ...routerEntries,
+    ...sharedSections,
+  ]);
+}
+
+// Detect current version from pathname
+// Versioned: /docs/15/app/... or /zh-hans/docs/15/app/...
+// Latest: /docs/app/... or /zh-hans/docs/app/...
+const versionMatch = pathname.match(/\/docs\/(\d+)\//);
+const currentVersion = versionMatch ? versionMatch[1] : null;
+const versionPrefix = currentVersion ? `/docs/${currentVersion}` : '/docs';
+
+// Router options — use version-aware paths
+const routerOptions = [
+  {
+    label: 'Using App Router',
+    description: 'Features available in /app',
+    href: `${versionPrefix}/app/getting-started/installation/`,
+    active: routerType === 'app',
+    icon: 'app',
+  },
+  {
+    label: 'Using Pages Router',
+    description: 'Features available in /pages',
+    href: `${versionPrefix}/pages/getting-started/installation/`,
+    active: routerType === 'pages',
+    icon: 'pages',
+  },
+];
+
+// Version options
+const versions = [
+  { label: 'v16 (Latest)', version: '16.1.6', href: '/docs/app/getting-started/installation/', active: currentVersion === null },
+  { label: 'v15', version: '15.5.12', href: '/docs/15/app/getting-started/installation/', active: currentVersion === '15' },
+  { label: 'v14', version: '14.2.35', href: '/docs/14/app/getting-started/installation/', active: currentVersion === '14' },
+  { label: 'v13', version: '13.5.11', href: '/docs/13/app/getting-started/installation/', active: currentVersion === '13' },
+];
+const activeVersion = versions.find((v) => v.active) || versions[0];
+---
+
+{isDocs && (
+  <div class="sidebar-toggles">
+    {/* Router Switcher */}
+    <details class="router-switcher">
+      <summary class="toggle-option active">
+        <div class="toggle-icon">
+          {routerType === 'app' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M9 4v16"/></svg>
+          )}
+        </div>
+        <div class="toggle-text">
+          <span class="toggle-label">{routerType === 'app' ? 'Using App Router' : 'Using Pages Router'}</span>
+          <span class="toggle-desc">{routerType === 'app' ? 'Features available in /app' : 'Features available in /pages'}</span>
+        </div>
+        <svg class="toggle-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="version-list">
+        {routerOptions.filter((opt) => !opt.active).map((opt) => (
+          <a href={opt.href} class="version-item">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <div class="toggle-icon" style="width:1.25rem; height:1.25rem;">
+                {opt.icon === 'app' ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M9 4v16"/></svg>
+                )}
+              </div>
+              <div class="toggle-text">
+                <span class="toggle-label">{opt.label}</span>
+                <span class="toggle-desc">{opt.description}</span>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </details>
+
+    {/* Version Switcher */}
+    <details class="version-switcher">
+      <summary class="toggle-option active">
+        <div class="toggle-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>
+        </div>
+        <div class="toggle-text">
+          <span class="toggle-label">{activeVersion.label}</span>
+          <span class="toggle-desc">{activeVersion.version}</span>
+        </div>
+        <svg class="toggle-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="version-list">
+        {versions.filter((v) => !v.active).map((v) => (
+          <a href={v.href} class="version-item">
+            <span class="toggle-label">{v.label}</span>
+            <span class="toggle-desc">{v.version}</span>
+          </a>
+        ))}
+      </div>
+    </details>
+  </div>
+)}
+
+{filteredSidebar.length > 0 ? (
+  <>
+    <SidebarPersister>
+      <SidebarSublist sublist={filteredSidebar} groupHrefMap={groupHrefMap} />
+    </SidebarPersister>
+    <div class="md:sl-hidden">
+      <MobileMenuFooter />
+    </div>
+  </>
+) : isBlog ? (
+  <style is:global>
+    .sidebar-pane { display: none !important; }
+    starlight-menu-button { display: none !important; }
+    .main-pane { --sl-content-inline-start: 0rem !important; }
+  </style>
+) : (
+  <div class="md:sl-hidden">
+    <MobileMenuFooter />
+  </div>
+)}
+
+<style is:global>
+  .sidebar-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--sl-color-gray-6);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--sl-color-bg-sidebar);
+  }
+
+  .toggle-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  a.toggle-option,
+  summary.toggle-option {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    color: var(--sl-color-gray-2);
+    cursor: pointer;
+    transition: background-color 0.15s;
+    list-style: none;
+  }
+
+  a.toggle-option:hover,
+  summary.toggle-option:hover {
+    background-color: var(--sl-color-gray-6);
+  }
+
+  a.toggle-option.active {
+    background-color: var(--sl-color-gray-6);
+    color: var(--sl-color-white);
+  }
+
+  .toggle-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.375rem;
+    background-color: var(--sl-color-gray-6);
+    color: var(--sl-color-gray-3);
+    flex-shrink: 0;
+  }
+
+  .active .toggle-icon {
+    background-color: var(--sl-color-accent-low);
+    color: var(--sl-color-text-accent);
+  }
+
+  .toggle-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .toggle-label {
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .toggle-desc {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+    line-height: 1.3;
+  }
+
+  .toggle-chevron {
+    flex-shrink: 0;
+    color: var(--sl-color-gray-3);
+    transition: transform 0.2s;
+  }
+
+  details[open] > summary .toggle-chevron {
+    transform: rotate(180deg);
+  }
+
+  .version-switcher,
+  .router-switcher {
+    border-radius: 0.5rem;
+  }
+
+  .version-switcher summary::-webkit-details-marker,
+  .router-switcher summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .version-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.25rem 0 0.25rem 0.5rem;
+  }
+
+  a.version-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.375rem 0.625rem;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    color: var(--sl-color-gray-2);
+    transition: background-color 0.15s;
+  }
+
+  a.version-item:hover {
+    background-color: var(--sl-color-gray-6);
+  }
+</style>
