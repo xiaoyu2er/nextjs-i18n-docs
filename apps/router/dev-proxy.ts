@@ -48,21 +48,20 @@ const server = Bun.serve({
       return new Response('WebSocket not proxied — connect directly to worker port', { status: 426 });
     }
 
-    // Version root redirects
-    const versionRedirects: Record<string, string> = {
-      '/docs/15': '/docs/15/app/getting-started/',
-      '/docs/14': '/docs/14/app/building-your-application/',
-      '/docs/13': '/docs/13/app/building-your-application/',
-    };
+    // Version root redirects (same logic as router worker)
     const segments = pathname.split('/').filter(Boolean);
     let matchPath = pathname;
     if (LOCALES.includes(segments[0])) {
       matchPath = '/' + segments.slice(1).join('/');
     }
-    const cleanPath = matchPath.endsWith('/') ? matchPath.slice(0, -1) : matchPath;
-    if (versionRedirects[cleanPath]) {
+    const versionMatch = matchPath.match(/^\/docs\/(\d+)\/?$/);
+    if (versionMatch) {
+      const ver = versionMatch[1];
       const localePrefix = LOCALES.includes(segments[0]) ? `/${segments[0]}` : '';
-      return Response.redirect(`http://localhost:3000${localePrefix}${versionRedirects[cleanPath]}`, 302);
+      const defaultPage = Number(ver) >= 15
+        ? `/docs/${ver}/app/getting-started/`
+        : `/docs/${ver}/app/building-your-application/`;
+      return Response.redirect(`http://localhost:3000${localePrefix}${defaultPage}`, 302);
     }
 
     let port = getTargetPort(pathname);
