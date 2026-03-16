@@ -2,10 +2,10 @@
  * End-to-end incremental translation pipeline.
  *
  * Usage:
- *   OPENAI_API_KEY=xxx pnpm exec tsx packages/translate/src/pipeline.ts <source-file> [options]
+ *   OPENAI_API_KEY=xxx bun run packages/translate/src/pipeline.ts <source-file> [options]
  *
  * Example:
- *   OPENAI_API_KEY=xxx pnpm exec tsx packages/translate/src/pipeline.ts \
+ *   OPENAI_API_KEY=xxx bun run packages/translate/src/pipeline.ts \
  *     apps/docs/content/en/docs/01-app/01-getting-started/01-installation.mdx \
  *     --lang zh-hans --lang-name "Simplified Chinese"
  *
@@ -69,7 +69,7 @@ async function main() {
 
   if (!opts.sourceFile) {
     console.error(
-      'Usage: pnpm exec tsx packages/translate/src/pipeline.ts <source-file> [options]',
+      'Usage: bun run packages/translate/src/pipeline.ts <source-file> [options]',
     );
     process.exit(1);
   }

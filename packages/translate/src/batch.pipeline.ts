@@ -2,7 +2,7 @@
  * Batch translation pipeline — translate multiple files.
  *
  * Usage:
- *   pnpm exec tsx packages/translate/src/batch.pipeline.ts [options]
+ *   bun run packages/translate/src/batch.pipeline.ts [options]
  *
  * Options:
  *   --docs-root     Source docs root (default: apps/docs/content/en)
