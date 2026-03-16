@@ -13,13 +13,14 @@ interface Worker {
   dir: string;
   port: number;
   color: string;
+  env?: Record<string, string>;
 }
 
 const ALL_WORKERS: Worker[] = [
   { name: 'latest', dir: 'apps/web', port: 4321, color: '\x1b[36m' },
-  { name: 'v13', dir: 'apps/web-v13', port: 4322, color: '\x1b[33m' },
-  { name: 'v14', dir: 'apps/web-v14', port: 4323, color: '\x1b[35m' },
-  { name: 'v15', dir: 'apps/web-v15', port: 4324, color: '\x1b[32m' },
+  { name: 'v13', dir: 'apps/web-v', port: 4322, color: '\x1b[33m', env: { VERSION: '13' } },
+  { name: 'v14', dir: 'apps/web-v', port: 4323, color: '\x1b[35m', env: { VERSION: '14' } },
+  { name: 'v15', dir: 'apps/web-v', port: 4324, color: '\x1b[32m', env: { VERSION: '15' } },
 ];
 
 const RESET = '\x1b[0m';
@@ -70,6 +71,7 @@ for (const w of workers) {
     cwd: resolve(ROOT, w.dir),
     stdout: 'pipe',
     stderr: 'pipe',
+    env: { ...process.env, ...w.env },
   });
 
   prefixStream(proc.stdout, w.name, w.color);
