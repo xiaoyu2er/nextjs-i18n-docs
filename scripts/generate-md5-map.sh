@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/generate-md5-map.sh
 # Generate MD5 map for all translatable nodes in content/en/.
-# Outputs to apps/docs/cache/en.jsonl
+# Outputs to .cache/en.jsonl
 #
 # Usage: bash scripts/generate-md5-map.sh
 

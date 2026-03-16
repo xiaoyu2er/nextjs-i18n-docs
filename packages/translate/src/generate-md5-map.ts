@@ -1,6 +1,6 @@
 /**
  * Generate MD5 map for all translatable nodes in English source files.
- * Writes to apps/docs/cache/en.jsonl
+ * Writes to .cache/en.jsonl
  *
  * Each line: {"k":"md5","v":"original english text","src":["file:line",...]}
  *
@@ -19,7 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 const DOCS_ROOT = path.join(PROJECT_ROOT, 'apps/docs/content/en');
-const CACHE_DIR = path.join(PROJECT_ROOT, 'apps/docs/cache');
+const CACHE_DIR = path.join(PROJECT_ROOT, '.cache');
 
 interface Md5Entry {
   v: string;

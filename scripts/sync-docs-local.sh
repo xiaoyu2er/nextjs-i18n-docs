@@ -9,7 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONTENT_EN="$PROJECT_ROOT/apps/docs/content/en/docs"
+CONTENT_EN="$PROJECT_ROOT/content/en/docs"
 TMP_DIR=$(mktemp -d)
 
 cd "$PROJECT_ROOT"

@@ -25,8 +25,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DOCS_ROOT="$PROJECT_ROOT/apps/docs/content/en"
-CACHE_DIR="$PROJECT_ROOT/apps/docs/cache"
+DOCS_ROOT="$PROJECT_ROOT/content/en"
+CACHE_DIR="$PROJECT_ROOT/.cache"
 TMP_OUTPUT="$PROJECT_ROOT/tmp/translate-output"
 
 # Parse arguments
@@ -76,7 +76,7 @@ node --import tsx packages/translate/src/batch.pipeline.ts \
 echo ""
 
 # Step 3: Replace content/{lang}/
-LANG_DIR="$PROJECT_ROOT/apps/docs/content/$LANG"
+LANG_DIR="$PROJECT_ROOT/content/$LANG"
 OUTPUT_LANG_DIR="$TMP_OUTPUT/$LANG"
 
 if [ "$SKIP_REPLACE" = false ] && [ -d "$OUTPUT_LANG_DIR" ]; then
