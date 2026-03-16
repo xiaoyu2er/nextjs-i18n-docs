@@ -10,6 +10,7 @@ on:
       - 'apps/web-v/**'
       - 'apps/router/**'
       - 'scripts/prepare-content.ts'
+      - '.github/nextjs-versions.json'
   workflow_dispatch:
     inputs:
       workers:
@@ -26,26 +27,41 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       latest: ${{ steps.check.outputs.latest }}
-      v13: ${{ steps.check.outputs.v13 }}
-      v14: ${{ steps.check.outputs.v14 }}
-      v15: ${{ steps.check.outputs.v15 }}
       router: ${{ steps.check.outputs.router }}
+      versioned-matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
+      - name: Build versioned matrix from nextjs-versions.json
+        id: matrix
+        run: |
+          LATEST_MAJOR=$(jq -r '.latestMajor' .github/nextjs-versions.json)
+          # All versions except latest major
+          VERSIONS=$(jq -r --arg latest "$LATEST_MAJOR" '.versions | keys[] | select(. != $latest)' .github/nextjs-versions.json)
+          MATRIX="["
+          FIRST=true
+          for v in $VERSIONS; do
+            if [ "$FIRST" = true ]; then FIRST=false; else MATRIX+=","; fi
+            MATRIX+="{\"version\":\"$v\"}"
+          done
+          MATRIX+="]"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Generated matrix: $MATRIX"
+
       - name: Detect changed workers
         id: check
         run: |
+          LATEST_MAJOR=$(jq -r '.latestMajor' .github/nextjs-versions.json)
+          VERSIONS=$(jq -r --arg latest "$LATEST_MAJOR" '.versions | keys[] | select(. != $latest)' .github/nextjs-versions.json)
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             INPUT="${{ github.event.inputs.workers }}"
             if [ "$INPUT" = "all" ] || [ -z "$INPUT" ]; then
               echo "latest=true" >> $GITHUB_OUTPUT
-              echo "v13=true" >> $GITHUB_OUTPUT
-              echo "v14=true" >> $GITHUB_OUTPUT
-              echo "v15=true" >> $GITHUB_OUTPUT
               echo "router=true" >> $GITHUB_OUTPUT
+              for v in $VERSIONS; do echo "v${v}=true" >> $GITHUB_OUTPUT; done
             else
               for w in $(echo "$INPUT" | tr ',' ' '); do
                 echo "${w}=true" >> $GITHUB_OUTPUT
@@ -57,38 +73,32 @@ jobs:
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
 
           # Shared changes trigger all doc workers
-          if echo "$CHANGED" | grep -qE '^(packages/shared/|scripts/prepare-content\.ts)'; then
+          if echo "$CHANGED" | grep -qE '^(packages/shared/|scripts/prepare-content\.ts|\.github/nextjs-versions\.json)'; then
             echo "latest=true" >> $GITHUB_OUTPUT
-            echo "v13=true" >> $GITHUB_OUTPUT
-            echo "v14=true" >> $GITHUB_OUTPUT
-            echo "v15=true" >> $GITHUB_OUTPUT
+            for v in $VERSIONS; do echo "v${v}=true" >> $GITHUB_OUTPUT; done
           fi
 
-          # Content changes — detect which versions
+          # Latest content changes
           if echo "$CHANGED" | grep -qE '^content/[^/]+/docs/(01-app|02-pages|03-architecture|04-community|index)'; then
             echo "latest=true" >> $GITHUB_OUTPUT
           fi
           if echo "$CHANGED" | grep -qE '^content/[^/]+/(learn|blog)/'; then
             echo "latest=true" >> $GITHUB_OUTPUT
           fi
-          if echo "$CHANGED" | grep -qE '^content/[^/]+/docs/13/'; then
-            echo "v13=true" >> $GITHUB_OUTPUT
-          fi
-          if echo "$CHANGED" | grep -qE '^content/[^/]+/docs/14/'; then
-            echo "v14=true" >> $GITHUB_OUTPUT
-          fi
-          if echo "$CHANGED" | grep -qE '^content/[^/]+/docs/15/'; then
-            echo "v15=true" >> $GITHUB_OUTPUT
-          fi
+
+          # Versioned content changes
+          for v in $VERSIONS; do
+            if echo "$CHANGED" | grep -qE "^content/[^/]+/docs/${v}/"; then
+              echo "v${v}=true" >> $GITHUB_OUTPUT
+            fi
+          done
 
           # App-specific changes
           if echo "$CHANGED" | grep -qE '^apps/web/'; then
             echo "latest=true" >> $GITHUB_OUTPUT
           fi
           if echo "$CHANGED" | grep -qE '^apps/web-v/'; then
-            echo "v13=true" >> $GITHUB_OUTPUT
-            echo "v14=true" >> $GITHUB_OUTPUT
-            echo "v15=true" >> $GITHUB_OUTPUT
+            for v in $VERSIONS; do echo "v${v}=true" >> $GITHUB_OUTPUT; done
           fi
           if echo "$CHANGED" | grep -qE '^apps/router/'; then
             echo "router=true" >> $GITHUB_OUTPUT
@@ -111,26 +121,20 @@ jobs:
 
   deploy-versioned:
     needs: detect-changes
+    if: needs.detect-changes.outputs.versioned-matrix != '[]'
     strategy:
       matrix:
-        include:
-          - version: '13'
-            enabled: ${{ needs.detect-changes.outputs.v13 == 'true' }}
-          - version: '14'
-            enabled: ${{ needs.detect-changes.outputs.v14 == 'true' }}
-          - version: '15'
-            enabled: ${{ needs.detect-changes.outputs.v15 == 'true' }}
-    if: needs.detect-changes.outputs.v13 == 'true' || needs.detect-changes.outputs.v14 == 'true' || needs.detect-changes.outputs.v15 == 'true'
+        include: ${{ fromJson(needs.detect-changes.outputs.versioned-matrix) }}
     runs-on: ubuntu-latest
     name: Deploy v${{ matrix.version }}
     steps:
-      - if: matrix.enabled == 'true'
-        uses: actions/checkout@v4
-      - if: matrix.enabled == 'true'
-        uses: oven-sh/setup-bun@v2
-      - if: matrix.enabled == 'true'
-        run: bun install --ignore-scripts
-      - if: matrix.enabled == 'true'
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --ignore-scripts
+      - name: Check if version needs deploy
+        id: should-deploy
+        run: echo "deploy=${{ needs.detect-changes.outputs[format('v{0}', matrix.version)] }}" >> $GITHUB_OUTPUT
+      - if: steps.should-deploy.outputs.deploy == 'true'
         name: Build & Deploy v${{ matrix.version }}
         env:
           VERSION: ${{ matrix.version }}

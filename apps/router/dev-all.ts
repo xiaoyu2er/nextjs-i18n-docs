@@ -8,6 +8,12 @@ import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname!, '../..');
 
+// Read versions from single source of truth
+const versionsFile = resolve(ROOT, '.github/nextjs-versions.json');
+const versionsData = JSON.parse(await Bun.file(versionsFile).text());
+const latestMajor = versionsData.latestMajor;
+const olderVersions = Object.keys(versionsData.versions).filter((v) => v !== latestMajor);
+
 interface Worker {
   name: string;
   dir: string;
@@ -16,11 +22,17 @@ interface Worker {
   env?: Record<string, string>;
 }
 
+const COLORS = ['\x1b[33m', '\x1b[35m', '\x1b[32m', '\x1b[34m'];
+
 const ALL_WORKERS: Worker[] = [
   { name: 'latest', dir: 'apps/web', port: 4321, color: '\x1b[36m' },
-  { name: 'v13', dir: 'apps/web-v', port: 4322, color: '\x1b[33m', env: { VERSION: '13' } },
-  { name: 'v14', dir: 'apps/web-v', port: 4323, color: '\x1b[35m', env: { VERSION: '14' } },
-  { name: 'v15', dir: 'apps/web-v', port: 4324, color: '\x1b[32m', env: { VERSION: '15' } },
+  ...olderVersions.map((v, i) => ({
+    name: `v${v}`,
+    dir: 'apps/web-v',
+    port: 4322 + i,
+    color: COLORS[i % COLORS.length],
+    env: { VERSION: v },
+  })),
 ];
 
 const RESET = '\x1b[0m';
