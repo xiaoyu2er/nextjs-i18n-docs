@@ -5,13 +5,20 @@
  * Usage: bun run dev-proxy.ts
  */
 
+import { resolve } from 'node:path';
+
 const LOCALES = ['zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
 
-const ROUTES: Array<{ prefix: string; port: number }> = [
-  { prefix: '/docs/13', port: 4322 },
-  { prefix: '/docs/14', port: 4323 },
-  { prefix: '/docs/15', port: 4324 },
-];
+// Read versions from single source of truth
+const ROOT = resolve(import.meta.dirname!, '../..');
+const versionsData = JSON.parse(await Bun.file(resolve(ROOT, '.github/nextjs-versions.json')).text());
+const latestMajor = versionsData.latestMajor;
+const olderVersions = Object.keys(versionsData.versions).filter((v) => v !== latestMajor);
+
+const ROUTES: Array<{ prefix: string; port: number }> = olderVersions.map((v, i) => ({
+  prefix: `/docs/${v}`,
+  port: 4322 + i,
+}));
 const DEFAULT_PORT = 4321;
 
 function getTargetPort(pathname: string): number {

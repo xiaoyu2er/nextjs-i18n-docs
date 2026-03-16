@@ -2,24 +2,16 @@
  * Router Worker — routes requests to version-specific doc workers
  * via Cloudflare Service Bindings (microfrontends pattern).
  *
- * Routes /docs/13/* → V13, /docs/14/* → V14, /docs/15/* → V15, else → LATEST.
+ * Version workers are bound as V{major}_DOCS (e.g. V13_DOCS, V14_DOCS).
  * Uses Referer header to route static assets (/_astro/*) to the correct worker.
  */
 
 interface Env {
   LATEST: Fetcher;
-  V13_DOCS: Fetcher;
-  V14_DOCS: Fetcher;
-  V15_DOCS: Fetcher;
+  [key: string]: Fetcher | unknown;
 }
 
 const LOCALES = ['zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
-
-const VERSION_REDIRECTS: Record<string, string> = {
-  '/docs/15': '/docs/15/app/getting-started/',
-  '/docs/14': '/docs/14/app/building-your-application/',
-  '/docs/13': '/docs/13/app/building-your-application/',
-};
 
 function stripLocale(path: string): string {
   const segments = path.split('/').filter(Boolean);
@@ -29,11 +21,22 @@ function stripLocale(path: string): string {
   return path;
 }
 
-function getVersionWorker(path: string, env: Env): Fetcher | null {
-  if (path.startsWith('/docs/13')) return env.V13_DOCS;
-  if (path.startsWith('/docs/14')) return env.V14_DOCS;
-  if (path.startsWith('/docs/15')) return env.V15_DOCS;
-  return null;
+/** Extract version number from path like /docs/15/... → "15" */
+function extractVersion(path: string): string | null {
+  const match = path.match(/^\/docs\/(\d+)(\/|$)/);
+  return match ? match[1] : null;
+}
+
+/** Get the service binding for a version, e.g. "15" → env.V15_DOCS */
+function getVersionWorker(version: string, env: Env): Fetcher | null {
+  const binding = env[`V${version}_DOCS`];
+  return binding && typeof (binding as Fetcher).fetch === 'function' ? (binding as Fetcher) : null;
+}
+
+/** Get worker from path (checks for /docs/{version}/ pattern) */
+function getWorkerForPath(path: string, env: Env): Fetcher | null {
+  const version = extractVersion(path);
+  return version ? getVersionWorker(version, env) : null;
 }
 
 export default {
@@ -41,34 +44,41 @@ export default {
     const url = new URL(request.url);
     const path = stripLocale(url.pathname);
 
-    // Version root redirects
-    const cleanPath = path.endsWith('/') ? path.slice(0, -1) : path;
-    if (VERSION_REDIRECTS[cleanPath]) {
-      const segments = url.pathname.split('/').filter(Boolean);
-      const localePrefix = LOCALES.includes(segments[0]) ? `/${segments[0]}` : '';
-      return Response.redirect(
-        new URL(`${localePrefix}${VERSION_REDIRECTS[cleanPath]}`, url.origin).href,
-        302
-      );
+    // Version root redirects: /docs/{ver} → /docs/{ver}/app/...
+    const version = extractVersion(path);
+    if (version) {
+      const cleanPath = path.endsWith('/') ? path.slice(0, -1) : path;
+      if (cleanPath === `/docs/${version}`) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        const localePrefix = LOCALES.includes(segments[0]) ? `/${segments[0]}` : '';
+        // Default landing page per version
+        const defaultPage = Number(version) >= 15
+          ? `/docs/${version}/app/getting-started/`
+          : `/docs/${version}/app/building-your-application/`;
+        return Response.redirect(
+          new URL(`${localePrefix}${defaultPage}`, url.origin).href,
+          302
+        );
+      }
     }
 
     // Route versioned doc pages
-    const versionWorker = getVersionWorker(path, env);
+    const versionWorker = getWorkerForPath(path, env);
     if (versionWorker) return versionWorker.fetch(request);
 
-    // Static assets (/_astro/*, /favicon.svg, etc.) — use Referer to find correct worker
+    // Static assets — use Referer to find correct worker
     if (!path.startsWith('/docs/') && !path.startsWith('/learn/') && !path.startsWith('/blog/')) {
       const referer = request.headers.get('Referer');
       if (referer) {
         try {
           const refPath = stripLocale(new URL(referer).pathname);
-          const refWorker = getVersionWorker(refPath, env);
+          const refWorker = getWorkerForPath(refPath, env);
           if (refWorker) return refWorker.fetch(request);
         } catch {}
       }
     }
 
-    // Default: latest (v16) + learn + blog + everything else
+    // Default: latest + learn + blog + everything else
     return env.LATEST.fetch(request);
   },
 };
