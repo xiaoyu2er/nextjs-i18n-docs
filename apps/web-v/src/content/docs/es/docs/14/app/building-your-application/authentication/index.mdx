@@ -1,0 +1,896 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:58:10.891Z
+title: Autenticación
+description: Aprenda cómo implementar autenticación en Next.js, cubriendo mejores prácticas, protección de rutas, técnicas de autorización y gestión de sesiones.
+sidebar:
+  order: 20109
+  label: "Autenticación"
+---
+
+
+Para implementar autenticación en Next.js, familiarícese con tres conceptos fundamentales:
+
+- **[Autenticación](#autenticación)** verifica si el usuario es quien dice ser. Requiere que el usuario demuestre su identidad con algo que posee, como un nombre de usuario y contraseña.
+- **[Gestión de sesiones](#gestión-de-sesiones)** rastrea el estado del usuario (ej. conectado) a través de múltiples solicitudes.
+- **[Autorización](#autorización)** decide qué partes de la aplicación puede acceder el usuario.
+
+Esta página demuestra cómo usar las características de Next.js para implementar patrones comunes de autenticación, autorización y gestión de sesiones, permitiéndole elegir las mejores soluciones según las necesidades de su aplicación.
+
+## Autenticación
+
+La autenticación verifica la identidad de un usuario. Esto ocurre cuando un usuario inicia sesión, ya sea con un nombre de usuario y contraseña o a través de un servicio como Google. Se trata de confirmar que los usuarios son realmente quienes dicen ser, protegiendo tanto los datos del usuario como la aplicación de accesos no autorizados o actividades fraudulentas.
+
+### Estrategias de autenticación
+
+Las aplicaciones web modernas comúnmente utilizan varias estrategias de autenticación:
+
+1. **OAuth/OpenID Connect (OIDC)**: Permiten acceso de terceros sin compartir credenciales de usuario. Ideales para inicios de sesión en redes sociales y soluciones de Single Sign-On (SSO). Añaden una capa de identidad con OpenID Connect.
+2. **Inicio de sesión basado en credenciales (Email + Contraseña)**: Una opción estándar para aplicaciones web, donde los usuarios inician sesión con un correo electrónico y contraseña. Familiar y fácil de implementar, requiere medidas de seguridad robustas contra amenazas como phishing.
+3. **Autenticación sin contraseña/basada en tokens**: Utiliza enlaces mágicos por correo electrónico o códigos de un solo uso por SMS para un acceso seguro sin contraseña. Popular por su conveniencia y mayor seguridad, este método ayuda a reducir la fatiga de contraseñas. Su limitación es la dependencia de la disponibilidad del correo electrónico o teléfono del usuario.
+4. **Passkeys/WebAuthn**: Utiliza credenciales criptográficas únicas para cada sitio, ofreciendo alta seguridad contra phishing. Segura pero nueva, esta estratega puede ser difícil de implementar.
+
+La selección de una estrategia de autenticación debe alinearse con los requisitos específicos de su aplicación, consideraciones de interfaz de usuario y objetivos de seguridad.
+
+### Implementación de autenticación
+
+En esta sección, exploraremos el proceso de agregar autenticación básica con correo electrónico y contraseña a una aplicación web. Si bien este método proporciona un nivel fundamental de seguridad, vale la pena considerar opciones más avanzadas como OAuth o inicios de sesión sin contraseña para una mayor protección contra amenazas de seguridad comunes. El flujo de autenticación que discutiremos es el siguiente:
+
+<PagesOnly>
+
+1. El usuario envía sus credenciales a través de un formulario de inicio de sesión.
+2. El formulario envía una solicitud que es manejada por una ruta de API.
+3. Tras una verificación exitosa, el proceso se completa, indicando la autenticación exitosa del usuario.
+4. Si la verificación falla, se muestra un mensaje de error.
+
+Considere un formulario de inicio de sesión donde los usuarios pueden ingresar sus credenciales:
+
+```tsx filename="pages/login.tsx" switcher
+import { FormEvent } from 'react'
+import { useRouter } from 'next/router'
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (response.ok) {
+      router.push('/profile')
+    } else {
+      // Manejar errores
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Contraseña" required />
+      <button type="submit">Iniciar sesión</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="pages/login.jsx" switcher
+import { FormEvent } from 'react'
+import { useRouter } from 'next/router'
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (response.ok) {
+      router.push('/profile')
+    } else {
+      // Manejar errores
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Contraseña" required />
+      <button type="submit">Iniciar sesión</button>
+    </form>
+  )
+}
+```
+
+El formulario anterior tiene dos campos de entrada para capturar el correo electrónico y la contraseña del usuario. Al enviarlo, activa una función que envía una solicitud POST a una ruta de API (`/api/auth/login`).
+
+Luego puede llamar a la API de su Proveedor de Autenticación en la ruta de API para manejar la autenticación:
+
+```ts filename="pages/api/auth/login.ts" switcher
+import { NextApiRequest, NextApiResponse } from 'next'
+import { signIn } from '@/auth'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    const { email, password } = req.body
+    await signIn('credentials', { email, password })
+
+    res.status(200).json({ success: true })
+  } catch (error) {
+    if (error.type === 'CredentialsSignin') {
+      res.status(401).json({ error: 'Credenciales inválidas.' })
+    } else {
+      res.status(500).json({ error: 'Algo salió mal.' })
+    }
+  }
+}
+```
+
+```js filename="pages/api/auth/login.js" switcher
+import { signIn } from '@/auth'
+
+export default async function handler(req, res) {
+  try {
+    const { email, password } = req.body
+    await signIn('credentials', { email, password })
+
+    res.status(200).json({ success: true })
+  } catch (error) {
+    if (error.type === 'CredentialsSignin') {
+      res.status(401).json({ error: 'Credenciales inválidas.' })
+    } else {
+      res.status(500).json({ error: 'Algo salió mal.' })
+    }
+  }
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+1. El usuario envía sus credenciales a través de un formulario de inicio de sesión.
+2. El formulario llama a una Acción de Servidor.
+3. Tras una verificación exitosa, el proceso se completa, indicando la autenticación exitosa del usuario.
+4. Si la verificación falla, se muestra un mensaje de error.
+
+Considere un formulario de inicio de sesión donde los usuarios pueden ingresar sus credenciales:
+
+```tsx filename="app/login/page.tsx" switcher
+import { authenticate } from '@/app/lib/actions'
+
+export default function Page() {
+  return (
+    <form action={authenticate}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Contraseña" required />
+      <button type="submit">Iniciar sesión</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/login/page.jsx" switcher
+import { authenticate } from '@/app/lib/actions'
+
+export default function Page() {
+  return (
+    <form action={authenticate}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Contraseña" required />
+      <button type="submit">Iniciar sesión</button>
+    </form>
+  )
+}
+```
+
+El formulario anterior tiene dos campos de entrada para capturar el correo electrónico y la contraseña del usuario. Al enviarlo, llama a la Acción de Servidor `authenticate`.
+
+Luego puede llamar a la API de su Proveedor de Autenticación en la Acción de Servidor para manejar la autenticación:
+
+```ts filename="app/lib/actions.ts" switcher
+'use server'
+
+import { signIn } from '@/auth'
+
+export async function authenticate(_currentState: unknown, formData: FormData) {
+  try {
+    await signIn('credentials', formData)
+  } catch (error) {
+    if (error) {
+      switch (error.type) {
+        case 'CredentialsSignin':
+          return 'Credenciales inválidas.'
+        default:
+          return 'Algo salió mal.'
+      }
+    }
+    throw error
+  }
+}
+```
+
+```js filename="app/lib/actions.js" switcher
+'use server'
+
+import { signIn } from '@/auth'
+
+export async function authenticate(_currentState, formData) {
+  try {
+    await signIn('credentials', formData)
+  } catch (error) {
+    if (error) {
+      switch (error.type) {
+        case 'CredentialsSignin':
+          return 'Credenciales inválidas.'
+        default:
+          return 'Algo salió mal.'
+      }
+    }
+    throw error
+  }
+}
+```
+
+</AppOnly>
+
+En este código, el método `signIn` verifica las credenciales contra los datos de usuario almacenados.
+Después de que el proveedor de autenticación procesa las credenciales, hay dos resultados posibles:
+
+- **Autenticación exitosa**: Este resultado implica que el inicio de sesión fue exitoso. Luego se pueden iniciar acciones adicionales, como acceder a rutas protegidas y obtener información del usuario.
+- **Autenticación fallida**: En casos donde las credenciales son incorrectas o se encuentra un error, la función devuelve un mensaje de error correspondiente para indicar el fallo de autenticación.
+
+<AppOnly>
+
+Finalmente, en su componente `login-form.tsx`, puede usar `useFormState` de React para llamar a la Acción de Servidor y manejar errores del formulario, y usar `useFormStatus` para manejar el estado pendiente del formulario:
+
+```tsx filename="app/login/page.tsx" switcher
+'use client'
+
+import { authenticate } from '@/app/lib/actions'
+import { useFormState, useFormStatus } from 'react-dom'
+
+export default function Page() {
+  const [errorMessage, dispatch] = useFormState(authenticate, undefined)
+
+  return (
+    <form action={dispatch}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Contraseña" required />
+      <div>{errorMessage && <p>{errorMessage}</p>}</div>
+      <LoginButton />
+    </form>
+  )
+}
+
+function LoginButton() {
+  const { pending } = useFormStatus()
+
+  const handleClick = (event) => {
+    if (pending) {
+      event.preventDefault()
+    }
+  }
+
+  return (
+    <button aria-disabled={pending} type="submit" onClick={handleClick}>
+      Iniciar sesión
+    </button>
+  )
+}
+```
+
+```jsx filename="app/login/page.jsx" switcher
+'use client'
+
+import { authenticate } from '@/app/lib/actions'
+import { useFormState, useFormStatus } from 'react-dom'
+
+export default function Page() {
+  const [errorMessage, dispatch] = useFormState(authenticate, undefined)
+
+  return (
+    <form action={dispatch}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Contraseña" required />
+      <div>{errorMessage && <p>{errorMessage}</p>}</div>
+      <LoginButton />
+    </form>
+  )
+}
+
+function LoginButton() {
+  const { pending } = useFormStatus()
+
+  const handleClick = (event) => {
+    if (pending) {
+      event.preventDefault()
+    }
+  }
+
+  return (
+    <button aria-disabled={pending} type="submit" onClick={handleClick}>
+      Iniciar sesión
+    </button>
+  )
+}
+```
+
+</AppOnly>
+
+Para una configuración de autenticación más optimizada en proyectos Next.js, especialmente cuando se ofrecen múltiples métodos de inicio de sesión, considere usar una [solución de autenticación](#ejemplos).
+
+## Autorización
+
+Una vez que un usuario está autenticado, deberá asegurarse de que el usuario tenga permiso para visitar ciertas rutas y realizar operaciones como mutar datos con Acciones de Servidor y llamar a Manejadores de Ruta.
+
+### Protección de rutas con Middleware
+
+[Middleware](/docs/14/app/building-your-application/routing/middleware) en Next.js le ayuda a controlar quién puede acceder a diferentes partes de su sitio web. Esto es importante para mantener áreas como el panel de usuario protegidas mientras que otras páginas como las de marketing sean públicas. Se recomienda aplicar Middleware en todas las rutas y especificar exclusiones para acceso público.
+
+Así es como puede implementar Middleware para autenticación en Next.js:
+
+#### Configuración de Middleware:
+
+- Cree un archivo `middleware.ts` o `.js` en el directorio raíz de su proyecto.
+- Incluya lógica para autorizar el acceso de usuarios, como verificar tokens de autenticación.
+
+#### Definición de rutas protegidas:
+
+- No todas las rutas requieren autorización. Use la opción `matcher` en su Middleware para especificar las rutas que no requieren verificaciones de autorización.
+
+#### Lógica de Middleware:
+
+- Escriba lógica para verificar si un usuario está autenticado. Verifique roles o permisos de usuario para autorización de rutas.
+
+#### Manejo de acceso no autorizado:
+
+- Redirija usuarios no autorizados a una página de inicio de sesión o error según corresponda.
+
+Ejemplo de archivo Middleware:
+
+```ts filename="middleware.ts" switcher
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const currentUser = request.cookies.get('currentUser')?.value
+
+  if (currentUser && !request.nextUrl.pathname.startsWith('/dashboard')) {
+    return Response.redirect(new URL('/dashboard', request.url))
+  }
+
+  if (!currentUser && !request.nextUrl.pathname.startsWith('/login')) {
+    return Response.redirect(new URL('/login', request.url))
+  }
+}
+
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+}
+```
+
+```js filename="middleware.js" switcher
+export function middleware(request) {
+  const currentUser = request.cookies.get('currentUser')?.value
+
+  if (currentUser && !request.nextUrl.pathname.startsWith('/dashboard')) {
+    return Response.redirect(new URL('/dashboard', request.url))
+  }
+
+  if (!currentUser && !request.nextUrl.pathname.startsWith('/login')) {
+    return Response.redirect(new URL('/login', request.url))
+  }
+}
+
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+}
+```
+
+Este ejemplo utiliza [`Response.redirect`](https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static) para manejar redirecciones temprano en el pipeline de solicitudes, haciéndolo eficiente y centralizando el control de acceso.
+
+<AppOnly>
+
+Para necesidades específicas de redirección, la función `redirect` puede usarse en Componentes de Servidor, Manejadores de Ruta y Acciones de Servidor para proporcionar más control. Esto es útil para navegación basada en roles o escenarios sensibles al contexto.
+
+```ts filename="app/page.tsx" switcher
+import { redirect } from 'next/navigation'
+
+export default function Page() {
+  // Lógica para determinar si se necesita una redirección
+  const accessDenied = true
+  if (accessDenied) {
+    redirect('/login')
+  }
+
+  // Defina otras rutas y lógica
+}
+```
+
+```js filename="app/page.jsx" switcher
+import { redirect } from 'next/navigation'
+
+export default function Page() {
+  // Lógica para determinar si se necesita una redirección
+  const accessDenied = true
+  if (accessDenied) {
+    redirect('/login')
+  }
+
+  // Defina otras rutas y lógica
+}
+```
+
+</AppOnly>
+
+Después de una autenticación exitosa, es importante gestionar la navegación del usuario según sus roles. Por ejemplo, un usuario administrador podría ser redirigido a un panel de administración, mientras que un usuario regular es enviado a una página diferente. Esto es importante para experiencias específicas por rol y navegación condicional, como solicitar a los usuarios que completen su perfil si es necesario.
+
+Al configurar la autorización, es importante asegurarse de que las principales verificaciones de seguridad ocurran donde su aplicación accede o cambia datos. Si bien Middleware puede ser útil para la validación inicial, no debe ser la única línea de defensa para proteger sus datos. La mayor parte de las verificaciones de seguridad deben realizarse en la Capa de Acceso a Datos (DAL).
+
+<PagesOnly>
+
+### Protección de Rutas de API
+
+Las Rutas de API en Next.js son esenciales para manejar lógica del lado del servidor y gestión de datos. Es crucial proteger estas rutas para garantizar que solo usuarios autorizados puedan acceder a funcionalidades específicas. Esto generalmente implica verificar el estado de autenticación del usuario y sus permisos basados en roles.
+
+Aquí hay un ejemplo de cómo proteger una Ruta de API:
+
+```ts filename="pages/api/route.ts" switcher
+import { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const session = await getSession(req)
+
+  // Verificar si el usuario está autenticado
+  if (!session) {
+    res.status(401).json({
+      error: 'El usuario no está autenticado',
+    })
+    return
+  }
+
+  // Verificar si el usuario tiene el rol 'admin'
+  if (session.user.role !== 'admin') {
+    res.status(401).json({
+      error: 'Acceso no autorizado: El usuario no tiene privilegios de administrador.',
+    })
+    return
+  }
+
+  // Continuar con la ruta para usuarios autorizados
+  // ... implementación de la Ruta de API
+}
+```
+
+```js filename="pages/api/route.js" switcher
+export default async function handler(req, res) {
+  const session = await getSession(req)
+
+  // Verificar si el usuario está autenticado
+  if (!session) {
+    res.status(401).json({
+      error: 'El usuario no está autenticado',
+    })
+    return
+  }
+
+  // Verificar si el usuario tiene el rol 'admin'
+  if (session.user.role !== 'admin') {
+    res.status(401).json({
+      error: 'Acceso no autorizado: El usuario no tiene privilegios de administrador.',
+    })
+    return
+  }
+
+  // Continuar con la ruta para usuarios autorizados
+  // ... implementación de la Ruta de API
+}
+```
+
+Este ejemplo demuestra una Ruta de API con una verificación de seguridad de dos niveles para autenticación y autorización. Primero verifica si hay una sesión activa y luego confirma si el usuario que inició sesión es un 'admin'. Este enfoque garantiza un acceso seguro, limitado a usuarios autenticados y autorizados, manteniendo una seguridad robusta para el procesamiento de solicitudes.
+
+</PagesOnly>
+
+<AppOnly>
+
+Este enfoque, destacado en [este blog de seguridad](/blog/security-nextjs-server-components-actions), aboga por consolidar todo el acceso a datos dentro de una Capa de Acceso a Datos (DAL) dedicada. Esta estrategia asegura un acceso consistente a los datos, minimiza errores de autorización y simplifica el mantenimiento. Para garantizar una seguridad integral, considere las siguientes áreas clave:
+
+- Acciones del Servidor (Server Actions): Implemente verificaciones de seguridad en procesos del lado del servidor, especialmente para operaciones sensibles.
+- Manejadores de Ruta (Route Handlers): Gestione solicitudes entrantes con medidas de seguridad para limitar el acceso solo a usuarios autorizados.
+- Capa de Acceso a Datos (DAL): Interactúa directamente con la base de datos y es crucial para validar y autorizar transacciones de datos. Es vital realizar verificaciones críticas dentro de la DAL para proteger los datos en su punto de interacción más crucial—acceso o modificación.
+
+Para una guía detallada sobre cómo proteger la DAL, incluyendo fragmentos de código de ejemplo y prácticas avanzadas de seguridad, consulte nuestra [sección de Capa de Acceso a Datos](/blog/security-nextjs-server-components-actions#data-access-layer) en la guía de seguridad.
+
+### Protección de Acciones del Servidor
+
+Es importante tratar las [Acciones del Servidor](/docs/14/app/building-your-application/data-fetching/server-actions-and-mutations) con las mismas consideraciones de seguridad que los puntos finales de API públicos. Verificar la autorización del usuario para cada acción es crucial. Implemente verificaciones dentro de las Acciones del Servidor para determinar los permisos del usuario, como restringir ciertas acciones a usuarios administradores.
+
+En el siguiente ejemplo, verificamos el rol del usuario antes de permitir que la acción continúe:
+
+```ts filename="app/lib/actions.ts" switcher
+'use server'
+
+// ...
+
+export async function serverAction() {
+  const session = await getSession()
+  const userRole = session?.user?.role
+
+  // Verificar si el usuario está autorizado para realizar la acción
+  if (userRole !== 'admin') {
+    throw new Error('Acceso no autorizado: El usuario no tiene privilegios de administrador.')
+  }
+
+  // Continuar con la acción para usuarios autorizados
+  // ... implementación de la acción
+}
+```
+
+```js filename="app/lib/actions.js" switcher
+'use server'
+
+// ...
+
+export async function serverAction() {
+  const session = await getSession()
+  const userRole = session?.user?.role
+
+  // Verificar si el usuario está autorizado para realizar la acción
+  if (userRole !== 'admin') {
+    throw new Error('Acceso no autorizado: El usuario no tiene privilegios de administrador.')
+  }
+
+  // Continuar con la acción para usuarios autorizados
+  // ... implementación de la acción
+}
+```
+
+### Protección de Manejadores de Ruta
+
+Los Manejadores de Ruta en Next.js juegan un papel vital en la gestión de solicitudes entrantes. Al igual que las Acciones del Servidor, deben protegerse para garantizar que solo usuarios autorizados puedan acceder a ciertas funcionalidades. Esto a menudo implica verificar el estado de autenticación del usuario y sus permisos.
+
+Aquí hay un ejemplo de cómo proteger un Manejador de Ruta:
+
+```ts filename="app/api/route.ts" switcher
+export async function GET() {
+  // Autenticación del usuario y verificación de rol
+  const session = await getSession()
+
+  // Verificar si el usuario está autenticado
+  if (!session) {
+    return new Response(null, { status: 401 }) // Usuario no autenticado
+  }
+
+  // Verificar si el usuario tiene el rol 'admin'
+  if (session.user.role !== 'admin') {
+    return new Response(null, { status: 403 }) // Usuario autenticado pero sin los permisos adecuados
+  }
+
+  // Obtención de datos para usuarios autorizados
+}
+```
+
+```js filename="app/api/route.js" switcher
+export async function GET() {
+  // Autenticación del usuario y verificación de rol
+  const session = await getSession()
+
+  // Verificar si el usuario está autenticado
+  if (!session) {
+    return new Response(null, { status: 401 }) // Usuario no autenticado
+  }
+
+  // Verificar si el usuario tiene el rol 'admin'
+  if (session.user.role !== 'admin') {
+    return new Response(null, { status: 403 }) // Usuario autenticado pero sin los permisos adecuados
+  }
+
+  // Obtención de datos para usuarios autorizados
+}
+```
+
+Este ejemplo demuestra un Manejador de Ruta con una verificación de seguridad de dos niveles para autenticación y autorización. Primero verifica si hay una sesión activa y luego confirma si el usuario que inició sesión es un 'admin'. Este enfoque garantiza un acceso seguro, limitado a usuarios autenticados y autorizados, manteniendo una seguridad robusta para el procesamiento de solicitudes.
+
+### Autorización Usando Componentes del Servidor
+
+Los [Componentes del Servidor](/docs/14/app/building-your-application/rendering/server-components) en Next.js están diseñados para ejecución del lado del servidor y ofrecen un entorno seguro para integrar lógica compleja como la autorización. Permiten acceso directo a recursos del back-end, optimizando el rendimiento para tareas intensivas en datos y mejorando la seguridad para operaciones sensibles.
+
+En los Componentes del Servidor, una práctica común es renderizar condicionalmente elementos de la interfaz de usuario basados en el rol del usuario. Este enfoque mejora la experiencia del usuario y la seguridad al garantizar que los usuarios solo accedan a contenido para el que están autorizados.
+
+**Ejemplo:**
+
+```tsx filename="app/dashboard/page.tsx" switcher
+export default async function Dashboard() {
+  const session = await getSession()
+  const userRole = session?.user?.role // Asumiendo que 'role' es parte del objeto de sesión
+
+  if (userRole === 'admin') {
+    return <AdminDashboard /> // Componente para usuarios administradores
+  } else if (userRole === 'user') {
+    return <UserDashboard /> // Componente para usuarios regulares
+  } else {
+    return <AccessDenied /> // Componente mostrado para acceso no autorizado
+  }
+}
+```
+
+```jsx filename="app/dashboard/page.jsx" switcher
+export default function Dashboard() {
+  const session = await getSession()
+  const userRole = session?.user?.role // Asumiendo que 'role' es parte del objeto de sesión
+
+  if (userRole === 'admin') {
+    return <AdminDashboard /> // Componente para usuarios administradores
+  } else if (userRole === 'user') {
+    return <UserDashboard /> // Componente para usuarios regulares
+  } else {
+    return <AccessDenied /> // Componente mostrado para acceso no autorizado
+  }
+}
+```
+
+En este ejemplo, el componente Dashboard renderiza diferentes interfaces de usuario para roles 'admin', 'user' y no autorizados. Este patrón garantiza que cada usuario interactúe solo con componentes apropiados para su rol, mejorando tanto la seguridad como la experiencia del usuario.
+
+</AppOnly>
+
+### Mejores Prácticas
+
+- **Gestión Segura de Sesiones**: Priorice la seguridad de los datos de sesión para prevenir accesos no autorizados y brechas de datos. Use cifrado y prácticas de almacenamiento seguro.
+- **Gestión Dinámica de Roles**: Utilice un sistema flexible para roles de usuario que permita ajustes fáciles en permisos y roles, evitando roles codificados.
+- **Enfoque de Seguridad Primero**: En todos los aspectos de la lógica de autorización, priorice la seguridad para proteger los datos del usuario y mantener la integridad de su aplicación. Esto incluye pruebas exhaustivas y considerar posibles vulnerabilidades de seguridad.
+
+## Gestión de Sesiones
+
+La gestión de sesiones implica rastrear y administrar la interacción de un usuario con la aplicación a lo largo del tiempo, asegurando que su estado autenticado se mantenga en diferentes partes de la aplicación.
+
+Esto evita la necesidad de múltiples inicios de sesión, mejorando tanto la seguridad como la conveniencia del usuario. Hay dos métodos principales utilizados para la gestión de sesiones: sesiones basadas en cookies y sesiones en base de datos.
+
+### Sesiones Basadas en Cookies
+
+> **🎥 Ver:** Aprenda más sobre sesiones basadas en cookies y autenticación con Next.js → [YouTube (11 minutos)](https://www.youtube.com/watch?v=DJvM2lSPn6w).
+
+Las sesiones basadas en cookies gestionan los datos del usuario almacenando información de sesión cifrada directamente en las cookies del navegador. Al iniciar sesión, estos datos cifrados se almacenan en la cookie. Cada solicitud posterior al servidor incluye esta cookie, minimizando la necesidad de consultas repetidas al servidor y mejorando la eficiencia del lado del cliente.
+
+Sin embargo, este método requiere un cifrado cuidadoso para proteger datos sensibles, ya que las cookies son susceptibles a riesgos de seguridad del lado del cliente. Cifrar los datos de sesión en las cookies es clave para proteger la información del usuario de accesos no autorizados. Asegura que incluso si una cookie es robada, los datos dentro de ella permanezcan ilegibles.
+
+Además, aunque las cookies individuales tienen un tamaño limitado (típicamente alrededor de 4KB), técnicas como la división de cookies pueden superar esta limitación dividiendo grandes conjuntos de datos de sesión en múltiples cookies.
+
+Establecer una cookie en un proyecto de Next.js podría verse así:
+
+**Establecer una cookie en el servidor:**
+
+<PagesOnly>
+
+```ts filename="pages/api/login.ts" switcher
+import { serialize } from 'cookie'
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const sessionData = req.body
+  const encryptedSessionData = encrypt(sessionData)
+
+  const cookie = serialize('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // Una semana
+    path: '/',
+  })
+  res.setHeader('Set-Cookie', cookie)
+  res.status(200).json({ message: '¡Cookie establecida exitosamente!' })
+}
+```
+
+```js filename="pages/api/login.js" switcher
+import { serialize } from 'cookie'
+
+export default function handler(req, res) {
+  const sessionData = req.body
+  const encryptedSessionData = encrypt(sessionData)
+
+  const cookie = serialize('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // Una semana
+    path: '/',
+  })
+  res.setHeader('Set-Cookie', cookie)
+  res.status(200).json({ message: '¡Cookie establecida exitosamente!' })
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function handleLogin(sessionData) {
+  const encryptedSessionData = encrypt(sessionData) // Cifre sus datos de sesión
+  cookies().set('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // Una semana
+    path: '/',
+  })
+  // Redirigir o manejar la respuesta después de establecer la cookie
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function handleLogin(sessionData) {
+  const encryptedSessionData = encrypt(sessionData) // Cifre sus datos de sesión
+  cookies().set('session', encryptedSessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 7, // Una semana
+    path: '/',
+  })
+  // Redirigir o manejar la respuesta después de establecer la cookie
+}
+```
+
+**Acceder a los datos de sesión almacenados en la cookie en un componente del servidor:**
+
+```tsx filename="app/page.tsx" switcher
+import { cookies } from 'next/headers'
+
+export async function getSessionData(req) {
+  const encryptedSessionData = cookies().get('session')?.value
+  return encryptedSessionData ? JSON.parse(decrypt(encryptedSessionData)) : null
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { cookies } from 'next/headers'
+
+export async function getSessionData(req) {
+  const encryptedSessionData = cookies().get('session')?.value
+  return encryptedSessionData ? JSON.parse(decrypt(encryptedSessionData)) : null
+}
+```
+
+</AppOnly>
+
+### Sesiones en Base de Datos
+
+La gestión de sesiones en base de datos implica almacenar datos de sesión en el servidor, con el navegador del usuario recibiendo solo un ID de sesión. Este ID referencia los datos de sesión almacenados del lado del servidor, sin contener los datos mismos. Este método mejora la seguridad, ya que mantiene los datos sensibles de sesión alejados del entorno del lado del cliente, reduciendo el riesgo de exposición a ataques del lado del cliente. Las sesiones en base de datos también son más escalables, acomodando necesidades mayores de almacenamiento de datos.
+
+Sin embargo, este enfoque tiene sus compensaciones. Puede aumentar la sobrecarga de rendimiento debido a la necesidad de búsquedas en la base de datos en cada interacción del usuario. Estrategias como el almacenamiento en caché de datos de sesión pueden ayudar a mitigar esto. Además, la dependencia de la base de datos significa que la gestión de sesiones es tan confiable como el rendimiento y disponibilidad de la base de datos.
+
+Aquí hay un ejemplo simplificado de implementación de sesiones en base de datos en una aplicación Next.js:
+
+**Crear una Sesión en el Servidor**:
+
+<PagesOnly>
+
+```ts filename="pages/api/create-session.ts" switcher
+import db from '../../lib/db'
+import { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    const user = req.body
+    const sessionId = generateSessionId()
+    await db.insertSession({
+      sessionId,
+      userId: user.id,
+      createdAt: new Date(),
+    })
+
+    res.status(200).json({ sessionId })
+  } catch (error) {
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+}
+```
+
+```js filename="pages/api/create-session.js" switcher
+import db from '../../lib/db'
+
+export default async function handler(req, res) {
+  try {
+    const user = req.body
+    const sessionId = generateSessionId()
+    await db.insertSession({
+      sessionId,
+      userId: user.id,
+      createdAt: new Date(),
+    })
+
+    res.status(200).json({ sessionId })
+  } catch (error) {
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+}
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+```js
+import db from './lib/db'
+
+export async function createSession(user) {
+  const sessionId = generateSessionId() // Generar un ID de sesión único
+  await db.insertSession({ sessionId, userId: user.id, createdAt: new Date() })
+  return sessionId
+}
+```
+
+**Recuperar una Sesión en Middleware o Lógica del Lado del Servidor**:
+
+```js
+import { cookies } from 'next/headers'
+import db from './lib/db'
+
+export async function getSession() {
+  const sessionId = cookies().get('sessionId')?.value
+  return sessionId ? await db.findSession(sessionId) : null
+}
+```
+
+</AppOnly>
+
+### Selección de Gestión de Sesiones en Next.js
+
+La decisión entre sesiones basadas en cookies y sesiones en base de datos en Next.js depende de las necesidades de su aplicación. Las sesiones basadas en cookies son más simples y se adaptan mejor a aplicaciones pequeñas con menor carga en el servidor, pero pueden ofrecer menos seguridad. Las sesiones en base de datos, aunque más complejas, proporcionan mejor seguridad y escalabilidad, siendo ideales para aplicaciones más grandes y sensibles a los datos.
+
+Con [soluciones de autenticación](#ejemplos) como [NextAuth.js](https://authjs.dev/guides/upgrade-to-v5), la gestión de sesiones se vuelve más eficiente, ya sea utilizando cookies o almacenamiento en base de datos. Esta automatización simplifica el proceso de desarrollo, pero es importante comprender el método de gestión de sesiones utilizado por la solución elegida. Asegúrese de que se alinee con los requisitos de seguridad y rendimiento de su aplicación.
+
+Independientemente de su elección, priorice la seguridad en su estrategia de gestión de sesiones. Para sesiones basadas en cookies, el uso de cookies seguras y HTTP-only es crucial para proteger los datos de sesión. Para sesiones en base de datos, las copias de seguridad regulares y el manejo seguro de los datos de sesión son esenciales. Implementar mecanismos de expiración y limpieza de sesiones es vital en ambos enfoques para prevenir accesos no autorizados y mantener el rendimiento y la confiabilidad de la aplicación.
+
+## Ejemplos
+
+A continuación se presentan soluciones de autenticación compatibles con Next.js. Consulte las guías de inicio rápido para aprender cómo configurarlas en su aplicación Next.js:
+
+
+
+- [Auth0](https://auth0.com/docs/quickstart/webapp/nextjs/01-login)
+- [Clerk](https://clerk.com/docs/quickstarts/nextjs)
+- [Kinde](https://kinde.com/docs/developer-tools/nextjs-sdk)
+- [Lucia](https://lucia-auth.com/getting-started/nextjs-app)
+- [NextAuth.js](https://authjs.dev/guides/upgrade-to-v5)
+- [Supabase](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs)
+- [Stytch](https://stytch.com/docs/guides/quickstarts/nextjs)
+- [Iron Session](https://github.com/vvo/iron-session)
+
+## Lecturas Adicionales
+
+Para continuar aprendiendo sobre autenticación y seguridad, consulte los siguientes recursos:
+
+- [Entendiendo los Ataques XSS](https://vercel.com/guides/understanding-xss-attacks)
+- [Entendiendo los Ataques CSRF](https://vercel.com/guides/understanding-csrf-attacks)

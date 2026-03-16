@@ -1,0 +1,588 @@
+---
+source-updated-at: 2025-05-16T04:52:11.000Z
+translation-updated-at: 2025-06-06T16:58:44.858Z
+title: Middleware
+description: Apprenez à utiliser le Middleware pour exécuter du code avant qu'une requête ne soit complétée.
+source: app/building-your-application/routing/middleware
+sidebar:
+  order: 3010111
+---
+
+
+
+
+Le Middleware vous permet d'exécuter du code avant qu'une requête ne soit complétée. Ensuite, en fonction de la requête entrante, vous pouvez modifier la réponse en réécrivant, redirigeant, modifiant les en-têtes de requête ou de réponse, ou en répondant directement.
+
+Le Middleware s'exécute avant que le contenu mis en cache et les routes ne soient appariés. Voir [Appariement des chemins](#matching-paths) pour plus de détails.
+
+## Cas d'utilisation
+
+L'intégration du Middleware dans votre application peut conduire à des améliorations significatives en termes de performance, sécurité et expérience utilisateur. Voici quelques scénarios courants où le Middleware est particulièrement efficace :
+
+- Authentification et Autorisation : Vérifier l'identité de l'utilisateur et contrôler les cookies de session avant d'accorder l'accès à des pages ou routes API spécifiques.
+- Redirections côté serveur : Rediriger les utilisateurs au niveau serveur en fonction de certaines conditions (ex : locale, rôle utilisateur).
+- Réécriture de chemins : Prendre en charge les tests A/B, les déploiements de fonctionnalités ou les chemins hérités en réécrivant dynamiquement les chemins vers les routes API ou pages en fonction des propriétés de la requête.
+- Détection de bots : Protéger vos ressources en détectant et bloquant le trafic des bots.
+- Journalisation et Analytique : Capturer et analyser les données de requête pour obtenir des insights avant le traitement par la page ou l'API.
+- Feature Flagging : Activer ou désactiver des fonctionnalités dynamiquement pour des déploiements ou tests sans heurts.
+
+Il est tout aussi crucial de reconnaître les situations où le Middleware n'est pas l'approche optimale. Voici quelques scénarios à garder à l'esprit :
+
+- Récupération et Manipulation Complexe de Données : Le Middleware n'est pas conçu pour la récupération ou manipulation directe de données, cela devrait être fait dans les Route Handlers ou utilitaires côté serveur.
+- Tâches de Calcul Lourdes : Le Middleware doit être léger et répondre rapidement, sinon il peut causer des retards dans le chargement des pages. Les tâches de calcul lourdes ou processus longs doivent être effectués dans des Route Handlers dédiés.
+- Gestion de Session Étendue : Bien que le Middleware puisse gérer des tâches de session basiques, une gestion de session étendue devrait être gérée par des services d'authentification dédiés ou dans des Route Handlers.
+- Opérations Directes sur la Base de Données : Effectuer des opérations directes sur la base de données dans le Middleware n'est pas recommandé. Les interactions avec la base de données devraient être faites dans des Route Handlers ou utilitaires côté serveur.
+
+## Convention
+
+Utilisez le fichier `middleware.ts` (ou `.js`) à la racine de votre projet pour définir le Middleware. Par exemple, au même niveau que `pages` ou `app`, ou à l'intérieur de `src` si applicable.
+
+> **Note** : Bien qu'un seul fichier `middleware.ts` soit supporté par projet, vous pouvez toujours organiser votre logique de Middleware de manière modulaire. Séparez les fonctionnalités de Middleware dans des fichiers `.ts` ou `.js` distincts et importez-les dans votre fichier `middleware.ts` principal. Cela permet une gestion plus propre du Middleware spécifique aux routes, agrégé dans le `middleware.ts` pour un contrôle centralisé. En imposant un seul fichier de Middleware, cela simplifie la configuration, évite les conflits potentiels et optimise les performances en évitant plusieurs couches de Middleware.
+
+## Exemple
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+// Cette fonction peut être marquée `async` si vous utilisez `await` à l'intérieur
+export function middleware(request: NextRequest) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// Voir "Appariement des chemins" ci-dessous pour en savoir plus
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+// Cette fonction peut être marquée `async` si vous utilisez `await` à l'intérieur
+export function middleware(request) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+// Voir "Appariement des chemins" ci-dessous pour en savoir plus
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+## Appariement des chemins
+
+Le Middleware sera invoqué pour **chaque route de votre projet**. Compte tenu de cela, il est crucial d'utiliser des matchers pour cibler ou exclure précisément des routes spécifiques. Voici l'ordre d'exécution :
+
+1. `headers` de `next.config.js`
+2. `redirects` de `next.config.js`
+3. Middleware (`rewrites`, `redirects`, etc.)
+4. `beforeFiles` (`rewrites`) de `next.config.js`
+5. Routes du système de fichiers (`public/`, `_next/static/`, `pages/`, `app/`, etc.)
+6. `afterFiles` (`rewrites`) de `next.config.js`
+7. Routes Dynamiques (`/blog/[slug]`)
+8. `fallback` (`rewrites`) de `next.config.js`
+
+Il existe deux façons de définir sur quels chemins le Middleware s'exécutera :
+
+1. [Configuration personnalisée de matcher](#matcher)
+2. [Instructions conditionnelles](#conditional-statements)
+
+### Matcher
+
+`matcher` vous permet de filtrer le Middleware pour qu'il s'exécute sur des chemins spécifiques.
+
+```js filename="middleware.js"
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+Vous pouvez apparier un seul chemin ou plusieurs chemins avec une syntaxe de tableau :
+
+```js filename="middleware.js"
+export const config = {
+  matcher: ['/about/:path*', '/dashboard/:path*'],
+}
+```
+
+La configuration `matcher` permet des regex complets, donc des appariements comme des lookaheads négatifs ou des appariements de caractères sont supportés. Voici un exemple de lookahead négatif pour apparier tous les chemins sauf certains spécifiques :
+
+```js filename="middleware.js"
+export const config = {
+  matcher: [
+    /*
+     * Apparier tous les chemins de requête sauf ceux commençant par :
+     * - api (routes API)
+     * - _next/static (fichiers statiques)
+     * - _next/image (fichiers d'optimisation d'image)
+     * - favicon.ico (fichier favicon)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
+}
+```
+
+Vous pouvez également contourner le Middleware pour certaines requêtes en utilisant les tableaux `missing` ou `has`, ou une combinaison des deux :
+
+```js filename="middleware.js"
+export const config = {
+  matcher: [
+    /*
+     * Apparier tous les chemins de requête sauf ceux commençant par :
+     * - api (routes API)
+     * - _next/static (fichiers statiques)
+     * - _next/image (fichiers d'optimisation d'image)
+     * - favicon.ico (fichier favicon)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      has: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      has: [{ type: 'header', key: 'x-present' }],
+      missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
+    },
+  ],
+}
+```
+
+> **Bon à savoir** : Les valeurs de `matcher` doivent être des constantes pour pouvoir être analysées statiquement au moment de la construction. Les valeurs dynamiques comme les variables seront ignorées.
+
+Les matchers configurés :
+
+1. DOIVENT commencer par `/`
+2. Peuvent inclure des paramètres nommés : `/about/:path` appariera `/about/a` et `/about/b` mais pas `/about/a/c`
+3. Peuvent avoir des modificateurs sur les paramètres nommés (commençant par `:`) : `/about/:path*` appariera `/about/a/b/c` car `*` signifie _zéro ou plus_. `?` signifie _zéro ou un_ et `+` _un ou plus_
+4. Peuvent utiliser des expressions régulières entre parenthèses : `/about/(.*)` est identique à `/about/:path*`
+
+Lisez plus de détails dans la documentation [path-to-regexp](https://github.com/pillarjs/path-to-regexp#path-to-regexp-1).
+
+> **Bon à savoir** : Pour des raisons de compatibilité ascendante, Next.js considère toujours `/public` comme `/public/index`. Par conséquent, un matcher de `/public/:path` appariera.
+
+### Instructions conditionnelles
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  if (request.nextUrl.pathname.startsWith('/about')) {
+    return NextResponse.rewrite(new URL('/about-2', request.url))
+  }
+
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.rewrite(new URL('/dashboard/user', request.url))
+  }
+}
+```
+
+## NextResponse
+
+L'API `NextResponse` vous permet de :
+
+- `redirect` la requête entrante vers une URL différente
+- `rewrite` la réponse en affichant une URL donnée
+- Définir des en-têtes de requête pour les routes API, `getServerSideProps`, et les destinations de `rewrite`
+- Définir des cookies de réponse
+- Définir des en-têtes de réponse
+
+<AppOnly>
+
+Pour produire une réponse depuis le Middleware, vous pouvez :
+
+1. `rewrite` vers une route ([Page](/docs/14/app/building-your-application/routing/pages-and-layouts) ou [Route Handler](/docs/14/app/building-your-application/routing/route-handlers)) qui produit une réponse
+2. retourner une `NextResponse` directement. Voir [Produire une réponse](#producing-a-response)
+
+</AppOnly>
+
+<PagesOnly>
+
+Pour produire une réponse depuis le Middleware, vous pouvez :
+
+1. `rewrite` vers une route ([Page](/docs/14/pages/building-your-application/routing/pages-and-layouts) ou [Edge API Route](/docs/14/pages/building-your-application/routing/api-routes)) qui produit une réponse
+2. retourner une `NextResponse` directement. Voir [Produire une réponse](#producing-a-response)
+
+</PagesOnly>
+
+## Utilisation des Cookies
+
+Les cookies sont des en-têtes réguliers. Sur une `Request`, ils sont stockés dans l'en-tête `Cookie`. Sur une `Response`, ils sont dans l'en-tête `Set-Cookie`. Next.js fournit un moyen pratique d'accéder et de manipuler ces cookies via l'extension `cookies` sur `NextRequest` et `NextResponse`.
+
+1. Pour les requêtes entrantes, `cookies` vient avec les méthodes suivantes : `get`, `getAll`, `set`, et `delete` cookies. Vous pouvez vérifier l'existence d'un cookie avec `has` ou supprimer tous les cookies avec `clear`.
+2. Pour les réponses sortantes, `cookies` a les méthodes suivantes `get`, `getAll`, `set`, et `delete`.
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // Supposons qu'un en-tête "Cookie:nextjs=fast" soit présent sur la requête entrante
+  // Récupération des cookies de la requête en utilisant l'API `RequestCookies`
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // Définition des cookies sur la réponse en utilisant l'API `ResponseCookies`
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // La réponse sortante aura un en-tête `Set-Cookie:vercel=fast;path=/`.
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  // Supposons qu'un en-tête "Cookie:nextjs=fast" soit présent sur la requête entrante
+  // Récupération des cookies de la requête en utilisant l'API `RequestCookies`
+  let cookie = request.cookies.get('nextjs')
+  console.log(cookie) // => { name: 'nextjs', value: 'fast', Path: '/' }
+  const allCookies = request.cookies.getAll()
+  console.log(allCookies) // => [{ name: 'nextjs', value: 'fast' }]
+
+  request.cookies.has('nextjs') // => true
+  request.cookies.delete('nextjs')
+  request.cookies.has('nextjs') // => false
+
+  // Définition des cookies sur la réponse en utilisant l'API `ResponseCookies`
+  const response = NextResponse.next()
+  response.cookies.set('vercel', 'fast')
+  response.cookies.set({
+    name: 'vercel',
+    value: 'fast',
+    path: '/',
+  })
+  cookie = response.cookies.get('vercel')
+  console.log(cookie) // => { name: 'vercel', value: 'fast', Path: '/' }
+  // La réponse sortante aura un en-tête `Set-Cookie:vercel=fast;path=/test`.
+
+  return response
+}
+```
+
+## Définition des en-têtes
+
+Vous pouvez définir des en-têtes de requête et de réponse en utilisant l'API `NextResponse` (la définition des en-têtes de _requête_ est disponible depuis Next.js v13.0.0).
+
+```ts filename="middleware.ts" switcher
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // Cloner les en-têtes de requête et définir un nouvel en-tête `x-hello-from-middleware1`
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-middleware1', 'hello')
+
+  // Vous pouvez également définir des en-têtes de requête dans NextResponse.rewrite
+  const response = NextResponse.next({
+    request: {
+      // Nouveaux en-têtes de requête
+      headers: requestHeaders,
+    },
+  })
+
+  // Définir un nouvel en-tête de réponse `x-hello-from-middleware2`
+  response.headers.set('x-hello-from-middleware2', 'hello')
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  // Cloner les en-têtes de requête et définir un nouvel en-tête `x-hello-from-middleware1`
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-hello-from-middleware1', 'hello')
+
+  // Vous pouvez également définir des en-têtes de requête dans NextResponse.rewrite
+  const response = NextResponse.next({
+    request: {
+      // Nouveaux en-têtes de requête
+      headers: requestHeaders,
+    },
+  })
+
+  // Définir un nouvel en-tête de réponse `x-hello-from-middleware2`
+  response.headers.set('x-hello-from-middleware2', 'hello')
+  return response
+}
+```
+
+> **Bon à savoir** : Évitez de définir des en-têtes trop volumineux car cela pourrait causer une erreur [431 Request Header Fields Too Large](https://developer.mozilla.org/docs/Web/HTTP/Status/431) selon la configuration de votre serveur web backend.
+
+### CORS
+
+Vous pouvez configurer les en-têtes CORS dans le Middleware pour autoriser les requêtes cross-origin, y compris les requêtes [simples](https://developer.mozilla.org/fr/docs/Web/HTTP/CORS#requêtes_simples) et [pré-vérifiées](https://developer.mozilla.org/fr/docs/Web/HTTP/CORS#requêtes_pré-vérifiées).
+
+```tsx filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+const allowedOrigins = ['https://acme.com', 'https://my-app.org']
+
+const corsOptions = {
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+export function middleware(request: NextRequest) {
+  // Vérifier l'origine de la requête
+  const origin = request.headers.get('origin') ?? ''
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+
+  // Gérer les requêtes pré-vérifiées
+  const isPreflight = request.method === 'OPTIONS'
+
+  if (isPreflight) {
+    const preflightHeaders = {
+      ...(isAllowedOrigin && { 'Access-Control-Allow-Origin': origin }),
+      ...corsOptions,
+    }
+    return NextResponse.json({}, { headers: preflightHeaders })
+  }
+
+  // Gérer les requêtes simples
+  const response = NextResponse.next()
+
+  if (isAllowedOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+  }
+
+  Object.entries(corsOptions).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+
+  return response
+}
+
+export const config = {
+  matcher: '/api/:path*',
+}
+```
+
+```jsx filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+const allowedOrigins = ['https://acme.com', 'https://my-app.org']
+
+const corsOptions = {
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+export function middleware(request) {
+  // Vérifier l'origine de la requête
+  const origin = request.headers.get('origin') ?? ''
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+
+  // Gérer les requêtes pré-vérifiées
+  const isPreflight = request.method === 'OPTIONS'
+
+  if (isPreflight) {
+    const preflightHeaders = {
+      ...(isAllowedOrigin && { 'Access-Control-Allow-Origin': origin }),
+      ...corsOptions,
+    }
+    return NextResponse.json({}, { headers: preflightHeaders })
+  }
+
+  // Gérer les requêtes simples
+  const response = NextResponse.next()
+
+  if (isAllowedOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+  }
+
+  Object.entries(corsOptions).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+
+  return response
+}
+
+export const config = {
+  matcher: '/api/:path*',
+}
+```
+
+<AppOnly>
+
+> **Bon à savoir :** Vous pouvez configurer les en-têtes CORS pour des routes individuelles dans les [Route Handlers](/docs/14/app/building-your-application/routing/route-handlers#cors).
+
+</AppOnly>
+
+## Produire une réponse
+
+Vous pouvez répondre directement depuis le Middleware en retournant une instance de `Response` ou `NextResponse`. (Disponible depuis [Next.js v13.1.0](https://nextjs.org/blog/next-13-1#nextjs-advanced-middleware))
+
+```ts filename="middleware.ts" switcher
+import { NextRequest } from 'next/server'
+import { isAuthenticated } from '@lib/auth'
+
+// Limiter le middleware aux chemins commençant par `/api/`
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function middleware(request: NextRequest) {
+  // Appeler notre fonction d'authentification pour vérifier la requête
+  if (!isAuthenticated(request)) {
+    // Répondre avec un JSON indiquant un message d'erreur
+    return Response.json(
+      { success: false, message: 'Échec de l\'authentification' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+```js filename="middleware.js" switcher
+import { isAuthenticated } from '@lib/auth'
+
+// Limiter le middleware aux chemins commençant par `/api/`
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function middleware(request) {
+  // Appeler notre fonction d'authentification pour vérifier la requête
+  if (!isAuthenticated(request)) {
+    // Répondre avec un JSON indiquant un message d'erreur
+    return Response.json(
+      { success: false, message: 'Échec de l\'authentification' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+### `waitUntil` et `NextFetchEvent`
+
+L'objet `NextFetchEvent` étend l'objet natif [`FetchEvent`](https://developer.mozilla.org/fr/docs/Web/API/FetchEvent) et inclut la méthode [`waitUntil()`](https://developer.mozilla.org/fr/docs/Web/API/ExtendableEvent/waitUntil).
+
+La méthode `waitUntil()` prend une promesse comme argument et prolonge la durée de vie du Middleware jusqu'à ce que la promesse soit résolue. Ceci est utile pour effectuer des tâches en arrière-plan.
+
+```ts filename="middleware.ts"
+import { NextResponse } from 'next/server'
+import type { NextFetchEvent, NextRequest } from 'next/server'
+
+export function middleware(req: NextRequest, event: NextFetchEvent) {
+  event.waitUntil(
+    fetch('https://my-analytics-platform.com', {
+      method: 'POST',
+      body: JSON.stringify({ pathname: req.nextUrl.pathname }),
+    })
+  )
+
+  return NextResponse.next()
+}
+```
+
+## Flags avancés pour le Middleware
+
+Dans la version `v13.1` de Next.js, deux flags supplémentaires ont été introduits pour le middleware : `skipMiddlewareUrlNormalize` et `skipTrailingSlashRedirect` pour gérer des cas d'utilisation avancés.
+
+`skipTrailingSlashRedirect` désactive les redirections de Next.js pour l'ajout ou la suppression de barres obliques finales. Cela permet une gestion personnalisée dans le middleware pour conserver la barre oblique finale pour certains chemins mais pas d'autres, ce qui peut faciliter les migrations progressives.
+
+```js filename="next.config.js"
+module.exports = {
+  skipTrailingSlashRedirect: true,
+}
+```
+
+```js filename="middleware.js"
+const legacyPrefixes = ['/docs', '/blog']
+
+export default async function middleware(req) {
+  const { pathname } = req.nextUrl
+
+  if (legacyPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next()
+  }
+
+  // Appliquer la gestion des barres obliques finales
+  if (
+    !pathname.endsWith('/') &&
+    !pathname.match(/((?!\.well-known(?:\/.*)?)(?:[^/]+\/)*[^/]+\.\w+)/)
+  ) {
+    req.nextUrl.pathname += '/'
+    return NextResponse.redirect(req.nextUrl)
+  }
+}
+```
+
+`skipMiddlewareUrlNormalize` permet de désactiver la normalisation des URL dans Next.js pour traiter les visites directes et les transitions client de la même manière. Dans certains cas avancés, cette option offre un contrôle total en utilisant l'URL originale.
+
+```js filename="next.config.js"
+module.exports = {
+  skipMiddlewareUrlNormalize: true,
+}
+```
+
+```js filename="middleware.js"
+export default async function middleware(req) {
+  const { pathname } = req.nextUrl
+
+  // GET /_next/data/build-id/hello.json
+
+  console.log(pathname)
+  // avec le flag : /_next/data/build-id/hello.json
+  // sans le flag : normalisé en /hello
+}
+```
+
+## Runtime
+
+Le Middleware ne prend actuellement en charge que le [runtime Edge](/docs/14/app/building-your-application/rendering/edge-and-nodejs-runtimes). Le runtime Node.js ne peut pas être utilisé.
+
+## Historique des versions
+
+| Version   | Changements                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------ |
+| `v13.1.0` | Ajout des flags avancés pour le Middleware                                                       |
+| `v13.0.0` | Le Middleware peut modifier les en-têtes de requête, les en-têtes de réponse et envoyer des réponses |
+| `v12.2.0` | Le Middleware est stable, voir le [guide de mise à niveau](/docs/messages/middleware-upgrade-guide) |
+| `v12.0.9` | Application des URL absolues dans le runtime Edge ([PR](https://github.com/vercel/next.js/pull/33410)) |
+| `v12.0.0` | Middleware (Beta) ajouté                                                                         |
