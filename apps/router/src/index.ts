@@ -3,10 +3,8 @@
  * via Cloudflare Service Bindings (microfrontends pattern).
  *
  * Routes /docs/13/* → V13, /docs/14/* → V14, /docs/15/* → V15, else → LATEST.
- * Serves landing page at root /.
  * Uses Referer header to route static assets (/_astro/*) to the correct worker.
  */
-import { getLandingPage } from './landing';
 
 interface Env {
   LATEST: Fetcher;
@@ -42,13 +40,6 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = stripLocale(url.pathname);
-
-    // Landing page at root
-    if (path === '/' || path === '') {
-      return new Response(getLandingPage(), {
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      });
-    }
 
     // Version root redirects
     const cleanPath = path.endsWith('/') ? path.slice(0, -1) : path;
