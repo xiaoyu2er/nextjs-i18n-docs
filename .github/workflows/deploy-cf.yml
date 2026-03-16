@@ -1,0 +1,174 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'content/**'
+      - 'packages/shared/**'
+      - 'apps/web/**'
+      - 'apps/web-v13/**'
+      - 'apps/web-v14/**'
+      - 'apps/web-v15/**'
+      - 'apps/router/**'
+      - 'scripts/prepare-content.ts'
+  workflow_dispatch:
+    inputs:
+      workers:
+        description: 'Workers to deploy (comma-separated: latest,v13,v14,v15,router or all)'
+        required: false
+        default: 'all'
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      latest: ${{ steps.check.outputs.latest }}
+      v13: ${{ steps.check.outputs.v13 }}
+      v14: ${{ steps.check.outputs.v14 }}
+      v15: ${{ steps.check.outputs.v15 }}
+      router: ${{ steps.check.outputs.router }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed workers
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT="${{ github.event.inputs.workers }}"
+            if [ "$INPUT" = "all" ] || [ -z "$INPUT" ]; then
+              echo "latest=true" >> $GITHUB_OUTPUT
+              echo "v13=true" >> $GITHUB_OUTPUT
+              echo "v14=true" >> $GITHUB_OUTPUT
+              echo "v15=true" >> $GITHUB_OUTPUT
+              echo "router=true" >> $GITHUB_OUTPUT
+            else
+              for w in $(echo "$INPUT" | tr ',' ' '); do
+                echo "${w}=true" >> $GITHUB_OUTPUT
+              done
+            fi
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+
+          # Shared changes trigger all doc workers
+          if echo "$CHANGED" | grep -qE '^(packages/shared/|scripts/prepare-content\.ts)'; then
+            echo "latest=true" >> $GITHUB_OUTPUT
+            echo "v13=true" >> $GITHUB_OUTPUT
+            echo "v14=true" >> $GITHUB_OUTPUT
+            echo "v15=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Content changes — detect which versions
+          if echo "$CHANGED" | grep -qE '^content/[^/]+/docs/(01-app|02-pages|03-architecture|04-community|index)'; then
+            echo "latest=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -qE '^content/[^/]+/(learn|blog)/'; then
+            echo "latest=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -qE '^content/[^/]+/docs/13/'; then
+            echo "v13=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -qE '^content/[^/]+/docs/14/'; then
+            echo "v14=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -qE '^content/[^/]+/docs/15/'; then
+            echo "v15=true" >> $GITHUB_OUTPUT
+          fi
+
+          # App-specific changes
+          if echo "$CHANGED" | grep -qE '^apps/web/'; then
+            echo "latest=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -qE '^apps/web-v13/'; then
+            echo "v13=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -qE '^apps/web-v14/'; then
+            echo "v14=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -qE '^apps/web-v15/'; then
+            echo "v15=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED" | grep -qE '^apps/router/'; then
+            echo "router=true" >> $GITHUB_OUTPUT
+          fi
+
+  deploy-latest:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.latest == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --ignore-scripts
+      - name: Build & Deploy
+        run: |
+          cd apps/web
+          bun run prepare-content
+          NODE_OPTIONS='--max-old-space-size=8192' bun run astro build
+          bunx wrangler deploy
+
+  deploy-v13:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.v13 == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --ignore-scripts
+      - name: Build & Deploy
+        run: |
+          cd apps/web-v13
+          bun run prepare-content
+          NODE_OPTIONS='--max-old-space-size=8192' bun run astro build
+          bunx wrangler deploy
+
+  deploy-v14:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.v14 == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --ignore-scripts
+      - name: Build & Deploy
+        run: |
+          cd apps/web-v14
+          bun run prepare-content
+          NODE_OPTIONS='--max-old-space-size=8192' bun run astro build
+          bunx wrangler deploy
+
+  deploy-v15:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.v15 == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --ignore-scripts
+      - name: Build & Deploy
+        run: |
+          cd apps/web-v15
+          bun run prepare-content
+          NODE_OPTIONS='--max-old-space-size=8192' bun run astro build
+          bunx wrangler deploy
+
+  deploy-router:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.router == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --ignore-scripts
+      - name: Deploy Router
+        run: |
+          cd apps/router
+          bunx wrangler deploy
