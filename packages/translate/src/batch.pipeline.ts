@@ -69,7 +69,7 @@ function parseArgs(argv: string[]) {
     ),
     cacheDir: path.resolve(
       PROJECT_ROOT,
-      getOpt('cache-dir', 'apps/docs/cache'),
+      getOpt('cache-dir', '.cache'),
     ),
     lang: getOpt('lang', 'zh-hans'),
     langName: getOpt('lang-name', 'Simplified Chinese'),
