@@ -4,7 +4,8 @@ import { remarkAutoImport } from './src/plugins/remark-auto-import.ts';
 import { remarkPackageTabs } from './src/plugins/remark-package-tabs.ts';
 import { starlightLocales, starlightSocial } from '../../packages/shared/src/config.ts';
 
-const ver = '13';
+const ver = process.env.VERSION;
+if (!ver) throw new Error('VERSION env var is required (e.g. VERSION=15)');
 
 export default defineConfig({
   site: 'https://nextjs.im',
