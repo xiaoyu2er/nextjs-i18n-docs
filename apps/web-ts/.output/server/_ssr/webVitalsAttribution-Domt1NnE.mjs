@@ -1,0 +1,194 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { n as __exportAll } from "./chunk-BnRpC7BT.mjs";
+import { v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/webVitalsAttribution-Domt1NnE.js
+var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
+var webVitalsAttribution_exports = /* @__PURE__ */ __exportAll({
+	default: () => MDXContent,
+	frontmatter: () => frontmatter,
+	structuredData: () => structuredData,
+	toc: () => toc
+});
+var frontmatter = {
+	"title": "webVitalsAttribution",
+	"description": "Learn how to use the webVitalsAttribution option to pinpoint the source of Web Vitals issues."
+};
+var structuredData = {
+	"contents": [
+		{
+			"heading": void 0,
+			"content": "When debugging issues related to Web Vitals, it is often helpful if we can pinpoint the source of the problem.\nFor example, in the case of Cumulative Layout Shift (CLS), we might want to know the first element that shifted when the single largest layout shift occurred.\nOr, in the case of Largest Contentful Paint (LCP), we might want to identify the element corresponding to the LCP for the page.\nIf the LCP element is an image, knowing the URL of the image resource can help us locate the asset we need to optimize."
+		},
+		{
+			"heading": void 0,
+			"content": "Pinpointing the biggest contributor to the Web Vitals score, aka attribution,\nallows us to obtain more in-depth information like entries for PerformanceEventTiming, PerformanceNavigationTiming and PerformanceResourceTiming."
+		},
+		{
+			"heading": void 0,
+			"content": "Attribution is disabled by default in Next.js but can be enabled **per metric** by specifying the following in `next.config.js`."
+		},
+		{
+			"heading": void 0,
+			"content": "Valid attribution values are all `web-vitals` metrics specified in the `NextWebVitalsMetric` type."
+		}
+	],
+	"headings": []
+};
+var toc = [];
+function _createMdxContent(props) {
+	const _components = {
+		a: "a",
+		code: "code",
+		p: "p",
+		pre: "pre",
+		span: "span",
+		strong: "strong",
+		...props.components
+	};
+	return (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "When debugging issues related to Web Vitals, it is often helpful if we can pinpoint the source of the problem.\nFor example, in the case of Cumulative Layout Shift (CLS), we might want to know the first element that shifted when the single largest layout shift occurred.\nOr, in the case of Largest Contentful Paint (LCP), we might want to identify the element corresponding to the LCP for the page.\nIf the LCP element is an image, knowing the URL of the image resource can help us locate the asset we need to optimize." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Pinpointing the biggest contributor to the Web Vitals score, aka ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/GoogleChrome/web-vitals/blob/4ca38ae64b8d1e899028c692f94d4c56acfc996c/README.md#attribution",
+				children: "attribution"
+			}),
+			",\nallows us to obtain more in-depth information like entries for ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/API/PerformanceEventTiming",
+				children: "PerformanceEventTiming"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/API/PerformanceNavigationTiming",
+				children: "PerformanceNavigationTiming"
+			}),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/API/PerformanceResourceTiming",
+				children: "PerformanceResourceTiming"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Attribution is disabled by default in Next.js but can be enabled ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "per metric" }),
+			" by specifying the following in ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next.config.js" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "next.config.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6F42C1",
+							"--shiki-dark": "#B392F0"
+						},
+						children: "experimental"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: ": {"
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "  webVitalsAttribution"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ": ["
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'CLS'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'LCP'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "]"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Valid attribution values are all ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "web-vitals" }),
+			" metrics specified in the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/blob/442378d21dd56d6e769863eb8c2cb521a463a2e0/packages/next/shared/lib/utils.ts#L43",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "NextWebVitalsMetric" })
+			}),
+			" type."
+		] })
+	] });
+}
+function MDXContent(props = {}) {
+	const { wrapper: MDXLayout } = props.components || {};
+	return MDXLayout ? (0, import_jsx_runtime.jsx)(MDXLayout, {
+		...props,
+		children: (0, import_jsx_runtime.jsx)(_createMdxContent, { ...props })
+	}) : _createMdxContent(props);
+}
+//#endregion
+export { webVitalsAttribution_exports as a, toc as i, frontmatter as n, structuredData as r, MDXContent as t };

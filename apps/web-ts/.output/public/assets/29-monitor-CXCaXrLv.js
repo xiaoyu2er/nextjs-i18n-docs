@@ -1,0 +1,8 @@
+import{r as e}from"./chunk-DECur_0Z.js";import{t}from"./jsx-runtime-Cns_S3nq.js";var n=e(t()),r={title:`Monitoring your Core Web Vitals`,image:`https://nextjs.org/api/learn-og?title=Monitoring%20your%20Core%20Web%20Vitals&amp;chapter=29`,headline:`SEO: Monitoring your Core Web Vitals`},i={contents:[{heading:void 0,content:`Once you have optimized your site, it's important to monitor while in production so you can continue to iterate. When monitoring Core Web Vitals, tracking over time is key rather than relying on one-off lab tests.`},{heading:void 0,content:`In this lesson, you’ll learn more about:`},{heading:void 0,content:`Next.js Speed Insights`},{heading:void 0,content:`Next.js Custom Reporting`},{heading:void 0,content:`CrUX Report`},{heading:void 0,content:`Other tools for measurement`}],headings:[]},a=[];function o(e){let t={li:`li`,p:`p`,ul:`ul`,...e.components};return(0,n.jsxs)(n.Fragment,{children:[(0,n.jsx)(t.p,{children:`Once you have optimized your site, it's important to monitor while in production so you can continue to iterate. When monitoring Core Web Vitals, tracking over time is key rather than relying on one-off lab tests.`}),`
+`,(0,n.jsx)(t.p,{children:`In this lesson, you’ll learn more about:`}),`
+`,(0,n.jsxs)(t.ul,{children:[`
+`,(0,n.jsx)(t.li,{children:`Next.js Speed Insights`}),`
+`,(0,n.jsx)(t.li,{children:`Next.js Custom Reporting`}),`
+`,(0,n.jsx)(t.li,{children:`CrUX Report`}),`
+`,(0,n.jsx)(t.li,{children:`Other tools for measurement`}),`
+`]})]})}function s(e={}){let{wrapper:t}=e.components||{};return t?(0,n.jsx)(t,{...e,children:(0,n.jsx)(o,{...e})}):o(e)}export{s as default,r as frontmatter,i as structuredData,a as toc};

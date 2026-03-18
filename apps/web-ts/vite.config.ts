@@ -14,10 +14,7 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart({
       prerender: {
-        enabled: true,
-        crawlLinks: true,
-        concurrency: 4,
-        failOnError: false,
+        enabled: false,
       },
     }),
     react(),

@@ -1,0 +1,1717 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { n as __exportAll } from "./chunk-BnRpC7BT.mjs";
+import { v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/next-9-0-7-DPDspqSV.js
+var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
+var next_9_0_7_exports = /* @__PURE__ */ __exportAll({
+	default: () => MDXContent,
+	frontmatter: () => frontmatter,
+	structuredData: () => structuredData,
+	toc: () => toc
+});
+var frontmatter = {
+	"title": "Next.js 9.0.7",
+	"description": "Next.js 9.0 was released approximately two months ago. Since then, we’ve been busy with 7 smaller but quite important releases. Let’s dive into what these releases have brought to your websites and applications, with absolutely no breaking changes.",
+	"author": [
+		{
+			"name": "JJ Kasper",
+			"image": "/static/team/jj.jpg"
+		},
+		{
+			"name": "Joe Haddad",
+			"image": "/static/team/timer.jpg"
+		},
+		{
+			"name": "Luis Alvarez",
+			"image": "/static/team/lfades.jpg"
+		},
+		{
+			"name": "Lukáš Huvar",
+			"image": "/static/team/huvik.jpg"
+		},
+		{
+			"name": "Tim Neutkens",
+			"image": "/static/team/tim.jpg"
+		}
+	],
+	"date": /* @__PURE__ */ new Date(1569854829956),
+	"image": "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-0-7/twitter-card.png"
+};
+var structuredData = {
+	"contents": [
+		{
+			"heading": void 0,
+			"content": "Next.js 9.0 was released approximately two months ago. Since then, we’ve been busy with 7 smaller but quite important releases: 9.0.1, 9.0.2, 9.0.3, 9.0.4, 9.0.5, 9.0.6, and 9.0.7."
+		},
+		{
+			"heading": void 0,
+			"content": "Let’s dive into what these releases have brought to your websites and applications, with absolutely no breaking changes."
+		},
+		{
+			"heading": void 0,
+			"content": "**Improved Concurrency in Windows Environments**: The `next build` process is now more reliable on Windows and can parallelize work better."
+		},
+		{
+			"heading": void 0,
+			"content": "**Gzip Compression by Default**: Gzip compression is now added by default to reduce optimization steps needed."
+		},
+		{
+			"heading": void 0,
+			"content": "**TypeScript Report on Active Pages Only**: The built-in TypeScript support was extended to only watch changes on active pages making it faster and more reliable."
+		},
+		{
+			"heading": void 0,
+			"content": "**Telemetry**: Will help us focus on what parts of Next.js to optimize and validate optimizations have the intended effect."
+		},
+		{
+			"heading": void 0,
+			"content": "**Improved `next/head` Element Tracking**: The `next-head` class has been removed which makes it easier to implement certain tooling that verifies their implementation."
+		},
+		{
+			"heading": void 0,
+			"content": "**Preventing Non-Pages in the Pages Directory**: Optimizing your application security and `next build` time by preventing accidental publishing of non-pages."
+		},
+		{
+			"heading": void 0,
+			"content": "**Runtime Improvements**: When certain parts of Next.js are not used, for example, `next/dynamic`, they will no longer be required at runtime, making bundle sizes smaller."
+		},
+		{
+			"heading": "improved-concurrency-in-windows-environments",
+			"content": "Next.js does concurrent work in many places during the `next build` process. The main usage is to minify build output with Terser in parallel."
+		},
+		{
+			"heading": "improved-concurrency-in-windows-environments",
+			"content": "Previously, this work was handled across many CPUs using a package called `worker-farm`. However, we noticed many Windows users had disabled minification with custom webpack configuration. Upon further inspection, we found `worker-farm` did not work consistently on Windows machines."
+		},
+		{
+			"heading": "improved-concurrency-in-windows-environments",
+			"content": "To solve this issue, we migrated from `worker-farm` to `jest-worker`. This ensures builds are reliable and consistent on macOS, Linux, and Windows machines alike."
+		},
+		{
+			"heading": "improved-concurrency-in-windows-environments",
+			"content": "`jest-worker`, as its name implies, is part of the Jest test runner. It's the package Jest uses to parallelize test cases. This means this package is very battle-tested, reliable, and maintained."
+		},
+		{
+			"heading": "improved-concurrency-in-windows-environments",
+			"content": "`jest-worker` also supports `worker_threads`, a new feature in Node 12. Unlike `child_process`, `worker_threads` can share memory — this means faster build times on new Node versions."
+		},
+		{
+			"heading": "improved-concurrency-in-windows-environments",
+			"content": "By switching to `jest-worker`, we were able to re-enable build concurrency for Windows users."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "While investigating why companies use a custom server, we found it was most often for compression. Companies would add an Express Middleware called `compression`, which handles Gzip compression of HTTP responses."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "This middleware compresses responses so fewer bytes are sent over-the-wire to your users. Normally, this should be handled by a reverse proxy like Nginx. Reverse proxies remove the CPU-heavy work from the single-threaded Node process."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "However, when inspecting Next.js usage on the web, we found that a large percentage of companies did not have any compression configured."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "On platforms like Vercel, `gzip` and `brotli` are handled automatically on the proxy level."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "When self-hosting, companies have to add in gzip (via `compression` or a reverse proxy) themselves."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "Starting in Next.js 9.0.4, `gzip` compression is included by default when using `next start` or a custom `server.js`."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "`brotli` support is coming soon as Node.js now natively supports Brotli."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "If compression is already enabled in your application via a custom server, Next.js will not add its own compressor."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "Next.js does not include compression for the serverless target by default because when using the serverless target assets are uploaded separately and not served through Node.js."
+		},
+		{
+			"heading": "gzip-compression-by-default",
+			"content": "If you're deploying on a platform that handles compression such as Vercel no changes are needed."
+		},
+		{
+			"heading": "typescript-report-on-active-pages-only",
+			"content": "Next.js 9 included built-in support for TypeScript. All that's necessary is to rename a single page from `.js` to `.tsx`. Next.js will automatically handle or guide you through any remaining setup."
+		},
+		{
+			"heading": "typescript-report-on-active-pages-only",
+			"content": "Next.js also handles type-checking by running `tsc --watch` in parallel to the development process. During development, Next.js has a concept called on-demand entries. This feature only compiles pages that you are actively working on."
+		},
+		{
+			"heading": "typescript-report-on-active-pages-only",
+			"content": "The on-demand entries flow"
+		},
+		{
+			"heading": "typescript-report-on-active-pages-only",
+			"content": "As of 9.0.4, Next.js now only reports type errors for pages that are being actively compiled by on-demand entries. This reduces a lot of type-checking noise while focusing on a specific set of pages."
+		},
+		{
+			"heading": "typescript-report-on-active-pages-only",
+			"content": "Full application type-checking is still run during `next build` or can be handled in/by your editor."
+		},
+		{
+			"heading": "telemetry",
+			"content": "Next.js was released almost 3 years ago, and the framework has grown considerably in these 3 years, from new features to better defaults for all users."
+		},
+		{
+			"heading": "telemetry",
+			"content": "The way that we've been approaching this improvement process has been very much a manual one."
+		},
+		{
+			"heading": "telemetry",
+			"content": "Vercel has a few large Next.js applications. For example,\xA0vercel.com, vercel.com/docs, and https\\://nextjs.org. We've been\xA0dogfooding\xA0Next.js internally at Vercel and improved Next.js based on our experiences."
+		},
+		{
+			"heading": "telemetry",
+			"content": "On top of that, we actively engage with the community to gather feedback. Chances are that you have talked to Tim before to provide feedback on how you're using Next.js at your company."
+		},
+		{
+			"heading": "telemetry",
+			"content": "For example, if you use a custom server, if you have custom webpack configuration, and more. This feedback is extremely valuable in steering feature development for Next.js."
+		},
+		{
+			"heading": "telemetry",
+			"content": "However, there is a problem with this approach, which is that we can only collect feedback from a subset of users. This subset may have different needs and use-cases than you / your company."
+		},
+		{
+			"heading": "telemetry",
+			"content": "One example of this would be importing CSS files, which is non-standard, but quite a chunk of users seem to be using this, either through\xA0`next-css`\xA0(or Sass/Less), or a custom configuration. If we know what percentage of users are using that specific approach we can prioritize improving it."
+		},
+		{
+			"heading": "telemetry",
+			"content": "For this reason, we've introduced an anonymous, more automated, approach to collecting these points of feedback so that we can improve Next.js even more in the near future."
+		},
+		{
+			"heading": "telemetry",
+			"content": "This will also allow us to verify if improvements made to the framework are improving the baseline of all applications."
+		},
+		{
+			"heading": "telemetry",
+			"content": "You can read more about telemetry on nextjs.org/telemetry. There you will also find how to optionally opt-out if you don’t want to participate."
+		},
+		{
+			"heading": "build-feedback-with-dots-indicating-activity",
+			"content": "While talking to users of Next.js, one small feedback item was that it sometimes looked like `next build` wasn't doing anything, mostly visually."
+		},
+		{
+			"heading": "build-feedback-with-dots-indicating-activity",
+			"content": "To solve this, we've added a loading indicator to the console output while running `next build`. This output gives a visual indication that the command is still running, and that the process is not frozen."
+		},
+		{
+			"heading": "build-feedback-with-dots-indicating-activity",
+			"content": "We plan to expand on this build output to show more stages of the build when possible."
+		},
+		{
+			"heading": "build-feedback-with-dots-indicating-activity",
+			"content": "The new build indication dots"
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "Next.js provides a built-in way to manage `<head>` elements because its responsible for rendering the HTML of your application. This API is exposed through the `next/head` module."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "For example, to add a title to the page:"
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "When rendering to HTML, Next.js will collect all components rendered within `<Head>` and render the tags into the `<head>` of your page."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "However, Next.js allows single page application (SPA) type route transitions using the `<Link>` component."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "When you click on a `<Link>`, Next.js will fetch the required JavaScript file to render the page on the client-side. Then, it will render the React component associated with the file."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "Because this transition happens client-side, we have to clean up the `<head>` elements injected from the previous page, otherwise outdated elements could be present on another page."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "Previously, Next.js kept track of these elements by adding a class name to every `<Head>`-provided element."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "Taking the above example, the `<head>` would look like:"
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "This solution works well as every element that got injected through `next/head` was clearly marked and easy to clean up."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "However, a small subset of users reported issues that the extra `class` attribute on the elements would sometimes make scripts being added from external services not validate."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "Gerald Monaco, from the Google Chrome team, came up with a way to preserve the cleanup behavior without the need for a class name on the elements."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "The new behavior is that Next.js will insert an additional `<meta>` tag holding the number of elements it (`next/head`) rendered. With this, Next.js can use the count to clean up the existing elements."
+		},
+		{
+			"heading": "improved-nexthead-element-tracking",
+			"content": "As a result, this approach reduces the initial HTML payload size when multiple elements are injected into the `<head>` of a page."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "When getting started with Next.js, the first thing you do is create a `pages` directory."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "The convention is that every file in the `pages` directory becomes a route in the application. A simple example is that `pages/about.js` becomes `/about`."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "As time progressed, we received occasional reports that users' applications, both large and small, had poor build performance."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "Upon further investigation, it was revealed that these users had created their entire component structure in the `pages` directory."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "As every file in the `pages` directory is treated as a page, every component was being compiled as a page in the application. This causes a lot of build-time overhead, generating 2+ JavaScript files for invalid pages."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "Furthermore, this would partially affect how Next.js decides to generate code-split chunks. This is because Next.js uses heuristics about library usage across pages."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "Because of this, we must ensure users don't introduce this pitfall into their Next.js application."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "Next.js 9 now validates that files within the `pages` directory export a React Component."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "In action, this means Next.js will show you a message alerting you that a potential non-page was found in the `pages` directory."
+		},
+		{
+			"heading": "preventing-non-pages-in-the-pages-directory",
+			"content": "This encourages the user to move the file that is not a page into another directory. In turn, the development, production, and code-splitting are faster and more accurate."
+		},
+		{
+			"heading": "runtime-improvements",
+			"content": "The Next.js Framework consists of many parts. One of them is the client-side runtime. This runtime handles hydration, client-side routing, and more."
+		},
+		{
+			"heading": "runtime-improvements",
+			"content": "Hydration, which is what this improvement focused on, is what's necessary to make the server-rendered or prerendered HTML interactive. Hydration adds event handlers and calls lifecycle methods like `useEffect()` or `componentDidMount` — making your application ready for the end-user."
+		},
+		{
+			"heading": "runtime-improvements",
+			"content": "Furthermore, Next.js handles more than basic hydration — for example, setting up a client-side router, configuring `next/head`, and loading additional application logic through `next/dynamic`."
+		},
+		{
+			"heading": "runtime-improvements",
+			"content": "Each of these responsibilities have their own specific runtime part, too."
+		},
+		{
+			"heading": "runtime-improvements",
+			"content": "In the case of `next/dynamic`, Next.js has to ensure that lazily loaded components that were rendered on the server are ready on the client-side. Every usage of `next/dynamic` generates an additional JavaScript bundle, and these files must be loaded before hydration to avoid a hydration mismatch."
+		},
+		{
+			"heading": "runtime-improvements",
+			"content": "Previously, this runtime would be included in the Next.js runtime bundle always. Now, it is only included when you use `next/dynamic` in your application. This means less JavaScript is downloaded, parsed, and executed for applications not using `next/dynamic`."
+		},
+		{
+			"heading": "apptree-support",
+			"content": "Some libraries in the React ecosystem implement server-side rendering in a very specific way. Most notably, Apollo's server-side rendering solution, called `getDataFromTree`, works by rendering the React tree and for every `Query` that is found it will await the result and then rerender the React tree again."
+		},
+		{
+			"heading": "apptree-support",
+			"content": "By default, Next.js adds some context values into the React tree, for example, the router that can be read using `useRouter`."
+		},
+		{
+			"heading": "apptree-support",
+			"content": "The way the `with-apollo` example used to render the React tree was through rendering `<App>` and trying to fill in the missing properties manually. With the addition of React Context this was no longer possible because the context provider is a separate element."
+		},
+		{
+			"heading": "apptree-support",
+			"content": "Starting from Next.js 9.0.4 a new property called `AppTree` was added to the context object in `getInitialProps`. It was specifically added for cases where external libraries have to traverse the whole React tree like with Apollo's `getDataFromTree`."
+		},
+		{
+			"heading": "apptree-support",
+			"content": "The `with-apollo` example has been updated to reflect the changes. If you already have Apollo implemented in your app it's recommended to update to the `AppTree` approach so that `useRouter` and other APIs added in the future will work correctly in your Next.js application."
+		},
+		{
+			"heading": "apptree-support",
+			"content": "If you're not using Apollo or a similar library we recommend to try and avoid using AppTree, as Next.js team does not recommend traversing the React tree in general. It adds quite a lot of performance overhead because the React tree is rendered multiple times instead of just once."
+		},
+		{
+			"heading": "removal-of-the-next-server-package",
+			"content": "When we started optimizing Next.js for serverless deployments over a year ago, we created a package called `next-server`. This package was experimental and published alongside the `next` package. It was never documented publicly but was an experiment to create the smallest possible Next.js server runtime."
+		},
+		{
+			"heading": "removal-of-the-next-server-package",
+			"content": "Eventually, the package was a success and did make the production server runtime smaller. However, we came up with an innovative new way to make the runtime even smaller with the Next.js compiler and static analysis."
+		},
+		{
+			"heading": "removal-of-the-next-server-package",
+			"content": "In doing so, the `next-server` became obsolete and was replaced by the serverless target. This target has a far more optimized output than using the `next-server` package as a replacement for `next`."
+		},
+		{
+			"heading": "removal-of-the-next-server-package",
+			"content": "While this package was obsolete and could not be used directly, we kept it around. This was because it had internals that were shared between packages and moving the code would require a non-trivial amount of effort."
+		},
+		{
+			"heading": "removal-of-the-next-server-package",
+			"content": "We've recently made this effort and moved the code from `next-server` back into the `next` package. Meaning that all code for the Next.js framework now lives in the `next` package."
+		},
+		{
+			"heading": "removal-of-the-next-server-package",
+			"content": "This makes it easier for beginners and seasoned contributors alike to contribute to Next.js. There is now a single compilation process and unified build configuration. Previously, there were separate settings for `next` and `next-server`, along with arbitrary constraints on what code belonged in each package."
+		},
+		{
+			"heading": "upgrading-nextjs",
+			"content": "If your project is running on an older version of Next.js, we recommend upgrading to Next.js 9."
+		},
+		{
+			"heading": "upgrading-nextjs",
+			"content": "In most cases, no changes are required to upgrade. You can follow the upgrade guide to ensure a smooth upgrade experience."
+		},
+		{
+			"heading": "upgrading-nextjs",
+			"content": "We'd like to thank all community contributors that updated the guide since it's release."
+		},
+		{
+			"heading": "whats-coming-in-the-future",
+			"content": "The new optimizations outlined in this blog post are just the start of broader optimizations and features we've been working on."
+		},
+		{
+			"heading": "whats-coming-in-the-future",
+			"content": "We'll share an update on ongoing RFCs very soon. Until then, you can get a small sneak peek through the RFC label on GitHub."
+		},
+		{
+			"heading": "whats-coming-in-the-future",
+			"content": "This shows some of the features we've been investigating like built-in CSS support, public directory support, and src directory support."
+		},
+		{
+			"heading": "community",
+			"content": "We're excited to see the continued growth of the Next.js community."
+		},
+		{
+			"heading": "community",
+			"content": "We've had over **800** contributors landing at least 1 commit."
+		},
+		{
+			"heading": "community",
+			"content": "On GitHub, the project has been starred over **41,100** times."
+		},
+		{
+			"heading": "community",
+			"content": "The Next.js community has doubled since the last major release with over 10,900 members. Join us!"
+		},
+		{
+			"heading": "community",
+			"content": "We are excited about the continued community contributions and external feedback from companies and users that help shape releases."
+		}
+	],
+	"headings": [
+		{
+			"id": "improved-concurrency-in-windows-environments",
+			"content": "Improved Concurrency in Windows Environments"
+		},
+		{
+			"id": "gzip-compression-by-default",
+			"content": "Gzip Compression by Default"
+		},
+		{
+			"id": "typescript-report-on-active-pages-only",
+			"content": "TypeScript Report on Active Pages Only"
+		},
+		{
+			"id": "telemetry",
+			"content": "Telemetry"
+		},
+		{
+			"id": "build-feedback-with-dots-indicating-activity",
+			"content": "Build Feedback with Dots Indicating Activity"
+		},
+		{
+			"id": "improved-nexthead-element-tracking",
+			"content": "Improved `next/head` Element Tracking"
+		},
+		{
+			"id": "preventing-non-pages-in-the-pages-directory",
+			"content": "Preventing Non-Pages in the Pages Directory"
+		},
+		{
+			"id": "runtime-improvements",
+			"content": "Runtime Improvements"
+		},
+		{
+			"id": "apptree-support",
+			"content": "AppTree Support"
+		},
+		{
+			"id": "removal-of-the-next-server-package",
+			"content": "Removal of the `next-server` Package"
+		},
+		{
+			"id": "upgrading-nextjs",
+			"content": "Upgrading Next.js"
+		},
+		{
+			"id": "whats-coming-in-the-future",
+			"content": "What's Coming in the Future?"
+		},
+		{
+			"id": "community",
+			"content": "Community"
+		}
+	]
+};
+var toc = [
+	{
+		depth: 3,
+		url: "#improved-concurrency-in-windows-environments",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#improved-concurrency-in-windows-environments",
+			children: "Improved Concurrency in Windows Environments"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#gzip-compression-by-default",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#gzip-compression-by-default",
+			children: "Gzip Compression by Default"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#typescript-report-on-active-pages-only",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#typescript-report-on-active-pages-only",
+			children: "TypeScript Report on Active Pages Only"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#telemetry",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#telemetry",
+			children: "Telemetry"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#build-feedback-with-dots-indicating-activity",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#build-feedback-with-dots-indicating-activity",
+			children: "Build Feedback with Dots Indicating Activity"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#improved-nexthead-element-tracking",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsxs)("a", {
+			href: "#improved-nexthead-element-tracking",
+			children: [
+				"Improved ",
+				(0, import_jsx_runtime.jsx)("code", { children: "next/head" }),
+				" Element Tracking"
+			]
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#preventing-non-pages-in-the-pages-directory",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#preventing-non-pages-in-the-pages-directory",
+			children: "Preventing Non-Pages in the Pages Directory"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#runtime-improvements",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#runtime-improvements",
+			children: "Runtime Improvements"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#apptree-support",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#apptree-support",
+			children: "AppTree Support"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#removal-of-the-next-server-package",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsxs)("a", {
+			href: "#removal-of-the-next-server-package",
+			children: [
+				"Removal of the ",
+				(0, import_jsx_runtime.jsx)("code", { children: "next-server" }),
+				" Package"
+			]
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#upgrading-nextjs",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#upgrading-nextjs",
+			children: "Upgrading Next.js"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#whats-coming-in-the-future",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#whats-coming-in-the-future",
+			children: "What's Coming in the Future?"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#community",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#community",
+			children: "Community"
+		}) })
+	}
+];
+function _createMdxContent(props) {
+	const _components = {
+		a: "a",
+		code: "code",
+		h3: "h3",
+		img: "img",
+		li: "li",
+		p: "p",
+		pre: "pre",
+		span: "span",
+		strong: "strong",
+		ul: "ul",
+		...props.components
+	};
+	return (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js 9.0 was released approximately two months ago. Since then, we’ve been busy with 7 smaller but quite important releases: ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.0.1",
+				children: "9.0.1"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.0.2",
+				children: "9.0.2"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.0.3",
+				children: "9.0.3"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.0.4",
+				children: "9.0.4"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.0.5",
+				children: "9.0.5"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.0.6",
+				children: "9.0.6"
+			}),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.0.7",
+				children: "9.0.7"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Let’s dive into what these releases have brought to your websites and applications, with absolutely no breaking changes." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#improved-concurrency-in-windows-environments",
+					children: "Improved Concurrency in Windows Environments"
+				}) }),
+				": The ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next build" }),
+				" process is now more reliable on Windows and can parallelize work better."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#gzip-compression-by-default",
+				children: "Gzip Compression by Default"
+			}) }), ": Gzip compression is now added by default to reduce optimization steps needed."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#typescript-report-on-active-pages-only",
+				children: "TypeScript Report on Active Pages Only"
+			}) }), ": The built-in TypeScript support was extended to only watch changes on active pages making it faster and more reliable."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#telemetry",
+				children: "Telemetry"
+			}) }), ": Will help us focus on what parts of Next.js to optimize and validate optimizations have the intended effect."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsxs)(_components.a, {
+					href: "#improved-nexthead-element-tracking",
+					children: [
+						"Improved ",
+						(0, import_jsx_runtime.jsx)(_components.code, { children: "next/head" }),
+						" Element Tracking"
+					]
+				}) }),
+				": The ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next-head" }),
+				" class has been removed which makes it easier to implement certain tooling that verifies their implementation."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#preventing-non-pages-in-the-pages-directory",
+					children: "Preventing Non-Pages in the Pages Directory"
+				}) }),
+				": Optimizing your application security and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next build" }),
+				" time by preventing accidental publishing of non-pages."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#runtime-improvements",
+					children: "Runtime Improvements"
+				}) }),
+				": When certain parts of Next.js are not used, for example, ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+				", they will no longer be required at runtime, making bundle sizes smaller."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "improved-concurrency-in-windows-environments",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#improved-concurrency-in-windows-environments",
+				children: "Improved Concurrency in Windows Environments"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js does concurrent work in many places during the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next build" }),
+			" process. The main usage is to minify build output with Terser in parallel."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Previously, this work was handled across many CPUs using a package called ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "worker-farm" }),
+			". However, we noticed many Windows users had disabled minification with custom webpack configuration. Upon further inspection, we found ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "worker-farm" }),
+			" did not work consistently on Windows machines."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"To solve this issue, we migrated from ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "worker-farm" }),
+			" to ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "jest-worker" }),
+			". This ensures builds are reliable and consistent on macOS, Linux, and Windows machines alike."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "jest-worker" }), ", as its name implies, is part of the Jest test runner. It's the package Jest uses to parallelize test cases. This means this package is very battle-tested, reliable, and maintained."] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "jest-worker" }),
+			" also supports ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/facebook/jest/tree/master/packages/jest-worker#experimental-worker",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "worker_threads" })
+			}),
+			", a new feature in Node 12. Unlike ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "child_process" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "worker_threads" }),
+			" can share memory — this means faster build times on new Node versions."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"By switching to ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "jest-worker" }),
+			", we were able to re-enable build concurrency for Windows users."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "gzip-compression-by-default",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#gzip-compression-by-default",
+				children: "Gzip Compression by Default"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"While investigating why companies use a custom server, we found it was most often for compression. Companies would add an Express Middleware called ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "compression" }),
+			", which handles Gzip compression of HTTP responses."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This middleware compresses responses so fewer bytes are sent over-the-wire to your users. Normally, this should be handled by a reverse proxy like Nginx. Reverse proxies remove the CPU-heavy work from the single-threaded Node process." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "However, when inspecting Next.js usage on the web, we found that a large percentage of companies did not have any compression configured." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"On platforms like ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com",
+				children: "Vercel"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "gzip" }),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "brotli" }),
+			" are handled automatically on the proxy level."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"When self-hosting, companies have to add in gzip (via ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "compression" }),
+			" or a reverse proxy) themselves."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Starting in Next.js 9.0.4, ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "gzip" }),
+			" compression is included by default when using ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next start" }),
+			" or a custom ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "server.js" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "brotli" }),
+			" support is ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/expressjs/compression/pull/150",
+				children: "coming soon"
+			}),
+			" as Node.js now natively supports Brotli."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "If compression is already enabled in your application via a custom server, Next.js will not add its own compressor." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Next.js does not include compression for the serverless target by default because when using the serverless target assets are uploaded separately and not served through Node.js." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"If you're deploying on a platform that handles compression such as ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com",
+				children: "Vercel"
+			}),
+			" no changes are needed."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "typescript-report-on-active-pages-only",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#typescript-report-on-active-pages-only",
+				children: "TypeScript Report on Active Pages Only"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js 9 included built-in support for TypeScript. All that's necessary is to rename a single page from ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ".js" }),
+			" to ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ".tsx" }),
+			". Next.js will automatically handle or guide you through any remaining setup."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js also handles type-checking by running ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "tsc --watch" }),
+			" in parallel to the development process. During development, Next.js has a concept called ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org/blog/next-8#improved-on-demand-entries",
+				children: "on-demand entries"
+			}),
+			". This feature only compiles pages that you are actively working on."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.img, {
+			src: "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/flow.jpg",
+			alt: "The on-demand entries flow"
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The on-demand entries flow" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "As of 9.0.4, Next.js now only reports type errors for pages that are being actively compiled by on-demand entries. This reduces a lot of type-checking noise while focusing on a specific set of pages." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Full application type-checking is still run during ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next build" }),
+			" or can be handled in/by your editor."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "telemetry",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#telemetry",
+				children: "Telemetry"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Next.js was released almost 3 years ago, and the framework has grown considerably in these 3 years, from new features to better defaults for all users." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The way that we've been approaching this improvement process has been very much a manual one." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Vercel has a few large Next.js applications. For example,\xA0",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com",
+				children: "vercel.com"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com/docs",
+				children: "vercel.com/docs"
+			}),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org",
+				children: "https://nextjs.org"
+			}),
+			". We've been\xA0",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://en.wikipedia.org/wiki/Eating_your_own_dog_food",
+				children: "dogfooding"
+			}),
+			"\xA0Next.js internally at Vercel and improved Next.js based on our experiences."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "On top of that, we actively engage with the community to gather feedback. Chances are that you have talked to Tim before to provide feedback on how you're using Next.js at your company." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "For example, if you use a custom server, if you have custom webpack configuration, and more. This feedback is extremely valuable in steering feature development for Next.js." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "However, there is a problem with this approach, which is that we can only collect feedback from a subset of users. This subset may have different needs and use-cases than you / your company." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"One example of this would be importing CSS files, which is non-standard, but quite a chunk of users seem to be using this, either through\xA0",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next-css" }),
+			"\xA0(or Sass/Less), or a custom configuration. If we know what percentage of users are using that specific approach we can prioritize improving it."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "For this reason, we've introduced an anonymous, more automated, approach to collecting these points of feedback so that we can improve Next.js even more in the near future." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This will also allow us to verify if improvements made to the framework are improving the baseline of all applications." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can read more about telemetry on ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org/telemetry",
+				children: "nextjs.org/telemetry"
+			}),
+			". There you will also find how to optionally opt-out if you don’t want to participate."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "build-feedback-with-dots-indicating-activity",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#build-feedback-with-dots-indicating-activity",
+				children: "Build Feedback with Dots Indicating Activity"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"While talking to users of Next.js, one small feedback item was that it sometimes looked like ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next build" }),
+			" wasn't doing anything, mostly visually."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"To solve this, we've added a loading indicator to the console output while running ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next build" }),
+			". This output gives a visual indication that the command is still running, and that the process is not frozen."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We plan to expand on this build output to show more stages of the build when possible." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The new build indication dots" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "improved-nexthead-element-tracking",
+			children: (0, import_jsx_runtime.jsxs)(_components.a, {
+				href: "#improved-nexthead-element-tracking",
+				children: [
+					"Improved ",
+					(0, import_jsx_runtime.jsx)(_components.code, { children: "next/head" }),
+					" Element Tracking"
+				]
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js provides a built-in way to manage ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<head>" }),
+			" elements because its responsible for rendering the HTML of your application. This API is exposed through the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/head" }),
+			" module."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "For example, to add a title to the page:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "pages/index.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "import"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " Head "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "from"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'next/head'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ";"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " MyPage"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " ("
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    <>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "      <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "Head"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "        <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "title"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">My Title</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "title"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "      </"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "Head"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "      <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "h1"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">Hello World</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "h1"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    </>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  );"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"When rendering to HTML, Next.js will collect all components rendered within ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<Head>" }),
+			" and render the tags into the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<head>" }),
+			" of your page."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"However, Next.js allows single page application (SPA) type route transitions using the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<Link>" }),
+			" component."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"When you click on a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<Link>" }),
+			", Next.js will fetch the required JavaScript file to render the page on the client-side. Then, it will render the React component associated with the file."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Because this transition happens client-side, we have to clean up the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<head>" }),
+			" elements injected from the previous page, otherwise outdated elements could be present on another page."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Previously, Next.js kept track of these elements by adding a class name to every ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<Head>" }),
+			"-provided element."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Taking the above example, the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<head>" }),
+			" would look like:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "<head>" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "  <title class=\"next-head\">My Title</title>" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "</head>" })
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"This solution works well as every element that got injected through ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/head" }),
+			" was clearly marked and easy to clean up."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"However, a small subset of users reported issues that the extra ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "class" }),
+			" attribute on the elements would sometimes make scripts being added from external services not validate."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/devknoll",
+				children: "Gerald Monaco"
+			}),
+			", from the Google Chrome team, ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/pull/8020",
+				children: "came up with a way"
+			}),
+			" to preserve the cleanup behavior without the need for a class name on the elements."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The new behavior is that Next.js will insert an additional ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<meta>" }),
+			" tag holding the number of elements it (",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/head" }),
+			") rendered. With this, Next.js can use the count to clean up the existing elements."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"As a result, this approach reduces the initial HTML payload size when multiple elements are injected into the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<head>" }),
+			" of a page."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "preventing-non-pages-in-the-pages-directory",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#preventing-non-pages-in-the-pages-directory",
+				children: "Preventing Non-Pages in the Pages Directory"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"When getting started with Next.js, the first thing you do is create a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The convention is that every file in the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory becomes a route in the application. A simple example is that ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages/about.js" }),
+			" becomes ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "/about" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "As time progressed, we received occasional reports that users' applications, both large and small, had poor build performance." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Upon further investigation, it was revealed that these users had created their entire component structure in the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"As every file in the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory is treated as a page, every component was being compiled as a page in the application. This causes a lot of build-time overhead, generating 2+ JavaScript files for invalid pages."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Furthermore, this would partially affect how Next.js decides to generate code-split chunks. This is because Next.js uses heuristics about library usage across pages." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Because of this, we must ensure users don't introduce this pitfall into their Next.js application." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js 9 now validates that files within the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory export a React Component."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In action, this means Next.js will show you a message alerting you that a potential non-page was found in the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This encourages the user to move the file that is not a page into another directory. In turn, the development, production, and code-splitting are faster and more accurate." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "runtime-improvements",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#runtime-improvements",
+				children: "Runtime Improvements"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The Next.js Framework consists of many parts. One of them is the client-side runtime. This runtime handles hydration, client-side routing, and more." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Hydration, which is what this improvement focused on, is what's necessary to make the server-rendered or prerendered HTML interactive. Hydration adds event handlers and calls lifecycle methods like ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "useEffect()" }),
+			" or ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "componentDidMount" }),
+			" — making your application ready for the end-user."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Furthermore, Next.js handles more than basic hydration — for example, setting up a client-side router, configuring ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/head" }),
+			", and loading additional application logic through ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Each of these responsibilities have their own specific runtime part, too." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In the case of ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			", Next.js has to ensure that lazily loaded components that were rendered on the server are ready on the client-side. Every usage of ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			" generates an additional JavaScript bundle, and these files must be loaded before hydration to avoid a hydration mismatch."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Previously, this runtime would be included in the Next.js runtime bundle always. Now, it is only included when you use ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			" in your application. This means less JavaScript is downloaded, parsed, and executed for applications not using ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "apptree-support",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#apptree-support",
+				children: "AppTree Support"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Some libraries in the React ecosystem implement server-side rendering in a very specific way. Most notably, Apollo's server-side rendering solution, called ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "getDataFromTree" }),
+			", works by rendering the React tree and for every ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "Query" }),
+			" that is found it will await the result and then rerender the React tree again."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"By default, Next.js adds some context values into the React tree, for example, the router that can be read using ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "useRouter" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The way the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "with-apollo" }),
+			" example used to render the React tree was through rendering ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<App>" }),
+			" and trying to fill in the missing properties manually. With the addition of React Context this was no longer possible because the context provider is a separate element."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Starting from Next.js 9.0.4 a new property called ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "AppTree" }),
+			" was added to the context object in ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "getInitialProps" }),
+			". It was specifically added for cases where external libraries have to traverse the whole React tree like with Apollo's ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "getDataFromTree" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "with-apollo" }),
+			" example has been ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/blob/v9.0.4/examples/with-apollo/lib/with-apollo-client.js#L20-L34",
+				children: "updated to reflect the changes"
+			}),
+			". If you already have Apollo implemented in your app it's recommended to update to the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "AppTree" }),
+			" approach so that ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "useRouter" }),
+			" and other APIs added in the future will work correctly in your Next.js application."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "If you're not using Apollo or a similar library we recommend to try and avoid using AppTree, as Next.js team does not recommend traversing the React tree in general. It adds quite a lot of performance overhead because the React tree is rendered multiple times instead of just once." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "removal-of-the-next-server-package",
+			children: (0, import_jsx_runtime.jsxs)(_components.a, {
+				href: "#removal-of-the-next-server-package",
+				children: [
+					"Removal of the ",
+					(0, import_jsx_runtime.jsx)(_components.code, { children: "next-server" }),
+					" Package"
+				]
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"When we started optimizing Next.js for serverless deployments over a year ago, we created a package called ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next-server" }),
+			". This package was experimental and published alongside the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next" }),
+			" package. It was never documented publicly but was an experiment to create the smallest possible Next.js server runtime."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Eventually, the package was a success and did make the production server runtime smaller. However, we came up with an innovative new way to make the runtime even smaller with the Next.js compiler and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/node-file-trace",
+				children: "static analysis"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In doing so, the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next-server" }),
+			" became obsolete and was replaced by the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs#serverless-deployment",
+				children: "serverless target"
+			}),
+			". This target has a far more optimized output than using the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next-server" }),
+			" package as a replacement for ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "While this package was obsolete and could not be used directly, we kept it around. This was because it had internals that were shared between packages and moving the code would require a non-trivial amount of effort." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"We've recently made this effort and moved the code from ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next-server" }),
+			" back into the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next" }),
+			" package. Meaning that all code for the Next.js framework now lives in the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next" }),
+			" package."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"This makes it easier for beginners and seasoned contributors alike to contribute to Next.js. There is now a single compilation process and unified build configuration. Previously, there were separate settings for ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next" }),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next-server" }),
+			", along with arbitrary constraints on what code belonged in each package."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "upgrading-nextjs",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#upgrading-nextjs",
+				children: "Upgrading Next.js"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "If your project is running on an older version of Next.js, we recommend upgrading to Next.js 9." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In most cases, no changes are required to upgrade. You can follow the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/blob/canary/UPGRADING.md#migrating-from-v8-to-v9",
+				children: "upgrade guide"
+			}),
+			" to ensure a smooth upgrade experience."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We'd like to thank all community contributors that updated the guide since it's release." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "whats-coming-in-the-future",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#whats-coming-in-the-future",
+				children: "What's Coming in the Future?"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The new optimizations outlined in this blog post are just the start of broader optimizations and features we've been working on." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"We'll share an update on ongoing RFCs very soon. Until then, you can get a small sneak peek through the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/labels/RFC",
+				children: "RFC label on GitHub"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"This shows some of the features we've been investigating like ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/issues/8626",
+				children: "built-in CSS support"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/issues/7177",
+				children: "public directory support"
+			}),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/issues/8451",
+				children: "src directory support"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "community",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#community",
+				children: "Community"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We're excited to see the continued growth of the Next.js community." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"We've had over ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "800" }),
+				" contributors landing at least 1 commit."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"On GitHub, the project has been starred over ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "41,100" }),
+				" times."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: ["The Next.js community has doubled since the last major release with over 10,900 members. ", (0, import_jsx_runtime.jsx)(_components.a, {
+			href: "https://github.com/vercel/next.js/discussions",
+			children: "Join us!"
+		})] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We are excited about the continued community contributions and external feedback from companies and users that help shape releases." })
+	] });
+}
+function MDXContent(props = {}) {
+	const { wrapper: MDXLayout } = props.components || {};
+	return MDXLayout ? (0, import_jsx_runtime.jsx)(MDXLayout, {
+		...props,
+		children: (0, import_jsx_runtime.jsx)(_createMdxContent, { ...props })
+	}) : _createMdxContent(props);
+}
+//#endregion
+export { toc as a, structuredData as i, frontmatter as n, next_9_0_7_exports as r, MDXContent as t };

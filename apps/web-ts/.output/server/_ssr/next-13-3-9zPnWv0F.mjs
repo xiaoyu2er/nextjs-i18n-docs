@@ -1,0 +1,3274 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { n as __exportAll } from "./chunk-BnRpC7BT.mjs";
+import { v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/next-13-3-9zPnWv0F.js
+var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
+var next_13_3_exports = /* @__PURE__ */ __exportAll({
+	default: () => MDXContent,
+	frontmatter: () => frontmatter,
+	structuredData: () => structuredData,
+	toc: () => toc
+});
+var frontmatter = {
+	"title": "Next.js 13.3",
+	"description": "Next.js 13.3 introduces dynamic open graph images, advanced static exports, parallel routes and interception, OTEL support, and more.",
+	"author": [{
+		"name": "Delba de Oliveira",
+		"image": "/static/team/delba.jpg"
+	}, {
+		"name": "Tim Neutkens",
+		"image": "/static/team/tim.jpg"
+	}],
+	"date": /* @__PURE__ */ new Date(1680804000507),
+	"image": "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-3/twitter-card.png"
+};
+var structuredData = {
+	"contents": [
+		{
+			"heading": void 0,
+			"content": "Next.js 13.3 adds popular community-requested features, including:"
+		},
+		{
+			"heading": void 0,
+			"content": "**File-Based Metadata API**: Dynamically generate sitemaps, robots, favicons, and more."
+		},
+		{
+			"heading": void 0,
+			"content": "**Dynamic Open Graph Images**: Generate OG images using JSX, HTML, and CSS."
+		},
+		{
+			"heading": void 0,
+			"content": "**Static Export for App Router**: Static / Single-Page Application (SPA) support for Server Components."
+		},
+		{
+			"heading": void 0,
+			"content": "**Parallel Routes and Interception**: Advanced routing features for the App Router."
+		},
+		{
+			"heading": void 0,
+			"content": "Update today by running:"
+		},
+		{
+			"heading": void 0,
+			"content": "We are closing in on marking App Router as stable in the next minor release and are shifting our focus to optimizing performance, enhancing behaviors, and fixing bugs."
+		},
+		{
+			"heading": void 0,
+			"content": "While we're still working on a few features like Mutations we don't expect these to impact the API surface of other App Router features. We're excited to see what you build with the App Router and look forward to your feedback."
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "In Next.js 13.2, we announced a new Metadata API, allowing you to define metadata (e.g. `title`, `meta`, and `link` tags inside your HTML `head` element) by exporting a Metadata object from a layout or page."
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "In addition to config-based metadata, the Metadata API now supports new file conventions, allowing you to conveniently customize your pages for improved SEO and sharing on the web:"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "`opengraph-image.(jpg|png|svg)`"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "`twitter-image.(jpg|png|svg)`"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "`favicon.ico`"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "`icon.(ico|jpg|png|svg)`"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "`sitemap.(xml|js|jsx|ts|tsx)`"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "`robots.(txt|js|jsx|ts|tsx)`"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "`manifest.(json|js|jsx|ts|tsx)`"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "For example, you can use file-based metadata to add a favicon for your app and an open graph image for your `/about` page:"
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "Next.js will automatically serve these files with hashes (for the file name) in production for caching, and update the relevant `head` elements with the correct metadata information such as the asset's URL, file type, and image size."
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "Adding static files to your application is often the simplest approach, but there are cases where you may need to create files dynamically. For each static file convention, there's an accompanying dynamic `(.js|.jsx|.ts|.tsx)` variant that allows you to write code to generate the file."
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "For example, while you can add a static `sitemap.xml` file, most sites have some pages that are dynamically generated using an external data source. To generate a dynamic sitemap, you can add a `sitemap.js` file that returns an array of your dynamic routes."
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "With config-based and new file-based options, you now have a comprehensive Metadata API to cover both static and dynamic metadata."
+		},
+		{
+			"heading": "file-based-metadata-api",
+			"content": "The Metadata API is available in 13.3 for the App Router (`app`). It is not available in the `pages` directory. Learn more about file-based metadata and view the API reference."
+		},
+		{
+			"heading": "dynamic-open-graph-image-generation",
+			"content": "Six months ago, we released @vercel/og and Satori, libraries that allow you to generate images dynamically using JSX, HTML, and CSS."
+		},
+		{
+			"heading": "dynamic-open-graph-image-generation",
+			"content": "`@vercel/og` was put to the test at Next.js Conf, generating over 100,000 dynamic ticket images for every attendee. With extensive adoption across Vercel customers and over 900,000 downloads since the release, we're excited to bring dynamically generated images to all Next.js applications without the need for an external package."
+		},
+		{
+			"heading": "dynamic-open-graph-image-generation",
+			"content": "You can now import `ImageResponse` from `next/server` to generate images:"
+		},
+		{
+			"heading": "dynamic-open-graph-image-generation",
+			"content": "`ImageResponse` naturally integrates well with other Next.js APIs, including Route Handlers and file-based Metadata. For example, you can use `ImageResponse` in a `opengraph-image.tsx` file to generate Open Graph and Twitter images at build time or dynamically at request time."
+		},
+		{
+			"heading": "dynamic-open-graph-image-generation",
+			"content": "Learn more about the Image Response API."
+		},
+		{
+			"heading": "static-export-for-app-router",
+			"content": "The Next.js App Router now supports fully static exports."
+		},
+		{
+			"heading": "static-export-for-app-router",
+			"content": "You can start as a static site or Single-Page Application (SPA), then later optionally upgrade to use Next.js features that require a server."
+		},
+		{
+			"heading": "static-export-for-app-router",
+			"content": "When running `next build`, Next.js generates an HTML file per route. By breaking a strict SPA into individual HTML files, Next.js can avoid loading unnecessary JavaScript code on the client-side, reducing the bundle size and enabling faster page loads."
+		},
+		{
+			"heading": "static-export-for-app-router",
+			"content": "Static Export works with the `app` router's new features including static Route Handlers, Open Graph images, and React Server Components."
+		},
+		{
+			"heading": "static-export-for-app-router",
+			"content": "For example, Server Components will run during the build, similar to traditional static-site generation, rendering the components into static HTML for the initial page load and a static payload for client navigation between routes."
+		},
+		{
+			"heading": "static-export-for-app-router",
+			"content": "Previously, to use Static Export in the `pages` directory, you needed to run `next export`. However, with the `next.config.js` option, `next build` will output a `out` directory when `output: 'export'` is set. You can use the same configuration for the `app` router and `pages` directory. This means `next export` is no longer required."
+		},
+		{
+			"heading": "static-export-for-app-router",
+			"content": "With advanced static export support, you'll get errors earlier in the development process (`next dev`), such as when attempting to use a dynamic function that requires a server like `cookies()` or `headers()`."
+		},
+		{
+			"heading": "static-export-for-app-router",
+			"content": "Learn more about Static Export."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "Next.js 13.3 introduces new dynamic conventions that allow you to implement advanced routing cases: **Parallel Routes and Intercepting Routes**. These features enable you to show more than one page in the same view, like with complex dashboards or modals."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "With Parallel Routes, you can simultaneously render one or more pages in the *same view* that can be navigated independently. It can also be used to conditionally render pages."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "Parallel Routes are created using named &#x2A;*\"slots\".** Slots are defined with the `@folder` convention:"
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "The layout in the same route segment accepts the slots as props:"
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "In the example above, the `@user` and `@team` parallel route slots (explicit) are conditionally rendered based on your logic. `children` is an implicit route slot that does *not* need to be mapped to a `@folder`. For example, `dashboard/page.js` is equivalent to `dashboard/@children/page.js`."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "Intercepting routes allow you to load a new route within the current layout while \"masking\" the browser URL. This is useful when keeping the context of the current page is important, such as expanding a photo in a feed through a modal where the feed is kept in the background of the modal."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "Intercepting routes can be defined with the `(..)` convention, similar to relative paths `../`. You can also use the `(...)` convention to create a path relative to the `app` directory."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "In the example above, clicking the photo from the user's profile will open the photo in a modal during client-side navigation. However, refreshing or sharing the page will load the photo with its default layout."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "Parallel routes and interception enable Instagram-like modal routing."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "This solves the challenges you may have when creating modals, such as making the modal content shareable through an URL, preventing context from being lost when the page is refreshed, and closing and reopening the modal with backward and forward navigation."
+		},
+		{
+			"heading": "parallel-routes-and-interception",
+			"content": "For more examples and behavior, see the Parallel and Intercepting Routes documentation."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Design Updates:** The Next.js homepage and showcase have been refreshed with a new design."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Turbopack:** Added support for Middleware, all `next/font` options, and streaming with Server Components as it approaches beta (see demo). We've also patched additional bugs discovered while dogfooding on mature Next.js apps like vercel.com and nextjs.org. Learn more."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Fast Refresh for `next.config.js`:** Making changes to `next.config.js` will now automatically restart your local dev server. This extends automatic reloading of `.env`, `.env.*`, `jsconfig.json`, `tsconfig.json` configuration files."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Accessibility:** The App Router now includes the route annoucement from `pages`. This feature announces client-side route transitions to screen readers and other assistive technology. Learn more."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Statically Typed Links**: `redirects` and `rewrites` set in `next.config.js` are now considered during type checking. Learn more."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Tailwind CSS for `create-next-app`:** When starting a new project with `npx create-next-app@latest`, you can now optionally select Tailwind CSS, or use the `--tailwind` flag, to preconfigure your application with this styling solution."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Route Handlers:** Using `export default` instead of a supported HTTP verb now throws a helpful error with `route.ts`. Learn more about Route Handlers."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Images:** `next/image` now supports the `fetchPriority=\"high\"` attribute."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Metadata:** The previous API for metadata (`head.js`), which was deprecated in 13.2, has been removed. Instead, use the built-in support for SEO through the Metadata API."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Opt folders out of routing:** Prefix a folder with \\_ to opt it and any child segments out of routing. For example, `app/_dashboard/page.tsx` would not be routable."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**App Router:** We've added a new `useParams` client component hook to read the dynamic parameters for the given route segment. Learn more."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Improved Stylesheet Loading:** Next.js now implements React’s Suspensey CSS which fixes many issues around CSS loading and flashes of unstyled content, particularly during navigation."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Improved Not Found handling:** In addition to catching expected `notFound()` errors, the root `app/not-found.js` file will also handle any unmatched URLs for your whole application. This means users that visit a URL that is not handled by your app will be shown the UI exported by the `app/not-found.js` file. Learn more."
+		},
+		{
+			"heading": "other-improvements",
+			"content": "**Improved client-side router cache:** `router.refresh()` will now invalidate the entire cache and search params are now part of the cache key allowing navigation between two search params (e.g. `/?search=leerob` and `/?search=tim`) to correctly restore content that relied on the param."
+		},
+		{
+			"heading": "community",
+			"content": "Next.js is the result of the combined work of over 2,600 individual developers, industry partners like Google and Meta, and our core team at Vercel. With over 4.2 million npm downloads per week and 104,000+ GitHub stars, Next.js is one of the most popular ways of building the Web."
+		},
+		{
+			"heading": "community",
+			"content": "Join the community on GitHub Discussions, Reddit, and Discord."
+		},
+		{
+			"heading": "community",
+			"content": "This release was brought to you by:"
+		},
+		{
+			"heading": "community",
+			"content": "The **Next.js** team: Andrew, Balazs, Hannes, Jan, Jiachi, Jimmy, JJ, Josh, Sebastian, Shu, Steven, Tim, and Wyatt."
+		},
+		{
+			"heading": "community",
+			"content": "The **Turbopack** team: Alex, Donny, Justin, Leah, LongYinan, Maia, OJ, Tobias, and Will."
+		},
+		{
+			"heading": "community",
+			"content": "And the contributions of: @shuding, @huozhi, @sokra, @hanneslund, @JesseKoldewijn, @kaguya3222, @yangshun, @ijjk, @konomae, @Brooooooklyn, @jridgewell, @zlrlyy, @JohnDaly, @abhiyandhakal, @benjie, @johnnyomair, @nk980113, @dirheimerb, @DerTimonius, @DuCanhGH, @padmaia, @stafyniaksacha, @Gladowar, @zek, @jankaifer, @styfle, @balazsorban44, @wbinnssmith, @chibicode, @ForsakenHarmony, @franktronics, @FSaldanha, @Schniz, @raisedadead, @AdamKatzDev, @wyattjoh, @leerob, @meesvandongen, @vladikoff, @feedthejim, @tka5, @pyjun01, @gdborton, @M3kH, @aretrace, @shivanshubisht, @alexkirsz, @agrattan0820, @vinaykulk621, @heyitsuzair, @mrkldshv, @timneutkens, @furkanmavili, @swaminator, @EndangeredMassa, @DevEsteves, @rishabhpoddar, @schehata, @molebox, @dlehmhus, @akshaynox, @sp00ls, @janicklas-ralph, @tomryanx, @kwonoj, @karlhorky, @kdy1, @dante-robinson, @lachlanjc, @ianmacartney, @hotters, @isaackatayev, @insik-han, @jayair, @ivanhofer, @javivelasco, @SukkaW, @visshaljagtap, @imranbarbhuiya, @nivak-monarch, @HarshaVardhanReddyDuvvuru, @ianldgs, @ricardofiorani, @swarnava, and @gustavostz."
+		}
+	],
+	"headings": [
+		{
+			"id": "file-based-metadata-api",
+			"content": "File-Based Metadata API"
+		},
+		{
+			"id": "dynamic-open-graph-image-generation",
+			"content": "Dynamic Open Graph Image Generation"
+		},
+		{
+			"id": "static-export-for-app-router",
+			"content": "Static Export for App Router"
+		},
+		{
+			"id": "parallel-routes-and-interception",
+			"content": "Parallel Routes and Interception"
+		},
+		{
+			"id": "other-improvements",
+			"content": "Other Improvements"
+		},
+		{
+			"id": "community",
+			"content": "Community"
+		}
+	]
+};
+var toc = [
+	{
+		depth: 2,
+		url: "#file-based-metadata-api",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#file-based-metadata-api",
+			children: "File-Based Metadata API"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#dynamic-open-graph-image-generation",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#dynamic-open-graph-image-generation",
+			children: "Dynamic Open Graph Image Generation"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#static-export-for-app-router",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#static-export-for-app-router",
+			children: "Static Export for App Router"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#parallel-routes-and-interception",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#parallel-routes-and-interception",
+			children: "Parallel Routes and Interception"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#other-improvements",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#other-improvements",
+			children: "Other Improvements"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#community",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#community",
+			children: "Community"
+		}) })
+	}
+];
+function _createMdxContent(props) {
+	const _components = {
+		a: "a",
+		code: "code",
+		em: "em",
+		h2: "h2",
+		img: "img",
+		li: "li",
+		p: "p",
+		pre: "pre",
+		span: "span",
+		strong: "strong",
+		ul: "ul",
+		...props.components
+	};
+	return (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Next.js 13.3 adds popular community-requested features, including:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#file-based-metadata-api",
+				children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "File-Based Metadata API" })
+			}), ": Dynamically generate sitemaps, robots, favicons, and more."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#dynamic-open-graph-image-generation",
+				children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "Dynamic Open Graph Images" })
+			}), ": Generate OG images using JSX, HTML, and CSS."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#static-export-for-app-router",
+				children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "Static Export for App Router" })
+			}), ": Static / Single-Page Application (SPA) support for Server Components."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#parallel-routes-and-interception",
+				children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "Parallel Routes and Interception" })
+			}), ": Advanced routing features for the App Router."] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Update today by running:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "Terminal",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsx)(_components.code, { children: (0, import_jsx_runtime.jsxs)(_components.span, {
+				className: "line",
+				children: [
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6F42C1",
+							"--shiki-dark": "#B392F0"
+						},
+						children: "npm"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " i"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " next@latest"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " react@latest"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " react-dom@latest"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " eslint-config-next@latest"
+					})
+				]
+			}) })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We are closing in on marking App Router as stable in the next minor release and are shifting our focus to optimizing performance, enhancing behaviors, and fixing bugs." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"While we're still working on a few features like Mutations we don't expect these to impact the API surface of other App Router features. We're excited to see what you build with the App Router and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/discussions/41745",
+				children: "look forward to your feedback"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "file-based-metadata-api",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#file-based-metadata-api",
+				children: "File-Based Metadata API"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org/blog/next-13-2#built-in-seo-support-with-new-metadata-api",
+				children: "Next.js 13.2"
+			}),
+			", we announced a new Metadata API, allowing you to define metadata (e.g. ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "title" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "meta" }),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "link" }),
+			" tags inside your HTML ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "head" }),
+			" element) by exporting a Metadata object from a layout or page."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "layout.js or page.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// either Static metadata"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " metadata"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "  title: "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'Home'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ","
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "};"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// Output:"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// <head>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "//	 <title>Home</title>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// </head>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// or Dynamic metadata"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " async"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " generateMetadata"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "({ "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "params"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "searchParams"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " }) {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " product"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " await"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " getProduct"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "(params.id);"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " { title: product.title };"
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// Output:"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// <head>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "//	 <title>My Unique Product</title>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// </head>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Page"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {}"
+						})
+					]
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "In addition to config-based metadata, the Metadata API now supports new file conventions, allowing you to conveniently customize your pages for improved SEO and sharing on the web:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "opengraph-image.(jpg|png|svg)" }) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "twitter-image.(jpg|png|svg)" }) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "favicon.ico" }) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "icon.(ico|jpg|png|svg)" }) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "sitemap.(xml|js|jsx|ts|tsx)" }) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "robots.(txt|js|jsx|ts|tsx)" }) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "manifest.(json|js|jsx|ts|tsx)" }) }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"For example, you can use file-based metadata to add a favicon for your app and an open graph image for your ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "/about" }),
+			" page:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "app" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "├── favicon.ico" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "├── layout.js" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "├── page.js" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "└── about" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "    ├── opengraph-image.jpg" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "    └── page.js" })
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js will automatically serve these files with hashes (for the file name) in production for caching, and update the relevant ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "head" }),
+			" elements with the correct metadata information such as the asset's URL, file type, and image size."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "// Visiting \"/\"" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "<link rel=\"icon\" href=\"<computedUrl>\"/>" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: " " })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "// Visiting \"/about\"" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "<link rel=\"icon\" href=\"<computedUrl>\"/>" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "<meta property=\"og:image\" content=\"<computedUrl>\" type=\"<computedType>\" ... />" })
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Adding static files to your application is often the simplest approach, but there are cases where you may need to create files dynamically. For each static file convention, there's an accompanying dynamic ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "(.js|.jsx|.ts|.tsx)" }),
+			" variant that allows you to write code to generate the file."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"For example, while you can add a static ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "sitemap.xml" }),
+			" file, most sites have some pages that are dynamically generated using an external data source. To generate a dynamic sitemap, you can add a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "sitemap.js" }),
+			" file that returns an array of your dynamic routes."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "app/sitemap.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " async"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " sitemap"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " res"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " await"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " fetch"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'https://.../posts'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ");"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " allPosts"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " await"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " res."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "json"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "();"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " posts"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " allPosts."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "map"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "(("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "post"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ") "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "=>"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ({"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    url: "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "`https://acme.com/blog/${"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "post"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "slug"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "}`"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ","
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    lastModified: post.publishedAt,"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  }));"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " routes"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ["
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "''"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'/about'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'/blog'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "]."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "map"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "(("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "route"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ") "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "=>"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ({"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    url: "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "`https://acme.com${"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "route"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "}`"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ","
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    lastModified: "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "new"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Date"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "()."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "toISOString"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "(),"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  }));"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  return"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ["
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "..."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "routes, "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "..."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "posts];"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"With ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/metadata#metadata-object",
+				children: "config-based"
+			}),
+			" and new file-based options, you now have a comprehensive Metadata API to cover both static and dynamic metadata."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The Metadata API is available in 13.3 for the App Router (",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "app" }),
+			"). It is not available in the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory. Learn more about ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/metadata#file-based-metadata",
+				children: "file-based metadata and view the API reference"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "dynamic-open-graph-image-generation",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#dynamic-open-graph-image-generation",
+				children: "Dynamic Open Graph Image Generation"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Six months ago, we released ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com/blog/introducing-vercel-og-image-generation-fast-dynamic-social-card-images",
+				children: "@vercel/og"
+			}),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/satori",
+				children: "Satori"
+			}),
+			", libraries that allow you to generate images dynamically using JSX, HTML, and CSS."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "@vercel/og" }),
+			" was put to the test at ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org/conf",
+				children: "Next.js Conf"
+			}),
+			", generating over 100,000 dynamic ticket images for every attendee. With extensive adoption across Vercel customers and over 900,000 downloads since the release, we're excited to bring dynamically generated images to all Next.js applications without the need for an external package."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can now import ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "ImageResponse" }),
+			" from ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/server" }),
+			" to generate images:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "/app/about/opengraph-image.tsx",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "import"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " { ImageResponse } "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "from"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'next/server'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ";"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " size"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " { width: "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "1200"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", height: "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "600"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " };"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " alt"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'About Acme'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ";"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " contentType"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'image/png'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ";"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " runtime"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'edge'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ";"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " og"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  return"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " new"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " ImageResponse"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "();"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "  // ..."
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "ImageResponse" }),
+			" naturally integrates well with other Next.js APIs, including Route Handlers and file-based Metadata. For example, you can use ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "ImageResponse" }),
+			" in a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "opengraph-image.tsx" }),
+			" file to generate Open Graph and Twitter images at build time or dynamically at request time."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: ["Learn more about the ", (0, import_jsx_runtime.jsx)(_components.a, {
+			href: "/docs/app/building-your-application/optimizing/metadata#dynamic-image-generation",
+			children: "Image Response API."
+		})] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "static-export-for-app-router",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#static-export-for-app-router",
+				children: "Static Export for App Router"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The Next.js App Router now supports fully static exports." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "You can start as a static site or Single-Page Application (SPA), then later optionally upgrade to use Next.js features that require a server." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"When running ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next build" }),
+			", Next.js generates an HTML file per route. By breaking a strict SPA into individual HTML files, Next.js can avoid loading unnecessary JavaScript code on the client-side, reducing the bundle size and enabling faster page loads."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "next.config.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "/**"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6A737D",
+								"--shiki-dark": "#6A737D"
+							},
+							children: " * "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "@type"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " {import('next').NextConfig}"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: " */"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " nextConfig"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "  output: "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'export'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ","
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "};"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "module"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "exports"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " nextConfig;"
+						})
+					]
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Static Export works with the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "app" }),
+			" router's new features including static Route Handlers, Open Graph images, and React Server Components."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "For example, Server Components will run during the build, similar to traditional static-site generation, rendering the components into static HTML for the initial page load and a static payload for client navigation between routes." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Previously, to use Static Export in the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory, you needed to run ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next export" }),
+			". However, with the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next.config.js" }),
+			" option, ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next build" }),
+			" will output a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "out" }),
+			" directory when ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "output: 'export'" }),
+			" is set. You can use the same configuration for the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "app" }),
+			" router and ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+			" directory. This means ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next export" }),
+			" is no longer required."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"With advanced static export support, you'll get errors earlier in the development process (",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next dev" }),
+			"), such as when attempting to use a dynamic function that requires a server like ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "cookies()" }),
+			" or ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "headers()" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Learn more about ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/building-your-application/deploying/static-exports",
+				children: "Static Export"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "parallel-routes-and-interception",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#parallel-routes-and-interception",
+				children: "Parallel Routes and Interception"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js 13.3 introduces new dynamic conventions that allow you to implement advanced routing cases: ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "Parallel Routes and Intercepting Routes" }),
+			". These features enable you to show more than one page in the same view, like with complex dashboards or modals."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"With Parallel Routes, you can simultaneously render one or more pages in the ",
+			(0, import_jsx_runtime.jsx)(_components.em, { children: "same view" }),
+			" that can be navigated independently. It can also be used to conditionally render pages."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Parallel Routes are created using named ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "\"slots\"." }),
+			" Slots are defined with the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "@folder" }),
+			" convention:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "dashboard" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "├── @user" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "│   └── page.js" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "├── @team" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "│   └── page.js" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "├── layout.js" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "└── page.js" })
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The layout in the same route segment accepts the slots as props:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "app/dashboard/layout.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " async"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Layout"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "({ "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "children"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "user"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "team"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " }) {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " userType"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " getCurrentUserType"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "();"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " ("
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    <>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "      {userType "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "==="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'user'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ?"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " user "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " team}"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "      {children}"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    </>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  );"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In the example above, the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "@user" }),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "@team" }),
+			" parallel route slots (explicit) are conditionally rendered based on your logic. ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "children" }),
+			" is an implicit route slot that does ",
+			(0, import_jsx_runtime.jsx)(_components.em, { children: "not" }),
+			" need to be mapped to a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "@folder" }),
+			". For example, ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "dashboard/page.js" }),
+			" is equivalent to ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "dashboard/@children/page.js" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Intercepting routes allow you to load a new route within the current layout while \"masking\" the browser URL. This is useful when keeping the context of the current page is important, such as expanding a photo in a feed through a modal where the feed is kept in the background of the modal." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Intercepting routes can be defined with the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "(..)" }),
+			" convention, similar to relative paths ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "../" }),
+			". You can also use the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "(...)" }),
+			" convention to create a path relative to the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "app" }),
+			" directory."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "feed" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "├── @modal" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "│   └── (..)photo" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "│       └── [id]" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "│           └── page.tsx" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "├── page.tsx" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "└── layout.tsx" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "photo" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "└── [id]" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "    └── page.tsx" })
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "In the example above, clicking the photo from the user's profile will open the photo in a modal during client-side navigation. However, refreshing or sharing the page will load the photo with its default layout." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.img, {
+			src: "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-13-3/modal-routing.png",
+			alt: "Parallel routes and interception enable Instagram-like modal routing."
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Parallel routes and interception enable Instagram-like modal routing." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This solves the challenges you may have when creating modals, such as making the modal content shareable through an URL, preventing context from being lost when the page is refreshed, and closing and reopening the modal with backward and forward navigation." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"For more examples and behavior, see the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/building-your-application/routing/parallel-routes",
+				children: "Parallel"
+			}),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/building-your-application/routing/intercepting-routes",
+				children: "Intercepting Routes documentation"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "other-improvements",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#other-improvements",
+				children: "Other Improvements"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Design Updates:" }),
+				" The Next.js ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://nextjs.org/",
+					children: "homepage"
+				}),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://nextjs.org/showcase",
+					children: "showcase"
+				}),
+				" have been refreshed with a new design."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Turbopack:" }),
+				" Added support for Middleware, all ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next/font" }),
+				" options, and streaming with Server Components as it approaches beta (",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://twitter.com/padmaia/status/1641130761775464448",
+					children: "see demo"
+				}),
+				"). We've also patched additional bugs discovered while dogfooding on mature Next.js apps like ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://vercel.com",
+					children: "vercel.com"
+				}),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://nextjs.org/",
+					children: "nextjs.org"
+				}),
+				". ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/architecture/turbopack",
+					children: "Learn more"
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.strong, { children: [
+					"Fast Refresh for ",
+					(0, import_jsx_runtime.jsx)(_components.code, { children: "next.config.js" }),
+					":"
+				] }),
+				" Making changes to ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next.config.js" }),
+				" will now automatically restart your local dev server. This extends automatic reloading of ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: ".env" }),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: ".env.*" }),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "jsconfig.json" }),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "tsconfig.json" }),
+				" configuration files."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Accessibility:" }),
+				" The App Router now includes the route annoucement from ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+				". This feature announces client-side route transitions to screen readers and other assistive technology. ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/accessibility",
+					children: "Learn more"
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Statically Typed Links" }),
+				": ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "redirects" }),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "rewrites" }),
+				" set in ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next.config.js" }),
+				" are now considered during type checking. ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/building-your-application/configuring/typescript#statically-typed-links",
+					children: "Learn more"
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.strong, { children: [
+					"Tailwind CSS for ",
+					(0, import_jsx_runtime.jsx)(_components.code, { children: "create-next-app" }),
+					":"
+				] }),
+				" When starting a new project with ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "npx create-next-app@latest" }),
+				", you can now optionally select Tailwind CSS, or use the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "--tailwind" }),
+				" flag, to preconfigure your application with this styling solution."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Route Handlers:" }),
+				" Using ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "export default" }),
+				" instead of a ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/api-reference/file-conventions/route",
+					children: "supported HTTP verb"
+				}),
+				" now throws a helpful error with ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "route.ts" }),
+				". ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/building-your-application/routing/route-handlers",
+					children: "Learn more about Route Handlers"
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Images:" }),
+				" ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next/image" }),
+				" now supports the ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://developer.mozilla.org/docs/Web/HTML/Element/img#:~:text=elementtiming%20attribute%20page.-,fetchpriority,-Experimental",
+					children: (0, import_jsx_runtime.jsx)(_components.code, { children: "fetchPriority=\"high\"" })
+				}),
+				" attribute."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Metadata:" }),
+				" The previous API for metadata (",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "head.js" }),
+				"), which was deprecated in 13.2, has been removed. Instead, use the built-in support for SEO through the ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/api-reference/file-conventions/metadata",
+					children: "Metadata"
+				}),
+				" API."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Opt folders out of routing:" }),
+				" Prefix a folder with _ to opt it and any child segments out of routing. For example, ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "app/_dashboard/page.tsx" }),
+				" would not be routable."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "App Router:" }),
+				" We've added a new ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "useParams" }),
+				" client component hook to read the dynamic parameters for the given route segment. ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/api-reference/functions/use-params",
+					children: "Learn more"
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Improved Stylesheet Loading:" }), " Next.js now implements React’s Suspensey CSS which fixes many issues around CSS loading and flashes of unstyled content, particularly during navigation."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Improved Not Found handling:" }),
+				" In addition to catching expected ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "notFound()" }),
+				" errors, the root ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "app/not-found.js" }),
+				" file will also handle any unmatched URLs for your whole application. This means users that visit a URL that is not handled by your app will be shown the UI exported by the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "app/not-found.js" }),
+				" file. ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/api-reference/file-conventions/not-found",
+					children: "Learn more"
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Improved client-side router cache:" }),
+				" ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "router.refresh()" }),
+				" will now invalidate the entire cache and search params are now part of the cache key allowing navigation between two search params (e.g. ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "/?search=leerob" }),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "/?search=tim" }),
+				") to correctly restore content that relied on the param."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "community",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#community",
+				children: "Community"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Next.js is the result of the combined work of over 2,600 individual developers, industry partners like Google and Meta, and our core team at Vercel. With over 4.2 million npm downloads per week and 104,000+ GitHub stars, Next.js is one of the most popular ways of building the Web." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Join the community on ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/discussions",
+				children: "GitHub Discussions"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://www.reddit.com/r/nextjs/",
+				children: "Reddit"
+			}),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org/discord",
+				children: "Discord"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This release was brought to you by:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"The ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Next.js" }),
+				" team: ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/acdlite",
+					children: "Andrew"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/balazsorban44",
+					children: "Balazs"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/hanneslund",
+					children: "Hannes"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/jankaifer",
+					children: "Jan"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/huozhi",
+					children: "Jiachi"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/feedthejim",
+					children: "Jimmy"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/ijjk",
+					children: "JJ"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/gnoff",
+					children: "Josh"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/sebmarkbage",
+					children: "Sebastian"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/shuding",
+					children: "Shu"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/styfle",
+					children: "Steven"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/timneutkens",
+					children: "Tim"
+				}),
+				", and ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/wyattjoh",
+					children: "Wyatt"
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"The ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Turbopack" }),
+				" team: ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/alexkirsz",
+					children: "Alex"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/kdy1",
+					children: "Donny"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/jridgewell",
+					children: "Justin"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/forsakenharmony",
+					children: "Leah"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/brooooooklyn",
+					children: "LongYinan"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/padmaia",
+					children: "Maia"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/kwonoj",
+					children: "OJ"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/sokra",
+					children: "Tobias"
+				}),
+				", and ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/wbinnssmith",
+					children: "Will"
+				}),
+				"."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "And the contributions of: @shuding, @huozhi, @sokra, @hanneslund, @JesseKoldewijn, @kaguya3222, @yangshun, @ijjk, @konomae, @Brooooooklyn, @jridgewell, @zlrlyy, @JohnDaly, @abhiyandhakal, @benjie, @johnnyomair, @nk980113, @dirheimerb, @DerTimonius, @DuCanhGH, @padmaia, @stafyniaksacha, @Gladowar, @zek, @jankaifer, @styfle, @balazsorban44, @wbinnssmith, @chibicode, @ForsakenHarmony, @franktronics, @FSaldanha, @Schniz, @raisedadead, @AdamKatzDev, @wyattjoh, @leerob, @meesvandongen, @vladikoff, @feedthejim, @tka5, @pyjun01, @gdborton, @M3kH, @aretrace, @shivanshubisht, @alexkirsz, @agrattan0820, @vinaykulk621, @heyitsuzair, @mrkldshv, @timneutkens, @furkanmavili, @swaminator, @EndangeredMassa, @DevEsteves, @rishabhpoddar, @schehata, @molebox, @dlehmhus, @akshaynox, @sp00ls, @janicklas-ralph, @tomryanx, @kwonoj, @karlhorky, @kdy1, @dante-robinson, @lachlanjc, @ianmacartney, @hotters, @isaackatayev, @insik-han, @jayair, @ivanhofer, @javivelasco, @SukkaW, @visshaljagtap, @imranbarbhuiya, @nivak-monarch, @HarshaVardhanReddyDuvvuru, @ianldgs, @ricardofiorani, @swarnava, and @gustavostz." })
+	] });
+}
+function MDXContent(props = {}) {
+	const { wrapper: MDXLayout } = props.components || {};
+	return MDXLayout ? (0, import_jsx_runtime.jsx)(MDXLayout, {
+		...props,
+		children: (0, import_jsx_runtime.jsx)(_createMdxContent, { ...props })
+	}) : _createMdxContent(props);
+}
+//#endregion
+export { toc as a, structuredData as i, frontmatter as n, next_13_3_exports as r, MDXContent as t };
