@@ -1,15 +1,15 @@
 import { r as __toESM } from "./_runtime.mjs";
 import { _ as require_react, c as lazyRouteComponent, l as createFileRoute, v as require_jsx_runtime } from "./_libs/@tanstack/react-router+[...].mjs";
-import { t as twMerge } from "./_libs/tailwind-merge.mjs";
-import { C as useControllableState, D as useLayoutEffect2, E as useId, O as usePathname, S as useComposedRefs, T as useI18n, f as buttonVariants, g as createContextScope, i as I18nLabel, l as Presence, o as Image$2, p as composeEventHandlers, u as Primitive, x as useCallbackRef$1 } from "./_ssr/Combination-Gx_g2Nzj.mjs";
-import { a as PopoverContent, c as createCollection, d as useDirection, f as useIsScrollTop, i as Popover, l as isActive, o as PopoverTrigger, r as Link, u as normalize } from "./_ssr/dist-CP9lNkop.mjs";
 import { c as createServerFn, i as TSS_SERVER_FUNCTION } from "./_ssr/createServerFn-DnkWHxBI.mjs";
+import { n as normalizeUrl, t as findPath } from "./_ssr/utils-6GexS7iX-BaZEp7pz.mjs";
+import { t as browser } from "./_libs/fumadocs-mdx.mjs";
+import { t as twMerge } from "./_libs/tailwind-merge.mjs";
+import { C as useControllableState, D as useLayoutEffect2, E as useId$1, O as usePathname, S as useComposedRefs, T as useI18n, f as buttonVariants, g as createContextScope, i as I18nLabel, l as Presence, o as Image$2, p as composeEventHandlers, u as Primitive, x as useCallbackRef$1 } from "./_ssr/Combination-DoPQMWre.mjs";
+import { a as PopoverContent, c as createCollection, d as useDirection, f as useIsScrollTop, i as Popover, l as isActive, o as PopoverTrigger, r as Link, u as normalize } from "./_ssr/dist-DE7Znuq2.mjs";
 import { t as getServerFnById } from "./__tanstack-start-server-fn-resolver-BkZFNguf.mjs";
 import { n as useOnChange, t as e } from "./_ssr/use-on-change-B8PHvoum.mjs";
-import { n as normalizeUrl, t as findPath } from "./_ssr/utils-6GexS7iX-BaZEp7pz.mjs";
-import { n as browser } from "./_libs/fumadocs-mdx.mjs";
 import { _ as ChevronRight, b as Check, c as Lightbulb, f as ExternalLink, g as ChevronsUpDown, h as CircleCheck, m as CircleX, n as Text, p as Clipboard, s as Link$1, t as TriangleAlert, u as Info, v as ChevronLeft, y as ChevronDown } from "./_libs/lucide-react.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/_-CBMvbxh4.js
+//#region node_modules/.nitro/vite/services/ssr/assets/_-BViFWFv2.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
 var create = browser();
@@ -1798,7 +1798,7 @@ var Collapsible$1 = import_react.forwardRef((props, forwardedRef) => {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CollapsibleProvider, {
 		scope: __scopeCollapsible,
 		disabled,
-		contentId: useId(),
+		contentId: useId$1(),
 		open,
 		onOpenToggle: import_react.useCallback(() => setOpen((prevOpen) => !prevOpen), [setOpen]),
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
@@ -2684,6 +2684,472 @@ function DocsTitle({ children, className, ...props }) {
 		children
 	});
 }
+var ENTRY_FOCUS = "rovingFocusGroup.onEntryFocus";
+var EVENT_OPTIONS = {
+	bubbles: false,
+	cancelable: true
+};
+var GROUP_NAME = "RovingFocusGroup";
+var [Collection, useCollection, createCollectionScope] = createCollection(GROUP_NAME);
+var [createRovingFocusGroupContext, createRovingFocusGroupScope] = createContextScope(GROUP_NAME, [createCollectionScope]);
+var [RovingFocusProvider, useRovingFocusContext] = createRovingFocusGroupContext(GROUP_NAME);
+var RovingFocusGroup = import_react.forwardRef((props, forwardedRef) => {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection.Provider, {
+		scope: props.__scopeRovingFocusGroup,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection.Slot, {
+			scope: props.__scopeRovingFocusGroup,
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RovingFocusGroupImpl, {
+				...props,
+				ref: forwardedRef
+			})
+		})
+	});
+});
+RovingFocusGroup.displayName = GROUP_NAME;
+var RovingFocusGroupImpl = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeRovingFocusGroup, orientation, loop = false, dir, currentTabStopId: currentTabStopIdProp, defaultCurrentTabStopId, onCurrentTabStopIdChange, onEntryFocus, preventScrollOnEntryFocus = false, ...groupProps } = props;
+	const ref = import_react.useRef(null);
+	const composedRefs = useComposedRefs(forwardedRef, ref);
+	const direction = useDirection(dir);
+	const [currentTabStopId, setCurrentTabStopId] = useControllableState({
+		prop: currentTabStopIdProp,
+		defaultProp: defaultCurrentTabStopId ?? null,
+		onChange: onCurrentTabStopIdChange,
+		caller: GROUP_NAME
+	});
+	const [isTabbingBackOut, setIsTabbingBackOut] = import_react.useState(false);
+	const handleEntryFocus = useCallbackRef$1(onEntryFocus);
+	const getItems = useCollection(__scopeRovingFocusGroup);
+	const isClickFocusRef = import_react.useRef(false);
+	const [focusableItemsCount, setFocusableItemsCount] = import_react.useState(0);
+	import_react.useEffect(() => {
+		const node = ref.current;
+		if (node) {
+			node.addEventListener(ENTRY_FOCUS, handleEntryFocus);
+			return () => node.removeEventListener(ENTRY_FOCUS, handleEntryFocus);
+		}
+	}, [handleEntryFocus]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RovingFocusProvider, {
+		scope: __scopeRovingFocusGroup,
+		orientation,
+		dir: direction,
+		loop,
+		currentTabStopId,
+		onItemFocus: import_react.useCallback((tabStopId) => setCurrentTabStopId(tabStopId), [setCurrentTabStopId]),
+		onItemShiftTab: import_react.useCallback(() => setIsTabbingBackOut(true), []),
+		onFocusableItemAdd: import_react.useCallback(() => setFocusableItemsCount((prevCount) => prevCount + 1), []),
+		onFocusableItemRemove: import_react.useCallback(() => setFocusableItemsCount((prevCount) => prevCount - 1), []),
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
+			tabIndex: isTabbingBackOut || focusableItemsCount === 0 ? -1 : 0,
+			"data-orientation": orientation,
+			...groupProps,
+			ref: composedRefs,
+			style: {
+				outline: "none",
+				...props.style
+			},
+			onMouseDown: composeEventHandlers(props.onMouseDown, () => {
+				isClickFocusRef.current = true;
+			}),
+			onFocus: composeEventHandlers(props.onFocus, (event) => {
+				const isKeyboardFocus = !isClickFocusRef.current;
+				if (event.target === event.currentTarget && isKeyboardFocus && !isTabbingBackOut) {
+					const entryFocusEvent = new CustomEvent(ENTRY_FOCUS, EVENT_OPTIONS);
+					event.currentTarget.dispatchEvent(entryFocusEvent);
+					if (!entryFocusEvent.defaultPrevented) {
+						const items = getItems().filter((item) => item.focusable);
+						focusFirst([
+							items.find((item) => item.active),
+							items.find((item) => item.id === currentTabStopId),
+							...items
+						].filter(Boolean).map((item) => item.ref.current), preventScrollOnEntryFocus);
+					}
+				}
+				isClickFocusRef.current = false;
+			}),
+			onBlur: composeEventHandlers(props.onBlur, () => setIsTabbingBackOut(false))
+		})
+	});
+});
+var ITEM_NAME = "RovingFocusGroupItem";
+var RovingFocusGroupItem = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeRovingFocusGroup, focusable = true, active = false, tabStopId, children, ...itemProps } = props;
+	const autoId = useId$1();
+	const id = tabStopId || autoId;
+	const context = useRovingFocusContext(ITEM_NAME, __scopeRovingFocusGroup);
+	const isCurrentTabStop = context.currentTabStopId === id;
+	const getItems = useCollection(__scopeRovingFocusGroup);
+	const { onFocusableItemAdd, onFocusableItemRemove, currentTabStopId } = context;
+	import_react.useEffect(() => {
+		if (focusable) {
+			onFocusableItemAdd();
+			return () => onFocusableItemRemove();
+		}
+	}, [
+		focusable,
+		onFocusableItemAdd,
+		onFocusableItemRemove
+	]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection.ItemSlot, {
+		scope: __scopeRovingFocusGroup,
+		id,
+		focusable,
+		active,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.span, {
+			tabIndex: isCurrentTabStop ? 0 : -1,
+			"data-orientation": context.orientation,
+			...itemProps,
+			ref: forwardedRef,
+			onMouseDown: composeEventHandlers(props.onMouseDown, (event) => {
+				if (!focusable) event.preventDefault();
+				else context.onItemFocus(id);
+			}),
+			onFocus: composeEventHandlers(props.onFocus, () => context.onItemFocus(id)),
+			onKeyDown: composeEventHandlers(props.onKeyDown, (event) => {
+				if (event.key === "Tab" && event.shiftKey) {
+					context.onItemShiftTab();
+					return;
+				}
+				if (event.target !== event.currentTarget) return;
+				const focusIntent = getFocusIntent(event, context.orientation, context.dir);
+				if (focusIntent !== void 0) {
+					if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+					event.preventDefault();
+					let candidateNodes = getItems().filter((item) => item.focusable).map((item) => item.ref.current);
+					if (focusIntent === "last") candidateNodes.reverse();
+					else if (focusIntent === "prev" || focusIntent === "next") {
+						if (focusIntent === "prev") candidateNodes.reverse();
+						const currentIndex = candidateNodes.indexOf(event.currentTarget);
+						candidateNodes = context.loop ? wrapArray(candidateNodes, currentIndex + 1) : candidateNodes.slice(currentIndex + 1);
+					}
+					setTimeout(() => focusFirst(candidateNodes));
+				}
+			}),
+			children: typeof children === "function" ? children({
+				isCurrentTabStop,
+				hasTabStop: currentTabStopId != null
+			}) : children
+		})
+	});
+});
+RovingFocusGroupItem.displayName = ITEM_NAME;
+var MAP_KEY_TO_FOCUS_INTENT = {
+	ArrowLeft: "prev",
+	ArrowUp: "prev",
+	ArrowRight: "next",
+	ArrowDown: "next",
+	PageUp: "first",
+	Home: "first",
+	PageDown: "last",
+	End: "last"
+};
+function getDirectionAwareKey(key, dir) {
+	if (dir !== "rtl") return key;
+	return key === "ArrowLeft" ? "ArrowRight" : key === "ArrowRight" ? "ArrowLeft" : key;
+}
+function getFocusIntent(event, orientation, dir) {
+	const key = getDirectionAwareKey(event.key, dir);
+	if (orientation === "vertical" && ["ArrowLeft", "ArrowRight"].includes(key)) return void 0;
+	if (orientation === "horizontal" && ["ArrowUp", "ArrowDown"].includes(key)) return void 0;
+	return MAP_KEY_TO_FOCUS_INTENT[key];
+}
+function focusFirst(candidates, preventScroll = false) {
+	const PREVIOUSLY_FOCUSED_ELEMENT = document.activeElement;
+	for (const candidate of candidates) {
+		if (candidate === PREVIOUSLY_FOCUSED_ELEMENT) return;
+		candidate.focus({ preventScroll });
+		if (document.activeElement !== PREVIOUSLY_FOCUSED_ELEMENT) return;
+	}
+}
+function wrapArray(array, startIndex) {
+	return array.map((_, index) => array[(startIndex + index) % array.length]);
+}
+var Root = RovingFocusGroup;
+var Item = RovingFocusGroupItem;
+var TABS_NAME = "Tabs";
+var [createTabsContext, createTabsScope] = createContextScope(TABS_NAME, [createRovingFocusGroupScope]);
+var useRovingFocusGroupScope = createRovingFocusGroupScope();
+var [TabsProvider, useTabsContext] = createTabsContext(TABS_NAME);
+var Tabs$2 = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeTabs, value: valueProp, onValueChange, defaultValue, orientation = "horizontal", dir, activationMode = "automatic", ...tabsProps } = props;
+	const direction = useDirection(dir);
+	const [value, setValue] = useControllableState({
+		prop: valueProp,
+		onChange: onValueChange,
+		defaultProp: defaultValue ?? "",
+		caller: TABS_NAME
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsProvider, {
+		scope: __scopeTabs,
+		baseId: useId$1(),
+		value,
+		onValueChange: setValue,
+		orientation,
+		dir: direction,
+		activationMode,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
+			dir: direction,
+			"data-orientation": orientation,
+			...tabsProps,
+			ref: forwardedRef
+		})
+	});
+});
+Tabs$2.displayName = TABS_NAME;
+var TAB_LIST_NAME = "TabsList";
+var TabsList$2 = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeTabs, loop = true, ...listProps } = props;
+	const context = useTabsContext(TAB_LIST_NAME, __scopeTabs);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root, {
+		asChild: true,
+		...useRovingFocusGroupScope(__scopeTabs),
+		orientation: context.orientation,
+		dir: context.dir,
+		loop,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
+			role: "tablist",
+			"aria-orientation": context.orientation,
+			...listProps,
+			ref: forwardedRef
+		})
+	});
+});
+TabsList$2.displayName = TAB_LIST_NAME;
+var TRIGGER_NAME = "TabsTrigger";
+var TabsTrigger$2 = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeTabs, value, disabled = false, ...triggerProps } = props;
+	const context = useTabsContext(TRIGGER_NAME, __scopeTabs);
+	const rovingFocusGroupScope = useRovingFocusGroupScope(__scopeTabs);
+	const triggerId = makeTriggerId(context.baseId, value);
+	const contentId = makeContentId(context.baseId, value);
+	const isSelected = value === context.value;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Item, {
+		asChild: true,
+		...rovingFocusGroupScope,
+		focusable: !disabled,
+		active: isSelected,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.button, {
+			type: "button",
+			role: "tab",
+			"aria-selected": isSelected,
+			"aria-controls": contentId,
+			"data-state": isSelected ? "active" : "inactive",
+			"data-disabled": disabled ? "" : void 0,
+			disabled,
+			id: triggerId,
+			...triggerProps,
+			ref: forwardedRef,
+			onMouseDown: composeEventHandlers(props.onMouseDown, (event) => {
+				if (!disabled && event.button === 0 && event.ctrlKey === false) context.onValueChange(value);
+				else event.preventDefault();
+			}),
+			onKeyDown: composeEventHandlers(props.onKeyDown, (event) => {
+				if ([" ", "Enter"].includes(event.key)) context.onValueChange(value);
+			}),
+			onFocus: composeEventHandlers(props.onFocus, () => {
+				const isAutomaticActivation = context.activationMode !== "manual";
+				if (!isSelected && !disabled && isAutomaticActivation) context.onValueChange(value);
+			})
+		})
+	});
+});
+TabsTrigger$2.displayName = TRIGGER_NAME;
+var CONTENT_NAME = "TabsContent";
+var TabsContent$2 = import_react.forwardRef((props, forwardedRef) => {
+	const { __scopeTabs, value, forceMount, children, ...contentProps } = props;
+	const context = useTabsContext(CONTENT_NAME, __scopeTabs);
+	const triggerId = makeTriggerId(context.baseId, value);
+	const contentId = makeContentId(context.baseId, value);
+	const isSelected = value === context.value;
+	const isMountAnimationPreventedRef = import_react.useRef(isSelected);
+	import_react.useEffect(() => {
+		const rAF = requestAnimationFrame(() => isMountAnimationPreventedRef.current = false);
+		return () => cancelAnimationFrame(rAF);
+	}, []);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Presence, {
+		present: forceMount || isSelected,
+		children: ({ present }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
+			"data-state": isSelected ? "active" : "inactive",
+			"data-orientation": context.orientation,
+			role: "tabpanel",
+			"aria-labelledby": triggerId,
+			hidden: !present,
+			id: contentId,
+			tabIndex: 0,
+			...contentProps,
+			ref: forwardedRef,
+			style: {
+				...props.style,
+				animationDuration: isMountAnimationPreventedRef.current ? "0s" : void 0
+			},
+			children: present && children
+		})
+	});
+});
+TabsContent$2.displayName = CONTENT_NAME;
+function makeTriggerId(baseId, value) {
+	return `${baseId}-trigger-${value}`;
+}
+function makeContentId(baseId, value) {
+	return `${baseId}-content-${value}`;
+}
+var listeners = /* @__PURE__ */ new Map();
+var TabsContext$2 = (0, import_react.createContext)(null);
+function useTabContext$1() {
+	const ctx = (0, import_react.use)(TabsContext$2);
+	if (!ctx) throw new Error("You must wrap your component in <Tabs>");
+	return ctx;
+}
+var TabsList$1 = TabsList$2;
+var TabsTrigger$1 = TabsTrigger$2;
+function Tabs$1({ ref, groupId, persist = false, updateAnchor = false, defaultValue, value: _value, onValueChange: _onValueChange, ...props }) {
+	const tabsRef = (0, import_react.useRef)(null);
+	const valueToIdMap = (0, import_react.useMemo)(() => /* @__PURE__ */ new Map(), []);
+	const [value, setValue] = _value === void 0 ? (0, import_react.useState)(defaultValue) : [_value, (0, import_react.useEffectEvent)((v) => _onValueChange?.(v))];
+	(0, import_react.useLayoutEffect)(() => {
+		if (!groupId) return;
+		let previous = sessionStorage.getItem(groupId);
+		if (persist) previous ??= localStorage.getItem(groupId);
+		if (previous) setValue(previous);
+		const groupListeners = listeners.get(groupId) ?? /* @__PURE__ */ new Set();
+		groupListeners.add(setValue);
+		listeners.set(groupId, groupListeners);
+		return () => {
+			groupListeners.delete(setValue);
+		};
+	}, [
+		groupId,
+		persist,
+		setValue
+	]);
+	(0, import_react.useLayoutEffect)(() => {
+		const hash = window.location.hash.slice(1);
+		if (!hash) return;
+		for (const [value, id] of valueToIdMap.entries()) if (id === hash) {
+			setValue(value);
+			tabsRef.current?.scrollIntoView();
+			break;
+		}
+	}, [setValue, valueToIdMap]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tabs$2, {
+		ref: mergeRefs$1(ref, tabsRef),
+		value,
+		onValueChange: (v) => {
+			if (updateAnchor) {
+				const id = valueToIdMap.get(v);
+				if (id) window.history.replaceState(null, "", `#${id}`);
+			}
+			if (groupId) {
+				const groupListeners = listeners.get(groupId);
+				if (groupListeners) for (const listener of groupListeners) listener(v);
+				sessionStorage.setItem(groupId, v);
+				if (persist) localStorage.setItem(groupId, v);
+			} else setValue(v);
+		},
+		...props,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContext$2, {
+			value: (0, import_react.useMemo)(() => ({ valueToIdMap }), [valueToIdMap]),
+			children: props.children
+		})
+	});
+}
+function TabsContent$1({ value, ...props }) {
+	const { valueToIdMap } = useTabContext$1();
+	if (props.id) valueToIdMap.set(value, props.id);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContent$2, {
+		value,
+		...props,
+		children: props.children
+	});
+}
+var TabsContext$1 = (0, import_react.createContext)(null);
+function useTabContext() {
+	const ctx = (0, import_react.useContext)(TabsContext$1);
+	if (!ctx) throw new Error("You must wrap your component in <Tabs>");
+	return ctx;
+}
+var TabsList = import_react.forwardRef((props, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsList$1, {
+	ref,
+	...props,
+	className: twMerge("flex gap-3.5 text-fd-secondary-foreground overflow-x-auto px-4 not-prose", props.className)
+}));
+TabsList.displayName = "TabsList";
+var TabsTrigger = import_react.forwardRef((props, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsTrigger$1, {
+	ref,
+	...props,
+	className: twMerge("inline-flex items-center gap-2 whitespace-nowrap text-fd-muted-foreground border-b border-transparent py-2 text-sm font-medium transition-colors [&_svg]:size-4 hover:text-fd-accent-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-fd-primary data-[state=active]:text-fd-primary", props.className)
+}));
+TabsTrigger.displayName = "TabsTrigger";
+function Tabs({ ref, className, items, label, defaultIndex = 0, defaultValue = items ? escapeValue(items[defaultIndex]) : void 0, ...props }) {
+	const [value, setValue] = (0, import_react.useState)(defaultValue);
+	const collection = (0, import_react.useMemo)(() => [], []);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Tabs$1, {
+		ref,
+		className: twMerge("flex flex-col overflow-hidden rounded-xl border bg-fd-secondary my-4", className),
+		value,
+		onValueChange: (v) => {
+			if (items && !items.some((item) => escapeValue(item) === v)) return;
+			setValue(v);
+		},
+		...props,
+		children: [items && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TabsList, { children: [label && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "text-sm font-medium my-auto me-auto",
+			children: label
+		}), items.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsTrigger, {
+			value: escapeValue(item),
+			children: item
+		}, item))] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContext$1.Provider, {
+			value: (0, import_react.useMemo)(() => ({
+				items,
+				collection
+			}), [collection, items]),
+			children: props.children
+		})]
+	});
+}
+function Tab({ value, ...props }) {
+	const { items } = useTabContext();
+	const resolved = value ?? items?.at(useCollectionIndex());
+	if (!resolved) throw new Error("Failed to resolve tab `value`, please pass a `value` prop to the Tab component.");
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContent, {
+		value: escapeValue(resolved),
+		...props,
+		children: props.children
+	});
+}
+function TabsContent({ value, className, ...props }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContent$1, {
+		value,
+		forceMount: true,
+		className: twMerge("p-4 text-[0.9375rem] bg-fd-background rounded-xl outline-none prose-no-margin data-[state=inactive]:hidden [&>figure:only-child]:-m-4 [&>figure:only-child]:border-none", className),
+		...props,
+		children: props.children
+	});
+}
+/**
+* Inspired by Headless UI.
+*
+* Return the index of children, this is made possible by registering the order of render from children using React context.
+* This is supposed by work with pre-rendering & pure client-side rendering.
+*/
+function useCollectionIndex() {
+	const key = (0, import_react.useId)();
+	const { collection } = useTabContext();
+	(0, import_react.useEffect)(() => {
+		return () => {
+			const idx = collection.indexOf(key);
+			if (idx !== -1) collection.splice(idx, 1);
+		};
+	}, [key, collection]);
+	if (!collection.includes(key)) collection.push(key);
+	return collection.indexOf(key);
+}
+/**
+* only escape whitespaces in values in simple mode
+*/
+function escapeValue(v) {
+	return v.toLowerCase().replace(/\s/, "-");
+}
 function Cards(props) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		...props,
@@ -2790,384 +3256,6 @@ function Heading({ as, className, ...props }) {
 		})]
 	});
 }
-var ENTRY_FOCUS = "rovingFocusGroup.onEntryFocus";
-var EVENT_OPTIONS = {
-	bubbles: false,
-	cancelable: true
-};
-var GROUP_NAME = "RovingFocusGroup";
-var [Collection, useCollection, createCollectionScope] = createCollection(GROUP_NAME);
-var [createRovingFocusGroupContext, createRovingFocusGroupScope] = createContextScope(GROUP_NAME, [createCollectionScope]);
-var [RovingFocusProvider, useRovingFocusContext] = createRovingFocusGroupContext(GROUP_NAME);
-var RovingFocusGroup = import_react.forwardRef((props, forwardedRef) => {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection.Provider, {
-		scope: props.__scopeRovingFocusGroup,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection.Slot, {
-			scope: props.__scopeRovingFocusGroup,
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RovingFocusGroupImpl, {
-				...props,
-				ref: forwardedRef
-			})
-		})
-	});
-});
-RovingFocusGroup.displayName = GROUP_NAME;
-var RovingFocusGroupImpl = import_react.forwardRef((props, forwardedRef) => {
-	const { __scopeRovingFocusGroup, orientation, loop = false, dir, currentTabStopId: currentTabStopIdProp, defaultCurrentTabStopId, onCurrentTabStopIdChange, onEntryFocus, preventScrollOnEntryFocus = false, ...groupProps } = props;
-	const ref = import_react.useRef(null);
-	const composedRefs = useComposedRefs(forwardedRef, ref);
-	const direction = useDirection(dir);
-	const [currentTabStopId, setCurrentTabStopId] = useControllableState({
-		prop: currentTabStopIdProp,
-		defaultProp: defaultCurrentTabStopId ?? null,
-		onChange: onCurrentTabStopIdChange,
-		caller: GROUP_NAME
-	});
-	const [isTabbingBackOut, setIsTabbingBackOut] = import_react.useState(false);
-	const handleEntryFocus = useCallbackRef$1(onEntryFocus);
-	const getItems = useCollection(__scopeRovingFocusGroup);
-	const isClickFocusRef = import_react.useRef(false);
-	const [focusableItemsCount, setFocusableItemsCount] = import_react.useState(0);
-	import_react.useEffect(() => {
-		const node = ref.current;
-		if (node) {
-			node.addEventListener(ENTRY_FOCUS, handleEntryFocus);
-			return () => node.removeEventListener(ENTRY_FOCUS, handleEntryFocus);
-		}
-	}, [handleEntryFocus]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RovingFocusProvider, {
-		scope: __scopeRovingFocusGroup,
-		orientation,
-		dir: direction,
-		loop,
-		currentTabStopId,
-		onItemFocus: import_react.useCallback((tabStopId) => setCurrentTabStopId(tabStopId), [setCurrentTabStopId]),
-		onItemShiftTab: import_react.useCallback(() => setIsTabbingBackOut(true), []),
-		onFocusableItemAdd: import_react.useCallback(() => setFocusableItemsCount((prevCount) => prevCount + 1), []),
-		onFocusableItemRemove: import_react.useCallback(() => setFocusableItemsCount((prevCount) => prevCount - 1), []),
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
-			tabIndex: isTabbingBackOut || focusableItemsCount === 0 ? -1 : 0,
-			"data-orientation": orientation,
-			...groupProps,
-			ref: composedRefs,
-			style: {
-				outline: "none",
-				...props.style
-			},
-			onMouseDown: composeEventHandlers(props.onMouseDown, () => {
-				isClickFocusRef.current = true;
-			}),
-			onFocus: composeEventHandlers(props.onFocus, (event) => {
-				const isKeyboardFocus = !isClickFocusRef.current;
-				if (event.target === event.currentTarget && isKeyboardFocus && !isTabbingBackOut) {
-					const entryFocusEvent = new CustomEvent(ENTRY_FOCUS, EVENT_OPTIONS);
-					event.currentTarget.dispatchEvent(entryFocusEvent);
-					if (!entryFocusEvent.defaultPrevented) {
-						const items = getItems().filter((item) => item.focusable);
-						focusFirst([
-							items.find((item) => item.active),
-							items.find((item) => item.id === currentTabStopId),
-							...items
-						].filter(Boolean).map((item) => item.ref.current), preventScrollOnEntryFocus);
-					}
-				}
-				isClickFocusRef.current = false;
-			}),
-			onBlur: composeEventHandlers(props.onBlur, () => setIsTabbingBackOut(false))
-		})
-	});
-});
-var ITEM_NAME = "RovingFocusGroupItem";
-var RovingFocusGroupItem = import_react.forwardRef((props, forwardedRef) => {
-	const { __scopeRovingFocusGroup, focusable = true, active = false, tabStopId, children, ...itemProps } = props;
-	const autoId = useId();
-	const id = tabStopId || autoId;
-	const context = useRovingFocusContext(ITEM_NAME, __scopeRovingFocusGroup);
-	const isCurrentTabStop = context.currentTabStopId === id;
-	const getItems = useCollection(__scopeRovingFocusGroup);
-	const { onFocusableItemAdd, onFocusableItemRemove, currentTabStopId } = context;
-	import_react.useEffect(() => {
-		if (focusable) {
-			onFocusableItemAdd();
-			return () => onFocusableItemRemove();
-		}
-	}, [
-		focusable,
-		onFocusableItemAdd,
-		onFocusableItemRemove
-	]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Collection.ItemSlot, {
-		scope: __scopeRovingFocusGroup,
-		id,
-		focusable,
-		active,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.span, {
-			tabIndex: isCurrentTabStop ? 0 : -1,
-			"data-orientation": context.orientation,
-			...itemProps,
-			ref: forwardedRef,
-			onMouseDown: composeEventHandlers(props.onMouseDown, (event) => {
-				if (!focusable) event.preventDefault();
-				else context.onItemFocus(id);
-			}),
-			onFocus: composeEventHandlers(props.onFocus, () => context.onItemFocus(id)),
-			onKeyDown: composeEventHandlers(props.onKeyDown, (event) => {
-				if (event.key === "Tab" && event.shiftKey) {
-					context.onItemShiftTab();
-					return;
-				}
-				if (event.target !== event.currentTarget) return;
-				const focusIntent = getFocusIntent(event, context.orientation, context.dir);
-				if (focusIntent !== void 0) {
-					if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-					event.preventDefault();
-					let candidateNodes = getItems().filter((item) => item.focusable).map((item) => item.ref.current);
-					if (focusIntent === "last") candidateNodes.reverse();
-					else if (focusIntent === "prev" || focusIntent === "next") {
-						if (focusIntent === "prev") candidateNodes.reverse();
-						const currentIndex = candidateNodes.indexOf(event.currentTarget);
-						candidateNodes = context.loop ? wrapArray(candidateNodes, currentIndex + 1) : candidateNodes.slice(currentIndex + 1);
-					}
-					setTimeout(() => focusFirst(candidateNodes));
-				}
-			}),
-			children: typeof children === "function" ? children({
-				isCurrentTabStop,
-				hasTabStop: currentTabStopId != null
-			}) : children
-		})
-	});
-});
-RovingFocusGroupItem.displayName = ITEM_NAME;
-var MAP_KEY_TO_FOCUS_INTENT = {
-	ArrowLeft: "prev",
-	ArrowUp: "prev",
-	ArrowRight: "next",
-	ArrowDown: "next",
-	PageUp: "first",
-	Home: "first",
-	PageDown: "last",
-	End: "last"
-};
-function getDirectionAwareKey(key, dir) {
-	if (dir !== "rtl") return key;
-	return key === "ArrowLeft" ? "ArrowRight" : key === "ArrowRight" ? "ArrowLeft" : key;
-}
-function getFocusIntent(event, orientation, dir) {
-	const key = getDirectionAwareKey(event.key, dir);
-	if (orientation === "vertical" && ["ArrowLeft", "ArrowRight"].includes(key)) return void 0;
-	if (orientation === "horizontal" && ["ArrowUp", "ArrowDown"].includes(key)) return void 0;
-	return MAP_KEY_TO_FOCUS_INTENT[key];
-}
-function focusFirst(candidates, preventScroll = false) {
-	const PREVIOUSLY_FOCUSED_ELEMENT = document.activeElement;
-	for (const candidate of candidates) {
-		if (candidate === PREVIOUSLY_FOCUSED_ELEMENT) return;
-		candidate.focus({ preventScroll });
-		if (document.activeElement !== PREVIOUSLY_FOCUSED_ELEMENT) return;
-	}
-}
-function wrapArray(array, startIndex) {
-	return array.map((_, index) => array[(startIndex + index) % array.length]);
-}
-var Root = RovingFocusGroup;
-var Item = RovingFocusGroupItem;
-var TABS_NAME = "Tabs";
-var [createTabsContext, createTabsScope] = createContextScope(TABS_NAME, [createRovingFocusGroupScope]);
-var useRovingFocusGroupScope = createRovingFocusGroupScope();
-var [TabsProvider, useTabsContext] = createTabsContext(TABS_NAME);
-var Tabs$1 = import_react.forwardRef((props, forwardedRef) => {
-	const { __scopeTabs, value: valueProp, onValueChange, defaultValue, orientation = "horizontal", dir, activationMode = "automatic", ...tabsProps } = props;
-	const direction = useDirection(dir);
-	const [value, setValue] = useControllableState({
-		prop: valueProp,
-		onChange: onValueChange,
-		defaultProp: defaultValue ?? "",
-		caller: TABS_NAME
-	});
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsProvider, {
-		scope: __scopeTabs,
-		baseId: useId(),
-		value,
-		onValueChange: setValue,
-		orientation,
-		dir: direction,
-		activationMode,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
-			dir: direction,
-			"data-orientation": orientation,
-			...tabsProps,
-			ref: forwardedRef
-		})
-	});
-});
-Tabs$1.displayName = TABS_NAME;
-var TAB_LIST_NAME = "TabsList";
-var TabsList$1 = import_react.forwardRef((props, forwardedRef) => {
-	const { __scopeTabs, loop = true, ...listProps } = props;
-	const context = useTabsContext(TAB_LIST_NAME, __scopeTabs);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Root, {
-		asChild: true,
-		...useRovingFocusGroupScope(__scopeTabs),
-		orientation: context.orientation,
-		dir: context.dir,
-		loop,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
-			role: "tablist",
-			"aria-orientation": context.orientation,
-			...listProps,
-			ref: forwardedRef
-		})
-	});
-});
-TabsList$1.displayName = TAB_LIST_NAME;
-var TRIGGER_NAME = "TabsTrigger";
-var TabsTrigger$1 = import_react.forwardRef((props, forwardedRef) => {
-	const { __scopeTabs, value, disabled = false, ...triggerProps } = props;
-	const context = useTabsContext(TRIGGER_NAME, __scopeTabs);
-	const rovingFocusGroupScope = useRovingFocusGroupScope(__scopeTabs);
-	const triggerId = makeTriggerId(context.baseId, value);
-	const contentId = makeContentId(context.baseId, value);
-	const isSelected = value === context.value;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Item, {
-		asChild: true,
-		...rovingFocusGroupScope,
-		focusable: !disabled,
-		active: isSelected,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.button, {
-			type: "button",
-			role: "tab",
-			"aria-selected": isSelected,
-			"aria-controls": contentId,
-			"data-state": isSelected ? "active" : "inactive",
-			"data-disabled": disabled ? "" : void 0,
-			disabled,
-			id: triggerId,
-			...triggerProps,
-			ref: forwardedRef,
-			onMouseDown: composeEventHandlers(props.onMouseDown, (event) => {
-				if (!disabled && event.button === 0 && event.ctrlKey === false) context.onValueChange(value);
-				else event.preventDefault();
-			}),
-			onKeyDown: composeEventHandlers(props.onKeyDown, (event) => {
-				if ([" ", "Enter"].includes(event.key)) context.onValueChange(value);
-			}),
-			onFocus: composeEventHandlers(props.onFocus, () => {
-				const isAutomaticActivation = context.activationMode !== "manual";
-				if (!isSelected && !disabled && isAutomaticActivation) context.onValueChange(value);
-			})
-		})
-	});
-});
-TabsTrigger$1.displayName = TRIGGER_NAME;
-var CONTENT_NAME = "TabsContent";
-var TabsContent$1 = import_react.forwardRef((props, forwardedRef) => {
-	const { __scopeTabs, value, forceMount, children, ...contentProps } = props;
-	const context = useTabsContext(CONTENT_NAME, __scopeTabs);
-	const triggerId = makeTriggerId(context.baseId, value);
-	const contentId = makeContentId(context.baseId, value);
-	const isSelected = value === context.value;
-	const isMountAnimationPreventedRef = import_react.useRef(isSelected);
-	import_react.useEffect(() => {
-		const rAF = requestAnimationFrame(() => isMountAnimationPreventedRef.current = false);
-		return () => cancelAnimationFrame(rAF);
-	}, []);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Presence, {
-		present: forceMount || isSelected,
-		children: ({ present }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Primitive.div, {
-			"data-state": isSelected ? "active" : "inactive",
-			"data-orientation": context.orientation,
-			role: "tabpanel",
-			"aria-labelledby": triggerId,
-			hidden: !present,
-			id: contentId,
-			tabIndex: 0,
-			...contentProps,
-			ref: forwardedRef,
-			style: {
-				...props.style,
-				animationDuration: isMountAnimationPreventedRef.current ? "0s" : void 0
-			},
-			children: present && children
-		})
-	});
-});
-TabsContent$1.displayName = CONTENT_NAME;
-function makeTriggerId(baseId, value) {
-	return `${baseId}-trigger-${value}`;
-}
-function makeContentId(baseId, value) {
-	return `${baseId}-content-${value}`;
-}
-var listeners = /* @__PURE__ */ new Map();
-var TabsContext$1 = (0, import_react.createContext)(null);
-function useTabContext() {
-	const ctx = (0, import_react.use)(TabsContext$1);
-	if (!ctx) throw new Error("You must wrap your component in <Tabs>");
-	return ctx;
-}
-var TabsList = TabsList$1;
-var TabsTrigger = TabsTrigger$1;
-function Tabs({ ref, groupId, persist = false, updateAnchor = false, defaultValue, value: _value, onValueChange: _onValueChange, ...props }) {
-	const tabsRef = (0, import_react.useRef)(null);
-	const valueToIdMap = (0, import_react.useMemo)(() => /* @__PURE__ */ new Map(), []);
-	const [value, setValue] = _value === void 0 ? (0, import_react.useState)(defaultValue) : [_value, (0, import_react.useEffectEvent)((v) => _onValueChange?.(v))];
-	(0, import_react.useLayoutEffect)(() => {
-		if (!groupId) return;
-		let previous = sessionStorage.getItem(groupId);
-		if (persist) previous ??= localStorage.getItem(groupId);
-		if (previous) setValue(previous);
-		const groupListeners = listeners.get(groupId) ?? /* @__PURE__ */ new Set();
-		groupListeners.add(setValue);
-		listeners.set(groupId, groupListeners);
-		return () => {
-			groupListeners.delete(setValue);
-		};
-	}, [
-		groupId,
-		persist,
-		setValue
-	]);
-	(0, import_react.useLayoutEffect)(() => {
-		const hash = window.location.hash.slice(1);
-		if (!hash) return;
-		for (const [value, id] of valueToIdMap.entries()) if (id === hash) {
-			setValue(value);
-			tabsRef.current?.scrollIntoView();
-			break;
-		}
-	}, [setValue, valueToIdMap]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tabs$1, {
-		ref: mergeRefs$1(ref, tabsRef),
-		value,
-		onValueChange: (v) => {
-			if (updateAnchor) {
-				const id = valueToIdMap.get(v);
-				if (id) window.history.replaceState(null, "", `#${id}`);
-			}
-			if (groupId) {
-				const groupListeners = listeners.get(groupId);
-				if (groupListeners) for (const listener of groupListeners) listener(v);
-				sessionStorage.setItem(groupId, v);
-				if (persist) localStorage.setItem(groupId, v);
-			} else setValue(v);
-		},
-		...props,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContext$1, {
-			value: (0, import_react.useMemo)(() => ({ valueToIdMap }), [valueToIdMap]),
-			children: props.children
-		})
-	});
-}
-function TabsContent({ value, ...props }) {
-	const { valueToIdMap } = useTabContext();
-	if (props.id) valueToIdMap.set(value, props.id);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContent$1, {
-		value,
-		...props,
-		children: props.children
-	});
-}
 var TabsContext = (0, import_react.createContext)(null);
 function Pre(props) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", {
@@ -3248,7 +3336,7 @@ function CopyButton({ className, containerRef, ...props }) {
 function CodeBlockTabs({ ref, ...props }) {
 	const containerRef = (0, import_react.useRef)(null);
 	const nested = (0, import_react.use)(TabsContext) !== null;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tabs, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tabs$1, {
 		ref: mergeRefs$1(containerRef, ref),
 		...props,
 		className: twMerge("bg-fd-card rounded-xl border", !nested && "my-4", props.className),
@@ -3262,21 +3350,21 @@ function CodeBlockTabs({ ref, ...props }) {
 	});
 }
 function CodeBlockTabsList(props) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsList, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsList$1, {
 		...props,
 		className: twMerge("flex flex-row px-2 overflow-x-auto text-fd-muted-foreground", props.className),
 		children: props.children
 	});
 }
 function CodeBlockTabsTrigger({ children, ...props }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TabsTrigger, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(TabsTrigger$1, {
 		...props,
 		className: twMerge("relative group inline-flex text-sm font-medium text-nowrap items-center transition-colors gap-2 px-2 py-1.5 hover:text-fd-accent-foreground data-[state=active]:text-fd-primary [&_svg]:size-3.5", props.className),
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-x-2 bottom-0 h-px group-data-[state=active]:bg-fd-primary" }), children]
 	});
 }
 function CodeBlockTab(props) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContent, { ...props });
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabsContent$1, { ...props });
 }
 function Image$1(props) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Image$2, {
@@ -3334,58 +3422,106 @@ var defaultMdxComponents = {
 	CalloutTitle,
 	CalloutDescription
 };
-function AppOnly({ children }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children });
-}
-function PagesOnly({ children }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-		style: { display: "none" },
-		children
+var Check$1 = ({ size }) => {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+		"data-testid": "geist-icon",
+		height: "16",
+		strokeLinejoin: "round",
+		viewBox: "0 0 16 16",
+		width: "16",
+		style: {
+			width: size,
+			height: size
+		},
+		color: "currentColor",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("title", { children: "Check Icon" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+			fillRule: "evenodd",
+			clipRule: "evenodd",
+			d: "M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8ZM11.5303 6.53033L12.0607 6L11 4.93934L10.4697 5.46967L6.5 9.43934L5.53033 8.46967L5 7.93934L3.93934 9L4.46967 9.53033L5.96967 11.0303C6.26256 11.3232 6.73744 11.3232 7.03033 11.0303L11.5303 6.53033Z",
+			fill: "currentColor"
+		})]
 	});
-}
-function Check$1() {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-		style: { color: "green" },
-		children: "✓"
+};
+var Cross = ({ size }) => {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+		"data-testid": "geist-icon",
+		height: "16",
+		strokeLinejoin: "round",
+		style: {
+			width: size,
+			height: size
+		},
+		color: "currentColor",
+		viewBox: "0 0 16 16",
+		width: "16",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("title", { children: "Cross Icon" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+			fillRule: "evenodd",
+			clipRule: "evenodd",
+			d: "M12.4697 13.5303L13 14.0607L14.0607 13L13.5303 12.4697L9.06065 7.99999L13.5303 3.53032L14.0607 2.99999L13 1.93933L12.4697 2.46966L7.99999 6.93933L3.53032 2.46966L2.99999 1.93933L1.93933 2.99999L2.46966 3.53032L6.93933 7.99999L2.46966 12.4697L1.93933 13L2.99999 14.0607L3.53032 13.5303L7.99999 9.06065L12.4697 13.5303Z",
+			fill: "currentColor"
+		})]
 	});
+};
+var DOCS_URL = "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com";
+function getImageSrc(src, size) {
+	const w = size === "1x" ? 1920 : 3840;
+	return `https://nextjs.org/_next/image?url=${encodeURIComponent(`${DOCS_URL}${src}`)}&w=${w}&q=75`;
 }
-function Cross() {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-		style: { color: "red" },
-		children: "✗"
-	});
-}
-function Image({ src, srcLight, srcDark, alt, width, height, ...rest }) {
-	const imgSrc = src || srcLight || srcDark || "";
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
-		src: imgSrc.startsWith("/") ? `https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com${imgSrc}` : imgSrc,
-		alt: alt || "",
+var Image = ({ srcLight, srcDark, alt, ...props }) => {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("figure", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+		...props,
+		alt,
+		loading: "lazy",
+		decoding: "async",
+		"data-nimg": "1",
+		className: "rounded-md border border-gray-200 bg-gray-100 dark:hidden",
+		srcSet: `${getImageSrc(srcLight, "1x")} 1x, ${getImageSrc(srcLight, "2x")} 2x`,
+		src: getImageSrc(srcLight, "2x"),
+		style: { color: "transparent" }
+	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+		...props,
+		alt,
+		loading: "lazy",
+		decoding: "async",
+		"data-nimg": "1",
+		className: "rounded-md border border-gray-200 bg-gray-100 hidden dark:block",
+		srcSet: `${getImageSrc(srcDark, "1x")} 1x, ${getImageSrc(srcDark, "2x")} 2x`,
+		src: getImageSrc(srcDark, "2x"),
+		style: { color: "transparent" }
+	})] });
+};
+var Video = ({ src, caption, width, height }) => {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("figure", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+		src,
 		width,
 		height,
-		loading: "lazy"
-	});
-}
-function OGImage() {
-	return null;
-}
-function VideoComponent() {
-	return null;
-}
-function VideoSkeleton() {
-	return null;
-}
+		autoPlay: true,
+		loop: true,
+		muted: true,
+		playsInline: true,
+		style: {
+			width: "100%",
+			height: "auto",
+			borderRadius: "8px"
+		}
+	}), caption && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("figcaption", {
+		style: {
+			textAlign: "center",
+			marginTop: "0.5rem"
+		},
+		children: caption
+	})] });
+};
 function getMDXComponents(components) {
 	return {
 		...defaultMdxComponents,
-		AppOnly,
-		PagesOnly,
-		Check: Check$1,
-		Cross,
 		Image,
-		img: Image,
-		OGImage,
-		VideoComponent,
-		VideoSkeleton,
+		img: (props) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", { ...props }),
+		Cross,
+		Check: Check$1,
+		Tab,
+		Tabs,
+		Video,
 		...components
 	};
 }
@@ -3412,7 +3548,7 @@ var createSsrRpc = (functionId, importer) => {
 		[TSS_SERVER_FUNCTION]: true
 	});
 };
-var $$splitComponentImporter = () => import("./_-BLA6-CEH.mjs");
+var $$splitComponentImporter = () => import("./_-uunaMeQ2.mjs");
 var Route = createFileRoute("/docs/$")({
 	component: lazyRouteComponent($$splitComponentImporter, "component"),
 	loader: async ({ params }) => {

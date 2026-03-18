@@ -1,85 +1,45 @@
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import type { MDXComponents } from 'mdx/types';
-import type { ReactNode } from 'react';
+import { Image as BlogImage } from '@/mdx/BlogImage';
+import { Check, Cross } from '@/mdx/Check';
+import { Image } from '@/mdx/Image';
+import { Video } from '@/mdx/Video';
 
-// Content filter components
-function AppOnly({ children }: { children: ReactNode }) {
-  return <>{children}</>;
-}
-
-function PagesOnly({ children }: { children: ReactNode }) {
-  return <div style={{ display: 'none' }}>{children}</div>;
-}
-
-// Status icons
-function Check() {
-  return <span style={{ color: 'green' }}>✓</span>;
-}
-
-function Cross() {
-  return <span style={{ color: 'red' }}>✗</span>;
-}
-
-// Image component - handles light/dark theme images
-function Image({
-  src,
-  srcLight,
-  srcDark,
-  alt,
-  width,
-  height,
-  ...rest
-}: {
-  src?: string;
-  srcLight?: string;
-  srcDark?: string;
-  alt?: string;
-  width?: number;
-  height?: number;
-  [key: string]: any;
-}) {
-  const imgSrc = src || srcLight || srcDark || '';
-  const resolvedSrc = imgSrc.startsWith('/')
-    ? `https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com${imgSrc}`
-    : imgSrc;
-
-  return (
-    <img
-      src={resolvedSrc}
-      alt={alt || ''}
-      width={width}
-      height={height}
-      loading="lazy"
-    />
-  );
-}
-
-function OGImage() {
-  return null;
-}
-
-function VideoComponent() {
-  return null;
-}
-
-function VideoSkeleton() {
-  return null;
-}
-
-export function getMDXComponents(components?: MDXComponents) {
+export function getMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     ...defaultMdxComponents,
-    AppOnly,
-    PagesOnly,
-    Check,
-    Cross,
     Image,
-    img: Image as any,
-    OGImage,
-    VideoComponent,
-    VideoSkeleton,
+    img: (props: any) => <img {...props} />,
+    Cross,
+    Check,
+    Tab,
+    Tabs,
+    Video,
     ...components,
-  } satisfies MDXComponents;
+  };
+}
+
+export function getBlogMDXComponents(
+  components?: MDXComponents,
+): MDXComponents {
+  return {
+    ...defaultMdxComponents,
+    Image: BlogImage,
+    img: (props: any) => <img {...props} />,
+    ...components,
+  };
+}
+
+export function getLearnMDXComponents(
+  components?: MDXComponents,
+): MDXComponents {
+  return {
+    ...defaultMdxComponents,
+    Image: BlogImage,
+    img: (props: any) => <img {...props} />,
+    ...components,
+  };
 }
 
 export const useMDXComponents = getMDXComponents;

@@ -4,7 +4,7 @@ import { a as RouterProvider, t as renderRouterToStream, v as require_jsx_runtim
 import { a as X_TSS_RAW_RESPONSE, d as isRedirect, f as isResolvedRedirect, h as safeObjectMerge, i as TSS_SERVER_FUNCTION, l as flattenMiddlewares, m as runWithStartContext, n as TSS_CONTENT_TYPE_FRAMED_VERSIONED, o as X_TSS_SERIALIZED, p as mergeHeaders, r as TSS_FORMDATA_CONTEXT, s as createNullProtoObject, t as FrameType, u as getStartOptions } from "./createServerFn-DnkWHxBI.mjs";
 import { t as getServerFnById } from "../__tanstack-start-server-fn-resolver-BkZFNguf.mjs";
 import { t as defineHandlerCallback } from "../_libs/tanstack__router-core.mjs";
-import processModule from "node:process";
+import process from "node:process";
 import { AsyncLocalStorage } from "node:async_hooks";
 //#region node_modules/.nitro/vite/services/ssr/index.js
 var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
@@ -3521,7 +3521,7 @@ var defaultSerovalPlugins = [
 * the dev styles URL for route-scoped CSS collection.
 */
 async function getStartManifest(matchedRoutes) {
-	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-Byf2hOLi.mjs");
+	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-CPk0TFIB.mjs");
 	const startManifest = tsrStartManifest();
 	const rootRoute = startManifest.routes[rootRouteId] = startManifest.routes["__root__"] || {};
 	rootRoute.assets = rootRoute.assets || [];
@@ -4267,7 +4267,7 @@ var baseManifestPromise;
 */
 var cachedFinalManifestPromise;
 async function loadEntries() {
-	const routerEntry = await import("./router-DcEqWcBQ.mjs");
+	const routerEntry = await import("./router-By51jc7k.mjs");
 	return {
 		startEntry: await import("./start-Cy_JjqhN.mjs"),
 		routerEntry
@@ -4305,8 +4305,8 @@ async function resolveManifest(matchedRoutes, transformFn, cache) {
 }
 var ROUTER_BASEPATH = "/";
 var SERVER_FN_BASE = "/_serverFn/";
-var IS_PRERENDERING = processModule.env.TSS_PRERENDERING === "true";
-var IS_SHELL_ENV = processModule.env.TSS_SHELL === "true";
+var IS_PRERENDERING = process.env.TSS_PRERENDERING === "true";
+var IS_SHELL_ENV = process.env.TSS_SHELL === "true";
 var IS_DEV = false;
 var ERR_NO_RESPONSE = IS_DEV ? `It looks like you forgot to return a response from your server route handler. If you want to defer to the app router, make sure to have a component set in this route.` : "Internal Server Error";
 var ERR_NO_DEFER = IS_DEV ? `You cannot defer to the app router if there is no component defined on this route.` : "Internal Server Error";
