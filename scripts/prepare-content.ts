@@ -379,6 +379,26 @@ function processFile(
   }
 }
 
+// ── Copy Astro-only content (e.g., splash index pages) ──
+
+const CONTENT_ASTRO = resolve(import.meta.dirname!, '../content-astro');
+if (existsSync(CONTENT_ASTRO)) {
+  const astroFiles = walkMdx(CONTENT_ASTRO);
+  for (const srcPath of astroFiles) {
+    const relPath = relative(CONTENT_ASTRO, srcPath);
+    // Map locale to Starlight structure (en goes to root)
+    const parts = relPath.split('/');
+    const locale = parts[0];
+    const rest = parts.slice(1).join('/');
+    const dstRel = locale === ROOT_LOCALE ? rest : relPath;
+    const dstPath = join(CONTENT_DST, dstRel);
+    ensureDir(dstPath);
+    writeFileSync(dstPath, readFileSync(srcPath, 'utf-8'));
+    totalFiles++;
+  }
+  console.log(`Astro-only content copied from ${CONTENT_ASTRO}`);
+}
+
 console.log(`\nTotal: ${totalFiles} files`);
 console.log(`Source references resolved: ${sourceResolved}`);
 console.log(`Source references failed: ${sourceErrors}`);
