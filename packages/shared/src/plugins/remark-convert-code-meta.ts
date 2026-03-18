@@ -1,4 +1,10 @@
-// Inline from packages/const to avoid dependency
+import type { Code, Root } from 'mdast';
+import { visit } from 'unist-util-visit';
+
+/**
+ * Language aliases — converts non-standard language identifiers to standard ones.
+ * Ported from packages/const/src/mdx.ts
+ */
 const LANGUAGE_MAP: Record<string, string> = {
   '.env': 'bash',
   env: 'bash',
@@ -8,48 +14,41 @@ const LANGUAGE_MAP: Record<string, string> = {
   Terminal: 'bash',
   'Component hierarchy': 'tsx',
 };
-import type { Code, Heading, Paragraph, Root } from 'mdast';
-import { visit } from 'unist-util-visit';
 
 /**
- * Remark plugin that enhances code blocks in the following ways:
+ * Remark plugin that enhances code blocks:
  *
- * 1. Converts code blocks with both `filename` and `switcher` attributes to use `tab` attribute format
- * 2. Converts code blocks with only `filename` attribute to use `title` attribute format
- * 3. Automatically converts specific language identifiers (e.g., ".env") to more appropriate ones (e.g., "bash")
+ * 1. `filename="x" switcher` → `tab="x"` (consecutive blocks become tabs)
+ * 2. `filename="x"` → `title="x"` (shows filename as code block title)
+ * 3. Language aliases: `.env`→`bash`, `terminal`→`bash`, etc.
  *
+ * Ported from apps/docs/src/lib/remark-plugins/remark-convert-code-meta.ts
  */
-export function convertCodeMeta() {
+export function remarkConvertCodeMeta() {
   return (tree: Root) => {
     visit(tree, 'code', (node: Code) => {
-      // Convert language to bash
+      // Convert language aliases
       if (node.lang && LANGUAGE_MAP[node.lang]) {
         node.lang = LANGUAGE_MAP[node.lang];
       }
-      // Check if node has meta with filename
+
       if (node.meta && typeof node.meta === 'string') {
         const meta = node.meta;
 
-        // Extract the filename if it exists
         const filenameMatch = meta.match(/filename="([^"]+)"/);
         if (filenameMatch?.[1]) {
           const filename = filenameMatch[1];
 
-          // Check if meta contains both filename and switcher
           if (meta.includes('filename=') && meta.includes('switcher')) {
-            // If it has both, convert to tab attribute and remove switcher
-            // First remove the switcher attribute
+            // filename + switcher → tab (for TS/JS toggle tabs)
             let newMeta = meta.replace(/\s*switcher\s*/, ' ');
-            // Then replace the filename attribute with tab attribute
             newMeta = newMeta.replace(
               /filename="([^"]+)"/,
               `tab="${filename}"`,
             );
-            // Cleanup any extra spaces
             node.meta = newMeta.trim();
-            // console.log(`Converted to tab: ${node.meta}`);
           } else if (meta.includes('filename=')) {
-            // If only filename, convert to title attribute
+            // filename only → title (shows as code block header)
             node.meta = meta.replace(
               /filename="([^"]+)"/,
               `title="${filename}"`,
