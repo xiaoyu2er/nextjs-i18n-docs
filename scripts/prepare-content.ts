@@ -212,9 +212,9 @@ function shouldIncludeSection(sectionName: string): boolean {
 
 // ── Main Processing ──
 
-if (existsSync(CONTENT_DST)) {
-  rmSync(CONTENT_DST, { recursive: true });
-}
+// Use force: true to handle race condition when multiple versioned workers
+// share the same directory (apps/web-v) and run prepare-content concurrently
+rmSync(CONTENT_DST, { recursive: true, force: true });
 mkdirSync(CONTENT_DST, { recursive: true });
 
 let totalFiles = 0;
