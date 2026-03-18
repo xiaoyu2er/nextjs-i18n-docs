@@ -103,9 +103,12 @@ for (const w of workers) {
     const dst = resolve(tmpDir, entry);
     const stat = lstatSync(src);
 
-    if (entry === 'node_modules' || entry === '.astro' || entry === 'dist') {
-      // Symlink large/generated dirs
+    if (entry === 'node_modules' || entry === 'dist') {
+      // Symlink large dirs (shared)
       symlinkSync(src, dst);
+    } else if (entry === '.astro') {
+      // Don't copy or create — Astro will regenerate its own cache per version
+      continue;
     } else if (entry === 'src') {
       // Deep copy src/ so each version has its own content dir
       cpSync(src, dst, { recursive: true });
@@ -125,6 +128,8 @@ for (const w of workers) {
   if (!existsSync(resolve(tmpDir, 'node_modules'))) {
     symlinkSync(resolve(ROOT, 'node_modules'), resolve(tmpDir, 'node_modules'));
   }
+
+
 
   // Update worker dir to point to the temp copy
   w.dir = `.cache/web-v${version}`;
@@ -165,7 +170,7 @@ console.log(`${CYAN}[prep]${RESET} Content ready.\n`);
 for (const w of workers) {
   console.log(`${w.color}[${w.name}]${RESET} Starting on :${w.port}...`);
 
-  const proc = spawn(['bunx', 'astro', 'dev', '--port', String(w.port)], {
+  const proc = spawn(['bunx', '--bun', 'astro', 'dev', '--port', String(w.port)], {
     cwd: resolve(ROOT, w.dir),
     stdout: 'pipe',
     stderr: 'pipe',
