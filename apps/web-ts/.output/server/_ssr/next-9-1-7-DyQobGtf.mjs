@@ -1,0 +1,1812 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { n as __exportAll } from "./chunk-BnRpC7BT.mjs";
+import { v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/next-9-1-7-DyQobGtf.js
+var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
+var next_9_1_7_exports = /* @__PURE__ */ __exportAll({
+	default: () => MDXContent,
+	frontmatter: () => frontmatter,
+	structuredData: () => structuredData,
+	toc: () => toc
+});
+var frontmatter = {
+	"title": "Next.js 9.1.7",
+	"description": "Next.js 9.1.7 improves upon a solid foundation, improving the enterprise-ready 9.1 release-channel. Upgrade for smaller client-side JavaScript bundles, redesigned CLI output, faster FCP/TTI, and more!",
+	"author": [
+		{
+			"name": "JJ Kasper",
+			"image": "/static/team/jj.jpg"
+		},
+		{
+			"name": "Joe Haddad",
+			"image": "/static/team/timer.jpg"
+		},
+		{
+			"name": "Luis Alvarez",
+			"image": "/static/team/lfades.jpg"
+		},
+		{
+			"name": "Tim Neutkens",
+			"image": "/static/team/tim.jpg"
+		}
+	],
+	"date": /* @__PURE__ */ new Date(15783255e5),
+	"image": "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-1-7/twitter-card.png"
+};
+var structuredData = {
+	"contents": [
+		{
+			"heading": void 0,
+			"content": "Next.js 9 was released six (6) months ago, followed by Next.js 9.1 three (3) months ago."
+		},
+		{
+			"heading": void 0,
+			"content": "These two releases added very powerful new features to Next.js, without increasing our baseline client runtime size."
+		},
+		{
+			"heading": void 0,
+			"content": "Since then, we've focused heavily on refining and improving the framework as a whole: 9.1.1, 9.1.2, 9.1.3, 9.1.4, 9.1.5, 9.1.6, and 9.1.7."
+		},
+		{
+			"heading": void 0,
+			"content": "Let's dive into what these releases have improved!"
+		},
+		{
+			"heading": void 0,
+			"content": "**3% - 8%+ Smaller Client-Side JavaScript Size**: We've optimized application output even futher, shaving 7.5kB off hello world applications. More complex applications will show a savings up to 8% or more."
+		},
+		{
+			"heading": void 0,
+			"content": "**Redesigned Production Build CLI Output**: The production build output now shows gzipped file sizes in an easier to understand format."
+		},
+		{
+			"heading": void 0,
+			"content": "**New Built-In Polyfills: fetch(), URL, and Object.assign**: Applications can leverage the `fetch()` API, `URL`, and `Object.assign` in legacy browsers without compatibility concerns."
+		},
+		{
+			"heading": void 0,
+			"content": "**Optimized Page Loading: Better FCP and TTI**: We've collaborated closely with the Google Chrome team to maximize page loading performance. This results in a much better end-user experience."
+		},
+		{
+			"heading": void 0,
+			"content": "**Support for the Latest JavaScript Features**: We're committed to ensuring you can always use the latest JavaScript features, including Optional Chaining, Nullish Coalescing, and other stable ES2020 features."
+		},
+		{
+			"heading": void 0,
+			"content": "**Zero-Config Deployment Support for `next export` Applications**: `next export` powered applications can now be deployed to Vercel with zero configuration."
+		},
+		{
+			"heading": void 0,
+			"content": "**React Strict Mode Compliance and Opt-In**: All of Next.js' client-side runtime is now compatible with React's Strict Mode. We've also added a configuration option to enable this mode for your whole application."
+		},
+		{
+			"heading": void 0,
+			"content": "**Automated Testing against Nightly React Builds**: Next.js is automatically tested against React's next channel, ensuring compatibility with future releases."
+		},
+		{
+			"heading": void 0,
+			"content": "All of these benefits are non-breaking and fully backwards compatible. All you need to do to update is run:"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "In collaboration with the Google Chrome team, all Next.js applications will benefit from a **7.5kB or more** size reduction."
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "Basic applications should see a 3-4% application size reduction, and more advanced applications may see upwards of 6-8% (or more)!"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "9.0.x"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "9.1.x"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "delta"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "Basic Application"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "68.9kB"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "66.1kB"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "**4.1%** *smaller*"
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "These savings are partially attributable to replacing the `url` package's client-side version with one built atop the URL API."
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "More size reduction has been accomplished by providing built-in, small polyfills for often-used packages. You can read more about those polyfills here."
+		},
+		{
+			"heading": "3---8-smaller-client-side-javascript-size",
+			"content": "Lastly, we've optimized our JSX output which will introduce savings in direct correlation to the amount of JSX in your application."
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "The CLI's production build output has been redesigned for clarity. Because Next.js is a hybrid application framework, each page may have different characteristics."
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "The new output classifies each page as one of the following:"
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "**Server-Side Rendered (Server)**: the page server-side renders at runtime, meaning it uses `getInitialProps` or `getServerProps` (proposal)"
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "**Automatically Statically Optimized (Static)**: the page was rendered as static HTML at build time, and will be served as a static file (uses no initial props)"
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "**Statically Generated Using Computed Data (SSG)**: the page was generated as static HTML/JSON at build time, and will be served as static files (uses `getStaticProps` (proposal))"
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "Furthermore, the new output displays the Gzipped size of each page — these sizes exclude files that are shared by all pages (displayed separately)."
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "Each page's size will be colored in accordance with their perceived user experience:"
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "**Less than 130kB**: *Green* — your application should be performant under most network and device conditions."
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "**Between 130kB and 170kB**: *Yellow* — your application is nearing a 5-6 second load time on global baseline device + network conditions."
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "**More than 170kB**: *Red* — your application will likely take more than 6 seconds to load on the same conditions."
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "The New Next.js Production CLI Output"
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "We'd love to hear your feedback about the new build output."
+		},
+		{
+			"heading": "redesigned-production-build-cli-output",
+			"content": "In the near future Next.js will also have size budgets that help you ensure pages are within a certain size bracket."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "While examining many users' applications and our examples, we found that most shipped with a similar set of polyfills. In some cases, applications even had duplicate polyfills for the same feature."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "To remedy this, we collaborated with the Google Chrome team to build in polyfills for the three most common APIs we observed."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "Using differential loading, these polyfills are **not loaded for 83% of web traffic** globally. This means that the majority of your users will not download the bytes associated with these polyfills—they'll only be downloaded if necessary."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "Furthermore, any well-known polyfills that we've now built in will be completely eliminated from your production build. This means you will not pay the price for one of your dependencies that inadvertently import a polyfill for one of these APIs."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "The list of built-in APIs and the polyfills they make obsolete are as follows:"
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "**fetch()** — Replacing: `whatwg-fetch` and `unfetch`."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "**URL** — Replacing: the `url` package (Node.js API)."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "**Object.assign()** — Replacing: `object-assign`, `object.assign`, and `core-js/object/assign`."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "You still need to import `isomorphic-fetch` or `isomorphic-unfetch` if you're using `fetch()` on the server."
+		},
+		{
+			"heading": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "This change is completely non-breaking, and all polyfills are made with the most spec-compliant versions available. The result is up to **18kB of JavaScript eliminated** from your production bundles on modern browsers."
+		},
+		{
+			"heading": "optimized-page-loading-better-fcp-and-tti",
+			"content": "Next.js has optimized its preloading implementation to reduce FCP and overall TTI."
+		},
+		{
+			"heading": "optimized-page-loading-better-fcp-and-tti",
+			"content": "By working around a browser bug, CSS (when used) is now correctly prioritized over JavaScript. This results in a faster First Contentful Paint, resulting in a much faster visually complete website for your end-users."
+		},
+		{
+			"heading": "optimized-page-loading-better-fcp-and-tti",
+			"content": "Additionally, we've optimized our page prefetching to use lower-priority network requests."
+		},
+		{
+			"heading": "optimized-page-loading-better-fcp-and-tti",
+			"content": "Furthermore, these requests only happen during browser idle-time, resulting in a quicker time-to-interactive. This is because the browser will prioritize making your application interactive over optimistic prefetching."
+		},
+		{
+			"heading": "optimized-page-loading-better-fcp-and-tti",
+			"content": "FCP/TTI Before and After Optimizations"
+		},
+		{
+			"heading": "support-for-the-latest-javascript-features",
+			"content": "Next.js has an advanced, highly optimized compilation pipeline that allows you to use the latest JavaScript features. Recent optimizations we have introduced directly contributed to the 3-8% reduction in application size."
+		},
+		{
+			"heading": "support-for-the-latest-javascript-features",
+			"content": "These JavaScript features can be leveraged without worrying about browser compatibility, as we automatically compile your code to support all browsers (excluding end-of-life versions). This includes ES6+ features, such as async/await (ES2017), Object Rest/Spread Properties (ES2018), Dynamic `import()` (ES2020), and more!"
+		},
+		{
+			"heading": "support-for-the-latest-javascript-features",
+			"content": "In this release, we're happy to announce support for Optional Chaining (Stage 4) and Nullish Coalescing (Stage 4)."
+		},
+		{
+			"heading": "support-for-the-latest-javascript-features",
+			"content": "> Optional chaining operator (`?.`)"
+		},
+		{
+			"heading": "support-for-the-latest-javascript-features",
+			"content": "> Nullish coalescing operator (`??`)"
+		},
+		{
+			"heading": "support-for-the-latest-javascript-features",
+			"content": "In the future, we plan to output even more optimized bundles via automatic module / nomodule builds."
+		},
+		{
+			"heading": "zero-config-deployment-support-for-next-export-applications",
+			"content": "Next.js' `next export` command now works with Vercel's Zero Configuration out-of-the-box. Prior to this change, users who leveraged `next export` were required to create a custom `now.json`."
+		},
+		{
+			"heading": "zero-config-deployment-support-for-next-export-applications",
+			"content": "Leveraging Next.js' export-mode on Vercel is as simple as having the following `build` script in `package.json`:"
+		},
+		{
+			"heading": "zero-config-deployment-support-for-next-export-applications",
+			"content": "Then, you can deploy your Next.js application to Vercel with **only a single command**. If you have not yet installed Vercel, you can do so by installing Vercel CLI."
+		},
+		{
+			"heading": "react-strict-mode-compliance-and-opt-in",
+			"content": "The complete Next.js runtime is now Strict Mode-compliant. This included updates to Next.js' head manager (`<Head>`), `next/dynamic`, and other core features. This means the runtimes now leverage hooks or have eliminated deprecated lifecycles, and are using React's new Context API."
+		},
+		{
+			"heading": "react-strict-mode-compliance-and-opt-in",
+			"content": "We've also added a convenient opt-in option for you to enable Strict Mode for your application."
+		},
+		{
+			"heading": "react-strict-mode-compliance-and-opt-in",
+			"content": "To do so, configure the following option in your `next.config.js`:"
+		},
+		{
+			"heading": "react-strict-mode-compliance-and-opt-in",
+			"content": "If you or your team are not ready to use Strict Mode in your entire application, that's OK! You can incrementally migrate on a page-by-page basis using `<React.StrictMode>`."
+		},
+		{
+			"heading": "react-strict-mode-compliance-and-opt-in",
+			"content": "While **not required**, Strict Mode will unlock a lot of optimizations in the future. Because of this, we suggest you look into it sooner rather than later!"
+		},
+		{
+			"heading": "automated-testing-against-nightly-react-builds",
+			"content": "In close collaboration with the React Core Team, we're now testing Next.js against React's next channel every 12 hours."
+		},
+		{
+			"heading": "automated-testing-against-nightly-react-builds",
+			"content": "These tests help ensure we're prepared and compatible with the future releases of React. Compatibility is something Next.js takes very seriously, and we're committed to the long-term API stability of Next.js."
+		},
+		{
+			"heading": "automated-testing-against-nightly-react-builds",
+			"content": "This process has been documented by the React Core Team in hopes other projects in the React ecosystem follow suit."
+		},
+		{
+			"heading": "community",
+			"content": "We are excited about the upcoming changes that will improve size and performance across all Next.js applications."
+		},
+		{
+			"heading": "community",
+			"content": "Furthermore, the Next.js community is still expanding:"
+		},
+		{
+			"heading": "community",
+			"content": "We have had over **865** independent contributors."
+		},
+		{
+			"heading": "community",
+			"content": "On GitHub, the project has been starred over **43,700** times."
+		},
+		{
+			"heading": "community",
+			"content": "The examples directory has over &#x2A;*220 examples.**"
+		},
+		{
+			"heading": "community",
+			"content": "The Next.js community now has over **13,600** members. Join us!"
+		},
+		{
+			"heading": "community",
+			"content": "We are thankful to our community and all the external feedback and contributions that helped shape this release."
+		}
+	],
+	"headings": [
+		{
+			"id": "3---8-smaller-client-side-javascript-size",
+			"content": "3% - 8%+ Smaller Client-Side JavaScript Size"
+		},
+		{
+			"id": "redesigned-production-build-cli-output",
+			"content": "Redesigned Production Build CLI Output"
+		},
+		{
+			"id": "new-built-in-polyfills-fetch-url-and-objectassign",
+			"content": "New Built-In Polyfills: fetch(), URL, and Object.assign"
+		},
+		{
+			"id": "optimized-page-loading-better-fcp-and-tti",
+			"content": "Optimized Page Loading: Better FCP and TTI"
+		},
+		{
+			"id": "support-for-the-latest-javascript-features",
+			"content": "Support for the Latest JavaScript Features"
+		},
+		{
+			"id": "zero-config-deployment-support-for-next-export-applications",
+			"content": "Zero-Config Deployment Support for `next export` Applications"
+		},
+		{
+			"id": "react-strict-mode-compliance-and-opt-in",
+			"content": "React Strict Mode Compliance and Opt-In"
+		},
+		{
+			"id": "automated-testing-against-nightly-react-builds",
+			"content": "Automated Testing against Nightly React Builds"
+		},
+		{
+			"id": "community",
+			"content": "Community"
+		}
+	]
+};
+var toc = [
+	{
+		depth: 3,
+		url: "#3---8-smaller-client-side-javascript-size",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#3---8-smaller-client-side-javascript-size",
+			children: "3% - 8%+ Smaller Client-Side JavaScript Size"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#redesigned-production-build-cli-output",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#redesigned-production-build-cli-output",
+			children: "Redesigned Production Build CLI Output"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#new-built-in-polyfills-fetch-url-and-objectassign",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#new-built-in-polyfills-fetch-url-and-objectassign",
+			children: "New Built-In Polyfills: fetch(), URL, and Object.assign"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#optimized-page-loading-better-fcp-and-tti",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#optimized-page-loading-better-fcp-and-tti",
+			children: "Optimized Page Loading: Better FCP and TTI"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#support-for-the-latest-javascript-features",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#support-for-the-latest-javascript-features",
+			children: "Support for the Latest JavaScript Features"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#zero-config-deployment-support-for-next-export-applications",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsxs)("a", {
+			href: "#zero-config-deployment-support-for-next-export-applications",
+			children: [
+				"Zero-Config Deployment Support for ",
+				(0, import_jsx_runtime.jsx)("code", { children: "next export" }),
+				" Applications"
+			]
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#react-strict-mode-compliance-and-opt-in",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#react-strict-mode-compliance-and-opt-in",
+			children: "React Strict Mode Compliance and Opt-In"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#automated-testing-against-nightly-react-builds",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#automated-testing-against-nightly-react-builds",
+			children: "Automated Testing against Nightly React Builds"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#community",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#community",
+			children: "Community"
+		}) })
+	}
+];
+function _createMdxContent(props) {
+	const _components = {
+		a: "a",
+		blockquote: "blockquote",
+		code: "code",
+		em: "em",
+		h2: "h2",
+		h3: "h3",
+		img: "img",
+		li: "li",
+		p: "p",
+		pre: "pre",
+		span: "span",
+		strong: "strong",
+		table: "table",
+		tbody: "tbody",
+		td: "td",
+		th: "th",
+		thead: "thead",
+		tr: "tr",
+		ul: "ul",
+		...props.components
+	};
+	return (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/blog/next-9",
+				children: "Next.js 9"
+			}),
+			" was released six (6) months ago, followed by ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/blog/next-9-1",
+				children: "Next.js 9.1"
+			}),
+			" three (3) months ago."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "These two releases added very powerful new features to Next.js, without increasing our baseline client runtime size." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Since then, we've focused heavily on refining and improving the framework as a whole: ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.1.1",
+				children: "9.1.1"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.1.2",
+				children: "9.1.2"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.1.3",
+				children: "9.1.3"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.1.4",
+				children: "9.1.4"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.1.5",
+				children: "9.1.5"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.1.6",
+				children: "9.1.6"
+			}),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/releases/tag/v9.1.7",
+				children: "9.1.7"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Let's dive into what these releases have improved!" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#3--8-smaller-client-side-javascript-size",
+				children: "3% - 8%+ Smaller Client-Side JavaScript Size"
+			}) }), ": We've optimized application output even futher, shaving 7.5kB off hello world applications. More complex applications will show a savings up to 8% or more."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#redesigned-production-build-cli-output",
+				children: "Redesigned Production Build CLI Output"
+			}) }), ": The production build output now shows gzipped file sizes in an easier to understand format."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#new-built-in-polyfills-fetch-url-and-objectassign",
+					children: "New Built-In Polyfills: fetch(), URL, and Object.assign"
+				}) }),
+				": Applications can leverage the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "fetch()" }),
+				" API, ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "URL" }),
+				", and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "Object.assign" }),
+				" in legacy browsers without compatibility concerns."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#optimized-page-loading-better-fcp-and-tti",
+				children: "Optimized Page Loading: Better FCP and TTI"
+			}) }), ": We've collaborated closely with the Google Chrome team to maximize page loading performance. This results in a much better end-user experience."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#support-for-the-latest-javascript-features",
+					children: "Support for the Latest JavaScript Features"
+				}) }),
+				": We're committed to ensuring you can always use the latest JavaScript features, including ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/tc39/proposal-optional-chaining",
+					children: "Optional Chaining"
+				}),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/tc39/proposal-nullish-coalescing",
+					children: "Nullish Coalescing"
+				}),
+				", and other stable ES2020 features."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsxs)(_components.a, {
+					href: "#zero-config-deployment-support-for-next-export-applications",
+					children: [
+						"Zero-Config Deployment Support for ",
+						(0, import_jsx_runtime.jsx)(_components.code, { children: "next export" }),
+						" Applications"
+					]
+				}) }),
+				": ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next export" }),
+				" powered applications can now be deployed to ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://vercel.com",
+					children: "Vercel"
+				}),
+				" with zero configuration."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#react-strict-mode-compliance-and-opt-in",
+				children: "React Strict Mode Compliance and Opt-In"
+			}) }), ": All of Next.js' client-side runtime is now compatible with React's Strict Mode. We've also added a configuration option to enable this mode for your whole application."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#automated-testing-against-nightly-react-builds",
+					children: "Automated Testing against Nightly React Builds"
+				}) }),
+				": Next.js is automatically tested against ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://reactjs.org/blog/2019/10/22/react-release-channels.html",
+					children: "React's next channel"
+				}),
+				", ensuring compatibility with future releases."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "All of these benefits are non-breaking and fully backwards compatible. All you need to do to update is run:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "Terminal",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsx)(_components.code, { children: (0, import_jsx_runtime.jsxs)(_components.span, {
+				className: "line",
+				children: [
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6F42C1",
+							"--shiki-dark": "#B392F0"
+						},
+						children: "npm"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " i"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " next@latest"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " react@latest"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " react-dom@latest"
+					})
+				]
+			}) })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "3---8-smaller-client-side-javascript-size",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#3---8-smaller-client-side-javascript-size",
+				children: "3% - 8%+ Smaller Client-Side JavaScript Size"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In collaboration with the Google Chrome team, all Next.js applications will benefit from a ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "7.5kB or more" }),
+			" size reduction."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Basic applications should see a 3-4% application size reduction, and more advanced applications may see upwards of 6-8% (or more)!" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.table, { children: [(0, import_jsx_runtime.jsx)(_components.thead, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.th, {}),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "9.0.x" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "9.1.x" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "delta" })
+		] }) }), (0, import_jsx_runtime.jsx)(_components.tbody, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "Basic Application" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "68.9kB" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "66.1kB" }),
+			(0, import_jsx_runtime.jsxs)(_components.td, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "4.1%" }),
+				" ",
+				(0, import_jsx_runtime.jsx)(_components.em, { children: "smaller" })
+			] })
+		] }) })] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"These savings are partially attributable to ",
+			(0, import_jsx_runtime.jsxs)(_components.a, {
+				href: "https://github.com/GoogleChromeLabs/native-url",
+				children: [
+					"replacing the ",
+					(0, import_jsx_runtime.jsx)(_components.code, { children: "url" }),
+					" package's client-side version"
+				]
+			}),
+			" with one built atop the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/API/URL",
+				children: "URL API"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"More size reduction has been accomplished by providing built-in, small polyfills for often-used packages. You can ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#new-built-in-polyfills-fetch-url-and-objectassign",
+				children: "read more about those polyfills here"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Lastly, we've optimized our JSX output which will introduce savings in direct correlation to the amount of JSX in your application." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "redesigned-production-build-cli-output",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#redesigned-production-build-cli-output",
+				children: "Redesigned Production Build CLI Output"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The CLI's production build output has been redesigned for clarity. Because Next.js is a hybrid application framework, each page may have different characteristics." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The new output classifies each page as one of the following:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Server-Side Rendered (Server)" }),
+				": the page server-side renders at runtime, meaning it uses ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "getInitialProps" }),
+				" or ",
+				(0, import_jsx_runtime.jsxs)(_components.a, {
+					href: "https://github.com/vercel/next.js/issues/9524",
+					children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "getServerProps" }), " (proposal)"]
+				})
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Automatically Statically Optimized (Static)" }), ": the page was rendered as static HTML at build time, and will be served as a static file (uses no initial props)"] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Statically Generated Using Computed Data (SSG)" }),
+				": the page was generated as static HTML/JSON at build time, and will be served as static files (uses ",
+				(0, import_jsx_runtime.jsxs)(_components.a, {
+					href: "https://github.com/vercel/next.js/issues/9524",
+					children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "getStaticProps" }), " (proposal)"]
+				}),
+				")"
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Furthermore, the new output displays the Gzipped size of each page — these sizes exclude files that are shared by all pages (displayed separately)." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Each page's size will be colored in accordance with their perceived user experience:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Less than 130kB" }),
+				": ",
+				(0, import_jsx_runtime.jsx)(_components.em, { children: "Green" }),
+				" — your application should be performant under most network and device conditions."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Between 130kB and 170kB" }),
+				": ",
+				(0, import_jsx_runtime.jsx)(_components.em, { children: "Yellow" }),
+				" — your application is nearing a 5-6 second load time on ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://infrequently.org/2017/10/can-you-afford-it-real-world-web-performance-budgets/",
+					children: "global baseline device + network conditions"
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "More than 170kB" }),
+				": ",
+				(0, import_jsx_runtime.jsx)(_components.em, { children: "Red" }),
+				" — your application will likely take more than 6 seconds to load on ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://infrequently.org/2017/10/can-you-afford-it-real-world-web-performance-budgets/",
+					children: "the same conditions"
+				}),
+				"."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.img, {
+			src: "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-1-7/next-new-output.png",
+			alt: "The New Next.js Production CLI Output"
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The New Next.js Production CLI Output" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We'd love to hear your feedback about the new build output." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "In the near future Next.js will also have size budgets that help you ensure pages are within a certain size bracket." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "new-built-in-polyfills-fetch-url-and-objectassign",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#new-built-in-polyfills-fetch-url-and-objectassign",
+				children: "New Built-In Polyfills: fetch(), URL, and Object.assign"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "While examining many users' applications and our examples, we found that most shipped with a similar set of polyfills. In some cases, applications even had duplicate polyfills for the same feature." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "To remedy this, we collaborated with the Google Chrome team to build in polyfills for the three most common APIs we observed." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Using differential loading, these polyfills are ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "not loaded for 83% of web traffic" }),
+			" globally. This means that the majority of your users will not download the bytes associated with these polyfills—they'll only be downloaded if necessary."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Furthermore, any well-known polyfills that we've now built in will be completely eliminated from your production build. This means you will not pay the price for one of your dependencies that inadvertently import a polyfill for one of these APIs." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The list of built-in APIs and the polyfills they make obsolete are as follows:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://developer.mozilla.org/docs/Web/API/Fetch_API",
+					children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "fetch()" })
+				}),
+				" — Replacing: ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "whatwg-fetch" }),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "unfetch" }),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://developer.mozilla.org/docs/Web/API/URL",
+					children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "URL" })
+				}),
+				" — Replacing: the ",
+				(0, import_jsx_runtime.jsxs)(_components.a, {
+					href: "https://nodejs.org/api/url.html",
+					children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "url" }), " package (Node.js API)"]
+				}),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object/assign",
+					children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "Object.assign()" })
+				}),
+				" — Replacing: ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "object-assign" }),
+				", ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "object.assign" }),
+				", and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "core-js/object/assign" }),
+				"."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You still need to import ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "isomorphic-fetch" }),
+			" or ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "isomorphic-unfetch" }),
+			" if you're using ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "fetch()" }),
+			" on the server."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"This change is completely non-breaking, and all polyfills are made with the most spec-compliant versions available. The result is up to ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "18kB of JavaScript eliminated" }),
+			" from your production bundles on modern browsers."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "optimized-page-loading-better-fcp-and-tti",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#optimized-page-loading-better-fcp-and-tti",
+				children: "Optimized Page Loading: Better FCP and TTI"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Next.js has optimized its preloading implementation to reduce FCP and overall TTI." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "By working around a browser bug, CSS (when used) is now correctly prioritized over JavaScript. This results in a faster First Contentful Paint, resulting in a much faster visually complete website for your end-users." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Additionally, we've optimized our page prefetching to use lower-priority network requests." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Furthermore, these requests only happen during browser idle-time, resulting in a quicker time-to-interactive. This is because the browser will prioritize making your application interactive over optimistic prefetching." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.img, {
+			src: "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-9-1-7/nextjs-org-scores.png",
+			alt: "FCP/TTI Before and After Optimizations"
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "FCP/TTI Before and After Optimizations" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "support-for-the-latest-javascript-features",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#support-for-the-latest-javascript-features",
+				children: "Support for the Latest JavaScript Features"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js has an advanced, highly optimized compilation pipeline that allows you to use the latest JavaScript features. Recent optimizations we have introduced directly contributed to the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#3--8-smaller-client-side-javascript-size",
+				children: "3-8% reduction"
+			}),
+			" in application size."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"These JavaScript features can be leveraged without worrying about browser compatibility, as we automatically compile your code to support all browsers (excluding end-of-life versions). This includes ES6+ features, such as ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/tc39/ecmascript-asyncawait",
+				children: "async/await (ES2017)"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/tc39/proposal-object-rest-spread",
+				children: "Object Rest/Spread Properties (ES2018)"
+			}),
+			", ",
+			(0, import_jsx_runtime.jsxs)(_components.a, {
+				href: "https://v8.dev/features/dynamic-import",
+				children: [
+					"Dynamic ",
+					(0, import_jsx_runtime.jsx)(_components.code, { children: "import()" }),
+					" (ES2020)"
+				]
+			}),
+			", and more!"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In this release, we're happy to announce support for ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/tc39/proposal-optional-chaining",
+				children: "Optional Chaining (Stage 4)"
+			}),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/tc39/proposal-nullish-coalescing",
+				children: "Nullish Coalescing (Stage 4)"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "pages/index.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Page"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "props"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ") {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " ("
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "p"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">{props?.deeply?.nested?.value}</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "p"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "    /* ⬆ If deeply.nested.value is not available it won't render */"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  );"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " Page;"
+						})
+					]
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.blockquote, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				"Optional chaining operator (",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "?." }),
+				")"
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "pages/index.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Page"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "props"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ") {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " ("
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "p"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">{props.something "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "??"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'Default value'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "}</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "p"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "    /* ⬆ results in \"Default value\" */"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  );"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " Page;"
+						})
+					]
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.blockquote, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				"Nullish coalescing operator (",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "??" }),
+				")"
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In the future, we plan to output even more optimized bundles via automatic ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org/blog/next-9-1#module--nomodule",
+				children: "module / nomodule builds"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "zero-config-deployment-support-for-next-export-applications",
+			children: (0, import_jsx_runtime.jsxs)(_components.a, {
+				href: "#zero-config-deployment-support-for-next-export-applications",
+				children: [
+					"Zero-Config Deployment Support for ",
+					(0, import_jsx_runtime.jsx)(_components.code, { children: "next export" }),
+					" Applications"
+				]
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js' ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next export" }),
+			" command now works with Vercel's ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com/blog/zero-config",
+				children: "Zero Configuration"
+			}),
+			" out-of-the-box. Prior to this change, users who leveraged ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next export" }),
+			" were required to create a custom ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "now.json" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Leveraging Next.js' export-mode on ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com",
+				children: "Vercel"
+			}),
+			" is as simple as having the following ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "build" }),
+			" script in ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "package.json" }),
+			":"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "package.json",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "{"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#005CC5",
+							"--shiki-dark": "#79B8FF"
+						},
+						children: "  \"scripts\""
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: ": {"
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "    \"build\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ": "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "\"next build && next export\""
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  }"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Then, you can deploy your Next.js application to ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com",
+				children: "Vercel"
+			}),
+			" with ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "only a single command" }),
+			". If you have not yet installed ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com",
+				children: "Vercel"
+			}),
+			", you can do so by installing ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com/cli",
+				children: "Vercel CLI"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "Terminal",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsx)(_components.code, { children: (0, import_jsx_runtime.jsx)(_components.span, {
+				className: "line",
+				children: (0, import_jsx_runtime.jsx)(_components.span, {
+					style: {
+						"--shiki-light": "#6F42C1",
+						"--shiki-dark": "#B392F0"
+					},
+					children: "now"
+				})
+			}) })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "react-strict-mode-compliance-and-opt-in",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#react-strict-mode-compliance-and-opt-in",
+				children: "React Strict Mode Compliance and Opt-In"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The complete Next.js runtime is now Strict Mode-compliant. This included updates to Next.js' head manager (",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<Head>" }),
+			"), ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			", and other core features. This means the runtimes now leverage hooks or have eliminated deprecated lifecycles, and are using React's new Context API."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We've also added a convenient opt-in option for you to enable Strict Mode for your application." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"To do so, configure the following option in your ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next.config.js" }),
+			":"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "next.config.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "module"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "exports"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "  reactStrictMode: "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "true"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ","
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "};"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"If you or your team are not ready to use Strict Mode in your entire application, that's OK! You can incrementally migrate on a page-by-page basis ",
+			(0, import_jsx_runtime.jsxs)(_components.a, {
+				href: "https://reactjs.org/docs/strict-mode.html",
+				children: ["using ", (0, import_jsx_runtime.jsx)(_components.code, { children: "<React.StrictMode>" })]
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"While ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "not required" }),
+			", Strict Mode will unlock a lot of optimizations in the future. Because of this, we suggest you look into it sooner rather than later!"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "automated-testing-against-nightly-react-builds",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#automated-testing-against-nightly-react-builds",
+				children: "Automated Testing against Nightly React Builds"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/pull/9165",
+				children: "close collaboration"
+			}),
+			" with the React Core Team, we're now ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/pull/9151",
+				children: "testing"
+			}),
+			" Next.js against React's next channel every 12 hours."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "These tests help ensure we're prepared and compatible with the future releases of React. Compatibility is something Next.js takes very seriously, and we're committed to the long-term API stability of Next.js." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"This process ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://reactjs.org/blog/2019/10/22/react-release-channels.html",
+				children: "has been documented"
+			}),
+			" by the React Core Team in hopes other projects in the React ecosystem follow suit."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "community",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#community",
+				children: "Community"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We are excited about the upcoming changes that will improve size and performance across all Next.js applications." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Furthermore, the Next.js community is still expanding:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"We have had over ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "865" }),
+				" independent contributors."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"On GitHub, the project has been starred over ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "43,700" }),
+				" times."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"The ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://github.com/vercel/next.js/tree/canary/examples",
+					children: "examples directory"
+				}),
+				" has over ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "220 examples." })
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The Next.js community now has over ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "13,600" }),
+			" members. ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/discussions",
+				children: "Join us!"
+			})
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "We are thankful to our community and all the external feedback and contributions that helped shape this release." })
+	] });
+}
+function MDXContent(props = {}) {
+	const { wrapper: MDXLayout } = props.components || {};
+	return MDXLayout ? (0, import_jsx_runtime.jsx)(MDXLayout, {
+		...props,
+		children: (0, import_jsx_runtime.jsx)(_createMdxContent, { ...props })
+	}) : _createMdxContent(props);
+}
+//#endregion
+export { toc as a, structuredData as i, frontmatter as n, next_9_1_7_exports as r, MDXContent as t };

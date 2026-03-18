@@ -1,0 +1,17532 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { n as __exportAll } from "./chunk-BnRpC7BT.mjs";
+import { v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/09-authentication-DrMXQP2u.js
+var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
+var _09_authentication_exports = /* @__PURE__ */ __exportAll({
+	default: () => MDXContent,
+	frontmatter: () => frontmatter,
+	structuredData: () => structuredData,
+	toc: () => toc
+});
+var frontmatter = {
+	"title": "Authentication",
+	"description": "Learn how to implement authentication in Next.js, covering best practices, securing routes, authorization techniques, and session management."
+};
+var structuredData = {
+	"contents": [
+		{
+			"heading": void 0,
+			"content": "To implement authentication in Next.js, familiarize yourself with three foundational concepts:"
+		},
+		{
+			"heading": void 0,
+			"content": "**Authentication** verifies if the user is who they say they are. It requires the user to prove their identity with something they have, such as a username and password."
+		},
+		{
+			"heading": void 0,
+			"content": "**Session Management** tracks the user's state (e.g. logged in) across multiple requests."
+		},
+		{
+			"heading": void 0,
+			"content": "**Authorization** decides what parts of the application the user is allowed to access."
+		},
+		{
+			"heading": void 0,
+			"content": "This page demonstrates how to use Next.js features to implement common authentication, authorization, and session management patterns so you can choose the best solutions based on your application's needs."
+		},
+		{
+			"heading": "authentication",
+			"content": "Authentication verifies a user's identity. This happens when a user logs in, either with a username and password or through a service like Google. It's all about confirming that users are really who they claim to be, protecting both the user's data and the application from unauthorized access or fraudulent activities."
+		},
+		{
+			"heading": "authentication-strategies",
+			"content": "Modern web applications commonly use several authentication strategies:"
+		},
+		{
+			"heading": "authentication-strategies",
+			"content": "**OAuth/OpenID Connect (OIDC)**: Enable third-party access without sharing user credentials. Ideal for social media logins and Single Sign-On (SSO) solutions. They add an identity layer with OpenID Connect."
+		},
+		{
+			"heading": "authentication-strategies",
+			"content": "**Credentials-based login (Email + Password)**: A standard choice for web applications, where users log in with an email and password. Familiar and easy to implement, it requires robust security measures against threats like phishing."
+		},
+		{
+			"heading": "authentication-strategies",
+			"content": "**Passwordless/Token-based authentication**: Use email magic links or SMS one-time codes for secure, password-free access. Popular for its convenience and enhanced security, this method helps reduce password fatigue. Its limitation is the dependency on the user's email or phone availability."
+		},
+		{
+			"heading": "authentication-strategies",
+			"content": "**Passkeys/WebAuthn**: Use cryptographic credentials unique to each site, offering high security against phishing. Secure but new, this strategy can be difficult to implement."
+		},
+		{
+			"heading": "authentication-strategies",
+			"content": "Selecting an authentication strategy should align with your application's specific requirements, user interface considerations, and security objectives."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "In this section, we'll explore the process of adding basic email-password authentication to a web application. While this method provides a fundamental level of security, it's worth considering more advanced options like OAuth or passwordless logins for enhanced protection against common security threats. The authentication flow we'll discuss is as follows:"
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "The user submits their credentials through a login form."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "The form sends a request that is handled by an API route."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "Upon successful verification, the process is completed, indicating the user's successful authentication."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "If verification is unsuccessful, an error message is shown."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "Consider a login form where users can input their credentials:"
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "The form above has two input fields for capturing the user's email and password. On submission, it triggers a function that sends a POST request to an API route (`/api/auth/login`)."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "You can then call your Authentication Provider's API in the API route to handle authentication:"
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "The user submits their credentials through a login form."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "The form calls a Server Action."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "Upon successful verification, the process is completed, indicating the user's successful authentication."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "If verification is unsuccessful, an error message is shown."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "Consider a login form where users can input their credentials:"
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "The form above has two input fields for capturing the user's email and password. On submission, it calls the `authenticate` Server Action."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "You can then call your Authentication Provider's API in the Server Action to handle authentication:"
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "In this code, the `signIn` method checks the credentials against stored user data.\nAfter the authentication provider processes the credentials, there are two possible outcomes:"
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "**Successful Authentication**: This outcome implies that the login was successful. Further actions, such as accessing protected routes and fetching user information, can then be initiated."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "**Failed Authentication**: In cases where the credentials are incorrect or an error is encountered, the function returns a corresponding error message to indicate the authentication failure."
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "Finally, in your `login-form.tsx` component, you can use React's `useFormState` to call the Server Action and handle form errors, and use `useFormStatus` to handle the pending state of the form:"
+		},
+		{
+			"heading": "implementing-authentication",
+			"content": "For a more streamlined authentication setup in Next.js projects, especially when offering multiple login methods, consider using a comprehensive authentication solution."
+		},
+		{
+			"heading": "authorization",
+			"content": "Once a user is authenticated, you'll need to ensure the user is allowed to visit certain routes, and perform operations such as mutating data with Server Actions and calling Route Handlers."
+		},
+		{
+			"heading": "protecting-routes-with-middleware",
+			"content": "Middleware in Next.js helps you control who can access different parts of your website. This is important for keeping areas like the user dashboard protected while having other pages like marketing pages be public. It's recommended to apply Middleware across all routes and specify exclusions for public access."
+		},
+		{
+			"heading": "protecting-routes-with-middleware",
+			"content": "Here's how to implement Middleware for authentication in Next.js:"
+		},
+		{
+			"heading": "setting-up-middleware",
+			"content": "Create a `middleware.ts` or `.js` file in your project's root directory."
+		},
+		{
+			"heading": "setting-up-middleware",
+			"content": "Include logic to authorize user access, such as checking for authentication tokens."
+		},
+		{
+			"heading": "defining-protected-routes",
+			"content": "Not all routes require authorization. Use the `matcher` option in your Middleware to specify any routes that do not require authorization checks."
+		},
+		{
+			"heading": "middleware-logic",
+			"content": "Write logic to verify if a user is authenticated. Check user roles or permissions for route authorization."
+		},
+		{
+			"heading": "handling-unauthorized-access",
+			"content": "Redirect unauthorized users to a login or error page as appropriate."
+		},
+		{
+			"heading": "handling-unauthorized-access",
+			"content": "Example Middleware file:"
+		},
+		{
+			"heading": "handling-unauthorized-access",
+			"content": "This example uses `Response.redirect` for handling redirects early in the request pipeline, making it efficient and centralizing access control."
+		},
+		{
+			"heading": "handling-unauthorized-access",
+			"content": "For specific redirection needs, the `redirect` function can be used in Server Components, Route Handlers, and Server Actions to provide more control. This is useful for role-based navigation or context-sensitive scenarios."
+		},
+		{
+			"heading": "handling-unauthorized-access",
+			"content": "After successful authentication, it's important to manage user navigation based on their roles. For example, an admin user might be redirected to an admin dashboard, while a regular user is sent to a different page. This is important for role-specific experiences and conditional navigation, such as prompting users to complete their profile if needed."
+		},
+		{
+			"heading": "handling-unauthorized-access",
+			"content": "When setting up authorization, it's important to ensure that the main security checks happen where your app accesses or changes data. While Middleware can be useful for initial validation, it should not be the sole line of defense in protecting your data. The bulk of security checks should be performed in the Data Access Layer (DAL)."
+		},
+		{
+			"heading": "protecting-api-routes",
+			"content": "API Routes in Next.js are essential for handling server-side logic and data management. It's crucial to secure these routes to ensure that only authorized users can access specific functionalities. This typically involves verifying the user's authentication status and their role-based permissions."
+		},
+		{
+			"heading": "protecting-api-routes",
+			"content": "Here's an example of securing an API Route:"
+		},
+		{
+			"heading": "protecting-api-routes",
+			"content": "This example demonstrates an API Route with a two-tier security check for authentication and authorization. It first checks for an active session, and then verifies if the logged-in user is an 'admin'. This approach ensures secure access, limited to authenticated and authorized users, maintaining robust security for request processing."
+		},
+		{
+			"heading": "protecting-api-routes",
+			"content": "This approach, highlighted in this security blog, advocates for consolidating all data access within a dedicated DAL. This strategy ensures consistent data access, minimizes authorization bugs, and simplifies maintenance. To ensure comprehensive security, consider the following key areas:"
+		},
+		{
+			"heading": "protecting-api-routes",
+			"content": "Server Actions: Implement security checks in server-side processes, especially for sensitive operations."
+		},
+		{
+			"heading": "protecting-api-routes",
+			"content": "Route Handlers: Manage incoming requests with security measures to ensure access is limited to authorized users."
+		},
+		{
+			"heading": "protecting-api-routes",
+			"content": "Data Access Layer (DAL): Directly interacts with the database and is crucial for validating and authorizing data transactions. It's vital to perform critical checks within the DAL to secure data at its most crucial interaction point—access or modification."
+		},
+		{
+			"heading": "protecting-api-routes",
+			"content": "For a detailed guide on securing the DAL, including example code snippets and advanced security practices, refer to our Data Access Layer section of the security guide."
+		},
+		{
+			"heading": "protecting-server-actions",
+			"content": "It is important to treat Server Actions with the same security considerations as public-facing API endpoints. Verifying user authorization for each action is crucial. Implement checks within Server Actions to determine user permissions, such as restricting certain actions to admin users."
+		},
+		{
+			"heading": "protecting-server-actions",
+			"content": "In the example below, we check the user's role before allowing the action to proceed:"
+		},
+		{
+			"heading": "protecting-route-handlers",
+			"content": "Route Handlers in Next.js play a vital role in managing incoming requests. Just like Server Actions, they should be secured to ensure that only authorized users can access certain functionalities. This often involves verifying the user's authentication status and their permissions."
+		},
+		{
+			"heading": "protecting-route-handlers",
+			"content": "Here's an example of securing a Route Handler:"
+		},
+		{
+			"heading": "protecting-route-handlers",
+			"content": "This example demonstrates a Route Handler with a two-tier security check for authentication and authorization. It first checks for an active session, and then verifies if the logged-in user is an 'admin'. This approach ensures secure access, limited to authenticated and authorized users, maintaining robust security for request processing."
+		},
+		{
+			"heading": "authorization-using-server-components",
+			"content": "Server Components in Next.js are designed for server-side execution and offer a secure environment for integrating complex logic like authorization. They enable direct access to back-end resources, optimizing performance for data-heavy tasks and enhancing security for sensitive operations."
+		},
+		{
+			"heading": "authorization-using-server-components",
+			"content": "In Server Components, a common practice is to conditionally render UI elements based on the user's role. This approach enhances user experience and security by ensuring users only access content they are authorized to view."
+		},
+		{
+			"heading": "authorization-using-server-components",
+			"content": "**Example:**"
+		},
+		{
+			"heading": "authorization-using-server-components",
+			"content": "In this example, the Dashboard component renders different UIs for 'admin', 'user', and unauthorized roles. This pattern ensures that each user interacts only with components appropriate to their role, enhancing both security and user experience."
+		},
+		{
+			"heading": "best-practices",
+			"content": "**Secure Session Management**: Prioritize the security of session data to prevent unauthorized access and data breaches. Use encryption and secure storage practices."
+		},
+		{
+			"heading": "best-practices",
+			"content": "**Dynamic Role Management**: Use a flexible system for user roles to easily adjust to changes in permissions and roles, avoiding hardcoded roles."
+		},
+		{
+			"heading": "best-practices",
+			"content": "**Security-First Approach**: In all aspects of authorization logic, prioritize security to safeguard user data and maintain the integrity of your application. This includes thorough testing and considering potential security vulnerabilities."
+		},
+		{
+			"heading": "session-management",
+			"content": "Session management involves tracking and managing a user's interaction with the application over time, ensuring that their authenticated state is preserved across different parts of the application."
+		},
+		{
+			"heading": "session-management",
+			"content": "This prevents the need for repeated logins, enhancing both security and user convenience. There are two primary methods used for session management: cookie-based and database sessions."
+		},
+		{
+			"heading": "cookie-based-sessions",
+			"content": "> **🎥 Watch:** Learn more about cookie-based sessions and authentication with Next.js → YouTube (11 minutes)."
+		},
+		{
+			"heading": "cookie-based-sessions",
+			"content": "Cookie-based sessions manage user data by storing encrypted session information directly in browser cookies. Upon user login, this encrypted data is stored in the cookie. Each subsequent server request includes this cookie, minimizing the need for repeated server queries and enhancing client-side efficiency."
+		},
+		{
+			"heading": "cookie-based-sessions",
+			"content": "However, this method requires careful encryption to protect sensitive data, as cookies are susceptible to client-side security risks. Encrypting session data in cookies is key to safeguarding user information from unauthorized access. It ensures that even if a cookie is stolen, the data inside remains unreadable."
+		},
+		{
+			"heading": "cookie-based-sessions",
+			"content": "Additionally, while individual cookies are limited in size (typically around 4KB), techniques like cookie-chunking can overcome this limitation by dividing large session data into multiple cookies."
+		},
+		{
+			"heading": "cookie-based-sessions",
+			"content": "Setting a cookie in a Next.js project might look something like this:"
+		},
+		{
+			"heading": "cookie-based-sessions",
+			"content": "**Setting a cookie on the server:**"
+		},
+		{
+			"heading": "cookie-based-sessions",
+			"content": "**Accessing the session data stored in the cookie in a server component:**"
+		},
+		{
+			"heading": "database-sessions",
+			"content": "Database session management involves storing session data on the server, with the user's browser only receiving a session ID. This ID references the session data stored server-side, without containing the data itself. This method enhances security, as it keeps sensitive session data away from the client-side environment, reducing the risk of exposure to client-side attacks. Database sessions are also more scalable, accommodating larger data storage needs."
+		},
+		{
+			"heading": "database-sessions",
+			"content": "However, this approach has its tradeoffs. It can increase performance overhead due to the need for database lookups at each user interaction. Strategies like session data caching can help mitigate this. Additionally, reliance on the database means that session management is as reliable as the database's performance and availability."
+		},
+		{
+			"heading": "database-sessions",
+			"content": "Here's a simplified example of implementing database sessions in a Next.js application:"
+		},
+		{
+			"heading": "database-sessions",
+			"content": "**Creating a Session on the Server**:"
+		},
+		{
+			"heading": "database-sessions",
+			"content": "**Retrieving a Session in Middleware or Server-Side Logic**:"
+		},
+		{
+			"heading": "selecting-session-management-in-nextjs",
+			"content": "Deciding between cookie-based and database sessions in Next.js depends on your application's needs. Cookie-based sessions are simpler and suit smaller applications with lower server load but may offer less security. Database sessions, while more complex, provide better security and scalability, ideal for larger, data-sensitive applications."
+		},
+		{
+			"heading": "selecting-session-management-in-nextjs",
+			"content": "With authentication solutions such as NextAuth.js, session management becomes more efficient, using either cookies or database storage. This automation simplifies the development process, but it's important to understand the session management method used by your chosen solution. Ensure it aligns with your application's security and performance requirements."
+		},
+		{
+			"heading": "selecting-session-management-in-nextjs",
+			"content": "Regardless of your choice, prioritize security in your session management strategy. For cookie-based sessions, using secure and HTTP-only cookies is crucial to protect session data. For database sessions, regular backups and secure handling of session data are essential. Implementing session expiry and cleanup mechanisms is vital in both approaches to prevent unauthorized access and maintain application performance and reliability."
+		},
+		{
+			"heading": "examples",
+			"content": "Here are authentication solutions compatible with Next.js, please refer to the quickstart guides below to learn how to configure them in your Next.js application:"
+		},
+		{
+			"heading": "examples",
+			"content": "Auth0"
+		},
+		{
+			"heading": "examples",
+			"content": "Clerk"
+		},
+		{
+			"heading": "examples",
+			"content": "Kinde"
+		},
+		{
+			"heading": "examples",
+			"content": "Lucia"
+		},
+		{
+			"heading": "examples",
+			"content": "NextAuth.js"
+		},
+		{
+			"heading": "examples",
+			"content": "Supabase"
+		},
+		{
+			"heading": "examples",
+			"content": "Stytch"
+		},
+		{
+			"heading": "examples",
+			"content": "Iron Session"
+		},
+		{
+			"heading": "further-reading",
+			"content": "To continue learning about authentication and security, check out the following resources:"
+		},
+		{
+			"heading": "further-reading",
+			"content": "Understanding XSS Attacks"
+		},
+		{
+			"heading": "further-reading",
+			"content": "Understanding CSRF Attacks"
+		}
+	],
+	"headings": [
+		{
+			"id": "authentication",
+			"content": "Authentication"
+		},
+		{
+			"id": "authentication-strategies",
+			"content": "Authentication Strategies"
+		},
+		{
+			"id": "implementing-authentication",
+			"content": "Implementing Authentication"
+		},
+		{
+			"id": "authorization",
+			"content": "Authorization"
+		},
+		{
+			"id": "protecting-routes-with-middleware",
+			"content": "Protecting Routes with Middleware"
+		},
+		{
+			"id": "setting-up-middleware",
+			"content": "Setting Up Middleware:"
+		},
+		{
+			"id": "defining-protected-routes",
+			"content": "Defining Protected Routes:"
+		},
+		{
+			"id": "middleware-logic",
+			"content": "Middleware Logic:"
+		},
+		{
+			"id": "handling-unauthorized-access",
+			"content": "Handling Unauthorized Access:"
+		},
+		{
+			"id": "protecting-api-routes",
+			"content": "Protecting API Routes"
+		},
+		{
+			"id": "protecting-server-actions",
+			"content": "Protecting Server Actions"
+		},
+		{
+			"id": "protecting-route-handlers",
+			"content": "Protecting Route Handlers"
+		},
+		{
+			"id": "authorization-using-server-components",
+			"content": "Authorization Using Server Components"
+		},
+		{
+			"id": "best-practices",
+			"content": "Best Practices"
+		},
+		{
+			"id": "session-management",
+			"content": "Session Management"
+		},
+		{
+			"id": "cookie-based-sessions",
+			"content": "Cookie-Based Sessions"
+		},
+		{
+			"id": "database-sessions",
+			"content": "Database Sessions"
+		},
+		{
+			"id": "selecting-session-management-in-nextjs",
+			"content": "Selecting Session Management in Next.js"
+		},
+		{
+			"id": "examples",
+			"content": "Examples"
+		},
+		{
+			"id": "further-reading",
+			"content": "Further Reading"
+		}
+	]
+};
+var toc = [
+	{
+		depth: 2,
+		url: "#authentication",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Authentication" })
+	},
+	{
+		depth: 3,
+		url: "#authentication-strategies",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Authentication Strategies" })
+	},
+	{
+		depth: 3,
+		url: "#implementing-authentication",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Implementing Authentication" })
+	},
+	{
+		depth: 2,
+		url: "#authorization",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Authorization" })
+	},
+	{
+		depth: 3,
+		url: "#protecting-routes-with-middleware",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Protecting Routes with Middleware" })
+	},
+	{
+		depth: 4,
+		url: "#setting-up-middleware",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Setting Up Middleware:" })
+	},
+	{
+		depth: 4,
+		url: "#defining-protected-routes",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Defining Protected Routes:" })
+	},
+	{
+		depth: 4,
+		url: "#middleware-logic",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Middleware Logic:" })
+	},
+	{
+		depth: 4,
+		url: "#handling-unauthorized-access",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Handling Unauthorized Access:" })
+	},
+	{
+		depth: 3,
+		url: "#protecting-api-routes",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Protecting API Routes" })
+	},
+	{
+		depth: 3,
+		url: "#protecting-server-actions",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Protecting Server Actions" })
+	},
+	{
+		depth: 3,
+		url: "#protecting-route-handlers",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Protecting Route Handlers" })
+	},
+	{
+		depth: 3,
+		url: "#authorization-using-server-components",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Authorization Using Server Components" })
+	},
+	{
+		depth: 3,
+		url: "#best-practices",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Best Practices" })
+	},
+	{
+		depth: 2,
+		url: "#session-management",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Session Management" })
+	},
+	{
+		depth: 3,
+		url: "#cookie-based-sessions",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Cookie-Based Sessions" })
+	},
+	{
+		depth: 3,
+		url: "#database-sessions",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Database Sessions" })
+	},
+	{
+		depth: 3,
+		url: "#selecting-session-management-in-nextjs",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Selecting Session Management in Next.js" })
+	},
+	{
+		depth: 2,
+		url: "#examples",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Examples" })
+	},
+	{
+		depth: 2,
+		url: "#further-reading",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Further Reading" })
+	}
+];
+function _createMdxContent(props) {
+	const _components = {
+		a: "a",
+		blockquote: "blockquote",
+		code: "code",
+		h2: "h2",
+		h3: "h3",
+		h4: "h4",
+		li: "li",
+		ol: "ol",
+		p: "p",
+		pre: "pre",
+		span: "span",
+		strong: "strong",
+		ul: "ul",
+		...props.components
+	}, { AppOnly, CodeBlockTab, CodeBlockTabs, CodeBlockTabsList, CodeBlockTabsTrigger, PagesOnly } = _components;
+	if (!AppOnly) _missingMdxReference("AppOnly", true);
+	if (!CodeBlockTab) _missingMdxReference("CodeBlockTab", true);
+	if (!CodeBlockTabs) _missingMdxReference("CodeBlockTabs", true);
+	if (!CodeBlockTabsList) _missingMdxReference("CodeBlockTabsList", true);
+	if (!CodeBlockTabsTrigger) _missingMdxReference("CodeBlockTabsTrigger", true);
+	if (!PagesOnly) _missingMdxReference("PagesOnly", true);
+	return (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "To implement authentication in Next.js, familiarize yourself with three foundational concepts:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#authentication",
+				children: "Authentication"
+			}) }), " verifies if the user is who they say they are. It requires the user to prove their identity with something they have, such as a username and password."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#session-management",
+				children: "Session Management"
+			}) }), " tracks the user's state (e.g. logged in) across multiple requests."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#authorization",
+				children: "Authorization"
+			}) }), " decides what parts of the application the user is allowed to access."] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This page demonstrates how to use Next.js features to implement common authentication, authorization, and session management patterns so you can choose the best solutions based on your application's needs." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "authentication",
+			children: "Authentication"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Authentication verifies a user's identity. This happens when a user logs in, either with a username and password or through a service like Google. It's all about confirming that users are really who they claim to be, protecting both the user's data and the application from unauthorized access or fraudulent activities." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "authentication-strategies",
+			children: "Authentication Strategies"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Modern web applications commonly use several authentication strategies:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ol, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "OAuth/OpenID Connect (OIDC)" }), ": Enable third-party access without sharing user credentials. Ideal for social media logins and Single Sign-On (SSO) solutions. They add an identity layer with OpenID Connect."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Credentials-based login (Email + Password)" }), ": A standard choice for web applications, where users log in with an email and password. Familiar and easy to implement, it requires robust security measures against threats like phishing."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Passwordless/Token-based authentication" }), ": Use email magic links or SMS one-time codes for secure, password-free access. Popular for its convenience and enhanced security, this method helps reduce password fatigue. Its limitation is the dependency on the user's email or phone availability."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Passkeys/WebAuthn" }), ": Use cryptographic credentials unique to each site, offering high security against phishing. Secure but new, this strategy can be difficult to implement."] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Selecting an authentication strategy should align with your application's specific requirements, user interface considerations, and security objectives." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "implementing-authentication",
+			children: "Implementing Authentication"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "In this section, we'll explore the process of adding basic email-password authentication to a web application. While this method provides a fundamental level of security, it's worth considering more advanced options like OAuth or passwordless logins for enhanced protection against common security threats. The authentication flow we'll discuss is as follows:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(PagesOnly, { children: [
+			(0, import_jsx_runtime.jsxs)(_components.ol, { children: [
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "The user submits their credentials through a login form." }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "The form sends a request that is handled by an API route." }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "Upon successful verification, the process is completed, indicating the user's successful authentication." }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "If verification is unsuccessful, an error message is shown." }),
+				"\n"
+			] }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "Consider a login form where users can input their credentials:" }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "pages/login.tsx",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "pages/login.tsx",
+						children: "pages/login.tsx"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "pages/login.jsx",
+						children: "pages/login.jsx"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "pages/login.tsx",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { FormEvent } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'react'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { useRouter } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'next/router'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " LoginPage"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " router"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " useRouter"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " handleSubmit"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "event"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " FormEvent"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "<"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "HTMLFormElement"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    event."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "preventDefault"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " formData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " new"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " FormData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "(event.currentTarget)"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " email"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " formData."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "get"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'email'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " password"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " formData."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "get"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'password'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " response"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " fetch"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'/api/auth/login'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      method: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'POST'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      headers: { "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Content-Type'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ": "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'application/json'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " },"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      body: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "JSON"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "stringify"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({ email, password }),"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    })"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    if"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (response.ok) {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      router."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "push"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'/profile'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "else"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "      // Handle errors"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ("
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "form"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " onSubmit"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "{handleSubmit}>"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "input"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " name"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " placeholder"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"Email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " required"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " />"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "input"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " name"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " placeholder"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"Password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " required"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " />"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "button"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"submit\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">Login</"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "button"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    </"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "form"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  )"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "pages/login.jsx",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { FormEvent } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'react'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { useRouter } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'next/router'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " LoginPage"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " router"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " useRouter"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " handleSubmit"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "event"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    event."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "preventDefault"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " formData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " new"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " FormData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "(event.currentTarget)"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " email"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " formData."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "get"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'email'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " password"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " formData."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "get"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'password'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " response"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " fetch"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'/api/auth/login'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      method: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'POST'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      headers: { "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Content-Type'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ": "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'application/json'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " },"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      body: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "JSON"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "stringify"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({ email, password }),"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    })"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    if"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (response.ok) {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      router."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "push"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'/profile'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "else"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "      // Handle errors"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ("
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "form"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " onSubmit"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "{handleSubmit}>"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "input"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " name"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " placeholder"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"Email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " required"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " />"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "input"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " name"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " placeholder"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"Password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " required"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " />"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "button"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"submit\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">Login</"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "button"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    </"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "form"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  )"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			}),
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				"The form above has two input fields for capturing the user's email and password. On submission, it triggers a function that sends a POST request to an API route (",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "/api/auth/login" }),
+				")."
+			] }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "You can then call your Authentication Provider's API in the API route to handle authentication:" }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "pages/api/auth/login.ts",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "pages/api/auth/login.ts",
+						children: "pages/api/auth/login.ts"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "pages/api/auth/login.js",
+						children: "pages/api/auth/login.js"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "pages/api/auth/login.ts",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { NextApiRequest, NextApiResponse } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'next'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { signIn } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " '@/auth'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " handler"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "  req"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " NextApiRequest"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "  res"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " NextApiResponse"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  try"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "email"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "password"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " req.body"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " signIn"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'credentials'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", { email, password })"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "200"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({ success: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "true"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " })"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "  } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "catch"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (error) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (error.type "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "==="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'CredentialsSignin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "401"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({ error: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Invalid credentials.'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " })"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "else"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "500"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({ error: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Something went wrong.'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " })"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "pages/api/auth/login.js",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { signIn } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " '@/auth'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " handler"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "req"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "res"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  try"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "email"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "password"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " req.body"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " signIn"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'credentials'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", { email, password })"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "200"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({ success: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "true"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " })"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "  } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "catch"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (error) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (error.type "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "==="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'CredentialsSignin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "401"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({ error: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Invalid credentials.'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " })"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "else"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "500"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({ error: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Something went wrong.'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " })"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			})
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(AppOnly, { children: [
+			(0, import_jsx_runtime.jsxs)(_components.ol, { children: [
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "The user submits their credentials through a login form." }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "The form calls a Server Action." }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "Upon successful verification, the process is completed, indicating the user's successful authentication." }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "If verification is unsuccessful, an error message is shown." }),
+				"\n"
+			] }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "Consider a login form where users can input their credentials:" }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "app/login/page.tsx",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/login/page.tsx",
+						children: "app/login/page.tsx"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/login/page.jsx",
+						children: "app/login/page.jsx"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/login/page.tsx",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { authenticate } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " '@/app/lib/actions'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Page"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ("
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "form"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " action"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "{authenticate}>"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "input"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " name"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " placeholder"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"Email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " required"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " />"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "input"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " name"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " placeholder"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"Password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " required"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " />"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "button"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"submit\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">Login</"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "button"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    </"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "form"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  )"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/login/page.jsx",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { authenticate } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " '@/app/lib/actions'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Page"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ("
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "form"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " action"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "{authenticate}>"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "input"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " name"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " placeholder"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"Email\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " required"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " />"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "input"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " name"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " placeholder"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"Password\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " required"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " />"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "button"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " type"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "\"submit\""
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">Login</"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "button"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    </"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#22863A",
+												"--shiki-dark": "#85E89D"
+											},
+											children: "form"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ">"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  )"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			}),
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				"The form above has two input fields for capturing the user's email and password. On submission, it calls the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "authenticate" }),
+				" Server Action."
+			] }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "You can then call your Authentication Provider's API in the Server Action to handle authentication:" }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "app/lib/actions.ts",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/lib/actions.ts",
+						children: "app/lib/actions.ts"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/lib/actions.js",
+						children: "app/lib/actions.js"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/lib/actions.ts",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'use server'"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { signIn } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " '@/auth'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " authenticate"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "_currentState"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " unknown"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "formData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " FormData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  try"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " signIn"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'credentials'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", formData)"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "  } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "catch"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (error) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    if"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (error) {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "      switch"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (error.type) {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "        case"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'CredentialsSignin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ":"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "          return"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'Invalid credentials.'"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "        default"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ":"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "          return"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'Something went wrong.'"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    throw"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " error"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/lib/actions.js",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'use server'"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { signIn } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " '@/auth'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " authenticate"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "_currentState"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "formData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  try"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " signIn"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'credentials'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", formData)"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "  } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "catch"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (error) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    if"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (error) {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "      switch"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (error.type) {"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "        case"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'CredentialsSignin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ":"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "          return"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'Invalid credentials.'"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "        default"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ":"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "          return"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'Something went wrong.'"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    throw"
+									}), (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " error"
+									})]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			})
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In this code, the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "signIn" }),
+			" method checks the credentials against stored user data.\nAfter the authentication provider processes the credentials, there are two possible outcomes:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Successful Authentication" }), ": This outcome implies that the login was successful. Further actions, such as accessing protected routes and fetching user information, can then be initiated."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Failed Authentication" }), ": In cases where the credentials are incorrect or an error is encountered, the function returns a corresponding error message to indicate the authentication failure."] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(AppOnly, { children: [(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Finally, in your ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "login-form.tsx" }),
+			" component, you can use React's ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "useFormState" }),
+			" to call the Server Action and handle form errors, and use ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "useFormStatus" }),
+			" to handle the pending state of the form:"
+		] }), (0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/login/page.tsx",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/login/page.tsx",
+					children: "app/login/page.tsx"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/login/page.jsx",
+					children: "app/login/page.jsx"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/login/page.tsx",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "'use client'"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { authenticate } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " '@/app/lib/actions'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { useFormState, useFormStatus } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'react-dom'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " default"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Page"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ["
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "errorMessage"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "dispatch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "] "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " useFormState"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(authenticate, "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "undefined"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  return"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " ("
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "form"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " action"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "{dispatch}>"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "input"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"email\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " name"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"email\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " placeholder"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"Email\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " required"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " />"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "input"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"password\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " name"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"password\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " placeholder"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"Password\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " required"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " />"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "div"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">{errorMessage "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "&&"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "p"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">{errorMessage}</"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "p"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">}</"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "div"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "LoginButton"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " />"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    </"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "form"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  )"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " LoginButton"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "pending"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " useFormStatus"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " handleClick"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "event"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "=>"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "    if"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " (pending) {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      event."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "preventDefault"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  return"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " ("
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "button"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " aria-disabled"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "{pending} "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"submit\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " onClick"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "{handleClick}>"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      Login"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    </"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "button"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  )"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/login/page.jsx",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "'use client'"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { authenticate } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " '@/app/lib/actions'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { useFormState, useFormStatus } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'react-dom'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " default"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Page"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ["
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "errorMessage"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "dispatch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "] "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " useFormState"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(authenticate, "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "undefined"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  return"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " ("
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "form"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " action"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "{dispatch}>"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "input"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"email\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " name"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"email\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " placeholder"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"Email\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " required"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " />"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "input"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"password\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " name"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"password\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " placeholder"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"Password\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " required"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " />"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "div"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">{errorMessage "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "&&"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "p"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">{errorMessage}</"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "p"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">}</"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "div"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "LoginButton"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " />"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    </"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "form"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  )"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " LoginButton"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "pending"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " useFormStatus"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " handleClick"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "event"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "=>"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "    if"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " (pending) {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      event."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "preventDefault"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  return"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " ("
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    <"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "button"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " aria-disabled"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "{pending} "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "\"submit\""
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " onClick"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "{handleClick}>"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      Login"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    </"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#22863A",
+											"--shiki-dark": "#85E89D"
+										},
+										children: "button"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ">"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  )"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		})] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"For a more streamlined authentication setup in Next.js projects, especially when offering multiple login methods, consider using a comprehensive ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#examples",
+				children: "authentication solution"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "authorization",
+			children: "Authorization"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Once a user is authenticated, you'll need to ensure the user is allowed to visit certain routes, and perform operations such as mutating data with Server Actions and calling Route Handlers." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "protecting-routes-with-middleware",
+			children: "Protecting Routes with Middleware"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [(0, import_jsx_runtime.jsx)(_components.a, {
+			href: "/docs/app/building-your-application/routing/middleware",
+			children: "Middleware"
+		}), " in Next.js helps you control who can access different parts of your website. This is important for keeping areas like the user dashboard protected while having other pages like marketing pages be public. It's recommended to apply Middleware across all routes and specify exclusions for public access."] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Here's how to implement Middleware for authentication in Next.js:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h4, {
+			id: "setting-up-middleware",
+			children: "Setting Up Middleware:"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"Create a ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "middleware.ts" }),
+				" or ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: ".js" }),
+				" file in your project's root directory."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Include logic to authorize user access, such as checking for authentication tokens." }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h4, {
+			id: "defining-protected-routes",
+			children: "Defining Protected Routes:"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"Not all routes require authorization. Use the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "matcher" }),
+				" option in your Middleware to specify any routes that do not require authorization checks."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h4, {
+			id: "middleware-logic",
+			children: "Middleware Logic:"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Write logic to verify if a user is authenticated. Check user roles or permissions for route authorization." }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h4, {
+			id: "handling-unauthorized-access",
+			children: "Handling Unauthorized Access:"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Redirect unauthorized users to a login or error page as appropriate." }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Example Middleware file:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "middleware.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "middleware.ts",
+					children: "middleware.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "middleware.js",
+					children: "middleware.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "middleware.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { NextRequest } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/server'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " middleware"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " NextRequest"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " currentUser"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request.cookies."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'currentUser'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")?.value"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  if"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (currentUser "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "&&"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " !"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "request.nextUrl.pathname."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "startsWith"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/dashboard'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "redirect"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " URL"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/dashboard'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", request.url))"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  if"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "!"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "currentUser "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "&&"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " !"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "request.nextUrl.pathname."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "startsWith"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/login'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "redirect"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " URL"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/login'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", request.url))"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " config"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  matcher: ["
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/((?!api|_next/static|_next/image|.*"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "\\\\"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: ".png$).*)'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "],"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "middleware.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " middleware"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " currentUser"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request.cookies."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'currentUser'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")?.value"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  if"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (currentUser "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "&&"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " !"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "request.nextUrl.pathname."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "startsWith"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/dashboard'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "redirect"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " URL"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/dashboard'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", request.url))"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  if"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " ("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "!"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "currentUser "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "&&"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " !"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "request.nextUrl.pathname."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "startsWith"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/login'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "redirect"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " URL"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/login'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", request.url))"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " config"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  matcher: ["
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/((?!api|_next/static|_next/image|.*"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "\\\\"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: ".png$).*)'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "],"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"This example uses ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "Response.redirect" })
+			}),
+			" for handling redirects early in the request pipeline, making it efficient and centralizing access control."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(AppOnly, { children: [(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"For specific redirection needs, the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "redirect" }),
+			" function can be used in Server Components, Route Handlers, and Server Actions to provide more control. This is useful for role-based navigation or context-sensitive scenarios."
+		] }), (0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/page.tsx",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/page.tsx",
+					children: "app/page.tsx"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/page.jsx",
+					children: "app/page.jsx"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/page.tsx",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { redirect } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/navigation'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " default"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Page"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "  // Logic to determine if a redirect is needed"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " accessDenied"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " true"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  if"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " (accessDenied) {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "    redirect"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/login'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "  // Define other routes and logic"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/page.jsx",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { redirect } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/navigation'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " default"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Page"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "  // Logic to determine if a redirect is needed"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " accessDenied"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " true"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  if"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " (accessDenied) {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "    redirect"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/login'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "  // Define other routes and logic"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		})] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "After successful authentication, it's important to manage user navigation based on their roles. For example, an admin user might be redirected to an admin dashboard, while a regular user is sent to a different page. This is important for role-specific experiences and conditional navigation, such as prompting users to complete their profile if needed." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "When setting up authorization, it's important to ensure that the main security checks happen where your app accesses or changes data. While Middleware can be useful for initial validation, it should not be the sole line of defense in protecting your data. The bulk of security checks should be performed in the Data Access Layer (DAL)." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(PagesOnly, { children: [
+			(0, import_jsx_runtime.jsx)(_components.h3, {
+				id: "protecting-api-routes",
+				children: "Protecting API Routes"
+			}),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "API Routes in Next.js are essential for handling server-side logic and data management. It's crucial to secure these routes to ensure that only authorized users can access specific functionalities. This typically involves verifying the user's authentication status and their role-based permissions." }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "Here's an example of securing an API Route:" }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "pages/api/route.ts",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "pages/api/route.ts",
+						children: "pages/api/route.ts"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "pages/api/route.js",
+						children: "pages/api/route.js"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "pages/api/route.ts",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { NextApiRequest, NextApiResponse } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'next'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " handler"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "  req"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " NextApiRequest"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "  res"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " NextApiResponse"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " session"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSession"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "(req)"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if the user is authenticated"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " ("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "session) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "401"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      error: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'User is not authenticated'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    })"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if the user has the 'admin' role"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (session.user.role "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!=="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'admin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "401"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      error: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Unauthorized access: User does not have admin privileges.'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    })"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Proceed with the route for authorized users"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // ... implementation of the API Route"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "pages/api/route.js",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " handler"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "req"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "res"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " session"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSession"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "(req)"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if the user is authenticated"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " ("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "session) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "401"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      error: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'User is not authenticated'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    })"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if the user has the 'admin' role"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (session.user.role "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!=="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'admin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    res."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "status"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "401"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "json"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "({"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "      error: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Unauthorized access: User does not have admin privileges.'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    })"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Proceed with the route for authorized users"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // ... implementation of the API Route"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			}),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "This example demonstrates an API Route with a two-tier security check for authentication and authorization. It first checks for an active session, and then verifies if the logged-in user is an 'admin'. This approach ensures secure access, limited to authenticated and authorized users, maintaining robust security for request processing." })
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(AppOnly, { children: [
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				"This approach, highlighted in ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/blog/security-nextjs-server-components-actions",
+					children: "this security blog"
+				}),
+				", advocates for consolidating all data access within a dedicated DAL. This strategy ensures consistent data access, minimizes authorization bugs, and simplifies maintenance. To ensure comprehensive security, consider the following key areas:"
+			] }),
+			(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "Server Actions: Implement security checks in server-side processes, especially for sensitive operations." }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "Route Handlers: Manage incoming requests with security measures to ensure access is limited to authorized users." }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.li, { children: "Data Access Layer (DAL): Directly interacts with the database and is crucial for validating and authorizing data transactions. It's vital to perform critical checks within the DAL to secure data at its most crucial interaction point—access or modification." }),
+				"\n"
+			] }),
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				"For a detailed guide on securing the DAL, including example code snippets and advanced security practices, refer to our ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/blog/security-nextjs-server-components-actions#data-access-layer",
+					children: "Data Access Layer section"
+				}),
+				" of the security guide."
+			] }),
+			(0, import_jsx_runtime.jsx)(_components.h3, {
+				id: "protecting-server-actions",
+				children: "Protecting Server Actions"
+			}),
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				"It is important to treat ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/building-your-application/data-fetching/server-actions-and-mutations",
+					children: "Server Actions"
+				}),
+				" with the same security considerations as public-facing API endpoints. Verifying user authorization for each action is crucial. Implement checks within Server Actions to determine user permissions, such as restricting certain actions to admin users."
+			] }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "In the example below, we check the user's role before allowing the action to proceed:" }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "app/lib/actions.ts",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/lib/actions.ts",
+						children: "app/lib/actions.ts"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/lib/actions.js",
+						children: "app/lib/actions.js"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/lib/actions.ts",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'use server'"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "// ..."
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " serverAction"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " session"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSession"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " userRole"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " session?.user?.role"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if user is authorized to perform the action"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (userRole "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!=="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'admin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    throw"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " new"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Error"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Unauthorized access: User does not have admin privileges.'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Proceed with the action for authorized users"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // ... implementation of the action"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/lib/actions.js",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'use server'"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "// ..."
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " serverAction"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " session"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSession"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " userRole"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " session?.user?.role"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if user is authorized to perform the action"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (userRole "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!=="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'admin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    throw"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " new"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Error"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'Unauthorized access: User does not have admin privileges.'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Proceed with the action for authorized users"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // ... implementation of the action"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			}),
+			(0, import_jsx_runtime.jsx)(_components.h3, {
+				id: "protecting-route-handlers",
+				children: "Protecting Route Handlers"
+			}),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "Route Handlers in Next.js play a vital role in managing incoming requests. Just like Server Actions, they should be secured to ensure that only authorized users can access certain functionalities. This often involves verifying the user's authentication status and their permissions." }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "Here's an example of securing a Route Handler:" }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "app/api/route.ts",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/api/route.ts",
+						children: "app/api/route.ts"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/api/route.js",
+						children: "app/api/route.js"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/api/route.ts",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " GET"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // User authentication and role verification"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " session"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSession"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if the user is authenticated"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " ("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "session) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " new"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Response"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "null"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", { status: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "401"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " }) "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// User is not authenticated"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if the user has the 'admin' role"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (session.user.role "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!=="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'admin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " new"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Response"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "null"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", { status: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "403"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " }) "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// User is authenticated but does not have the right permissions"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Data fetching for authorized users"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/api/route.js",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " GET"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // User authentication and role verification"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " session"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSession"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if the user is authenticated"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " ("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "session) {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " new"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Response"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "null"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", { status: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "401"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " }) "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// User is not authenticated"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Check if the user has the 'admin' role"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (session.user.role "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "!=="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'admin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " new"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Response"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "null"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", { status: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "403"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " }) "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// User is authenticated but does not have the right permissions"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Data fetching for authorized users"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			}),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "This example demonstrates a Route Handler with a two-tier security check for authentication and authorization. It first checks for an active session, and then verifies if the logged-in user is an 'admin'. This approach ensures secure access, limited to authenticated and authorized users, maintaining robust security for request processing." }),
+			(0, import_jsx_runtime.jsx)(_components.h3, {
+				id: "authorization-using-server-components",
+				children: "Authorization Using Server Components"
+			}),
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/building-your-application/rendering/server-components",
+				children: "Server Components"
+			}), " in Next.js are designed for server-side execution and offer a secure environment for integrating complex logic like authorization. They enable direct access to back-end resources, optimizing performance for data-heavy tasks and enhancing security for sensitive operations."] }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "In Server Components, a common practice is to conditionally render UI elements based on the user's role. This approach enhances user experience and security by ensuring users only access content they are authorized to view." }),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "Example:" }) }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "app/dashboard/page.tsx",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/dashboard/page.tsx",
+						children: "app/dashboard/page.tsx"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/dashboard/page.jsx",
+						children: "app/dashboard/page.jsx"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/dashboard/page.tsx",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Dashboard"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " session"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSession"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " userRole"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " session?.user?.role "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Assuming 'role' is part of the session object"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (userRole "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "==="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'admin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "AdminDashboard"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " /> "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Component for admin users"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "  } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "else"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (userRole "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "==="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'user'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "UserDashboard"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " /> "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Component for regular users"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "  } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "else"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "AccessDenied"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " /> "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Component shown for unauthorized access"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/dashboard/page.jsx",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " default"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " Dashboard"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "() {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " session"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " await"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSession"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " userRole"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " session?.user?.role "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Assuming 'role' is part of the session object"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (userRole "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "==="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'admin'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "AdminDashboard"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " /> "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Component for admin users"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "  } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "else"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " if"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " (userRole "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "==="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'user'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "UserDashboard"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " /> "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Component for regular users"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "  } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "else"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "    return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " <"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "AccessDenied"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " /> "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Component shown for unauthorized access"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  }"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			}),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: "In this example, the Dashboard component renders different UIs for 'admin', 'user', and unauthorized roles. This pattern ensures that each user interacts only with components appropriate to their role, enhancing both security and user experience." })
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "best-practices",
+			children: "Best Practices"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Secure Session Management" }), ": Prioritize the security of session data to prevent unauthorized access and data breaches. Use encryption and secure storage practices."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Dynamic Role Management" }), ": Use a flexible system for user roles to easily adjust to changes in permissions and roles, avoiding hardcoded roles."] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Security-First Approach" }), ": In all aspects of authorization logic, prioritize security to safeguard user data and maintain the integrity of your application. This includes thorough testing and considering potential security vulnerabilities."] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "session-management",
+			children: "Session Management"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Session management involves tracking and managing a user's interaction with the application over time, ensuring that their authenticated state is preserved across different parts of the application." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This prevents the need for repeated logins, enhancing both security and user convenience. There are two primary methods used for session management: cookie-based and database sessions." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "cookie-based-sessions",
+			children: "Cookie-Based Sessions"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.blockquote, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "🎥 Watch:" }),
+				" Learn more about cookie-based sessions and authentication with Next.js → ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://www.youtube.com/watch?v=DJvM2lSPn6w",
+					children: "YouTube (11 minutes)"
+				}),
+				"."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Cookie-based sessions manage user data by storing encrypted session information directly in browser cookies. Upon user login, this encrypted data is stored in the cookie. Each subsequent server request includes this cookie, minimizing the need for repeated server queries and enhancing client-side efficiency." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "However, this method requires careful encryption to protect sensitive data, as cookies are susceptible to client-side security risks. Encrypting session data in cookies is key to safeguarding user information from unauthorized access. It ensures that even if a cookie is stolen, the data inside remains unreadable." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Additionally, while individual cookies are limited in size (typically around 4KB), techniques like cookie-chunking can overcome this limitation by dividing large session data into multiple cookies." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Setting a cookie in a Next.js project might look something like this:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "Setting a cookie on the server:" }) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(PagesOnly, { children: (0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "pages/api/login.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "pages/api/login.ts",
+					children: "pages/api/login.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "pages/api/login.js",
+					children: "pages/api/login.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "pages/api/login.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { serialize } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'cookie'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { NextApiRequest, NextApiResponse } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " default"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " handler"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "req"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " NextApiRequest"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " NextApiResponse"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " sessionData"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " req.body"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " encryptedSessionData"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " encrypt"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(sessionData)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " cookie"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " serialize"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'session'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", encryptedSessionData, {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    httpOnly: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "true"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    secure: process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "NODE_ENV"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ==="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'production'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    maxAge: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "60"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " *"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " 60"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " *"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " 24"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " *"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " 7"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "// One week"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    path: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "setHeader"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Set-Cookie'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", cookie)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "status"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ message: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Successfully set cookie!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "pages/api/login.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { serialize } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'cookie'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " default"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " handler"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "req"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " sessionData"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " req.body"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " encryptedSessionData"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " encrypt"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(sessionData)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " cookie"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " serialize"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'session'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", encryptedSessionData, {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    httpOnly: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "true"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    secure: process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "NODE_ENV"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ==="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'production'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    maxAge: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "60"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " *"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " 60"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " *"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " 24"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " *"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " 7"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "// One week"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    path: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'/'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "setHeader"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Set-Cookie'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", cookie)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "status"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ message: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Successfully set cookie!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(AppOnly, { children: [
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "app/actions.ts",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/actions.ts",
+						children: "app/actions.ts"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/actions.js",
+						children: "app/actions.js"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/actions.ts",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'use server'"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { cookies } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'next/headers'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " handleLogin"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "sessionData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " encryptedSessionData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " encrypt"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "(sessionData) "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Encrypt your session data"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "  cookies"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "set"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'session'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", encryptedSessionData, {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    httpOnly: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "true"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    secure: process.env."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "NODE_ENV"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ==="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'production'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    maxAge: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "60"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " *"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " 60"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " *"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " 24"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " *"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " 7"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// One week"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    path: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'/'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  })"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Redirect or handle the response after setting the cookie"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/actions.js",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'use server'"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { cookies } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'next/headers'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " handleLogin"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "sessionData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " encryptedSessionData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " encrypt"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "(sessionData) "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// Encrypt your session data"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "  cookies"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "set"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'session'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", encryptedSessionData, {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    httpOnly: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "true"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    secure: process.env."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "NODE_ENV"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ==="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'production'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    maxAge: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: "60"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " *"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " 60"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " *"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " 24"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " *"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " 7"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ", "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6A737D",
+												"--shiki-dark": "#6A737D"
+											},
+											children: "// One week"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "    path: "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'/'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ","
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  })"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "  // Redirect or handle the response after setting the cookie"
+									})
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			}),
+			(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.strong, { children: "Accessing the session data stored in the cookie in a server component:" }) }),
+			(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+				defaultValue: "app/page.tsx",
+				children: [
+					(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/page.tsx",
+						children: "app/page.tsx"
+					}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+						value: "app/page.jsx",
+						children: "app/page.jsx"
+					})] }),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/page.tsx",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { cookies } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'next/headers'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSessionData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "req"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " encryptedSessionData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " cookies"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "get"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'session'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")?.value"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " encryptedSessionData "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "?"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " JSON"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "parse"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "decrypt"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "(encryptedSessionData)) "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " null"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					}),
+					(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+						value: "app/page.jsx",
+						children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+							className: "shiki shiki-themes github-light github-dark",
+							style: {
+								"--shiki-light": "#24292e",
+								"--shiki-dark": "#e1e4e8",
+								"--shiki-light-bg": "#fff",
+								"--shiki-dark-bg": "#24292e"
+							},
+							tabIndex: "0",
+							icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+							children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "import"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " { cookies } "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "from"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: " 'next/headers'"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "export"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " async"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " function"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " getSessionData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#E36209",
+												"--shiki-dark": "#FFAB70"
+											},
+											children: "req"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ") {"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  const"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " encryptedSessionData"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: " ="
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: " cookies"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "()."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "get"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#032F62",
+												"--shiki-dark": "#9ECBFF"
+											},
+											children: "'session'"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: ")?.value"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsxs)(_components.span, {
+									className: "line",
+									children: [
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "  return"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: " encryptedSessionData "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: "?"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " JSON"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "."
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "parse"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "("
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#6F42C1",
+												"--shiki-dark": "#B392F0"
+											},
+											children: "decrypt"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#24292E",
+												"--shiki-dark": "#E1E4E8"
+											},
+											children: "(encryptedSessionData)) "
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#D73A49",
+												"--shiki-dark": "#F97583"
+											},
+											children: ":"
+										}),
+										(0, import_jsx_runtime.jsx)(_components.span, {
+											style: {
+												"--shiki-light": "#005CC5",
+												"--shiki-dark": "#79B8FF"
+											},
+											children: " null"
+										})
+									]
+								}),
+								"\n",
+								(0, import_jsx_runtime.jsx)(_components.span, {
+									className: "line",
+									children: (0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "}"
+									})
+								})
+							] })
+						}) })
+					})
+				]
+			})
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "database-sessions",
+			children: "Database Sessions"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Database session management involves storing session data on the server, with the user's browser only receiving a session ID. This ID references the session data stored server-side, without containing the data itself. This method enhances security, as it keeps sensitive session data away from the client-side environment, reducing the risk of exposure to client-side attacks. Database sessions are also more scalable, accommodating larger data storage needs." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "However, this approach has its tradeoffs. It can increase performance overhead due to the need for database lookups at each user interaction. Strategies like session data caching can help mitigate this. Additionally, reliance on the database means that session management is as reliable as the database's performance and availability." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Here's a simplified example of implementing database sessions in a Next.js application:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Creating a Session on the Server" }), ":"] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(PagesOnly, { children: (0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "pages/api/create-session.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "pages/api/create-session.ts",
+					children: "pages/api/create-session.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "pages/api/create-session.js",
+					children: "pages/api/create-session.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "pages/api/create-session.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " db "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " '../../lib/db'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { NextApiRequest, NextApiResponse } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " default"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " handler"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "  req"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " NextApiRequest"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "  res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " NextApiResponse"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: ") {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  try"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " user"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " req.body"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " sessionId"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " generateSessionId"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " db."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "insertSession"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      sessionId,"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      userId: user.id,"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      createdAt: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Date"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(),"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "status"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ sessionId })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "catch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (error) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "status"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "500"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ error: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Internal Server Error'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "pages/api/create-session.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " db "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " '../../lib/db'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " default"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " handler"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "req"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  try"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " user"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " req.body"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " sessionId"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " generateSessionId"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " db."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "insertSession"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      sessionId,"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      userId: user.id,"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      createdAt: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Date"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(),"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "status"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ sessionId })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "catch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (error) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "status"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "500"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ error: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Internal Server Error'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(AppOnly, { children: [
+			(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+				className: "shiki shiki-themes github-light github-dark",
+				style: {
+					"--shiki-light": "#24292e",
+					"--shiki-dark": "#e1e4e8",
+					"--shiki-light-bg": "#fff",
+					"--shiki-dark-bg": "#24292e"
+				},
+				tabIndex: "0",
+				icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+				children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "import"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: " db "
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "from"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#032F62",
+									"--shiki-dark": "#9ECBFF"
+								},
+								children: " './lib/db'"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+					"\n",
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "export"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: " async"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: " function"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6F42C1",
+									"--shiki-dark": "#B392F0"
+								},
+								children: " createSession"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: "("
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#E36209",
+									"--shiki-dark": "#FFAB70"
+								},
+								children: "user"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: ") {"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "  const"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#005CC5",
+									"--shiki-dark": "#79B8FF"
+								},
+								children: " sessionId"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: " ="
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6F42C1",
+									"--shiki-dark": "#B392F0"
+								},
+								children: " generateSessionId"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: "() "
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6A737D",
+									"--shiki-dark": "#6A737D"
+								},
+								children: "// Generate a unique session ID"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "  await"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: " db."
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6F42C1",
+									"--shiki-dark": "#B392F0"
+								},
+								children: "insertSession"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: "({ sessionId, userId: user.id, createdAt: "
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "new"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6F42C1",
+									"--shiki-dark": "#B392F0"
+								},
+								children: " Date"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: "() })"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  return"
+						}), (0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " sessionId"
+						})]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						className: "line",
+						children: (0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "}"
+						})
+					})
+				] })
+			}) }),
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Retrieving a Session in Middleware or Server-Side Logic" }), ":"] }),
+			(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+				className: "shiki shiki-themes github-light github-dark",
+				style: {
+					"--shiki-light": "#24292e",
+					"--shiki-dark": "#e1e4e8",
+					"--shiki-light-bg": "#fff",
+					"--shiki-dark-bg": "#24292e"
+				},
+				tabIndex: "0",
+				icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+				children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "import"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: " { cookies } "
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "from"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#032F62",
+									"--shiki-dark": "#9ECBFF"
+								},
+								children: " 'next/headers'"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "import"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: " db "
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "from"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#032F62",
+									"--shiki-dark": "#9ECBFF"
+								},
+								children: " './lib/db'"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+					"\n",
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "export"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: " async"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: " function"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6F42C1",
+									"--shiki-dark": "#B392F0"
+								},
+								children: " getSession"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: "() {"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "  const"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#005CC5",
+									"--shiki-dark": "#79B8FF"
+								},
+								children: " sessionId"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: " ="
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6F42C1",
+									"--shiki-dark": "#B392F0"
+								},
+								children: " cookies"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: "()."
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6F42C1",
+									"--shiki-dark": "#B392F0"
+								},
+								children: "get"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: "("
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#032F62",
+									"--shiki-dark": "#9ECBFF"
+								},
+								children: "'sessionId'"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: ")?.value"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsxs)(_components.span, {
+						className: "line",
+						children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "  return"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: " sessionId "
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: "?"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: " await"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: " db."
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#6F42C1",
+									"--shiki-dark": "#B392F0"
+								},
+								children: "findSession"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#24292E",
+									"--shiki-dark": "#E1E4E8"
+								},
+								children: "(sessionId) "
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#D73A49",
+									"--shiki-dark": "#F97583"
+								},
+								children: ":"
+							}),
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								style: {
+									"--shiki-light": "#005CC5",
+									"--shiki-dark": "#79B8FF"
+								},
+								children: " null"
+							})
+						]
+					}),
+					"\n",
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						className: "line",
+						children: (0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "}"
+						})
+					})
+				] })
+			}) })
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "selecting-session-management-in-nextjs",
+			children: "Selecting Session Management in Next.js"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Deciding between cookie-based and database sessions in Next.js depends on your application's needs. Cookie-based sessions are simpler and suit smaller applications with lower server load but may offer less security. Database sessions, while more complex, provide better security and scalability, ideal for larger, data-sensitive applications." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"With ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#examples",
+				children: "authentication solutions"
+			}),
+			" such as ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://authjs.dev/guides/upgrade-to-v5",
+				children: "NextAuth.js"
+			}),
+			", session management becomes more efficient, using either cookies or database storage. This automation simplifies the development process, but it's important to understand the session management method used by your chosen solution. Ensure it aligns with your application's security and performance requirements."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Regardless of your choice, prioritize security in your session management strategy. For cookie-based sessions, using secure and HTTP-only cookies is crucial to protect session data. For database sessions, regular backups and secure handling of session data are essential. Implementing session expiry and cleanup mechanisms is vital in both approaches to prevent unauthorized access and maintain application performance and reliability." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "examples",
+			children: "Examples"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Here are authentication solutions compatible with Next.js, please refer to the quickstart guides below to learn how to configure them in your Next.js application:" }),
+		"\n",
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://auth0.com/docs/quickstart/webapp/nextjs/01-login",
+				children: "Auth0"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://clerk.com/docs/quickstarts/nextjs",
+				children: "Clerk"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://kinde.com/docs/developer-tools/nextjs-sdk",
+				children: "Kinde"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://lucia-auth.com/getting-started/nextjs-app",
+				children: "Lucia"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://authjs.dev/guides/upgrade-to-v5",
+				children: "NextAuth.js"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://supabase.com/docs/guides/getting-started/quickstarts/nextjs",
+				children: "Supabase"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://stytch.com/docs/guides/quickstarts/nextjs",
+				children: "Stytch"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vvo/iron-session",
+				children: "Iron Session"
+			}) }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "further-reading",
+			children: "Further Reading"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "To continue learning about authentication and security, check out the following resources:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com/guides/understanding-xss-attacks",
+				children: "Understanding XSS Attacks"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com/guides/understanding-csrf-attacks",
+				children: "Understanding CSRF Attacks"
+			}) }),
+			"\n"
+		] })
+	] });
+}
+function MDXContent(props = {}) {
+	const { wrapper: MDXLayout } = props.components || {};
+	return MDXLayout ? (0, import_jsx_runtime.jsx)(MDXLayout, {
+		...props,
+		children: (0, import_jsx_runtime.jsx)(_createMdxContent, { ...props })
+	}) : _createMdxContent(props);
+}
+function _missingMdxReference(id, component) {
+	throw new Error("Expected " + (component ? "component" : "object") + " `" + id + "` to be defined: you likely forgot to import, pass, or provide it.");
+}
+//#endregion
+export { toc as a, structuredData as i, _09_authentication_exports as n, frontmatter as r, MDXContent as t };

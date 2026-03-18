@@ -1,7 +1,8 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { createServerFn } from '@tanstack/react-start';
-import { source } from '@/lib/source';
+import { docs } from '@/lib/source';
+import { getPage } from '@/lib/docs';
 import browserCollections from 'collections/browser';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page';
 import { baseOptions } from '@/lib/layout.shared';
@@ -26,15 +27,14 @@ const serverLoader = createServerFn({
   .handler(async ({ data: slugs }) => {
     // URL slugs have numeric prefixes stripped; match by URL
     const url = `/docs/${slugs.join('/')}`;
-    const result = source.getPageByHref(url);
-    const page = result?.page ?? source.getPage(slugs);
+    const page = getPage(url);
 
     if (!page) throw notFound();
 
     return {
       slugs: page.slugs,
       path: page.path,
-      pageTree: await source.serializePageTree(source.getPageTree()),
+      pageTree: await docs.serializePageTree(docs.getPageTree()),
     };
   });
 
@@ -56,7 +56,7 @@ function Page() {
   const data = useFumadocsLoader(Route.useLoaderData());
 
   return (
-    <DocsLayout {...baseOptions()} tree={data.pageTree}>
+    <DocsLayout {...baseOptions()} tree={(data as any).pageTree}>
       <Suspense>{clientLoader.useContent(data.path)}</Suspense>
     </DocsLayout>
   );

@@ -1,0 +1,15037 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { n as __exportAll } from "./chunk-BnRpC7BT.mjs";
+import { v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/12-route-handlers-BloTxW2v.js
+var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
+var _12_route_handlers_exports = /* @__PURE__ */ __exportAll({
+	default: () => MDXContent,
+	frontmatter: () => frontmatter,
+	structuredData: () => structuredData,
+	toc: () => toc
+});
+var frontmatter = {
+	"title": "Route Handlers",
+	"description": "Create custom request handlers for a given route using the Web's Request and Response APIs.",
+	"related": {
+		"title": "API Reference",
+		"description": "Learn more about the route.js file.",
+		"links": ["app/api-reference/file-conventions/route"]
+	}
+};
+var structuredData = {
+	"contents": [
+		{
+			"heading": void 0,
+			"content": "Route Handlers allow you to create custom request handlers for a given route using the Web Request and Response APIs."
+		},
+		{
+			"heading": void 0,
+			"content": "> **Good to know**: Route Handlers are only available inside the `app` directory. They are the equivalent of API Routes inside the `pages` directory meaning you **do not** need to use API Routes and Route Handlers together."
+		},
+		{
+			"heading": "convention",
+			"content": "Route Handlers are defined in a `route.js|ts` file inside the `app` directory:"
+		},
+		{
+			"heading": "convention",
+			"content": "Route Handlers can be nested inside the `app` directory, similar to `page.js` and `layout.js`. But there **cannot** be a `route.js` file at the same route segment level as `page.js`."
+		},
+		{
+			"heading": "supported-http-methods",
+			"content": "The following HTTP methods are supported: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`. If an unsupported method is called, Next.js will return a `405 Method Not Allowed` response."
+		},
+		{
+			"heading": "extended-nextrequest-and-nextresponse-apis",
+			"content": "In addition to supporting native Request and Response. Next.js extends them with\n`NextRequest` and `NextResponse` to provide convenient helpers for advanced use cases."
+		},
+		{
+			"heading": "caching",
+			"content": "Route Handlers are cached by default when using the `GET` method with the `Response` object."
+		},
+		{
+			"heading": "caching",
+			"content": "> **TypeScript Warning:** `Response.json()` is only valid from TypeScript 5.2. If you use a lower TypeScript version, you can use `NextResponse.json()` for typed responses instead."
+		},
+		{
+			"heading": "opting-out-of-caching",
+			"content": "You can opt out of caching by:"
+		},
+		{
+			"heading": "opting-out-of-caching",
+			"content": "Using the `Request` object with the `GET` method."
+		},
+		{
+			"heading": "opting-out-of-caching",
+			"content": "Using any of the other HTTP methods."
+		},
+		{
+			"heading": "opting-out-of-caching",
+			"content": "Using Dynamic Functions like `cookies` and `headers`."
+		},
+		{
+			"heading": "opting-out-of-caching",
+			"content": "The Segment Config Options manually specifies dynamic mode."
+		},
+		{
+			"heading": "opting-out-of-caching",
+			"content": "For example:"
+		},
+		{
+			"heading": "opting-out-of-caching",
+			"content": "Similarly, the `POST` method will cause the Route Handler to be evaluated dynamically."
+		},
+		{
+			"heading": "opting-out-of-caching",
+			"content": "> **Good to know**: Like API Routes, Route Handlers can be used for cases like handling form submissions. A new abstraction for handling forms and mutations that integrates deeply with React is being worked on."
+		},
+		{
+			"heading": "route-resolution",
+			"content": "You can consider a `route` the lowest level routing primitive."
+		},
+		{
+			"heading": "route-resolution",
+			"content": "They **do not** participate in layouts or client-side navigations like `page`."
+		},
+		{
+			"heading": "route-resolution",
+			"content": "There **cannot** be a `route.js` file at the same route as `page.js`."
+		},
+		{
+			"heading": "route-resolution",
+			"content": "Page"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "Route"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "Result"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "`app/page.js`"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "`app/route.js`"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "Conflict"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "`app/page.js`"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "`app/api/route.js`"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "Valid"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "`app/[user]/page.js`"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "`app/api/route.js`"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "Valid"
+		},
+		{
+			"heading": "route-resolution",
+			"content": "Each `route.js` or `page.js` file takes over all HTTP verbs for that route."
+		},
+		{
+			"heading": "examples",
+			"content": "The following examples show how to combine Route Handlers with other Next.js APIs and features."
+		},
+		{
+			"heading": "revalidating-cached-data",
+			"content": "You can revalidate cached data using the `next.revalidate` option:"
+		},
+		{
+			"heading": "revalidating-cached-data",
+			"content": "Alternatively, you can use the `revalidate` segment config option:"
+		},
+		{
+			"heading": "dynamic-functions",
+			"content": "Route Handlers can be used with dynamic functions from Next.js, like `cookies` and `headers`."
+		},
+		{
+			"heading": "cookies",
+			"content": "You can read or set cookies with `cookies` from `next/headers`. This server function can be called directly in a Route Handler, or nested inside of another function."
+		},
+		{
+			"heading": "cookies",
+			"content": "Alternatively, you can return a new `Response` using the `Set-Cookie` header."
+		},
+		{
+			"heading": "cookies",
+			"content": "You can also use the underlying Web APIs to read cookies from the request (`NextRequest`):"
+		},
+		{
+			"heading": "headers",
+			"content": "You can read headers with `headers` from `next/headers`. This server function can be called directly in a Route Handler, or nested inside of another function."
+		},
+		{
+			"heading": "headers",
+			"content": "This `headers` instance is read-only. To set headers, you need to return a new `Response` with new `headers`."
+		},
+		{
+			"heading": "headers",
+			"content": "You can also use the underlying Web APIs to read headers from the request (`NextRequest`):"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "> We recommend reading the Defining Routes page before continuing."
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "Route Handlers can use Dynamic Segments to create request handlers from dynamic data."
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "Route"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "Example URL"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`params`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`app/items/[slug]/route.js`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`/items/a`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`{ slug: 'a' }`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`app/items/[slug]/route.js`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`/items/b`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`{ slug: 'b' }`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`app/items/[slug]/route.js`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`/items/c`"
+		},
+		{
+			"heading": "dynamic-route-segments",
+			"content": "`{ slug: 'c' }`"
+		},
+		{
+			"heading": "url-query-parameters",
+			"content": "The request object passed to the Route Handler is a `NextRequest` instance, which has some additional convenience methods, including for more easily handling query parameters."
+		},
+		{
+			"heading": "streaming",
+			"content": "Streaming is commonly used in combination with Large Language Models (LLMs), such as OpenAI, for AI-generated content. Learn more about the AI SDK."
+		},
+		{
+			"heading": "streaming",
+			"content": "These abstractions use the Web APIs to create a stream. You can also use the underlying Web APIs directly."
+		},
+		{
+			"heading": "request-body",
+			"content": "You can read the `Request` body using the standard Web API methods:"
+		},
+		{
+			"heading": "request-body-formdata",
+			"content": "You can read the `FormData` using the `request.formData()` function:"
+		},
+		{
+			"heading": "request-body-formdata",
+			"content": "Since `formData` data are all strings, you may want to use `zod-form-data` to validate the request and retrieve data in the format you prefer (e.g. `number`)."
+		},
+		{
+			"heading": "cors",
+			"content": "You can set CORS headers for a specific Route Handler using the standard Web API methods:"
+		},
+		{
+			"heading": "cors",
+			"content": "> **Good to know**:\n>\n> * To add CORS headers to multiple Route Handlers, you can use Middleware or the `next.config.js` file.\n> * Alternatively, see our CORS example package."
+		},
+		{
+			"heading": "webhooks",
+			"content": "You can use a Route Handler to receive webhooks from third-party services:"
+		},
+		{
+			"heading": "webhooks",
+			"content": "Notably, unlike API Routes with the Pages Router, you do not need to use `bodyParser` to use any additional configuration."
+		},
+		{
+			"heading": "edge-and-nodejs-runtimes",
+			"content": "Route Handlers have an isomorphic Web API to support both Edge and Node.js runtimes seamlessly, including support for streaming. Since Route Handlers use the same route segment configuration as Pages and Layouts, they support long-awaited features like general-purpose statically regenerated Route Handlers."
+		},
+		{
+			"heading": "edge-and-nodejs-runtimes",
+			"content": "You can use the `runtime` segment config option to specify the runtime:"
+		},
+		{
+			"heading": "non-ui-responses",
+			"content": "You can use Route Handlers to return non-UI content. Note that `sitemap.xml`, `robots.txt`, `app icons`, and open graph images all have built-in support."
+		},
+		{
+			"heading": "segment-config-options",
+			"content": "Route Handlers use the same route segment configuration as pages and layouts."
+		},
+		{
+			"heading": "segment-config-options",
+			"content": "See the API reference for more details."
+		},
+		{
+			"heading": "api-reference",
+			"content": "Learn more about the route.js file."
+		}
+	],
+	"headings": [
+		{
+			"id": "convention",
+			"content": "Convention"
+		},
+		{
+			"id": "supported-http-methods",
+			"content": "Supported HTTP Methods"
+		},
+		{
+			"id": "extended-nextrequest-and-nextresponse-apis",
+			"content": "Extended `NextRequest` and `NextResponse` APIs"
+		},
+		{
+			"id": "behavior",
+			"content": "Behavior"
+		},
+		{
+			"id": "caching",
+			"content": "Caching"
+		},
+		{
+			"id": "opting-out-of-caching",
+			"content": "Opting out of caching"
+		},
+		{
+			"id": "route-resolution",
+			"content": "Route Resolution"
+		},
+		{
+			"id": "examples",
+			"content": "Examples"
+		},
+		{
+			"id": "revalidating-cached-data",
+			"content": "Revalidating Cached Data"
+		},
+		{
+			"id": "dynamic-functions",
+			"content": "Dynamic Functions"
+		},
+		{
+			"id": "cookies",
+			"content": "Cookies"
+		},
+		{
+			"id": "headers",
+			"content": "Headers"
+		},
+		{
+			"id": "redirects",
+			"content": "Redirects"
+		},
+		{
+			"id": "dynamic-route-segments",
+			"content": "Dynamic Route Segments"
+		},
+		{
+			"id": "url-query-parameters",
+			"content": "URL Query Parameters"
+		},
+		{
+			"id": "streaming",
+			"content": "Streaming"
+		},
+		{
+			"id": "request-body",
+			"content": "Request Body"
+		},
+		{
+			"id": "request-body-formdata",
+			"content": "Request Body FormData"
+		},
+		{
+			"id": "cors",
+			"content": "CORS"
+		},
+		{
+			"id": "webhooks",
+			"content": "Webhooks"
+		},
+		{
+			"id": "edge-and-nodejs-runtimes",
+			"content": "Edge and Node.js Runtimes"
+		},
+		{
+			"id": "non-ui-responses",
+			"content": "Non-UI Responses"
+		},
+		{
+			"id": "segment-config-options",
+			"content": "Segment Config Options"
+		},
+		{
+			"id": "api-reference",
+			"content": "API Reference"
+		}
+	]
+};
+var toc = [
+	{
+		depth: 2,
+		url: "#convention",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Convention" })
+	},
+	{
+		depth: 3,
+		url: "#supported-http-methods",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Supported HTTP Methods" })
+	},
+	{
+		depth: 3,
+		url: "#extended-nextrequest-and-nextresponse-apis",
+		title: (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+			"Extended ",
+			(0, import_jsx_runtime.jsx)("code", { children: "NextRequest" }),
+			" and ",
+			(0, import_jsx_runtime.jsx)("code", { children: "NextResponse" }),
+			" APIs"
+		] })
+	},
+	{
+		depth: 2,
+		url: "#behavior",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Behavior" })
+	},
+	{
+		depth: 3,
+		url: "#caching",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Caching" })
+	},
+	{
+		depth: 3,
+		url: "#opting-out-of-caching",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Opting out of caching" })
+	},
+	{
+		depth: 3,
+		url: "#route-resolution",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Route Resolution" })
+	},
+	{
+		depth: 2,
+		url: "#examples",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Examples" })
+	},
+	{
+		depth: 3,
+		url: "#revalidating-cached-data",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Revalidating Cached Data" })
+	},
+	{
+		depth: 3,
+		url: "#dynamic-functions",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Dynamic Functions" })
+	},
+	{
+		depth: 4,
+		url: "#cookies",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Cookies" })
+	},
+	{
+		depth: 4,
+		url: "#headers",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Headers" })
+	},
+	{
+		depth: 3,
+		url: "#redirects",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Redirects" })
+	},
+	{
+		depth: 3,
+		url: "#dynamic-route-segments",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Dynamic Route Segments" })
+	},
+	{
+		depth: 3,
+		url: "#url-query-parameters",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "URL Query Parameters" })
+	},
+	{
+		depth: 3,
+		url: "#streaming",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Streaming" })
+	},
+	{
+		depth: 3,
+		url: "#request-body",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Request Body" })
+	},
+	{
+		depth: 3,
+		url: "#request-body-formdata",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Request Body FormData" })
+	},
+	{
+		depth: 3,
+		url: "#cors",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "CORS" })
+	},
+	{
+		depth: 3,
+		url: "#webhooks",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Webhooks" })
+	},
+	{
+		depth: 3,
+		url: "#edge-and-nodejs-runtimes",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Edge and Node.js Runtimes" })
+	},
+	{
+		depth: 3,
+		url: "#non-ui-responses",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Non-UI Responses" })
+	},
+	{
+		depth: 3,
+		url: "#segment-config-options",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "Segment Config Options" })
+	},
+	{
+		depth: 2,
+		url: "#api-reference",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: "API Reference" })
+	}
+];
+function _createMdxContent(props) {
+	const _components = {
+		a: "a",
+		blockquote: "blockquote",
+		code: "code",
+		h2: "h2",
+		h3: "h3",
+		h4: "h4",
+		li: "li",
+		p: "p",
+		pre: "pre",
+		span: "span",
+		strong: "strong",
+		table: "table",
+		tbody: "tbody",
+		td: "td",
+		th: "th",
+		thead: "thead",
+		tr: "tr",
+		ul: "ul",
+		...props.components
+	}, { Check, CodeBlockTab, CodeBlockTabs, CodeBlockTabsList, CodeBlockTabsTrigger, Cross, Image } = _components;
+	if (!Check) _missingMdxReference("Check", true);
+	if (!CodeBlockTab) _missingMdxReference("CodeBlockTab", true);
+	if (!CodeBlockTabs) _missingMdxReference("CodeBlockTabs", true);
+	if (!CodeBlockTabsList) _missingMdxReference("CodeBlockTabsList", true);
+	if (!CodeBlockTabsTrigger) _missingMdxReference("CodeBlockTabsTrigger", true);
+	if (!Cross) _missingMdxReference("Cross", true);
+	if (!Image) _missingMdxReference("Image", true);
+	return (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Route Handlers allow you to create custom request handlers for a given route using the Web ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/API/Request",
+				children: "Request"
+			}),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/API/Response",
+				children: "Response"
+			}),
+			" APIs."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(Image, {
+			alt: "Route.js Special File",
+			srcLight: "/docs/light/route-special-file.png",
+			srcDark: "/docs/dark/route-special-file.png",
+			width: "1600",
+			height: "444"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.blockquote, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Good to know" }),
+				": Route Handlers are only available inside the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "app" }),
+				" directory. They are the equivalent of ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/pages/building-your-application/routing/api-routes",
+					children: "API Routes"
+				}),
+				" inside the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "pages" }),
+				" directory meaning you ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "do not" }),
+				" need to use API Routes and Route Handlers together."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "convention",
+			children: "Convention"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Route Handlers are defined in a ",
+			(0, import_jsx_runtime.jsxs)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/route",
+				children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "route.js|ts" }), " file"]
+			}),
+			" inside the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "app" }),
+			" directory:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamic"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'force-dynamic'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: " // defaults to auto"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {}"
+									})
+								]
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamic"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'force-dynamic'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: " // defaults to auto"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {}"
+									})
+								]
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Route Handlers can be nested inside the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "app" }),
+			" directory, similar to ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "page.js" }),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "layout.js" }),
+			". But there ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "cannot" }),
+			" be a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "route.js" }),
+			" file at the same route segment level as ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "page.js" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "supported-http-methods",
+			children: "Supported HTTP Methods"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The following ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/HTTP/Methods",
+				children: "HTTP methods"
+			}),
+			" are supported: ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "GET" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "POST" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "PUT" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "PATCH" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "DELETE" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "HEAD" }),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "OPTIONS" }),
+			". If an unsupported method is called, Next.js will return a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "405 Method Not Allowed" }),
+			" response."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.h3, {
+			id: "extended-nextrequest-and-nextresponse-apis",
+			children: [
+				"Extended ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "NextRequest" }),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "NextResponse" }),
+				" APIs"
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In addition to supporting native ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/API/Request",
+				children: "Request"
+			}),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/API/Response",
+				children: "Response"
+			}),
+			". Next.js extends them with\n",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/next-request",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "NextRequest" })
+			}),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/next-response",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "NextResponse" })
+			}),
+			" to provide convenient helpers for advanced use cases."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "behavior",
+			children: "Behavior"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "caching",
+			children: "Caching"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Route Handlers are cached by default when using the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "GET" }),
+			" method with the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "Response" }),
+			" object."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/items/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.ts",
+					children: "app/items/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.js",
+					children: "app/items/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " fetch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'https://data.mongodb-api.com/...'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Content-Type'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'application/json'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'API-Key'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "DATA_API_KEY"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " data"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ data })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " fetch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'https://data.mongodb-api.com/...'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Content-Type'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'application/json'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'API-Key'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "DATA_API_KEY"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " data"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ data })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.blockquote, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "TypeScript Warning:" }),
+				" ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "Response.json()" }),
+				" is only valid from TypeScript 5.2. If you use a lower TypeScript version, you can use ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/api-reference/functions/next-response#json",
+					children: (0, import_jsx_runtime.jsx)(_components.code, { children: "NextResponse.json()" })
+				}),
+				" for typed responses instead."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "opting-out-of-caching",
+			children: "Opting out of caching"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "You can opt out of caching by:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"Using the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "Request" }),
+				" object with the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "GET" }),
+				" method."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Using any of the other HTTP methods." }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"Using ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#dynamic-functions",
+					children: "Dynamic Functions"
+				}),
+				" like ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "cookies" }),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "headers" }),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"The ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#segment-config-options",
+					children: "Segment Config Options"
+				}),
+				" manually specifies dynamic mode."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "For example:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/products/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/products/api/route.ts",
+					children: "app/products/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/products/api/route.js",
+					children: "app/products/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/products/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "searchParams"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " URL"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(request.url)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " id"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " searchParams."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'id'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " fetch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "`https://data.mongodb-api.com/product/${"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "id"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "}`"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Content-Type'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'application/json'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'API-Key'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "DATA_API_KEY"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "!"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " product"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ product })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/products/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "searchParams"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " URL"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(request.url)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " id"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " searchParams."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'id'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " fetch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "`https://data.mongodb-api.com/product/${"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "id"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "}`"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Content-Type'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'application/json'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'API-Key'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "DATA_API_KEY"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " product"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ product })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Similarly, the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "POST" }),
+			" method will cause the Route Handler to be evaluated dynamically."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/items/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.ts",
+					children: "app/items/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.js",
+					children: "app/items/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " fetch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'https://data.mongodb-api.com/...'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    method: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'POST'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Content-Type'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'application/json'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'API-Key'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "DATA_API_KEY"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "!"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    body: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "JSON"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "stringify"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ time: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Date"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "toISOString"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() }),"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " data"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(data)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " fetch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'https://data.mongodb-api.com/...'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    method: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'POST'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Content-Type'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'application/json'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'API-Key'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "DATA_API_KEY"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    body: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "JSON"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "stringify"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ time: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Date"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "toISOString"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() }),"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " data"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(data)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.blockquote, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "Good to know" }),
+				": Like API Routes, Route Handlers can be used for cases like handling form submissions. A new abstraction for ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/building-your-application/data-fetching/server-actions-and-mutations",
+					children: "handling forms and mutations"
+				}),
+				" that integrates deeply with React is being worked on."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "route-resolution",
+			children: "Route Resolution"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can consider a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "route" }),
+			" the lowest level routing primitive."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"They ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "do not" }),
+				" participate in layouts or client-side navigations like ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "page" }),
+				"."
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"There ",
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "cannot" }),
+				" be a ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "route.js" }),
+				" file at the same route as ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "page.js" }),
+				"."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.table, { children: [(0, import_jsx_runtime.jsx)(_components.thead, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "Page" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "Route" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "Result" })
+		] }) }), (0, import_jsx_runtime.jsxs)(_components.tbody, { children: [
+			(0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/page.js" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/route.js" }) }),
+				(0, import_jsx_runtime.jsxs)(_components.td, { children: [(0, import_jsx_runtime.jsx)(Cross, { size: 18 }), " Conflict"] })
+			] }),
+			(0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/page.js" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/api/route.js" }) }),
+				(0, import_jsx_runtime.jsxs)(_components.td, { children: [(0, import_jsx_runtime.jsx)(Check, { size: 18 }), " Valid"] })
+			] }),
+			(0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/[user]/page.js" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/api/route.js" }) }),
+				(0, import_jsx_runtime.jsxs)(_components.td, { children: [(0, import_jsx_runtime.jsx)(Check, { size: 18 }), " Valid"] })
+			] })
+		] })] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Each ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "route.js" }),
+			" or ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "page.js" }),
+			" file takes over all HTTP verbs for that route."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "app/page.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Page"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  return"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "h1"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">Hello, Next.js!</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "h1"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// ❌ Conflict"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: "// `app/route.js`"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " async"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " POST"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "request"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ") {}"
+						})
+					]
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "examples",
+			children: "Examples"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The following examples show how to combine Route Handlers with other Next.js APIs and features." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "revalidating-cached-data",
+			children: "Revalidating Cached Data"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data",
+				children: "revalidate cached data"
+			}),
+			" using the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "next.revalidate" })
+			}),
+			" option:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/items/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.ts",
+					children: "app/items/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.js",
+					children: "app/items/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " fetch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'https://data.mongodb-api.com/...'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    next: { revalidate: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "60"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " }, "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "// Revalidate every 60 seconds"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " data"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(data)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " fetch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'https://data.mongodb-api.com/...'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    next: { revalidate: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "60"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " }, "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "// Revalidate every 60 seconds"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " data"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " res."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(data)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Alternatively, you can use the ",
+			(0, import_jsx_runtime.jsxs)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/route-segment-config#revalidate",
+				children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "revalidate" }), " segment config option"]
+			}),
+			":"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsx)(_components.code, { children: (0, import_jsx_runtime.jsxs)(_components.span, {
+				className: "line",
+				children: [
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "export"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: " const"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#005CC5",
+							"--shiki-dark": "#79B8FF"
+						},
+						children: " revalidate"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: " ="
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#005CC5",
+							"--shiki-dark": "#79B8FF"
+						},
+						children: " 60"
+					})
+				]
+			}) })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "dynamic-functions",
+			children: "Dynamic Functions"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Route Handlers can be used with dynamic functions from Next.js, like ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/cookies",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "cookies" })
+			}),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/headers",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "headers" })
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h4, {
+			id: "cookies",
+			children: "Cookies"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can read or set cookies with ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/cookies",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "cookies" })
+			}),
+			" from ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/headers" }),
+			". This server function can be called directly in a Route Handler, or nested inside of another function."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Alternatively, you can return a new ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "Response" }),
+			" using the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://developer.mozilla.org/docs/Web/HTTP/Headers/Set-Cookie",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "Set-Cookie" })
+			}),
+			" header."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { cookies } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/headers'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " cookieStore"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " cookies"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " token"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " cookieStore."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'token'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Hello, Next.js!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    headers: { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Set-Cookie'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "`token=${"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "token"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "value"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "}`"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " },"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { cookies } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/headers'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " cookieStore"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " cookies"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " token"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " cookieStore."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'token'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Hello, Next.js!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    headers: { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Set-Cookie'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "`token=${"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "token"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "}`"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " },"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can also use the underlying Web APIs to read cookies from the request (",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/next-request",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "NextRequest" })
+			}),
+			"):"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " NextRequest } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/server'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " NextRequest"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " token"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request.cookies."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'token'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " token"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request.cookies."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'token'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h4, {
+			id: "headers",
+			children: "Headers"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can read headers with ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/headers",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "headers" })
+			}),
+			" from ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/headers" }),
+			". This server function can be called directly in a Route Handler, or nested inside of another function."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"This ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "headers" }),
+			" instance is read-only. To set headers, you need to return a new ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "Response" }),
+			" with new ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "headers" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { headers } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/headers'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " headersList"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " headers"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " referer"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " headersList."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'referer'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Hello, Next.js!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: { referer: referer },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { headers } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/headers'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " headersList"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " headers"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " referer"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " headersList."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'referer'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Hello, Next.js!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: { referer: referer },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can also use the underlying Web APIs to read headers from the request (",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/next-request",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "NextRequest" })
+			}),
+			"):"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " NextRequest } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/server'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " NextRequest"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " requestHeaders"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Headers"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(request.headers)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " requestHeaders"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Headers"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(request.headers)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "redirects",
+			children: "Redirects"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { redirect } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/navigation'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "  redirect"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'https://nextjs.org/'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { redirect } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/navigation'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "  redirect"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'https://nextjs.org/'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "dynamic-route-segments",
+			children: "Dynamic Route Segments"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.blockquote, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+				"We recommend reading the ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "/docs/app/building-your-application/routing/defining-routes",
+					children: "Defining Routes"
+				}),
+				" page before continuing."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Route Handlers can use ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/building-your-application/routing/dynamic-routes",
+				children: "Dynamic Segments"
+			}),
+			" to create request handlers from dynamic data."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/items/[slug]/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/[slug]/route.ts",
+					children: "app/items/[slug]/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/[slug]/route.js",
+					children: "app/items/[slug]/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/[slug]/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "  request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "params"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " }"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "params"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "slug"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " string"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } }"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: ") {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " slug"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " params.slug "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "// 'a', 'b', or 'c'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/[slug]/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "params"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " }) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " slug"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " params.slug "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: "// 'a', 'b', or 'c'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.table, { children: [(0, import_jsx_runtime.jsx)(_components.thead, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "Route" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "Example URL" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "params" }) })
+		] }) }), (0, import_jsx_runtime.jsxs)(_components.tbody, { children: [
+			(0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/items/[slug]/route.js" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "/items/a" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "{ slug: 'a' }" }) })
+			] }),
+			(0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/items/[slug]/route.js" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "/items/b" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "{ slug: 'b' }" }) })
+			] }),
+			(0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app/items/[slug]/route.js" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "/items/c" }) }),
+				(0, import_jsx_runtime.jsx)(_components.td, { children: (0, import_jsx_runtime.jsx)(_components.code, { children: "{ slug: 'c' }" }) })
+			] })
+		] })] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "url-query-parameters",
+			children: "URL Query Parameters"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The request object passed to the Route Handler is a ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "NextRequest" }),
+			" instance, which has ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/functions/next-request#nexturl",
+				children: "some additional convenience methods"
+			}),
+			", including for more easily handling query parameters."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/search/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/search/route.ts",
+					children: "app/api/search/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/search/route.js",
+					children: "app/api/search/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/search/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "type"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " NextRequest } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'next/server'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " NextRequest"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " searchParams"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request.nextUrl.searchParams"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " query"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " searchParams."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'query'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "  // query is \"hello\" for /api/search?query=hello"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/search/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " searchParams"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request.nextUrl.searchParams"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " query"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " searchParams."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'query'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "  // query is \"hello\" for /api/search?query=hello"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "streaming",
+			children: "Streaming"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Streaming is commonly used in combination with Large Language Models (LLMs), such as OpenAI, for AI-generated content. Learn more about the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://sdk.vercel.ai/docs",
+				children: "AI SDK"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/chat/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/chat/route.ts",
+					children: "app/api/chat/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/chat/route.js",
+					children: "app/api/chat/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/chat/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " OpenAI "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'openai'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { OpenAIStream, StreamingTextResponse } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'ai'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " openai"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " OpenAI"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  apiKey: process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "OPENAI_API_KEY"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "})"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " runtime"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'edge'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "req"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "messages"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " req."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " openai.chat.completions."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "create"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    model: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'gpt-3.5-turbo'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    stream: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "true"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    messages,"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " stream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " OpenAIStream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(response)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " StreamingTextResponse"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(stream)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/chat/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " OpenAI "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'openai'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "import"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { OpenAIStream, StreamingTextResponse } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "from"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'ai'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " openai"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " OpenAI"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  apiKey: process.env."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "OPENAI_API_KEY"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "})"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " runtime"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'edge'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "req"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "messages"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " req."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " openai.chat.completions."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "create"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    model: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'gpt-3.5-turbo'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    stream: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "true"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    messages,"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " stream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " OpenAIStream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(response)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " StreamingTextResponse"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(stream)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "These abstractions use the Web APIs to create a stream. You can also use the underlying Web APIs directly." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "// https://developer.mozilla.org/docs/Web/API/ReadableStream#convert_async_iterator_to_stream"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " iteratorToStream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "iterator"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " any"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " ReadableStream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " pull"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "controller"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "      const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "value"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "done"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " iterator."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "next"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "      if"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " (done) {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "        controller."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "close"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "else"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "        controller."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "enqueue"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(value)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " sleep"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "time"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " number"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " Promise"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "resolve"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "=>"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6F42C1",
+										"--shiki-dark": "#B392F0"
+									},
+									children: "    setTimeout"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "(resolve, time)"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " encoder"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " TextEncoder"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function*"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " makeIterator"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  yield"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " encoder."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "encode"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'<p>One</p>'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " sleep"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  yield"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " encoder."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "encode"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'<p>Two</p>'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " sleep"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  yield"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " encoder."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "encode"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'<p>Three</p>'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " iterator"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " makeIterator"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " stream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " iteratorToStream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(iterator)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(stream)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "// https://developer.mozilla.org/docs/Web/API/ReadableStream#convert_async_iterator_to_stream"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " iteratorToStream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "iterator"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " ReadableStream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " pull"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "controller"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "      const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " { "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "value"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "done"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " iterator."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "next"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "      if"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " (done) {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "        controller."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "close"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "else"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "        controller."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "enqueue"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(value)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " sleep"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "time"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " Promise"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "resolve"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "=>"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6F42C1",
+										"--shiki-dark": "#B392F0"
+									},
+									children: "    setTimeout"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "(resolve, time)"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " encoder"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " TextEncoder"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function*"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " makeIterator"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  yield"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " encoder."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "encode"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'<p>One</p>'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " sleep"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  yield"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " encoder."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "encode"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'<p>Two</p>'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " sleep"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  yield"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " encoder."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "encode"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'<p>Three</p>'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " iterator"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " makeIterator"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " stream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " iteratorToStream"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(iterator)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "(stream)"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "request-body",
+			children: "Request Body"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can read the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "Request" }),
+			" body using the standard Web API methods:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/items/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.ts",
+					children: "app/items/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.js",
+					children: "app/items/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ res })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " res"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ res })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "request-body-formdata",
+			children: "Request Body FormData"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can read the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "FormData" }),
+			" using the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "request.formData()" }),
+			" function:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/items/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.ts",
+					children: "app/items/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.js",
+					children: "app/items/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " formData"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "formData"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " name"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " formData."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'name'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " email"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " formData."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'email'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ name, email })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " formData"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "formData"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " name"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " formData."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'name'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " email"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " formData."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "get"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'email'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ")"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " Response."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "json"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "({ name, email })"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Since ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "formData" }),
+			" data are all strings, you may want to use ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://www.npmjs.com/zod-form-data",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "zod-form-data" })
+			}),
+			" to validate the request and retrieve data in the format you prefer (e.g. ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "number" }),
+			")."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "cors",
+			children: "CORS"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "You can set CORS headers for a specific Route Handler using the standard Web API methods:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamic"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'force-dynamic'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: " // defaults to auto"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Hello, Next.js!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Access-Control-Allow-Origin'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'*'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Access-Control-Allow-Methods'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'GET, POST, PUT, DELETE, OPTIONS'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Access-Control-Allow-Headers'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Content-Type, Authorization'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamic"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'force-dynamic'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: " // defaults to auto"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Hello, Next.js!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Access-Control-Allow-Origin'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'*'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Access-Control-Allow-Methods'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'GET, POST, PUT, DELETE, OPTIONS'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "      'Access-Control-Allow-Headers'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Content-Type, Authorization'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.blockquote, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.p, { children: [(0, import_jsx_runtime.jsx)(_components.strong, { children: "Good to know" }), ":"] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+					"To add CORS headers to multiple Route Handlers, you can use ",
+					(0, import_jsx_runtime.jsx)(_components.a, {
+						href: "/docs/app/building-your-application/routing/middleware#cors",
+						children: "Middleware"
+					}),
+					" or the ",
+					(0, import_jsx_runtime.jsxs)(_components.a, {
+						href: "/docs/app/api-reference/next-config-js/headers#cors",
+						children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "next.config.js" }), " file"]
+					}),
+					"."
+				] }),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+					"Alternatively, see our ",
+					(0, import_jsx_runtime.jsx)(_components.a, {
+						href: "https://github.com/vercel/examples/blob/main/edge-functions/cors/lib/cors.ts",
+						children: "CORS example"
+					}),
+					" package."
+				] }),
+				"\n"
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "webhooks",
+			children: "Webhooks"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "You can use a Route Handler to receive webhooks from third-party services:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/api/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.ts",
+					children: "app/api/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/api/route.js",
+					children: "app/api/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: ":"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  try"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " text"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "text"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "    // Process the webhook payload"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "catch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (error) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "`Webhook error: ${"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "error"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "message"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "}`"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "400"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Success!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/api/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " POST"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#E36209",
+											"--shiki-dark": "#FFAB70"
+										},
+										children: "request"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ") {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#D73A49",
+										"--shiki-dark": "#F97583"
+									},
+									children: "  try"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: " {"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " text"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " await"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " request."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: "text"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "()"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#6A737D",
+										"--shiki-dark": "#6A737D"
+									},
+									children: "    // Process the webhook payload"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "  } "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "catch"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: " (error) {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "    return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "`Webhook error: ${"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "error"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "."
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "message"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "}`"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "      status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "400"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'Success!'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ", {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "    status: "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: "200"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  })"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Notably, unlike API Routes with the Pages Router, you do not need to use ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "bodyParser" }),
+			" to use any additional configuration."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "edge-and-nodejs-runtimes",
+			children: "Edge and Node.js Runtimes"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Route Handlers have an isomorphic Web API to support both Edge and Node.js runtimes seamlessly, including support for streaming. Since Route Handlers use the same ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/route-segment-config",
+				children: "route segment configuration"
+			}),
+			" as Pages and Layouts, they support long-awaited features like general-purpose ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/building-your-application/data-fetching/fetching-caching-and-revalidating#revalidating-data",
+				children: "statically regenerated"
+			}),
+			" Route Handlers."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can use the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "runtime" }),
+			" segment config option to specify the runtime:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsx)(_components.code, { children: (0, import_jsx_runtime.jsxs)(_components.span, {
+				className: "line",
+				children: [
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "export"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: " const"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#005CC5",
+							"--shiki-dark": "#79B8FF"
+						},
+						children: " runtime"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: " ="
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: " 'edge'"
+					}),
+					(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#6A737D",
+							"--shiki-dark": "#6A737D"
+						},
+						children: " // 'nodejs' is the default"
+					})
+				]
+			}) })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "non-ui-responses",
+			children: "Non-UI Responses"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"You can use Route Handlers to return non-UI content. Note that ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/metadata/sitemap#generating-a-sitemap-using-code-js-ts",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "sitemap.xml" })
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/metadata/robots#generate-a-robots-file",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "robots.txt" })
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/metadata/app-icons#generate-icons-using-code-js-ts-tsx",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "app icons" })
+			}),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/metadata/opengraph-image",
+				children: "open graph images"
+			}),
+			" all have built-in support."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/rss.xml/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/rss.xml/route.ts",
+					children: "app/rss.xml/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/rss.xml/route.js",
+					children: "app/rss.xml/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/rss.xml/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamic"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'force-dynamic'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: " // defaults to auto"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "    `<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "<rss version=\"2.0\">"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "<channel>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "  <title>Next.js Documentation</title>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "  <link>https://nextjs.org/docs</link>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "  <description>The React Framework for the Web</description>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "</channel>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "</rss>`"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: ","
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      headers: {"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "        'Content-Type'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ": "
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "'text/xml'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: ","
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "      },"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "    }"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "  )"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/rss.xml/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamic"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'force-dynamic'"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6A737D",
+											"--shiki-dark": "#6A737D"
+										},
+										children: " // defaults to auto"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " async"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " function"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " GET"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "() {"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "  return"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " new"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#6F42C1",
+											"--shiki-dark": "#B392F0"
+										},
+										children: " Response"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#24292E",
+											"--shiki-dark": "#E1E4E8"
+										},
+										children: "("
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: "`<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "<rss version=\"2.0\">"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "<channel>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "  <title>Next.js Documentation</title>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "  <link>https://nextjs.org/docs</link>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "  <description>The React Framework for the Web</description>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "</channel>"
+								})
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, { className: "line" }),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [(0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#032F62",
+										"--shiki-dark": "#9ECBFF"
+									},
+									children: "</rss>`"
+								}), (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: ")"
+								})]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsx)(_components.span, {
+								className: "line",
+								children: (0, import_jsx_runtime.jsx)(_components.span, {
+									style: {
+										"--shiki-light": "#24292E",
+										"--shiki-dark": "#E1E4E8"
+									},
+									children: "}"
+								})
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "segment-config-options",
+			children: "Segment Config Options"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Route Handlers use the same ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/route-segment-config",
+				children: "route segment configuration"
+			}),
+			" as pages and layouts."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(CodeBlockTabs, {
+			defaultValue: "app/items/route.ts",
+			children: [
+				(0, import_jsx_runtime.jsxs)(CodeBlockTabsList, { children: [(0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.ts",
+					children: "app/items/route.ts"
+				}), (0, import_jsx_runtime.jsx)(CodeBlockTabsTrigger, {
+					value: "app/items/route.js",
+					children: "app/items/route.js"
+				})] }),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.ts",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0zm17.363 9.75c.612 0 1.154.037 1.627.111a6.38 6.38 0 0 1 1.306.34v2.458a3.95 3.95 0 0 0-.643-.361 5.093 5.093 0 0 0-.717-.26 5.453 5.453 0 0 0-1.426-.2c-.3 0-.573.028-.819.086a2.1 2.1 0 0 0-.623.242c-.17.104-.3.229-.393.374a.888.888 0 0 0-.14.49c0 .196.053.373.156.529.104.156.252.304.443.444s.423.276.696.41c.273.135.582.274.926.416.47.197.892.407 1.266.628.374.222.695.473.963.753.268.279.472.598.614.957.142.359.214.776.214 1.253 0 .657-.125 1.21-.373 1.656a3.033 3.033 0 0 1-1.012 1.085 4.38 4.38 0 0 1-1.487.596c-.566.12-1.163.18-1.79.18a9.916 9.916 0 0 1-1.84-.164 5.544 5.544 0 0 1-1.512-.493v-2.63a5.033 5.033 0 0 0 3.237 1.2c.333 0 .624-.03.872-.09.249-.06.456-.144.623-.25.166-.108.29-.234.373-.38a1.023 1.023 0 0 0-.074-1.089 2.12 2.12 0 0 0-.537-.5 5.597 5.597 0 0 0-.807-.444 27.72 27.72 0 0 0-1.007-.436c-.918-.383-1.602-.852-2.053-1.405-.45-.553-.676-1.222-.676-2.005 0-.614.123-1.141.369-1.582.246-.441.58-.804 1.004-1.089a4.494 4.494 0 0 1 1.47-.629 7.536 7.536 0 0 1 1.77-.201zm-15.113.188h9.563v2.166H9.506v9.646H6.789v-9.646H3.375z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamic"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'auto'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamicParams"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " true"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " revalidate"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " false"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " fetchCache"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'auto'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " runtime"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'nodejs'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " preferredRegion"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'auto'"
+									})
+								]
+							})
+						] })
+					}) })
+				}),
+				(0, import_jsx_runtime.jsx)(CodeBlockTab, {
+					value: "app/items/route.js",
+					children: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+						className: "shiki shiki-themes github-light github-dark",
+						style: {
+							"--shiki-light": "#24292e",
+							"--shiki-dark": "#e1e4e8",
+							"--shiki-light-bg": "#fff",
+							"--shiki-dark-bg": "#24292e"
+						},
+						tabIndex: "0",
+						icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+						children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamic"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'auto'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " dynamicParams"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " true"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " revalidate"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " false"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " fetchCache"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'auto'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " runtime"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'nodejs'"
+									})
+								]
+							}),
+							"\n",
+							(0, import_jsx_runtime.jsxs)(_components.span, {
+								className: "line",
+								children: [
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: "export"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " const"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#005CC5",
+											"--shiki-dark": "#79B8FF"
+										},
+										children: " preferredRegion"
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#D73A49",
+											"--shiki-dark": "#F97583"
+										},
+										children: " ="
+									}),
+									(0, import_jsx_runtime.jsx)(_components.span, {
+										style: {
+											"--shiki-light": "#032F62",
+											"--shiki-dark": "#9ECBFF"
+										},
+										children: " 'auto'"
+									})
+								]
+							})
+						] })
+					}) })
+				})
+			]
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"See the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs/app/api-reference/file-conventions/route-segment-config",
+				children: "API reference"
+			}),
+			" for more details."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "api-reference",
+			children: "API Reference"
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Learn more about the route.js file." })
+	] });
+}
+function MDXContent(props = {}) {
+	const { wrapper: MDXLayout } = props.components || {};
+	return MDXLayout ? (0, import_jsx_runtime.jsx)(MDXLayout, {
+		...props,
+		children: (0, import_jsx_runtime.jsx)(_createMdxContent, { ...props })
+	}) : _createMdxContent(props);
+}
+function _missingMdxReference(id, component) {
+	throw new Error("Expected " + (component ? "component" : "object") + " `" + id + "` to be defined: you likely forgot to import, pass, or provide it.");
+}
+//#endregion
+export { toc as a, structuredData as i, _12_route_handlers_exports as n, frontmatter as r, MDXContent as t };

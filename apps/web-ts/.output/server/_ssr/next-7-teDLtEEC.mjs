@@ -1,0 +1,3830 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { n as __exportAll } from "./chunk-BnRpC7BT.mjs";
+import { v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/next-7-teDLtEEC.js
+var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
+var next_7_exports = /* @__PURE__ */ __exportAll({
+	default: () => MDXContent,
+	frontmatter: () => frontmatter,
+	structuredData: () => structuredData,
+	toc: () => toc
+});
+var frontmatter = {
+	"title": "Next.js 7",
+	"description": "After 26 canary releases and 3.4 million downloads, we are proud to introduce the production-ready Next.js 7",
+	"author": [
+		{
+			"name": "Giuseppe Gurgone",
+			"image": "/static/team/giuseppe.jpg"
+		},
+		{
+			"name": "Shu Ding",
+			"image": "/static/team/shu.jpg"
+		},
+		{
+			"name": "Tim Neutkens",
+			"image": "/static/team/tim.jpg"
+		}
+	],
+	"date": /* @__PURE__ */ new Date(1537373155907),
+	"image": "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-7/twitter-card.png"
+};
+var structuredData = {
+	"contents": [
+		{
+			"heading": void 0,
+			"content": "After 26 canary releases and 3.4 million downloads, we are proud to introduce the production-ready Next.js 7, featuring:"
+		},
+		{
+			"heading": void 0,
+			"content": "DX improvements: 57% faster bootup, 42% faster re-compilation"
+		},
+		{
+			"heading": void 0,
+			"content": "Better error reporting with react-error-overlay"
+		},
+		{
+			"heading": void 0,
+			"content": "Upgraded compilation pipeline: Webpack 4 and Babel 7"
+		},
+		{
+			"heading": void 0,
+			"content": "Standardized Dynamic Imports"
+		},
+		{
+			"heading": void 0,
+			"content": "Static CDN support"
+		},
+		{
+			"heading": void 0,
+			"content": "Smaller initial HTML payload"
+		},
+		{
+			"heading": void 0,
+			"content": "React Context with SSR between App and Pages"
+		},
+		{
+			"heading": void 0,
+			"content": "Finally, we are excited to be sharing this news on the all-new Nextjs.org"
+		},
+		{
+			"heading": "dx-improvements",
+			"content": "One of Next.js's primary goals is to provide the best production performance with **the best possible developer experience**. This release brings about many significant improvements to the build and debug pipelines"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "Thanks to webpack 4, Babel 7 and many improvements and optimizations on our codebase, Next.js now boots up to 57% faster during development."
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "Thanks to our new incremental compilation cache, changes you make to the code will now *build 40% faster*."
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "These are some example figures we have collected:"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "6.0"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "7.0"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "delta"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "Bootup time (basic application)"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "1947ms"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "835ms"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "**57%** *faster*"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "Code change (basic application)"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "304ms"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "178ms"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "**42%** *faster*"
+		},
+		{
+			"heading": "compilation-speed",
+			"content": "As a bonus, when developing and building you will now see better realtime feedback thanks to webpackbar:"
+		},
+		{
+			"heading": "better-error-reporting-with-react-error-overlay",
+			"content": "Rendering accurate and help errors is critical to a great development and debugging experience. Until now, we would render the error message and its stack trace. Moving forward, we make use of `react-error-overlay` to enrich the stack trace with:"
+		},
+		{
+			"heading": "better-error-reporting-with-react-error-overlay",
+			"content": "Accurate error locations for both server and client errors"
+		},
+		{
+			"heading": "better-error-reporting-with-react-error-overlay",
+			"content": "Highlights of the source to provide context"
+		},
+		{
+			"heading": "better-error-reporting-with-react-error-overlay",
+			"content": "A full rich stack trace"
+		},
+		{
+			"heading": "better-error-reporting-with-react-error-overlay",
+			"content": "This is a comparison of the before and after of our errors:"
+		},
+		{
+			"heading": "better-error-reporting-with-react-error-overlay",
+			"content": "The previous overlay left, react-error-overlay right"
+		},
+		{
+			"heading": "better-error-reporting-with-react-error-overlay",
+			"content": "As a bonus, `react-error-overlay` makes it easy to open your text editor by just clicking on a specific code block."
+		},
+		{
+			"heading": "webpack-4",
+			"content": "Since its very first release Next.js has been powered by webpack for bundling your code and re-using the rich ecosystem of plugins and extensions. We're excited to announce Next.js is now powered by the latest webpack 4, which comes with numerous improvements and bugfixes."
+		},
+		{
+			"heading": "webpack-4",
+			"content": "Among these we get:"
+		},
+		{
+			"heading": "webpack-4",
+			"content": "Support for `.mjs` source files"
+		},
+		{
+			"heading": "webpack-4",
+			"content": "Code splitting improvements"
+		},
+		{
+			"heading": "webpack-4",
+			"content": "Better tree-shaking (removal of unused code) support"
+		},
+		{
+			"heading": "webpack-4",
+			"content": "Another new feature is WebAssembly support, Next.js can even server-render WebAssembly, here is an example."
+		},
+		{
+			"heading": "webpack-4",
+			"content": "**Note:** this upgrade is **fully backwards-compatible**. However, if you are using custom webpack loaders or plugins via next.config.js, you might have to upgrade them."
+		},
+		{
+			"heading": "css-imports",
+			"content": "With webpack 4, a new way of extracting CSS from bundles was introduced, called mini-extract-css-plugin."
+		},
+		{
+			"heading": "css-imports",
+			"content": "`@zeit/next-css`, `@zeit/next-less`, `@zeit/next-sass`, and `@zeit/next-stylus` are now powered by `mini-extract-css-plugin`."
+		},
+		{
+			"heading": "css-imports",
+			"content": "The new version of these Next.js plugins **solves 20 existing issues related to CSS imports**; As an example, importing CSS in dynamic `import()`s is now supported:"
+		},
+		{
+			"heading": "css-imports",
+			"content": "A major improvement is that you are no longer required to add the following to `pages/_document.js`:"
+		},
+		{
+			"heading": "css-imports",
+			"content": "Instead, Next.js automatically injects the CSS file. In production, Next.js also automatically adds a content hash to the CSS URL, so that if there are changes, to ensure that your end-users never get stale versions of the file and have the ability to introduce immutable permanent caching."
+		},
+		{
+			"heading": "css-imports",
+			"content": "In short, all you have to do to support importing `.css` files in your Next.js project is **to just register the withCSS plugin** in your `next.config.js`:"
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "Next.js has had support for dynamic imports through `next/dynamic` since Version 3."
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "As early adopters of this technology, we had to write our own solution for handling `import()`."
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "As a consequence, Next.js was beginning to diverge from the support that webpack later introduced for it and some features were missing."
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "Because of this Next.js did not support a few `import()` features webpack has introduced since."
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "For example, naming and bundling certain files together manually was not possible:"
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "Another example is using `import()` without being wrapped in the `next/dynamic` module."
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "Starting with Next.js 7 we no longer touch the default `import()` behavior. This means you get **full import() support out of the box**."
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "This change is fully backwards-compatible as well. Making use of a dynamic component remains as simple as:"
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "What this example does is create a new JavaScript file for `my-component` and only load it when `<MyComponent />` is rendered."
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "Most importantly, if it is not rendered, the `<script>` tag is **not included in the initial HTML document payload**."
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "To further simplify our codebase and make use of the excellent React ecosystem, in Next.js 7 `next/dynamic` was re-written to make use of `react-loadable` behind the scenes (with some minor modifications). This also introduces two great new features for dynamic components:"
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "Timeouts using the `timeout` option on `next/dynamic`"
+		},
+		{
+			"heading": "standardized-dynamic-imports",
+			"content": "A loading component delay, using the `delay` option on `next/dynamic`. This delay allows your `loading` component to wait x time before rendering the loading state, for example, if the import is very fast."
+		},
+		{
+			"heading": "babel-7",
+			"content": "Next.js 6 introduced Babel 7 while it was still in beta. Since then the stable version of Babel 7 has been released, and Next.js 7 now using this version."
+		},
+		{
+			"heading": "babel-7",
+			"content": "For a full list of changes, you can refer to Babel its release notes."
+		},
+		{
+			"heading": "babel-7",
+			"content": "Some of the main features are:"
+		},
+		{
+			"heading": "babel-7",
+			"content": "Typescript support, for Next.js you can use `@zeit/next-typescript`"
+		},
+		{
+			"heading": "babel-7",
+			"content": "Fragment syntax `<>` support"
+		},
+		{
+			"heading": "babel-7",
+			"content": "`babel.config.js` support"
+		},
+		{
+			"heading": "babel-7",
+			"content": "`overrides` property to apply presets/plugins only to a subset of files or directories"
+		},
+		{
+			"heading": "babel-7",
+			"content": "If you do not have a custom Babel configuration in your Next.js project, there are no breaking changes."
+		},
+		{
+			"heading": "babel-7",
+			"content": "If you do however have a custom Babel configuration, you have to upgrade the respective custom plugins/presets to their latest version."
+		},
+		{
+			"heading": "babel-7",
+			"content": "In case you are upgrading from a version below Next.js 6 you can run the excellent `babel-upgrade` tool."
+		},
+		{
+			"heading": "babel-7",
+			"content": "In addition to upgrading to Babel 7, the Next.js Babel preset (`next/babel`) now defaults to setting the `modules` option to `commonjs` when `NODE_ENV` is set to `test`."
+		},
+		{
+			"heading": "babel-7",
+			"content": "This configuration option was often the only reason for creating a custom `.babelrc` in a Next.js project:"
+		},
+		{
+			"heading": "babel-7",
+			"content": "With Next.js 7 this becomes:"
+		},
+		{
+			"heading": "babel-7",
+			"content": "At this point, the `.babelrc` can be removed, as Next.js will then automatically use `next/babel` when there is no Babel configuration."
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "As Next.js pre-renders HTML, it wraps pages into a default structure with `<html>`, `<head>`, `<body>` and the JavaScript files needed to render the page."
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "This initial payload was previously around 1.62kB. With Next.js 7 we've optimized the initial HTML payload, it is now 1.5kB, a 7.4% reduction, making your pages leaner."
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "6.0"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "7.0"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "delta"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "Document size (server rendered)"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "1.62kb"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "1.50kb"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "**7.4%** *smaller*"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "The main ways we have reduced size are:"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "The `__next-error` div is removed"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "The inline scripts are minified, in a future release they will be completely removed"
+		},
+		{
+			"heading": "smaller-initial-html-payload",
+			"content": "Compiled away unused `__NEXT_DATA__` properties when they are not used, for example, the `nextExport` and `assetPrefix` properties."
+		},
+		{
+			"heading": "static-cdn-support",
+			"content": "In Next.js 5 we introduced `assetPrefix` support, a way to make Next.js automatically load assets from a certain location, usually a CDN. This option works great if your CDN supports proxying, you request an URL like"
+		},
+		{
+			"heading": "static-cdn-support",
+			"content": "Typically, the CDN checks if it has the file in its cache, or otherwise requests it directly from the origin."
+		},
+		{
+			"heading": "static-cdn-support",
+			"content": "Proxying assets is precisely how the Edge Network works."
+		},
+		{
+			"heading": "static-cdn-support",
+			"content": "However, some solutions require pre-uploading a directory directly into the CDN. The problem in doing this is that Next.js its URL structure did not match the folder structure inside the `.next` folder. For example our earlier example"
+		},
+		{
+			"heading": "static-cdn-support",
+			"content": "With Next.js 7 we have changed the directory structure of `.next` to match the url structure:"
+		},
+		{
+			"heading": "static-cdn-support",
+			"content": "While we do recommend using the proxying type of CDN, this new structure allows users of a different type of CDN to upload the `.next` directory to their CDN."
+		},
+		{
+			"heading": "styled-jsx-v3",
+			"content": "We are excited to introduce styled-jsx 3, the by default included CSS-in-JS solution in Next.js is now ready for React Suspense."
+		},
+		{
+			"heading": "styled-jsx-v3",
+			"content": "One thing that was often unclear was how to style a child component if that component is not part of the current component scope, for example, if you included a child component that needed specific styles only when used inside the parent component:"
+		},
+		{
+			"heading": "styled-jsx-v3",
+			"content": "The above code tries to select the `p` tag does not work because styled-jsx styles are scoped to the current component, they do not leak into child components. One way to get around this was using the `:global` method, removing the prefix from the `p` tag. However, this introduces a new issue, which is that styles do leak across the page."
+		},
+		{
+			"heading": "styled-jsx-v3",
+			"content": "In styled-jsx 3 this issue has been solved by introducing a new API, `css.resolve`, which will generate the `className` and `<style>` tags (the `styles` property) for the given styled-jsx string:"
+		},
+		{
+			"heading": "styled-jsx-v3",
+			"content": "This new API allows for transparently passing through custom styling to child components."
+		},
+		{
+			"heading": "styled-jsx-v3",
+			"content": "Since this is a major release for styled-jsx, there is one breaking change that improves bundle sizes if you are using `styles-jsx/css`. In styled-jsx 2 we would generate a \"scoped\" and \"global\" version of external styles, even when only the \"scoped\" version was used we would still include the \"global\" version of those external styles."
+		},
+		{
+			"heading": "styled-jsx-v3",
+			"content": "With styled-jsx 3 global styles have to be tagged with `css.global` instead of `css`, so that styled-jsx can optimize bundle size."
+		},
+		{
+			"heading": "styled-jsx-v3",
+			"content": "For all changes, please refer to the release notes."
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "Starting from Next.js 7 we now support the new React context API between `pages/_app.js` and page components."
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "Previously it was not possible to use React context in between pages on the server side. The reason for this was that webpack keeps an internal module cache instead of using require.cache, we've written a custom webpack plugin that changes this behavior to share module instances between pages."
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "In doing so we not only allow usage of the new React context, but also reduce Next.js's memory footprint when sharing code between pages."
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "6.0"
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "7.0"
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "delta"
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "Memory usage"
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "57.5MB"
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "48.1MB"
+		},
+		{
+			"heading": "react-context-with-ssr-between-app-and-pages",
+			"content": "**-16%** *memory*"
+		},
+		{
+			"heading": "nextjsorg",
+			"content": "Together with the Next.js 7 release, we are launching a completely redesigned nextjs.org."
+		},
+		{
+			"heading": "blog",
+			"content": "The blog post you are currently reading is already part of the new blog section on nextjs.org. This blog will be the new home for communication related to Next.js, for example, new version announcements."
+		},
+		{
+			"heading": "blog",
+			"content": "The new nextjs.org"
+		},
+		{
+			"heading": "get-inspired",
+			"content": "As the amount of apps using Next.js is continuously growing, we needed a way to show all these beautiful apps in one overview. Meet the new `/showcase` page:"
+		},
+		{
+			"heading": "get-inspired",
+			"content": "Get inspired on nextjs.org/showcase"
+		},
+		{
+			"heading": "get-inspired",
+			"content": "This new showcase allows us to add new apps built with Next.js continuously."
+		},
+		{
+			"heading": "get-inspired",
+			"content": "We invite you to visit `/showcase` to get inspired, or submit your app that uses Next.js!"
+		},
+		{
+			"heading": "community",
+			"content": "Ever since it's first release Next.js has been used in everything from fortune 500 companies to personal blogs. We're very excited to see the growth in Next.js adoption."
+		},
+		{
+			"heading": "community",
+			"content": "Currently, there are over 12,500 publicly indexed domains using Next.js."
+		},
+		{
+			"heading": "community",
+			"content": "We've had over 500 contributors landing at least 1 commit."
+		},
+		{
+			"heading": "community",
+			"content": "On GitHub, the project has been starred over 29,000 times."
+		},
+		{
+			"heading": "community",
+			"content": "Almost 2200 pull requests were submitted since the first release."
+		},
+		{
+			"heading": "community",
+			"content": "The Next.js community has nearly 2000 members. Join us!"
+		}
+	],
+	"headings": [
+		{
+			"id": "dx-improvements",
+			"content": "DX Improvements"
+		},
+		{
+			"id": "compilation-speed",
+			"content": "Compilation Speed"
+		},
+		{
+			"id": "better-error-reporting-with-react-error-overlay",
+			"content": "Better error reporting with React Error Overlay"
+		},
+		{
+			"id": "webpack-4",
+			"content": "Webpack 4"
+		},
+		{
+			"id": "css-imports",
+			"content": "CSS Imports"
+		},
+		{
+			"id": "standardized-dynamic-imports",
+			"content": "Standardized Dynamic Imports"
+		},
+		{
+			"id": "babel-7",
+			"content": "Babel 7"
+		},
+		{
+			"id": "smaller-initial-html-payload",
+			"content": "Smaller Initial HTML Payload"
+		},
+		{
+			"id": "static-cdn-support",
+			"content": "Static CDN Support"
+		},
+		{
+			"id": "styled-jsx-v3",
+			"content": "Styled JSX v3"
+		},
+		{
+			"id": "react-context-with-ssr-between-app-and-pages",
+			"content": "React Context with SSR between App and Pages"
+		},
+		{
+			"id": "nextjsorg",
+			"content": "nextjs.org"
+		},
+		{
+			"id": "blog",
+			"content": "Blog"
+		},
+		{
+			"id": "get-inspired",
+			"content": "Get Inspired"
+		},
+		{
+			"id": "community",
+			"content": "Community"
+		}
+	]
+};
+var toc = [
+	{
+		depth: 2,
+		url: "#dx-improvements",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#dx-improvements",
+			children: "DX Improvements"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#compilation-speed",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#compilation-speed",
+			children: "Compilation Speed"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#better-error-reporting-with-react-error-overlay",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#better-error-reporting-with-react-error-overlay",
+			children: "Better error reporting with React Error Overlay"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#webpack-4",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#webpack-4",
+			children: "Webpack 4"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#css-imports",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#css-imports",
+			children: "CSS Imports"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#standardized-dynamic-imports",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#standardized-dynamic-imports",
+			children: "Standardized Dynamic Imports"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#babel-7",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#babel-7",
+			children: "Babel 7"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#smaller-initial-html-payload",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#smaller-initial-html-payload",
+			children: "Smaller Initial HTML Payload"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#static-cdn-support",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#static-cdn-support",
+			children: "Static CDN Support"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#styled-jsx-v3",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#styled-jsx-v3",
+			children: "Styled JSX v3"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#react-context-with-ssr-between-app-and-pages",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#react-context-with-ssr-between-app-and-pages",
+			children: "React Context with SSR between App and Pages"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#nextjsorg",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#nextjsorg",
+			children: "nextjs.org"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#blog",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#blog",
+			children: "Blog"
+		}) })
+	},
+	{
+		depth: 3,
+		url: "#get-inspired",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#get-inspired",
+			children: "Get Inspired"
+		}) })
+	},
+	{
+		depth: 2,
+		url: "#community",
+		title: (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)("a", {
+			href: "#community",
+			children: "Community"
+		}) })
+	}
+];
+function _createMdxContent(props) {
+	const _components = {
+		a: "a",
+		code: "code",
+		em: "em",
+		h2: "h2",
+		h3: "h3",
+		img: "img",
+		li: "li",
+		p: "p",
+		pre: "pre",
+		span: "span",
+		strong: "strong",
+		table: "table",
+		tbody: "tbody",
+		td: "td",
+		th: "th",
+		thead: "thead",
+		tr: "tr",
+		ul: "ul",
+		...props.components
+	};
+	return (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "After 26 canary releases and 3.4 million downloads, we are proud to introduce the production-ready Next.js 7, featuring:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#dx-improvements",
+				children: "DX improvements"
+			}), ": 57% faster bootup, 42% faster re-compilation"] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#better-error-reporting-with-react-error-overlay",
+					children: "Better error reporting"
+				}),
+				" with ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "https://www.npmjs.com/package/react-error-overlay",
+					children: "react-error-overlay"
+				})
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#webpack-4",
+					children: "Upgraded compilation pipeline"
+				}),
+				": ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#webpack-4",
+					children: "Webpack 4"
+				}),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.a, {
+					href: "#babel-7",
+					children: "Babel 7"
+				})
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#standardized-dynamic-imports",
+				children: "Standardized Dynamic Imports"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#static-cdn-support",
+				children: "Static CDN support"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#smaller-initial-html-payload",
+				children: "Smaller initial HTML payload"
+			}) }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#react-context-with-ssr-between-app-and-pages",
+				children: "React Context with SSR between App and Pages"
+			}) }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Finally, we are excited to be sharing this news on the all-new Nextjs.org" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "dx-improvements",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#dx-improvements",
+				children: "DX Improvements"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"One of Next.js's primary goals is to provide the best production performance with ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "the best possible developer experience" }),
+			". This release brings about many significant improvements to the build and debug pipelines"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "compilation-speed",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#compilation-speed",
+				children: "Compilation Speed"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Thanks to webpack 4, Babel 7 and many improvements and optimizations on our codebase, Next.js now boots up to 57% faster during development." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Thanks to our new incremental compilation cache, changes you make to the code will now ",
+			(0, import_jsx_runtime.jsx)(_components.em, { children: "build 40% faster" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "These are some example figures we have collected:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.table, { children: [(0, import_jsx_runtime.jsx)(_components.thead, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.th, {}),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "6.0" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "7.0" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "delta" })
+		] }) }), (0, import_jsx_runtime.jsxs)(_components.tbody, { children: [(0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "Bootup time (basic application)" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "1947ms" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "835ms" }),
+			(0, import_jsx_runtime.jsxs)(_components.td, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "57%" }),
+				" ",
+				(0, import_jsx_runtime.jsx)(_components.em, { children: "faster" })
+			] })
+		] }), (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "Code change (basic application)" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "304ms" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "178ms" }),
+			(0, import_jsx_runtime.jsxs)(_components.td, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "42%" }),
+				" ",
+				(0, import_jsx_runtime.jsx)(_components.em, { children: "faster" })
+			] })
+		] })] })] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"As a bonus, when developing and building you will now see better realtime feedback thanks to ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/nuxt/webpackbar",
+				children: "webpackbar"
+			}),
+			":"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.img, {
+			src: "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-7/webpackbar.gif",
+			alt: ""
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "better-error-reporting-with-react-error-overlay",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#better-error-reporting-with-react-error-overlay",
+				children: "Better error reporting with React Error Overlay"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Rendering accurate and help errors is critical to a great development and debugging experience. Until now, we would render the error message and its stack trace. Moving forward, we make use of ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "react-error-overlay" }),
+			" to enrich the stack trace with:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Accurate error locations for both server and client errors" }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Highlights of the source to provide context" }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "A full rich stack trace" }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This is a comparison of the before and after of our errors:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.img, {
+			src: "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-7/errors.png",
+			alt: "The previous overlay left, react-error-overlay right"
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The previous overlay left, react-error-overlay right" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"As a bonus, ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "react-error-overlay" }),
+			" makes it easy to open your text editor by just clicking on a specific code block."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "webpack-4",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#webpack-4",
+				children: "Webpack 4"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Since its very first release Next.js has been powered by webpack for bundling your code and re-using the rich ecosystem of plugins and extensions. We're excited to announce Next.js is now powered by the latest webpack 4, which comes with numerous improvements and bugfixes." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Among these we get:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"Support for ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: ".mjs" }),
+				" source files"
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Code splitting improvements" }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Better tree-shaking (removal of unused code) support" }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Another new feature is WebAssembly support, Next.js can even server-render WebAssembly, here is an ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js/tree/canary/examples/with-webassembly",
+				children: "example"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "Note:" }),
+			" this upgrade is ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "fully backwards-compatible" }),
+			". However, if you are using custom webpack loaders or plugins via ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/docs#customizing-webpack-config",
+				children: "next.config.js"
+			}),
+			", you might have to upgrade them."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "css-imports",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#css-imports",
+				children: "CSS Imports"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"With webpack 4, a new way of extracting CSS from bundles was introduced, called ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/webpack-contrib/mini-css-extract-plugin",
+				children: "mini-extract-css-plugin"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next-plugins/tree/master/packages/next-css",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "@zeit/next-css" })
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next-plugins/tree/master/packages/next-less",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "@zeit/next-less" })
+			}),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next-plugins/tree/master/packages/next-sass",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "@zeit/next-sass" })
+			}),
+			", and ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next-plugins/tree/master/packages/next-stylus",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "@zeit/next-stylus" })
+			}),
+			" are now powered by ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "mini-extract-css-plugin" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The new version of these Next.js plugins ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "solves 20 existing issues related to CSS imports" }),
+			"; As an example, importing CSS in dynamic ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "import()" }),
+			"s is now supported:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "components/my-dynamic-component.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "import"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " './my-dynamic-component.css'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ";"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " MyDynamicComponent"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "  return"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "h1"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">My dynamic component</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "h1"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">;"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "pages/index.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "import"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " dynamic "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "from"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'next/dynamic'"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " MyDynamicComponent"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " dynamic"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "import"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'../components/my-dynamic-component'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "))"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Index"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " () {"
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    <div>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "      <MyDynamicComponent/>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    </div>"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  }"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"A major improvement is that you are no longer required to add the following to ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages/_document.js" }),
+			":"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsx)(_components.code, { children: (0, import_jsx_runtime.jsx)(_components.span, {
+				className: "line",
+				children: (0, import_jsx_runtime.jsx)(_components.span, { children: "<link rel=\"stylesheet\" href=\"/_next/static/style.css\" />" })
+			}) })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Instead, Next.js automatically injects the CSS file. In production, Next.js also automatically adds a content hash to the CSS URL, so that if there are changes, to ensure that your end-users never get stale versions of the file and have the ability to introduce immutable permanent caching." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In short, all you have to do to support importing ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ".css" }),
+			" files in your Next.js project is ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "to just register the withCSS plugin" }),
+			" in your ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next.config.js" }),
+			":"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "const withCSS = require('@zeit/next-css');" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "module.exports = withCSS({" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "  /* my next config */" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "});" })
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "standardized-dynamic-imports",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#standardized-dynamic-imports",
+				children: "Standardized Dynamic Imports"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Next.js has had support for dynamic imports through ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			" since Version 3."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"As early adopters of this technology, we had to write our own solution for handling ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "import()" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "As a consequence, Next.js was beginning to diverge from the support that webpack later introduced for it and some features were missing." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Because of this Next.js did not support a few ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "import()" }),
+			" features webpack has introduced since."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "For example, naming and bundling certain files together manually was not possible:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsx)(_components.code, { children: (0, import_jsx_runtime.jsx)(_components.span, {
+				className: "line",
+				children: (0, import_jsx_runtime.jsx)(_components.span, { children: "import(/* webpackChunkName: 'my-chunk' */ '../lib/my-library');" })
+			}) })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Another example is using ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "import()" }),
+			" without being wrapped in the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			" module."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Starting with Next.js 7 we no longer touch the default ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "import()" }),
+			" behavior. This means you get ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "full import() support out of the box" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This change is fully backwards-compatible as well. Making use of a dynamic component remains as simple as:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "pages/index.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "import"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " dynamic "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "from"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'next/dynamic'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ";"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: " MyComponent"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " dynamic"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "import"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "("
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "'../components/my-component'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "));"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Index"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " ("
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "      <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "MyComponent"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " />"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    </"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  );"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"What this example does is create a new JavaScript file for ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "my-component" }),
+			" and only load it when ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<MyComponent />" }),
+			" is rendered."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Most importantly, if it is not rendered, the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<script>" }),
+			" tag is ",
+			(0, import_jsx_runtime.jsx)(_components.strong, { children: "not included in the initial HTML document payload" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"To further simplify our codebase and make use of the excellent React ecosystem, in Next.js 7 ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+			" was re-written to make use of ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/jamiebuilds/react-loadable",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "react-loadable" })
+			}),
+			" behind the scenes (with some minor modifications). This also introduces two great new features for dynamic components:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"Timeouts using the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "timeout" }),
+				" option on ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" })
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"A loading component delay, using the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "delay" }),
+				" option on ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "next/dynamic" }),
+				". This delay allows your ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "loading" }),
+				" component to wait x time before rendering the loading state, for example, if the import is very fast."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "babel-7",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#babel-7",
+				children: "Babel 7"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Next.js 6 introduced Babel 7 while it was still in beta. Since then the stable version of Babel 7 has been released, and Next.js 7 now using this version." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"For a full list of changes, you can refer to Babel its ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "http://babeljs.io/blog/2018/08/27/7.0.0",
+				children: "release notes"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Some of the main features are:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: ["Typescript support, for Next.js you can use ", (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next-plugins/tree/master/packages/next-typescript",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "@zeit/next-typescript" })
+			})] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"Fragment syntax ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "<>" }),
+				" support"
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "babel.config.js" }), " support"] }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [(0, import_jsx_runtime.jsx)(_components.code, { children: "overrides" }), " property to apply presets/plugins only to a subset of files or directories"] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "If you do not have a custom Babel configuration in your Next.js project, there are no breaking changes." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "If you do however have a custom Babel configuration, you have to upgrade the respective custom plugins/presets to their latest version." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In case you are upgrading from a version below Next.js 6 you can run the excellent ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "http://babeljs.io/blog/2018/08/27/7.0.0#babel-upgrade",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "babel-upgrade" })
+			}),
+			" tool."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In addition to upgrading to Babel 7, the Next.js Babel preset (",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/next.js#customizing-babel-config",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "next/babel" })
+			}),
+			") now defaults to setting the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "modules" }),
+			" option to ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "commonjs" }),
+			" when ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "NODE_ENV" }),
+			" is set to ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "test" }),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"This configuration option was often the only reason for creating a custom ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ".babelrc" }),
+			" in a Next.js project:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: ".babelrc",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "{"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "  \"env\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "    \"development\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "      \"presets\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ["
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "\"next/babel\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "]"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    },"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "    \"production\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "      \"presets\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ["
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "\"next/babel\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "]"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    },"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "    \"test\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "      \"presets\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " [["
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "\"next/babel\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "{"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " \"preset-env\":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " {"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " \"modules\":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " \"commonjs\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " }"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " }]]"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "    }"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  }"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "With Next.js 7 this becomes:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: ".babelrc",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"m 4,4 a 1,1 0 0 0 -0.7070312,0.2929687 1,1 0 0 0 0,1.4140625 L 8.5859375,11 3.2929688,16.292969 a 1,1 0 0 0 0,1.414062 1,1 0 0 0 1.4140624,0 l 5.9999998,-6 a 1.0001,1.0001 0 0 0 0,-1.414062 L 4.7070312,4.2929687 A 1,1 0 0 0 4,4 Z m 8,14 a 1,1 0 0 0 -1,1 1,1 0 0 0 1,1 h 8 a 1,1 0 0 0 1,-1 1,1 0 0 0 -1,-1 z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "{"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "  \"presets\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: ":"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ["
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "\"next/babel\""
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "]"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"At this point, the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ".babelrc" }),
+			" can be removed, as Next.js will then automatically use ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "next/babel" }),
+			" when there is no Babel configuration."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "smaller-initial-html-payload",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#smaller-initial-html-payload",
+				children: "Smaller Initial HTML Payload"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"As Next.js pre-renders HTML, it wraps pages into a default structure with ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<html>" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<head>" }),
+			", ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<body>" }),
+			" and the JavaScript files needed to render the page."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This initial payload was previously around 1.62kB. With Next.js 7 we've optimized the initial HTML payload, it is now 1.5kB, a 7.4% reduction, making your pages leaner." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.table, { children: [(0, import_jsx_runtime.jsx)(_components.thead, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.th, {}),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "6.0" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "7.0" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "delta" })
+		] }) }), (0, import_jsx_runtime.jsx)(_components.tbody, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "Document size (server rendered)" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "1.62kb" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "1.50kb" }),
+			(0, import_jsx_runtime.jsxs)(_components.td, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "7.4%" }),
+				" ",
+				(0, import_jsx_runtime.jsx)(_components.em, { children: "smaller" })
+			] })
+		] }) })] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The main ways we have reduced size are:" }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"The ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "__next-error" }),
+				" div is removed"
+			] }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "The inline scripts are minified, in a future release they will be completely removed" }),
+			"\n",
+			(0, import_jsx_runtime.jsxs)(_components.li, { children: [
+				"Compiled away unused ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "__NEXT_DATA__" }),
+				" properties when they are not used, for example, the ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "nextExport" }),
+				" and ",
+				(0, import_jsx_runtime.jsx)(_components.code, { children: "assetPrefix" }),
+				" properties."
+			] }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "static-cdn-support",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#static-cdn-support",
+				children: "Static CDN Support"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In Next.js 5 we introduced ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "assetPrefix" }),
+			" support, a way to make Next.js automatically load assets from a certain location, usually a CDN. This option works great if your CDN supports proxying, you request an URL like"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsx)(_components.code, { children: (0, import_jsx_runtime.jsx)(_components.span, {
+				className: "line",
+				children: (0, import_jsx_runtime.jsx)(_components.span, { children: "https://cdn.example.com/_next/static/<buildid>/pages/index.js" })
+			}) })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Typically, the CDN checks if it has the file in its cache, or otherwise requests it directly from the origin." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Proxying assets is precisely how the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://vercel.com/edge-network",
+				children: "Edge Network"
+			}),
+			" works."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"However, some solutions require pre-uploading a directory directly into the CDN. The problem in doing this is that Next.js its URL structure did not match the folder structure inside the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ".next" }),
+			" folder. For example our earlier example"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "https://cdn.example.com/_next/static/<buildid>/pages/index.js" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "// mapped to:" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: ".next/page/index.js" })
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"With Next.js 7 we have changed the directory structure of ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ".next" }),
+			" to match the url structure:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M 6,1 C 4.354992,1 3,2.354992 3,4 v 16 c 0,1.645008 1.354992,3 3,3 h 12 c 1.645008,0 3,-1.354992 3,-3 V 8 7 A 1.0001,1.0001 0 0 0 20.707031,6.2929687 l -5,-5 A 1.0001,1.0001 0 0 0 15,1 h -1 z m 0,2 h 7 v 3 c 0,1.645008 1.354992,3 3,3 h 3 v 11 c 0,0.564129 -0.435871,1 -1,1 H 6 C 5.4358712,21 5,20.564129 5,20 V 4 C 5,3.4358712 5.4358712,3 6,3 Z M 15,3.4140625 18.585937,7 H 16 C 15.435871,7 15,6.5641288 15,6 Z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "https://cdn.example.com/_next/static/<buildid>/pages/index.js" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: "// mapped to:" })
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, { children: ".next/static/<buildid>/pages/index.js" })
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"While we do recommend using the proxying type of CDN, this new structure allows users of a different type of CDN to upload the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ".next" }),
+			" directory to their CDN."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "styled-jsx-v3",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#styled-jsx-v3",
+				children: "Styled JSX v3"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"We are excited to introduce styled-jsx 3, the by default included CSS-in-JS solution in Next.js is now ready for ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://www.youtube.com/watch?v=z-6JC0_cOns",
+				children: "React Suspense"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "One thing that was often unclear was how to style a child component if that component is not part of the current component scope, for example, if you included a child component that needed specific styles only when used inside the parent component:" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "pages/index.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " ChildComponent"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " () "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "=>"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ("
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "  <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "p"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">some text</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "p"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "  </"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: ");"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Index"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " ("
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "      <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "ChildComponent"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " />"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "      <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "style"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " jsx"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">{"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "`"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: "        p {"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: "          color: black;"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: "        }"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "      `"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "}</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "style"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    </"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  );"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The above code tries to select the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "p" }),
+			" tag does not work because styled-jsx styles are scoped to the current component, they do not leak into child components. One way to get around this was using the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: ":global" }),
+			" method, removing the prefix from the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "p" }),
+			" tag. However, this introduces a new issue, which is that styles do leak across the page."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"In styled-jsx 3 this issue has been solved by introducing a new API, ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "css.resolve" }),
+			", which will generate the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "className" }),
+			" and ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "<style>" }),
+			" tags (the ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "styles" }),
+			" property) for the given styled-jsx string:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: (0, import_jsx_runtime.jsx)(_components.pre, {
+			className: "shiki shiki-themes github-light github-dark",
+			style: {
+				"--shiki-light": "#24292e",
+				"--shiki-dark": "#e1e4e8",
+				"--shiki-light-bg": "#fff",
+				"--shiki-dark-bg": "#24292e"
+			},
+			tabIndex: "0",
+			title: "pages/index.js",
+			icon: "<svg viewBox=\"0 0 24 24\"><path d=\"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z\" fill=\"currentColor\" /></svg>",
+			children: (0, import_jsx_runtime.jsxs)(_components.code, { children: [
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "import"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " css "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "from"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: " 'styled-jsx/css'"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ";"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " ChildComponent"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " ="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ({ "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#E36209",
+								"--shiki-dark": "#FFAB70"
+							},
+							children: "className"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " }) "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "=>"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " ("
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "  <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "p"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " className"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "{className}>some text</"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "p"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "  </"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: ");"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "const"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " { "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "className"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ", "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "styles"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " } "
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: " css."
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: "resolve"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#032F62",
+								"--shiki-dark": "#9ECBFF"
+							},
+							children: "`"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: "  p {"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: "    color: black;"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: "  }"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#032F62",
+							"--shiki-dark": "#9ECBFF"
+						},
+						children: "`"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: ";"
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " "
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "export"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " default"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: " function"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " Index"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "() {"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [(0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#D73A49",
+							"--shiki-dark": "#F97583"
+						},
+						children: "  return"
+					}), (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: " ("
+					})]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "      <"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#005CC5",
+								"--shiki-dark": "#79B8FF"
+							},
+							children: "ChildComponent"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#6F42C1",
+								"--shiki-dark": "#B392F0"
+							},
+							children: " className"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#D73A49",
+								"--shiki-dark": "#F97583"
+							},
+							children: "="
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "{className} />"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "      {styles}"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsxs)(_components.span, {
+					className: "line",
+					children: [
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: "    </"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#22863A",
+								"--shiki-dark": "#85E89D"
+							},
+							children: "div"
+						}),
+						(0, import_jsx_runtime.jsx)(_components.span, {
+							style: {
+								"--shiki-light": "#24292E",
+								"--shiki-dark": "#E1E4E8"
+							},
+							children: ">"
+						})
+					]
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "  );"
+					})
+				}),
+				"\n",
+				(0, import_jsx_runtime.jsx)(_components.span, {
+					className: "line",
+					children: (0, import_jsx_runtime.jsx)(_components.span, {
+						style: {
+							"--shiki-light": "#24292E",
+							"--shiki-dark": "#E1E4E8"
+						},
+						children: "}"
+					})
+				})
+			] })
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This new API allows for transparently passing through custom styling to child components." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Since this is a major release for styled-jsx, there is one breaking change that improves bundle sizes if you are using ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "styles-jsx/css" }),
+			". In styled-jsx 2 we would generate a \"scoped\" and \"global\" version of external styles, even when only the \"scoped\" version was used we would still include the \"global\" version of those external styles."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"With styled-jsx 3 global styles have to be tagged with ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "css.global" }),
+			" instead of ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "css" }),
+			", so that styled-jsx can optimize bundle size."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"For all changes, please refer to the ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://github.com/vercel/styled-jsx/releases/tag/v3.0.0",
+				children: "release notes"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "react-context-with-ssr-between-app-and-pages",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#react-context-with-ssr-between-app-and-pages",
+				children: "React Context with SSR between App and Pages"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Starting from Next.js 7 we now support the new React context API between ",
+			(0, import_jsx_runtime.jsx)(_components.code, { children: "pages/_app.js" }),
+			" and page components."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Previously it was not possible to use React context in between pages on the server side. The reason for this was that webpack keeps an internal module cache instead of using require.cache, we've written a custom webpack plugin that changes this behavior to share module instances between pages." }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "In doing so we not only allow usage of the new React context, but also reduce Next.js's memory footprint when sharing code between pages." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.table, { children: [(0, import_jsx_runtime.jsx)(_components.thead, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.th, {}),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "6.0" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "7.0" }),
+			(0, import_jsx_runtime.jsx)(_components.th, { children: "delta" })
+		] }) }), (0, import_jsx_runtime.jsx)(_components.tbody, { children: (0, import_jsx_runtime.jsxs)(_components.tr, { children: [
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "Memory usage" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "57.5MB" }),
+			(0, import_jsx_runtime.jsx)(_components.td, { children: "48.1MB" }),
+			(0, import_jsx_runtime.jsxs)(_components.td, { children: [
+				(0, import_jsx_runtime.jsx)(_components.strong, { children: "-16%" }),
+				" ",
+				(0, import_jsx_runtime.jsx)(_components.em, { children: "memory" })
+			] })
+		] }) })] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "nextjsorg",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#nextjsorg",
+				children: "nextjs.org"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"Together with the Next.js 7 release, we are launching a completely redesigned ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org",
+				children: "nextjs.org"
+			}),
+			"."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "blog",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#blog",
+				children: "Blog"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"The blog post you are currently reading is already part of the new blog section on ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "https://nextjs.org",
+				children: "nextjs.org"
+			}),
+			". This blog will be the new home for communication related to Next.js, for example, new version announcements."
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.img, {
+			src: "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-7/homepage.png",
+			alt: "The new nextjs.org"
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "The new nextjs.org" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h3, {
+			id: "get-inspired",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#get-inspired",
+				children: "Get Inspired"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"As the amount of apps using Next.js is continuously growing, we needed a way to show all these beautiful apps in one overview. Meet the new ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/showcase",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "/showcase" })
+			}),
+			" page:"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: (0, import_jsx_runtime.jsx)(_components.img, {
+			src: "https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-7/showcase.png",
+			alt: "Get inspired on nextjs.org/showcase"
+		}) }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Get inspired on nextjs.org/showcase" }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "This new showcase allows us to add new apps built with Next.js continuously." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: [
+			"We invite you to visit ",
+			(0, import_jsx_runtime.jsx)(_components.a, {
+				href: "/showcase",
+				children: (0, import_jsx_runtime.jsx)(_components.code, { children: "/showcase" })
+			}),
+			" to get inspired, or submit your app that uses Next.js!"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.h2, {
+			id: "community",
+			children: (0, import_jsx_runtime.jsx)(_components.a, {
+				href: "#community",
+				children: "Community"
+			})
+		}),
+		"\n",
+		(0, import_jsx_runtime.jsx)(_components.p, { children: "Ever since it's first release Next.js has been used in everything from fortune 500 companies to personal blogs. We're very excited to see the growth in Next.js adoption." }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.ul, { children: [
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Currently, there are over 12,500 publicly indexed domains using Next.js." }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "We've had over 500 contributors landing at least 1 commit." }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "On GitHub, the project has been starred over 29,000 times." }),
+			"\n",
+			(0, import_jsx_runtime.jsx)(_components.li, { children: "Almost 2200 pull requests were submitted since the first release." }),
+			"\n"
+		] }),
+		"\n",
+		(0, import_jsx_runtime.jsxs)(_components.p, { children: ["The Next.js community has nearly 2000 members. ", (0, import_jsx_runtime.jsx)(_components.a, {
+			href: "https://github.com/vercel/next.js/discussions",
+			children: "Join us!"
+		})] })
+	] });
+}
+function MDXContent(props = {}) {
+	const { wrapper: MDXLayout } = props.components || {};
+	return MDXLayout ? (0, import_jsx_runtime.jsx)(MDXLayout, {
+		...props,
+		children: (0, import_jsx_runtime.jsx)(_createMdxContent, { ...props })
+	}) : _createMdxContent(props);
+}
+//#endregion
+export { toc as a, structuredData as i, frontmatter as n, next_7_exports as r, MDXContent as t };
