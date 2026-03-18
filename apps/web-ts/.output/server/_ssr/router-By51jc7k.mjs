@@ -1,13 +1,13 @@
 import { r as __toESM } from "../_runtime.mjs";
-import { _ as require_react, c as lazyRouteComponent, d as Link, f as useParams, i as HeadContent, l as createFileRoute, m as useRouter, o as createRouter, p as useRouterState, r as Scripts, s as Outlet, u as createRootRoute, v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
-import { a as I18nProvider, r as FrameworkProvider } from "./Combination-Gx_g2Nzj.mjs";
-import { n as J, s as SearchProvider, t as DirectionProvider } from "./dist-CP9lNkop.mjs";
-import { a as Route } from "../_-CBMvbxh4.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-DcEqWcBQ.js
+import { _ as require_react, c as lazyRouteComponent, d as Link, h as useRouter, i as HeadContent, l as createFileRoute, m as useRouterState, o as createRouter, p as useParams, r as Scripts, s as Outlet, u as createRootRoute, v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+import { a as I18nProvider, r as FrameworkProvider } from "./Combination-DoPQMWre.mjs";
+import { n as J, s as SearchProvider, t as DirectionProvider } from "./dist-DE7Znuq2.mjs";
+import { a as Route } from "../_-BViFWFv2.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/router-By51jc7k.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
 var app_default = "/assets/app-C-ITrZu9.css";
-var DefaultSearchDialog = (0, import_react.lazy)(() => import("./search-default-B-v5C_kg.mjs"));
+var DefaultSearchDialog = (0, import_react.lazy)(() => import("./search-default-hU2erI0q.mjs"));
 function RootProvider$1({ children, dir = "ltr", theme = {}, search, i18n }) {
 	let body = children;
 	if (search?.enabled !== false) body = /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchProvider, {
@@ -115,7 +115,7 @@ function RootComponent() {
 		})]
 	});
 }
-var $$splitComponentImporter = () => import("./routes-3eaQkix9.mjs");
+var $$splitComponentImporter = () => import("./routes-C3Q0K0tr.mjs");
 var rootRouteChildren = {
 	IndexRoute: createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter, "component") }).update({
 		id: "/",

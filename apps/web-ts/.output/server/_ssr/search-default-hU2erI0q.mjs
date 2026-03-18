@@ -2,12 +2,12 @@ import { r as __toESM } from "../_runtime.mjs";
 import { n as __exportAll, r as __toESM$1, t as __commonJSMin } from "./chunk-BnRpC7BT.mjs";
 import { _ as require_react, v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
 import { t as twMerge } from "../_libs/tailwind-merge.mjs";
-import { C as useControllableState, E as useId, S as useComposedRefs, T as useI18n, _ as createSlot, b as hideOthers, c as Portal, d as ReactRemoveScroll, f as buttonVariants, g as createContextScope, h as createContext2, i as I18nLabel, k as useRouter, l as Presence, n as FocusScope, p as composeEventHandlers, t as DismissableLayer, u as Primitive, v as cva, w as useFocusGuards } from "./Combination-Gx_g2Nzj.mjs";
+import { C as useControllableState, E as useId$1, S as useComposedRefs, T as useI18n, _ as createSlot, b as hideOthers, c as Portal, d as ReactRemoveScroll, f as buttonVariants, g as createContextScope, h as createContext2, i as I18nLabel, k as useRouter, l as Presence, n as FocusScope, p as composeEventHandlers, t as DismissableLayer, u as Primitive, v as cva, w as useFocusGuards } from "./Combination-DoPQMWre.mjs";
 import { n as useOnChange, t as e } from "./use-on-change-B8PHvoum.mjs";
 import { _ as ChevronRight, d as Hash, i as Search } from "../_libs/lucide-react.mjs";
 import { t as remark } from "../_libs/remark+[...].mjs";
 import { n as visit } from "../_libs/mdast-util-to-markdown+[...].mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/search-default-B-v5C_kg.js
+//#region node_modules/.nitro/vite/services/ssr/assets/search-default-hU2erI0q.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
 var DIALOG_NAME = "Dialog";
@@ -27,9 +27,9 @@ var Dialog = (props) => {
 		scope: __scopeDialog,
 		triggerRef,
 		contentRef,
-		contentId: useId(),
-		titleId: useId(),
-		descriptionId: useId(),
+		contentId: useId$1(),
+		titleId: useId$1(),
+		descriptionId: useId$1(),
 		open,
 		onOpenChange: setOpen,
 		onOpenToggle: import_react.useCallback(() => setOpen((prevOpen) => !prevOpen), [setOpen]),

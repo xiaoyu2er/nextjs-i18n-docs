@@ -1,7 +1,7 @@
 import { t as performance_default } from "../_libs/unenv.mjs";
 import { t as createContentHighlighter } from "./search-B7k1WpXx.mjs";
 import { t as removeUndefined } from "./remove-undefined-Bfj4SlGF-CbBuT4VC.mjs";
-import processModule from "node:process";
+import process from "node:process";
 //#region node_modules/.nitro/vite/services/ssr/assets/orama-static-BWDxHYz9.js
 var STEMMERS = {
 	arabic: "ar",
@@ -120,7 +120,7 @@ function isInsideWebWorker() {
 	return typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
 }
 function isInsideNode() {
-	return typeof processModule !== "undefined" && processModule.release && processModule.release.name === "node";
+	return typeof process !== "undefined" && process.release && process.release.name === "node";
 }
 function getNanosecondTimeViaPerformance() {
 	return BigInt(Math.floor(performance_default.now() * 1e6));
@@ -134,8 +134,8 @@ function formatNanoseconds(value) {
 }
 function getNanosecondsTime() {
 	if (isInsideWebWorker()) return getNanosecondTimeViaPerformance();
-	if (isInsideNode()) return processModule.hrtime.bigint();
-	if (typeof processModule !== "undefined" && typeof processModule?.hrtime?.bigint === "function") return processModule.hrtime.bigint();
+	if (isInsideNode()) return process.hrtime.bigint();
+	if (typeof process !== "undefined" && typeof process?.hrtime?.bigint === "function") return process.hrtime.bigint();
 	if (typeof performance_default !== "undefined") return getNanosecondTimeViaPerformance();
 	return BigInt(0);
 }

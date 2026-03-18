@@ -1,11 +1,11 @@
 import { r as __toESM } from "../_runtime.mjs";
-import { _ as require_react, d as Link, g as require_react_dom, v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+import { _ as require_react, d as Link, f as require_react_dom, v as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
 import { t as twMerge } from "../_libs/tailwind-merge.mjs";
-import { C as useControllableState, D as useLayoutEffect2, E as useId, S as useComposedRefs, f as buttonVariants, g as createContextScope, l as Presence, m as composeRefs, p as composeEventHandlers, t as DismissableLayer, u as Primitive, v as cva, x as useCallbackRef$1, y as dispatchDiscreteCustomEvent } from "./Combination-Gx_g2Nzj.mjs";
-import { c as createCollection, d as useDirection, f as useIsScrollTop, r as Link$1 } from "./dist-CP9lNkop.mjs";
+import { C as useControllableState, D as useLayoutEffect2, E as useId$1, S as useComposedRefs, f as buttonVariants, g as createContextScope, l as Presence, m as composeRefs, p as composeEventHandlers, t as DismissableLayer, u as Primitive, v as cva, x as useCallbackRef$1, y as dispatchDiscreteCustomEvent } from "./Combination-DoPQMWre.mjs";
+import { c as createCollection, d as useDirection, f as useIsScrollTop, r as Link$1 } from "./dist-DE7Znuq2.mjs";
 import { l as Languages, y as ChevronDown } from "../_libs/lucide-react.mjs";
-import { a as SearchToggle, c as renderTitleNav, i as LinkItem, n as LanguageToggleText, o as ThemeToggle, r as LargeSearchToggle, s as baseOptions, t as LanguageToggle, u as useLinkItems } from "./layout.shared-BG2uI02Z.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-3eaQkix9.js
+import { a as SearchToggle, c as renderTitleNav, i as LinkItem, n as LanguageToggleText, o as ThemeToggle, r as LargeSearchToggle, s as baseOptions, t as LanguageToggle, u as useLinkItems } from "./layout.shared-BBx9oQ17.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-C3Q0K0tr.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
 var import_react_dom = /* @__PURE__ */ __toESM(require_react_dom());
@@ -176,7 +176,7 @@ var NavigationMenuProvider = (props) => {
 		rootNavigationMenu,
 		value,
 		previousValue: usePrevious(value),
-		baseId: useId(),
+		baseId: useId$1(),
 		dir,
 		orientation,
 		viewport,
@@ -238,7 +238,7 @@ var ITEM_NAME = "NavigationMenuItem";
 var [NavigationMenuItemContextProvider, useNavigationMenuItemContext] = createNavigationMenuContext(ITEM_NAME);
 var NavigationMenuItem$1 = import_react.forwardRef((props, forwardedRef) => {
 	const { __scopeNavigationMenu, value: valueProp, ...itemProps } = props;
-	const autoValue = useId();
+	const autoValue = useId$1();
 	const value = valueProp || autoValue || "LEGACY_REACT_AUTO_VALUE";
 	const contentRef = import_react.useRef(null);
 	const triggerRef = import_react.useRef(null);

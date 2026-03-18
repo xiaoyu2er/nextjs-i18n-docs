@@ -1,13 +1,13 @@
 import { r as __toESM } from "./_runtime.mjs";
 import { _ as require_react, v as require_jsx_runtime } from "./_libs/@tanstack/react-router+[...].mjs";
-import { t as twMerge } from "./_libs/tailwind-merge.mjs";
-import { D as useLayoutEffect2, O as usePathname, S as useComposedRefs, f as buttonVariants, g as createContextScope, l as Presence, p as composeEventHandlers, u as Primitive, v as cva, x as useCallbackRef$1 } from "./_ssr/Combination-Gx_g2Nzj.mjs";
-import { d as useDirection, l as isActive } from "./_ssr/dist-CP9lNkop.mjs";
 import { r as visit } from "./_ssr/utils-6GexS7iX-BaZEp7pz.mjs";
+import { t as twMerge } from "./_libs/tailwind-merge.mjs";
+import { D as useLayoutEffect2, O as usePathname, S as useComposedRefs, f as buttonVariants, g as createContextScope, l as Presence, p as composeEventHandlers, u as Primitive, v as cva, x as useCallbackRef$1 } from "./_ssr/Combination-DoPQMWre.mjs";
+import { d as useDirection, l as isActive } from "./_ssr/dist-DE7Znuq2.mjs";
 import { a as PanelLeft, l as Languages } from "./_libs/lucide-react.mjs";
-import { C as useFolderDepth, S as useFolder, T as useTreePath, _ as SidebarTabsDropdown, a as Route, b as clientLoader, c as SidebarDrawerContent, d as SidebarFolderContent$1, f as SidebarFolderLink$1, g as SidebarSeparator$1, h as SidebarProvider, i as LayoutTabs, l as SidebarDrawerOverlay, m as SidebarItem$1, n as LayoutContextProvider, o as SidebarCollapseTrigger$1, p as SidebarFolderTrigger$1, r as LayoutHeader, s as SidebarContent$1, t as LayoutBody, u as SidebarFolder$1, v as SidebarTrigger$1, w as useTreeContext, x as mergeRefs$1, y as TreeContextProvider } from "./_-CBMvbxh4.mjs";
-import { a as SearchToggle, c as renderTitleNav, i as LinkItem, l as useLinkItemActive, n as LanguageToggleText, o as ThemeToggle, r as LargeSearchToggle, s as baseOptions, t as LanguageToggle, u as useLinkItems } from "./_ssr/layout.shared-BG2uI02Z.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/_-BLA6-CEH.js
+import { C as useFolderDepth, S as useFolder, T as useTreePath, _ as SidebarTabsDropdown, a as Route, b as clientLoader, c as SidebarDrawerContent, d as SidebarFolderContent$1, f as SidebarFolderLink$1, g as SidebarSeparator$1, h as SidebarProvider, i as LayoutTabs, l as SidebarDrawerOverlay, m as SidebarItem$1, n as LayoutContextProvider, o as SidebarCollapseTrigger$1, p as SidebarFolderTrigger$1, r as LayoutHeader, s as SidebarContent$1, t as LayoutBody, u as SidebarFolder$1, v as SidebarTrigger$1, w as useTreeContext, x as mergeRefs$1, y as TreeContextProvider } from "./_-BViFWFv2.mjs";
+import { a as SearchToggle, c as renderTitleNav, i as LinkItem, l as useLinkItemActive, n as LanguageToggleText, o as ThemeToggle, r as LargeSearchToggle, s as baseOptions, t as LanguageToggle, u as useLinkItems } from "./_ssr/layout.shared-BBx9oQ17.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/_-uunaMeQ2.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = /* @__PURE__ */ __toESM(require_jsx_runtime());
 function createLinkItemRenderer({ SidebarFolder, SidebarFolderContent, SidebarFolderLink, SidebarFolderTrigger, SidebarItem }) {
