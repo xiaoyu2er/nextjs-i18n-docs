@@ -4,8 +4,17 @@ import { docs as docsPosts, blog as blogEntries, learn as learnPosts } from 'col
 import { createElement } from 'react';
 import { getDocUrl } from './utils';
 
+const LANGUAGES = ['en', 'zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
+
+const i18nConfig = {
+  languages: LANGUAGES,
+  defaultLanguage: 'en',
+  parser: 'dir' as const,
+};
+
 export const docs = loader({
   source: docsPosts.toFumadocsSource(),
+  i18n: i18nConfig,
   baseUrl: '/docs',
   icon(icon) {
     if (icon && icon in icons)
@@ -16,12 +25,12 @@ export const docs = loader({
   },
 });
 
-// Blog uses defineCollections (simple doc collection), not defineDocs
-// Access directly without loader wrapper
+// Blog uses defineCollections (simple doc collection)
 export const blog = blogEntries;
 
 export const learn = loader({
   source: learnPosts.toFumadocsSource(),
+  i18n: i18nConfig,
   baseUrl: '/learn',
   icon(icon) {
     if (icon && icon in icons)
@@ -34,6 +43,8 @@ export const learn = loader({
     return url;
   },
 });
+
+export { LANGUAGES, i18nConfig };
 
 export type DocsSource = typeof docs;
 export type LearnSource = typeof learn;

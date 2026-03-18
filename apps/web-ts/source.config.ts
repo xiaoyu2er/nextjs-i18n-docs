@@ -13,10 +13,17 @@ import { addMdxContent } from './src/lib/remark-plugins/remark-add-content';
 import { convertCodeMeta } from './src/lib/remark-plugins/remark-convert-code-meta';
 import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
 
-const locale = process.env.LOCALE || 'en';
+// Content structure (symlinked):
+//   content/docs/{locale}/01-app/...  → content/{locale}/docs/01-app/...
+//   content/blog/{locale}/...         → content/{locale}/blog/...
+//   content/learn/{locale}/...        → content/{locale}/learn/...
+//
+// fumadocs 'dir' parser extracts locale from first path segment:
+//   {locale}/01-app/01-getting-started/01-installation.mdx
+//   → locale=en, path=01-app/01-getting-started/01-installation.mdx
 
 export const docs = defineDocs({
-  dir: `content/${locale}/docs`,
+  dir: 'content/docs',
   docs: {
     schema: frontmatterSchema.extend({
       'translation-updated-at': z.date().optional(),
@@ -38,7 +45,7 @@ export const docs = defineDocs({
 
 export const blog = defineCollections({
   type: 'doc',
-  dir: `content/${locale}/blog`,
+  dir: 'content/blog',
   schema: frontmatterSchema.extend({
     'translation-updated-at': z.date().optional(),
     author: z
@@ -54,7 +61,7 @@ export const blog = defineCollections({
 });
 
 export const learn = defineDocs({
-  dir: `content/${locale}/learn`,
+  dir: 'content/learn',
   docs: {
     schema: frontmatterSchema.extend({
       'translation-updated-at': z.date().optional(),

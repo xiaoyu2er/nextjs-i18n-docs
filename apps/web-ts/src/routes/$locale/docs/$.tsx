@@ -10,11 +10,14 @@ import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { Suspense } from 'react';
 import { useMDXComponents } from '@/components/mdx';
 
-export const Route = createFileRoute('/docs/$')({
+export const Route = createFileRoute('/$locale/docs/$')({
   component: Page,
   loader: async ({ params }) => {
+    const locale = params.locale;
+    if (!LANGUAGES.includes(locale)) throw notFound();
+    
     const slugs = params._splat?.split('/') ?? [];
-    const data = await serverLoader({ data: slugs });
+    const data = await serverLoader({ data: { slugs, locale } });
     await clientLoader.preload(data.path);
     return data;
   },
@@ -23,18 +26,17 @@ export const Route = createFileRoute('/docs/$')({
 const serverLoader = createServerFn({
   method: 'GET',
 })
-  .inputValidator((slugs: string[]) => slugs)
-  .handler(async ({ data: slugs }) => {
+  .inputValidator((input: { slugs: string[]; locale: string }) => input)
+  .handler(async ({ data: { slugs, locale } }) => {
     const url = `/docs/${slugs.join('/')}`;
-    
-    const page = getPage(url);
+    const page = getPage(url, locale);
     if (!page) throw notFound();
 
     return {
       slugs: page.slugs,
       path: page.path,
-      locale: 'en',
-      pageTree: await docs.serializePageTree(docs.getPageTree('en')),
+      locale,
+      pageTree: await docs.serializePageTree(docs.getPageTree(locale)),
     };
   });
 

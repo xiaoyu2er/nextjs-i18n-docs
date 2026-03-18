@@ -1,1 +1,0 @@
-function e(t,n=!1){let r=t;for(let t in r){if(r[t]===void 0&&delete r[t],!n)continue;let i=r[t];if(typeof i==`object`&&i){e(i,n);continue}if(Array.isArray(i))for(let t of i)e(t,n)}return t}export{e as t};
