@@ -1,2 +1,0 @@
-import { a as toc, i as structuredData, r as frontmatter, t as MDXContent } from "./10-deploying-D-fU-j62.mjs";
-export { MDXContent as default, frontmatter, structuredData, toc };
