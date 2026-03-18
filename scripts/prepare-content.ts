@@ -381,8 +381,9 @@ function processFile(
 
 // ── Copy Astro-only content (e.g., splash index pages) ──
 
+// Copy Astro-only splash pages (blog/learn index) — only for latest worker, not versioned
 const CONTENT_ASTRO = resolve(import.meta.dirname!, '../content-astro');
-if (existsSync(CONTENT_ASTRO)) {
+if (!version && existsSync(CONTENT_ASTRO)) {
   const astroFiles = walkMdx(CONTENT_ASTRO);
   for (const srcPath of astroFiles) {
     const relPath = relative(CONTENT_ASTRO, srcPath);
