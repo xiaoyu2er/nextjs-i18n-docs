@@ -1,31 +1,20 @@
 /**
  * Start all workers + router proxy with a single command.
- * Usage: bun run dev-all.ts [--only latest,v13]
+ * Usage:
+ *   bun run dev-all.ts              # latest only (fast, ~5s)
+ *   bun run dev-all.ts --all        # all workers
+ *   bun run dev-all.ts --only=v14   # specific workers
  *
- * For versioned workers (v13/v14/v15), creates temporary copies of apps/web-v
- * at .cache/web-v{N}/ so each version has its own isolated content directory.
+ * Versioned workers use cached copies at .cache/web-v{N}/.
+ * The .astro cache is preserved between runs for fast restarts.
  */
 
 import { spawn, spawnSync, type Subprocess } from 'bun';
 import { resolve, relative } from 'node:path';
-import { cpSync, rmSync, existsSync, mkdirSync, readdirSync, symlinkSync, lstatSync, readlinkSync } from 'node:fs';
+import { cpSync, rmSync, existsSync, mkdirSync, readdirSync, symlinkSync, lstatSync, readlinkSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
-// Kill any leftover processes on our ports
-function freePort(port: number) {
-  try {
-    const pids = execSync(`lsof -ti :${port} 2>/dev/null`).toString().trim();
-    if (pids) {
-      for (const pid of pids.split('\n')) {
-        try { process.kill(Number(pid), 9); } catch {}
-      }
-    }
-  } catch {}
-}
-
 const ROOT = resolve(import.meta.dirname!, '../..');
-
-// Read versions from single source of truth
 const versionsFile = resolve(ROOT, '.github/nextjs-versions.json');
 const versionsData = JSON.parse(await Bun.file(versionsFile).text());
 const latestMajor = versionsData.latestMajor;
@@ -40,43 +29,146 @@ interface Worker {
 }
 
 const COLORS = ['\x1b[33m', '\x1b[35m', '\x1b[32m', '\x1b[34m'];
+const RESET = '\x1b[0m';
+const CYAN = '\x1b[36m';
+const DIM = '\x1b[2m';
 
 const ALL_WORKERS: Worker[] = [
   { name: 'latest', dir: 'apps/web', port: 4321, color: '\x1b[36m' },
   ...olderVersions.map((v, i) => ({
     name: `v${v}`,
-    dir: `apps/web-v`, // will be replaced with temp dir
+    dir: 'apps/web-v',
     port: 4322 + i,
     color: COLORS[i % COLORS.length],
     env: { VERSION: v },
   })),
 ];
 
-const RESET = '\x1b[0m';
-const CYAN = '\x1b[36m';
+// ── Parse args ──
+const args = process.argv.slice(2);
+const hasAll = args.includes('--all');
+const onlyArg = args.find((a) => a.startsWith('--only='))?.split('=')[1]
+  || (args.indexOf('--only') >= 0 ? args[args.indexOf('--only') + 1] : null);
 
-// Parse --only flag
-const onlyArg = process.argv.find((a) => a.startsWith('--only='))?.split('=')[1];
-const onlyIdx = process.argv.indexOf('--only');
-const onlyVal = onlyArg || (onlyIdx >= 0 ? process.argv[onlyIdx + 1] : null);
-const onlySet = onlyVal ? new Set(onlyVal.split(',')) : null;
-
-const workers = onlySet
-  ? ALL_WORKERS.filter((w) => onlySet.has(w.name))
-  : ALL_WORKERS;
+let workers: Worker[];
+if (hasAll) {
+  workers = ALL_WORKERS;
+} else if (onlyArg) {
+  const onlySet = new Set(onlyArg.split(','));
+  workers = ALL_WORKERS.filter((w) => onlySet.has(w.name));
+} else {
+  // Default: latest only (fast dev)
+  workers = ALL_WORKERS.filter((w) => w.name === 'latest');
+  console.log(`${DIM}Tip: use --all for all versions, or --only=v14,v15${RESET}\n`);
+}
 
 if (workers.length === 0) {
   console.error('No workers matched. Available: latest, v13, v14, v15');
   process.exit(1);
 }
 
+// ── Free ports ──
+function freePort(port: number) {
+  try {
+    const pids = execSync(`lsof -ti :${port} 2>/dev/null`).toString().trim();
+    if (pids) {
+      for (const pid of pids.split('\n')) {
+        try { process.kill(Number(pid), 9); } catch {}
+      }
+    }
+  } catch {}
+}
+
+const allPorts = [3000, ...workers.map(w => w.port)];
+for (const port of allPorts) freePort(port);
+
+// ── Create/update versioned worker copies ──
+const webVDir = resolve(ROOT, 'apps/web-v');
+
+for (const w of workers) {
+  const version = w.env?.VERSION;
+  if (!version) continue;
+
+  const tmpDir = resolve(ROOT, `.cache/web-v${version}`);
+  const hasCachedDir = existsSync(resolve(tmpDir, 'src'));
+
+  if (hasCachedDir) {
+    // Reuse cached copy — only update src/content/docs
+    console.log(`${w.color}[${w.name}]${RESET} Reusing cached .cache/web-v${version}/`);
+  } else {
+    // First run: create fresh copy
+    console.log(`${w.color}[${w.name}]${RESET} Creating .cache/web-v${version}/...`);
+    rmSync(tmpDir, { recursive: true, force: true });
+    mkdirSync(tmpDir, { recursive: true });
+
+    for (const entry of readdirSync(webVDir)) {
+      const src = resolve(webVDir, entry);
+      const dst = resolve(tmpDir, entry);
+      const stat = lstatSync(src);
+
+      if (entry === 'node_modules' || entry === 'dist') {
+        symlinkSync(src, dst);
+      } else if (entry === '.astro') {
+        continue; // Let Astro regenerate
+      } else if (entry === 'src') {
+        cpSync(src, dst, { recursive: true });
+      } else if (stat.isDirectory()) {
+        cpSync(src, dst, { recursive: true });
+      } else {
+        cpSync(src, dst);
+      }
+    }
+
+    if (!existsSync(resolve(tmpDir, 'node_modules'))) {
+      symlinkSync(resolve(ROOT, 'node_modules'), resolve(tmpDir, 'node_modules'));
+    }
+  }
+
+  w.dir = `.cache/web-v${version}`;
+}
+
+// ── Prepare content (only if needed) ──
+console.log(`\n${CYAN}[prep]${RESET} Preparing content...`);
+
+for (const w of workers) {
+  const version = w.env?.VERSION;
+  const target = w.dir;
+  const contentDir = resolve(ROOT, target, 'src/content/docs');
+
+  // Skip if content already exists and source hasn't changed
+  const hasContent = existsSync(contentDir) && readdirSync(contentDir).length > 2;
+  if (hasContent) {
+    const count = readdirSync(contentDir, { recursive: true }).length;
+    console.log(`${w.color}[${w.name}]${RESET} Content exists (${count} entries), skipping prepare`);
+    continue;
+  }
+
+  const prepArgs = version
+    ? ['bun', 'run', 'scripts/prepare-content.ts', '--target', target, '--version', version]
+    : ['bun', 'run', 'scripts/prepare-content.ts', '--target', target];
+
+  console.log(`${w.color}[${w.name}]${RESET} Preparing content...`);
+  const result = spawnSync(prepArgs, {
+    cwd: ROOT,
+    env: { ...process.env, ...w.env },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  if (result.exitCode !== 0) {
+    console.error(`${w.color}[${w.name}]${RESET} Failed:`, new TextDecoder().decode(result.stderr));
+  } else {
+    const output = new TextDecoder().decode(result.stdout).trim();
+    console.log(`${w.color}[${w.name}]${RESET} ${output.split('\n').pop()}`);
+  }
+}
+
+// ── Start dev servers ──
 const procs: Subprocess[] = [];
 
 function prefixStream(stream: ReadableStream<Uint8Array>, prefix: string, color: string) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-
   (async () => {
     while (true) {
       const { done, value } = await reader.read();
@@ -92,100 +184,7 @@ function prefixStream(stream: ReadableStream<Uint8Array>, prefix: string, color:
   })();
 }
 
-// ── Phase 0: Free ports ──
-const allPorts = [3000, ...workers.map(w => w.port)];
-for (const port of allPorts) {
-  freePort(port);
-}
-console.log(`${CYAN}[init]${RESET} Ports cleared: ${allPorts.join(', ')}\n`);
-
-// ── Phase 1: Create isolated copies for versioned workers ──
-// apps/web-v is a shared template. Each version needs its own copy
-// at .cache/web-v{N}/ with symlinks to node_modules and shared packages.
-
-const webVDir = resolve(ROOT, 'apps/web-v');
-
-for (const w of workers) {
-  const version = w.env?.VERSION;
-  if (!version) continue;
-
-  const tmpDir = resolve(ROOT, `.cache/web-v${version}`);
-  console.log(`${w.color}[${w.name}]${RESET} Creating isolated copy at .cache/web-v${version}/...`);
-
-  rmSync(tmpDir, { recursive: true, force: true });
-  mkdirSync(tmpDir, { recursive: true });
-
-  // Copy source files (astro.config, package.json, src/, tsconfig, etc.)
-  // but symlink node_modules and heavy dirs
-  for (const entry of readdirSync(webVDir)) {
-    const src = resolve(webVDir, entry);
-    const dst = resolve(tmpDir, entry);
-    const stat = lstatSync(src);
-
-    if (entry === 'node_modules' || entry === 'dist') {
-      // Symlink large dirs (shared)
-      symlinkSync(src, dst);
-    } else if (entry === '.astro') {
-      // Don't copy or create — Astro will regenerate its own cache per version
-      continue;
-    } else if (entry === 'src') {
-      // Deep copy src/ so each version has its own content dir
-      cpSync(src, dst, { recursive: true });
-    } else if (stat.isDirectory()) {
-      cpSync(src, dst, { recursive: true });
-    } else if (stat.isSymbolicLink()) {
-      // Preserve symlinks (e.g., src/components → packages/shared)
-      const target = resolve(webVDir, readlinkSync(src));
-      const relTarget = relative(tmpDir, target);
-      symlinkSync(relTarget, dst);
-    } else {
-      cpSync(src, dst);
-    }
-  }
-
-  // Also symlink node_modules from root if the app uses workspace deps
-  if (!existsSync(resolve(tmpDir, 'node_modules'))) {
-    symlinkSync(resolve(ROOT, 'node_modules'), resolve(tmpDir, 'node_modules'));
-  }
-
-
-
-  // Update worker dir to point to the temp copy
-  w.dir = `.cache/web-v${version}`;
-}
-
-// ── Phase 2: Prepare content SEQUENTIALLY ──
-// For versioned workers, use --target pointing to the temp dir
-// For latest, use --target apps/web (as usual)
-console.log(`\n${CYAN}[prep]${RESET} Preparing content for all workers...`);
-
-for (const w of workers) {
-  const version = w.env?.VERSION;
-  const target = w.dir; // e.g., 'apps/web' or '.cache/web-v13'
-  const args = version
-    ? ['bun', 'run', 'scripts/prepare-content.ts', '--target', target, '--version', version]
-    : ['bun', 'run', 'scripts/prepare-content.ts', '--target', target];
-
-  console.log(`${w.color}[${w.name}]${RESET} Preparing content (--target ${target})...`);
-  const result = spawnSync(args, {
-    cwd: ROOT,
-    env: { ...process.env, ...w.env },
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  if (result.exitCode !== 0) {
-    console.error(`${w.color}[${w.name}]${RESET} prepare-content failed:`);
-    console.error(new TextDecoder().decode(result.stderr));
-  } else {
-    const output = new TextDecoder().decode(result.stdout).trim();
-    const lastLine = output.split('\n').pop() || '';
-    console.log(`${w.color}[${w.name}]${RESET} ${lastLine}`);
-  }
-}
-
-console.log(`${CYAN}[prep]${RESET} Content ready.\n`);
-
-// ── Phase 3: Start dev servers ──
+console.log('');
 for (const w of workers) {
   console.log(`${w.color}[${w.name}]${RESET} Starting on :${w.port}...`);
 
@@ -201,9 +200,8 @@ for (const w of workers) {
   procs.push(proc);
 }
 
-// Wait for workers to be ready, then start proxy
+// ── Start router proxy ──
 await new Promise((r) => setTimeout(r, 2000));
-
 console.log(`\n${CYAN}[router]${RESET} Starting proxy on :3000...`);
 
 const routerProc = spawn(['bun', 'run', 'dev-proxy.ts'], {
@@ -211,14 +209,13 @@ const routerProc = spawn(['bun', 'run', 'dev-proxy.ts'], {
   stdout: 'pipe',
   stderr: 'pipe',
 });
-
 prefixStream(routerProc.stdout, 'router', CYAN);
 prefixStream(routerProc.stderr, 'router', CYAN);
 procs.push(routerProc);
 
-// Handle shutdown
+// ── Shutdown ──
 process.on('SIGINT', () => {
-  console.log('\nShutting down all workers...');
+  console.log('\nShutting down...');
   for (const p of procs) p.kill();
   process.exit(0);
 });
@@ -227,5 +224,4 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// Keep alive
 await new Promise(() => {});
