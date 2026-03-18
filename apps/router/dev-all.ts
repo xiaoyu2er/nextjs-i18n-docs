@@ -7,9 +7,21 @@
  */
 
 import { spawn, spawnSync, type Subprocess } from 'bun';
-import { resolve } from 'node:path';
+import { resolve, relative } from 'node:path';
 import { cpSync, rmSync, existsSync, mkdirSync, readdirSync, symlinkSync, lstatSync, readlinkSync } from 'node:fs';
-import { relative } from 'node:path';
+import { execSync } from 'node:child_process';
+
+// Kill any leftover processes on our ports
+function freePort(port: number) {
+  try {
+    const pids = execSync(`lsof -ti :${port} 2>/dev/null`).toString().trim();
+    if (pids) {
+      for (const pid of pids.split('\n')) {
+        try { process.kill(Number(pid), 9); } catch {}
+      }
+    }
+  } catch {}
+}
 
 const ROOT = resolve(import.meta.dirname!, '../..');
 
@@ -79,6 +91,13 @@ function prefixStream(stream: ReadableStream<Uint8Array>, prefix: string, color:
     if (buffer) console.log(`${color}[${prefix}]${RESET} ${buffer}`);
   })();
 }
+
+// ── Phase 0: Free ports ──
+const allPorts = [3000, ...workers.map(w => w.port)];
+for (const port of allPorts) {
+  freePort(port);
+}
+console.log(`${CYAN}[init]${RESET} Ports cleared: ${allPorts.join(', ')}\n`);
 
 // ── Phase 1: Create isolated copies for versioned workers ──
 // apps/web-v is a shared template. Each version needs its own copy
