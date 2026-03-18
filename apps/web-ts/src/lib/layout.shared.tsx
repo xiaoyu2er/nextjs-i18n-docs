@@ -1,6 +1,6 @@
-import type { DocsLayoutProps } from 'fumadocs-ui/layouts/docs';
+import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 
-export function baseOptions(): DocsLayoutProps {
+export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
       title: 'Next.js Docs',

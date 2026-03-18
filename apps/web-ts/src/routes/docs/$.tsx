@@ -4,10 +4,10 @@ import { createServerFn } from '@tanstack/react-start';
 import { source } from '@/lib/source';
 import browserCollections from 'collections/browser';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page';
-import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { baseOptions } from '@/lib/layout.shared';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { Suspense } from 'react';
+import { useMDXComponents } from '@/components/mdx';
 
 export const Route = createFileRoute('/docs/$')({
   component: Page,
@@ -24,9 +24,7 @@ const serverLoader = createServerFn({
 })
   .inputValidator((slugs: string[]) => slugs)
   .handler(async ({ data: slugs }) => {
-    // URL has numeric prefixes stripped (e.g. /docs/app/getting-started/installation)
-    // but source pages have original slugs (01-app/01-getting-started/01-installation)
-    // Use getPageByHref to match by URL
+    // URL slugs have numeric prefixes stripped; match by URL
     const url = `/docs/${slugs.join('/')}`;
     const result = source.getPageByHref(url);
     const page = result?.page ?? source.getPage(slugs);
@@ -34,6 +32,7 @@ const serverLoader = createServerFn({
     if (!page) throw notFound();
 
     return {
+      slugs: page.slugs,
       path: page.path,
       pageTree: await source.serializePageTree(source.getPageTree()),
     };
@@ -46,7 +45,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <DocsBody>
-          <MDX components={{ ...defaultMdxComponents }} />
+          <MDX components={useMDXComponents()} />
         </DocsBody>
       </DocsPage>
     );
