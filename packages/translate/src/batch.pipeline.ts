@@ -117,7 +117,10 @@ function parseArgs(argv: string[]): CliOptions {
     status: hasFlag('status'),
     annotateFiles: getOpt('annotate', ''),
     lookup: getOpt('lookup', ''),
-    configPath: getOpt('config', 'translation.config.example.mjs'),
+    configPath: getOpt(
+      'config',
+      'packages/translate/translation.config.example.mjs',
+    ),
   };
 }
 

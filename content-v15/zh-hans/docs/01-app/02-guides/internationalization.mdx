@@ -1,0 +1,237 @@
+---
+title: 国际化
+description: 通过国际化路由和本地化内容添加对多语言的支持。
+---
+
+{/* md5:6279938aa6c8f0cd2dc0f94c8cd5eb8a */}
+Next.js 使你能够配置路由和内容渲染，以支持多语言。让你的网站适配不同的区域设置 (locales) 包括翻译内容（本地化）和国际化路由。
+
+{/* md5:4c2b0bf563a09391255cc5bda07b45e4 */}
+## 术语
+
+{/* md5:514083b665d621cbcecf78c9a98f4f75 */}
+- **区域设置 (Locale):** 一组语言和格式偏好的标识符。这通常包括用户的首选语言，可能还包括其地理区域。
+  - `en-US`: 美国使用的英语
+  - `nl-NL`: 荷兰使用的荷兰语
+  - `nl`: 荷兰语，无特定区域
+
+{/* md5:e5c4ad705205ab605ed6c2b367d6045c */}
+## 路由概览
+
+{/* md5:64b73a2a36ff387301ca4374931eb8c7 */}
+建议使用浏览器中的用户语言偏好来选择使用哪个区域设置。更改你的首选语言将修改发送到你应用的 `Accept-Language` 请求头。
+
+{/* md5:ec69ae9b58f216b0c7dad05e6502db84 */}
+例如，使用以下库，你可以查看传入的 `Request`，根据请求头 (`Headers`)、你计划支持的区域设置以及默认区域设置来确定选择哪个区域设置。
+
+```js filename="middleware.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+{/* md5:d6dd44ab26059fc05a448aaaeb491a03 */}
+路由可以通过子路径（`/fr/products`）或域名（`my-site.fr/products`）进行国际化。有了这些信息，你现在可以根据区域设置在 [中间件](/docs/app/api-reference/file-conventions/middleware) 中重定向用户。
+
+```js filename="middleware.js"
+import { NextResponse } from "next/server";
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// Get the preferred locale, similar to the above or using a library
+function getLocale(request) { ... }
+
+export function middleware(request) {
+  // Check if there is any supported locale in the pathname
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  // Redirect if there is no locale
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // e.g. incoming request is /products
+  // The new URL is now /en-US/products
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // Skip all internal paths (_next)
+    '/((?!_next).*)',
+    // Optional: only run on root (/) URL
+    // '/'
+  ],
+}
+```
+
+{/* md5:baa888d3db27501d855d8a4429d86867 */}
+最后，确保 `app/` 内的所有特殊文件都嵌套在 `app/[lang]` 下。这使 Next.js 路由器能够动态处理路由中的不同区域设置，并将 `lang` 参数转发给每个布局和页面。例如：
+
+```tsx filename="app/[lang]/page.tsx" switcher
+// You now have access to the current locale
+// e.g. /en-US/products -> `lang` is "en-US"
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
+  const { lang } = await params
+  return ...
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+// You now have access to the current locale
+// e.g. /en-US/products -> `lang` is "en-US"
+export default async function Page({ params }) {
+  const { lang } = await params
+  return ...
+}
+```
+
+{/* md5:98d12bf7b52e2cb6c1492ee8288e58df */}
+根布局也可以嵌套在新文件夹中（例如 `app/[lang]/layout.js`）。
+
+{/* md5:ffb1ab32b7e77124ff65cd9e56327e96 */}
+## 本地化
+
+{/* md5:dcc57479c26fb24ccf1371b6328892b4 */}
+根据用户的首选区域设置更改显示内容（即本地化）并非 Next.js 特有。下面描述的模式在任何 Web 应用程序中都是相同的。
+
+{/* md5:567c6a2ab2b64add22c76f2587adaeec */}
+假设我们想在应用程序中同时支持英语和荷兰语内容。我们可能会维护两个不同的“字典”，这些对象为我们提供了从某个键到本地化字符串的映射。例如：
+
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+{/* md5:576499ebe788e0bbf581c5107779b418 */}
+然后我们可以创建一个 `getDictionary` 函数来加载所请求区域设置的翻译：
+
+```ts filename="app/[lang]/dictionaries.ts" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale: 'en' | 'nl') =>
+  dictionaries[locale]()
+```
+
+```js filename="app/[lang]/dictionaries.js" switcher
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale) => dictionaries[locale]()
+```
+
+{/* md5:2f6c066186b800da451bca89a4094b93 */}
+给定当前选择的语言，我们可以在布局或页面中获取字典。
+
+```tsx filename="app/[lang]/page.tsx" switcher
+import { getDictionary } from './dictionaries'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ lang: 'en' | 'nl' }>
+}) {
+  const { lang } = await params
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+```jsx filename="app/[lang]/page.js" switcher
+import { getDictionary } from './dictionaries'
+
+export default async function Page({ params }) {
+  const { lang } = await params
+  const dict = await getDictionary(lang) // en
+  return <button>{dict.products.cart}</button> // Add to Cart
+}
+```
+
+{/* md5:3f48d0898b8733d39159e7bf6361ed09 */}
+由于 `app/` 目录中的所有布局和页面默认都是 [服务器组件 (Server Components)](/docs/app/getting-started/server-and-client-components)，我们不需要担心翻译文件的大小会影响客户端 JavaScript 包的大小。此代码将**仅在服务器上运行**，只有生成的 HTML 会被发送到浏览器。
+
+{/* md5:5451108a0e54a30e6a0a1649cde24605 */}
+## 静态渲染
+
+{/* md5:d5671446fcd3d041ed10f13694b4679f */}
+要为一组给定的区域设置生成静态路由，我们可以将 `generateStaticParams` 与任何页面或布局一起使用。这可以是全局的，例如在根布局中：
+
+```tsx filename="app/[lang]/layout.tsx" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({
+  children,
+  params,
+}: Readonly<{
+  children: React.ReactNode
+  params: Promise<{ lang: 'en-US' | 'de' }>
+}>) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/[lang]/layout.js" switcher
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({ children, params }) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+{/* md5:b253b3ee45e1a87880843e69b400f7fd */}
+## 资源
+
+{/* md5:c134fa1b26557dac426cb36ff9809f5a */}
+- [最小化 i18n 路由和翻译](https://github.com/vercel/next.js/tree/canary/examples/i18n-routing)
+- [`next-intl`](https://next-intl.dev)
+- [`next-international`](https://github.com/QuiiBz/next-international)
+- [`next-i18n-router`](https://github.com/i18nexus/next-i18n-router)
+- [`paraglide-next`](https://inlang.com/m/osslbuzt/paraglide-next-i18n)
+- [`lingui`](https://lingui.dev)
+- [`tolgee`](https://tolgee.io/apps-integrations/next)
+- [`next-intlayer`](https://intlayer.org/doc/environment/nextjs)

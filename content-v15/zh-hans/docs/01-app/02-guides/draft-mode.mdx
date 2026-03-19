@@ -1,0 +1,234 @@
+---
+title: 如何在 Next.js 中使用草稿模式 (Draft Mode) 预览内容
+nav_title: 草稿模式 (Draft Mode)
+description: Next.js 拥有草稿模式 (Draft Mode)，可在静态和动态页面之间切换。你可以在此了解它在 App Router 中的工作方式。
+related:
+  title: 后续步骤
+  description: 有关如何使用草稿模式 (Draft Mode) 的更多信息，请参阅 API 参考。
+  links:
+    - app/api-reference/functions/draft-mode
+---
+
+{/* md5:e857c93bdc108793ca4a114ebd6d2ebe */}
+**草稿模式 (Draft Mode)** 允许你在 Next.js 应用中预览来自无头 CMS 的草稿内容。这对于在构建时生成的静态页面非常有用，因为它允许你切换到[动态渲染 (dynamic rendering)](/docs/app/getting-started/partial-prerendering#dynamic-rendering) 并查看草稿更改，而无需重新构建整个站点。
+
+{/* md5:fea1586d84b2ad38092313df1f693501 */}
+本页将介绍如何启用和使用草稿模式 (Draft Mode)。
+
+{/* md5:34c2989014e1877d9403dfb776997a81 */}
+## 步骤 1：创建路由处理器
+
+{/* md5:0f7883d8f9552359b4871a5952221dff */}
+创建 [路由处理器](/docs/app/api-reference/file-conventions/route)。它可以有任何名称，例如 `app/api/draft/route.ts`。
+
+```ts filename="app/api/draft/route.ts" switcher
+export async function GET(request: Request) {
+  return new Response('')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+export async function GET() {
+  return new Response('')
+}
+```
+
+{/* md5:9749594ccce25d6b8a8aad8c963bc847 */}
+然后，导入 [`draftMode`](/docs/app/api-reference/functions/draft-mode) 函数并调用 `enable()` 方法。
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request: Request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+
+export async function GET(request) {
+  const draft = await draftMode()
+  draft.enable()
+  return new Response('Draft mode is enabled')
+}
+```
+
+{/* md5:12b92f4cbc55072a1e924c16d2ed5417 */}
+这将设置一个 **cookie** 来启用草稿模式。后续包含此 cookie 的请求将触发草稿模式并改变静态生成页面的行为。
+
+{/* md5:f0ee1be9c0f84521237e54c2687ee388 */}
+你可以通过访问 `/api/draft` 并查看浏览器的开发者工具来手动测试此功能。注意 `Set-Cookie` 响应头，其中包含一个名为 `__prerender_bypass` 的 cookie。
+
+{/* md5:47df4d16a7f14816bda1ae5eb6c8cd48 */}
+## 步骤 2：从你的无头 CMS 访问路由处理器
+
+{/* md5:05c22183e35bea802beba4f138e11363 */}
+> 以下步骤假设你使用的无头 CMS 支持设置 **自定义草稿 URL**。如果不支持，你仍然可以使用此方法来保护你的草稿 URL，但你需要手动构建和访问草稿 URL。具体步骤将根据你使用的无头 CMS 而有所不同。
+
+{/* md5:95a37092e3776e36955cfaca2000a0c0 */}
+要安全地从你的无头 CMS 访问路由处理器：
+
+{/* md5:ab5e4ae42c034fb21956e5f45157b45d */}
+1.  使用你选择的令牌生成器创建一个 **密钥令牌字符串**。此密钥仅由你的 Next.js 应用和你的无头 CMS 知晓。
+2.  如果你的无头 CMS 支持设置自定义草稿 URL，请指定一个草稿 URL（这里假设你的路由处理器位于 `app/api/draft/route.ts`）。例如：
+
+```bash filename="Terminal"
+https://<your-site>/api/draft?secret=<token>&slug=<path>
+```
+
+{/* md5:c236fc08e800c98fd43d7259d405b05d */}
+> - `<your-site>` 应该是你的部署域名。
+> - `<token>` 应替换为你生成的密钥令牌。
+> - `<path>` 应该是你想要查看的页面的路径。如果你想查看 `/posts/one`，那么你应该使用 `&slug=/posts/one`。
+>
+> 你的无头 CMS 可能允许你在草稿 URL 中包含一个变量，以便 `<path>` 可以根据 CMS 的数据动态设置，如下所示：`&slug=/posts/{entry.fields.slug}`
+
+{/* md5:120e09e06b4a5ba3aa0a1efa1035300b */}
+3.  在你的路由处理器中，检查密钥是否匹配且 `slug` 参数是否存在（如果不存在，请求应失败），调用 `draftMode.enable()` 来设置 cookie。然后，将浏览器重定向到 `slug` 指定的路径：
+
+```ts filename="app/api/draft/route.ts" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  // Parse query string parameters
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Check the secret and next parameters
+  // This secret should only be known to this Route Handler and the CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Invalid token', { status: 401 })
+  }
+
+  // Fetch the headless CMS to check if the provided `slug` exists
+  // getPostBySlug would implement the required fetching logic to the headless CMS
+  const post = await getPostBySlug(slug)
+
+  // If the slug doesn't exist prevent draft mode from being enabled
+  if (!post) {
+    return new Response('Invalid slug', { status: 401 })
+  }
+
+  // Enable Draft Mode by setting the cookie
+  const draft = await draftMode()
+  draft.enable()
+
+  // Redirect to the path from the fetched post
+  // We don't redirect to searchParams.slug as that might lead to open redirect vulnerabilities
+  redirect(post.slug)
+}
+```
+
+```js filename="app/api/draft/route.js" switcher
+import { draftMode } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  // Parse query string parameters
+  const { searchParams } = new URL(request.url)
+  const secret = searchParams.get('secret')
+  const slug = searchParams.get('slug')
+
+  // Check the secret and next parameters
+  // This secret should only be known to this Route Handler and the CMS
+  if (secret !== 'MY_SECRET_TOKEN' || !slug) {
+    return new Response('Invalid token', { status: 401 })
+  }
+
+  // Fetch the headless CMS to check if the provided `slug` exists
+  // getPostBySlug would implement the required fetching logic to the headless CMS
+  const post = await getPostBySlug(slug)
+
+  // If the slug doesn't exist prevent draft mode from being enabled
+  if (!post) {
+    return new Response('Invalid slug', { status: 401 })
+  }
+
+  // Enable Draft Mode by setting the cookie
+  const draft = await draftMode()
+  draft.enable()
+
+  // Redirect to the path from the fetched post
+  // We don't redirect to searchParams.slug as that might lead to open redirect vulnerabilities
+  redirect(post.slug)
+}
+```
+
+{/* md5:642bc525206422e87bb8d52cb7e80f0e */}
+如果成功，浏览器将被重定向到你想要查看的路径，并带上草稿模式 cookie。
+
+{/* md5:deef37eabcd0512ec2052713ebff9740 */}
+## 步骤 3：预览草稿内容
+
+{/* md5:21ef0ea7a0c4c814d1c76b2f5924a6cf */}
+下一步是更新你的页面以检查 `draftMode().isEnabled` 的值。
+
+{/* md5:28542cca9f2754bce054340343ed4996 */}
+如果你请求一个设置了该 cookie 的页面，那么数据将在**请求时**获取（而不是在构建时）。
+
+{/* md5:e8362998459d0b53ac5573e8bab54d5a */}
+此外，`isEnabled` 的值将为 `true`。
+
+```tsx filename="app/page.tsx" switcher
+// page that fetches data
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+// page that fetches data
+import { draftMode } from 'next/headers'
+
+async function getData() {
+  const { isEnabled } = await draftMode()
+
+  const url = isEnabled
+    ? 'https://draft.example.com'
+    : 'https://production.example.com'
+
+  const res = await fetch(url)
+
+  return res.json()
+}
+
+export default async function Page() {
+  const { title, desc } = await getData()
+
+  return (
+    <main>
+      <h1>{title}</h1>
+      <p>{desc}</p>
+    </main>
+  )
+}
+```
+
+{/* md5:1c20e6998702e4bf040e285013c87832 */}
+如果你从你的无头 CMS 或通过手动使用 URL 访问草稿路由处理器（带有 `secret` 和 `slug`），你现在应该能看到草稿内容。而且，如果你更新了草稿但没有发布，你应该能够查看该草稿。
