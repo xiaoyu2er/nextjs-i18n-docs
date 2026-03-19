@@ -49,14 +49,13 @@ nextjs-i18n-docs/
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (primary runtime)
+- [Bun](https://bun.sh/)
 - Node.js 20+
-- [pnpm](https://pnpm.io/) 9.15+
 
 ### Installation
 
 ```bash
-pnpm install
+bun install
 ```
 
 ### Development
