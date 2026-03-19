@@ -160,9 +160,16 @@ function resolveSourceInDir(currentDir: string, parts: string[]): string | null 
   return null;
 }
 
-/** Strip MDX comments and rewrite links for versioned content */
+/** Strip MDX comments, fix malformed anchors, and rewrite links for versioned content */
 function filterContent(body: string): string {
   let result = body.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+
+  // Fix malformed heading anchors: "### Text![](#anchor)" → "### [Text](#anchor)"
+  // The "![](#anchor)" is image syntax that MDX/Rollup tries to resolve as a module import.
+  result = result.replace(
+    /^(#{1,6})\s+(.+?)!\[]\(#([^)]+)\)\s*$/gm,
+    '$1 [$2](#$3)'
+  );
 
   // For versioned builds, rewrite internal doc links:
   // /docs/app/... → /docs/{version}/app/...

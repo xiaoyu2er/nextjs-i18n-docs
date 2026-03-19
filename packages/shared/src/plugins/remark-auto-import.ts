@@ -11,6 +11,7 @@ const COMPONENTS = [
   'Cross',
   'AppOnly',
   'PagesOnly',
+  'Video',
   'VideoComponent',
   'VideoSkeleton',
 ];
