@@ -42,6 +42,21 @@ function getWorkerForPath(path: string, env: Env): Fetcher | null {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // 301 redirect: locale subdomains → path prefix
+    // e.g. zh-hans.nextjs.im/docs/... → nextjs.im/zh-hans/docs/...
+    const hostParts = url.hostname.split('.');
+    if (hostParts.length >= 3) {
+      const subdomain = hostParts[0];
+      if (LOCALES.includes(subdomain)) {
+        const baseDomain = hostParts.slice(1).join('.');
+        const newUrl = new URL(url);
+        newUrl.hostname = baseDomain;
+        newUrl.pathname = `/${subdomain}${url.pathname}`;
+        return Response.redirect(newUrl.href, 301);
+      }
+    }
+
     const path = stripLocale(url.pathname);
 
     // Version root redirects: /docs/{ver} → /docs/{ver}/app/...
