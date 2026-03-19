@@ -145,6 +145,8 @@ export function validate(
   llmOutput: string,
   lang: string,
   cache: TranslationCache,
+  /** File path for logging (optional) */
+  filePath?: string,
 ): ValidateResult {
   const sourceNodes = parseMdx(sourceContent);
   const outputNodes = parseMdx(llmOutput);
@@ -177,8 +179,9 @@ export function validate(
       lang,
       cache,
     );
+    const fileLabel = filePath ? ` [${filePath}]` : '';
     console.warn(
-      `⚠️ Node count mismatch: source=${srcCount}, output=${outCount}. ` +
+      `⚠️ Node count mismatch${fileLabel}: source=${srcCount}, output=${outCount}. ` +
         `Anchor-based alignment: ${alignment.size}/${srcCount} nodes aligned.`,
     );
   }

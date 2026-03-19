@@ -256,6 +256,7 @@ async function translateFile(
     translatedContent,
     opts.lang,
     cache,
+    relPath,
   );
 
   // Write final output
