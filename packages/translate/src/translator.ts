@@ -108,6 +108,73 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Attempt to repair broken JSON from LLM output.
+ * Common issues: unescaped newlines inside string values,
+ * trailing commas, missing closing brace.
+ */
+function repairJson(raw: string): string {
+  // Strategy: walk through the string character by character,
+  // track whether we're inside a JSON string value,
+  // and escape any literal newlines found inside strings.
+  let result = '';
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+
+    if (escaped) {
+      result += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === '\\') {
+      result += ch;
+      escaped = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      result += ch;
+      continue;
+    }
+
+    if (inString && ch === '\n') {
+      result += '\\n';
+      continue;
+    }
+
+    if (inString && ch === '\r') {
+      continue; // skip CR
+    }
+
+    if (inString && ch === '\t') {
+      result += '\\t';
+      continue;
+    }
+
+    result += ch;
+  }
+
+  // Fix trailing comma before closing brace
+  result = result.replace(/,\s*}/g, '}');
+
+  // Ensure closing brace
+  const trimmed = result.trim();
+  if (trimmed.startsWith('{') && !trimmed.endsWith('}')) {
+    // Find last complete key-value pair and close
+    const lastQuote = result.lastIndexOf('"');
+    if (lastQuote > 0) {
+      result = `${result.substring(0, lastQuote + 1)}}`;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Resolve API configuration for the given API type.
  * Returns { baseURL, apiKey, model } with defaults applied.
  */
@@ -267,7 +334,8 @@ Translate ONLY these marked sections. Return a JSON object where:
 
 RULES:
 1. Return ONLY a valid JSON object. No other text, no markdown code fences.
-2. Preserve all Markdown formatting: heading levels (## ###), links, inline code, bold, italic
+2. All newlines INSIDE translated text MUST be escaped as \\n in the JSON string. The JSON must be a SINGLE LINE per key-value pair. Example: {"key":"line1\\nline2\\n## Heading"}
+3. Preserve all Markdown formatting: heading levels (## ###), links, inline code, bold, italic
 3. Keep code blocks, file paths, URLs, variable names unchanged
 4. For frontmatter content (title, description), translate the values but keep YAML-safe formatting
 5. NEVER start a translated value with backticks, quotes, or special YAML characters
@@ -386,9 +454,15 @@ export async function translateJson(
       try {
         parsed = JSON.parse(raw);
       } catch {
-        throw new Error(
-          `Failed to parse JSON response: ${raw.substring(0, 200)}...`,
-        );
+        // Try to repair: fix unescaped newlines inside JSON string values
+        try {
+          const repaired = repairJson(raw);
+          parsed = JSON.parse(repaired);
+        } catch {
+          throw new Error(
+            `Failed to parse JSON response: ${raw.substring(0, 200)}...`,
+          );
+        }
       }
 
       // Validate: check for missing and extra keys

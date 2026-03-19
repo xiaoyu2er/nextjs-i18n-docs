@@ -275,11 +275,16 @@ async function translateFile(
     newTranslations++;
   }
 
-  // Log missing translations
+  // Log missing translations with details
   if (jsonResult.missing.length > 0) {
     console.warn(
-      `   ⚠️ ${jsonResult.missing.length} nodes missing from LLM response`,
+      `   ⚠️ ${jsonResult.missing.length}/${Object.keys(uncached).length} nodes missing from LLM response:`,
     );
+    for (const md5 of jsonResult.missing) {
+      const src = uncached[md5] ?? '';
+      const preview = src.split('\n')[0].substring(0, 80);
+      console.warn(`      ${md5.substring(0, 12)}… ${preview}`);
+    }
   }
 
   // Re-assemble from source structure + updated cache
@@ -294,7 +299,7 @@ async function translateFile(
 
   if (!reassembled.allCached) {
     console.warn(
-      `   ⚠️ ${reassembled.uncachedCount} nodes still uncached (English text in output)`,
+      `   ⚠️ ${reassembled.uncachedCount}/${reassembled.totalTranslatable} nodes still uncached (English text in output)`,
     );
   }
 
