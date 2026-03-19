@@ -44,15 +44,12 @@ function isHtmlPureTag(text: string): boolean {
 }
 
 /**
- * Compute MD5 hash. For headings, strip the leading # markers
- * so that ## Title and ### Title produce the same hash.
+ * Compute MD5 hash of the raw text.
+ * Headings include their level markers (## vs ###) so different
+ * heading levels produce distinct hashes.
  */
-function computeHash(text: string, type: string): string {
-  let hashInput = text;
-  if (type === 'heading') {
-    hashInput = text.replace(/^#{1,6}\s+/, '');
-  }
-  return crypto.createHash('md5').update(hashInput).digest('hex');
+function computeHash(text: string): string {
+  return crypto.createHash('md5').update(text).digest('hex');
 }
 
 /**
@@ -89,7 +86,7 @@ export function parseMdx(rawContent: string): ParsedNode[] {
     };
 
     if (needsTranslation) {
-      node.md5 = computeHash(rawText, type);
+      node.md5 = computeHash(rawText);
     }
 
     nodes.push(node);

@@ -116,10 +116,35 @@ describe('TranslationCache', () => {
       'utf8',
     );
     expect(index).toContain('docs/installation.mdx:12');
+  });
 
+  it('should preserve src field through save/load round-trip', () => {
+    const cache1 = new TranslationCache(tmpDir);
+    cache1.set('zh-hans', 'h1', 'v1');
+    cache1.updateSource('zh-hans', 'h1', 'docs/foo.mdx', 10);
+    cache1.updateSource('zh-hans', 'h1', 'docs/bar.mdx', 20);
+    cache1.save('zh-hans');
+
+    // Verify JSONL includes src
+    const content = fs.readFileSync(path.join(tmpDir, 'zh-hans.jsonl'), 'utf8');
+    expect(content).toContain('"src"');
+    expect(content).toContain('docs/foo.mdx:10');
+
+    // Reload and verify
+    const cache2 = new TranslationCache(tmpDir);
+    cache2.load('zh-hans');
+    const entry = [...cache2.entries('zh-hans')].find(([k]) => k === 'h1');
+    expect(entry?.[1].src).toContain('docs/foo.mdx:10');
+    expect(entry?.[1].src).toContain('docs/bar.mdx:20');
+  });
+
+  it('should not include src in JSONL when src array is empty', () => {
+    const cache = new TranslationCache(tmpDir);
+    cache.set('zh-hans', 'h1', 'v1');
     cache.save('zh-hans');
-    const jsonl = fs.readFileSync(path.join(tmpDir, 'zh-hans.jsonl'), 'utf8');
-    expect(jsonl).not.toContain('"src"');
+
+    const content = fs.readFileSync(path.join(tmpDir, 'zh-hans.jsonl'), 'utf8');
+    expect(content).not.toContain('"src"');
   });
 
   it('should not duplicate source locations', () => {

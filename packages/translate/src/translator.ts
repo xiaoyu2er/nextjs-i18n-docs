@@ -1,14 +1,9 @@
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { NEEDS_TRANSLATION_START } from './assembler';
 
-type ApiType = 'openai' | 'anthropic' | 'pi';
+type ApiType = 'openrouter' | 'openai' | 'anthropic';
 
-interface TranslateOptions {
+export interface TranslateOptions {
   /** Assembled file content with NEEDS_TRANSLATION markers */
   assembledContent: string;
   /** Target language name (e.g., "Simplified Chinese") */
@@ -17,17 +12,24 @@ interface TranslateOptions {
   guide?: string;
   /** Documentation context */
   docsContext?: string;
-  /** API type: 'openai', 'anthropic', or 'pi' */
+  /** API type: 'openrouter', 'openai', 'anthropic' */
   apiType?: ApiType;
-  /** API base URL (for openai/anthropic) */
+  /** API base URL override */
   apiBaseUrl?: string;
-  /** API key (for openai/anthropic, falls back to env vars) */
+  /** API key override (falls back to env vars) */
   apiKey?: string;
-  /** Model name */
+  /** Model name override */
   model?: string;
-  /** Provider name (for pi mode) */
-  provider?: string;
+  /** Max output tokens (default: 16384) */
+  maxTokens?: number;
 }
+
+/** Default max output tokens */
+const DEFAULT_MAX_TOKENS = 16384;
+
+/** Retry config */
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 2000;
 
 /**
  * Strip <think>...</think> blocks from model output (reasoning models).
@@ -92,126 +94,135 @@ OUTPUT: Return the complete file with translations applied and markers removed. 
 }
 
 /**
- * Translate via pi CLI in print mode.
- * Uses pi's auth and model registry — no API key management needed.
+ * Sleep for a given number of milliseconds.
  */
-function translateWithPi(opts: TranslateOptions, systemPrompt: string): string {
-  // Write assembled content to temp file for @file reference
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-translate-'));
-  const contentFile = path.join(tmpDir, 'content.mdx');
-  fs.writeFileSync(contentFile, opts.assembledContent, 'utf8');
-
-  try {
-    const args = [
-      '-p',
-      '--no-tools',
-      '--no-extensions',
-      '--no-skills',
-      '--no-prompt-templates',
-      '--no-session',
-    ];
-
-    if (opts.provider) {
-      args.push('--provider', opts.provider);
-    }
-    if (opts.model) {
-      args.push('--model', opts.model);
-    }
-
-    args.push('--system-prompt', systemPrompt);
-    args.push(`@${contentFile}`);
-    args.push(
-      'Translate the file above according to the system prompt instructions. Output only the translated file.',
-    );
-
-    const result = execFileSync('pi', args, {
-      encoding: 'utf8',
-      maxBuffer: 10 * 1024 * 1024, // 10MB
-      timeout: 15 * 60 * 1000, // 15 min
-    });
-
-    return stripThinkingBlock(result);
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * Translate via Anthropic Messages API (used by MiniMax, Claude, etc.)
+ * Resolve API configuration for the given API type.
+ * Returns { baseURL, apiKey, model } with defaults applied.
  */
-async function translateWithAnthropic(
-  opts: TranslateOptions,
-  systemPrompt: string,
-): Promise<string> {
-  const apiKey =
-    opts.apiKey ?? process.env.ANTHROPIC_API_KEY ?? process.env.MINIMAX_API_KEY;
+function resolveApiConfig(opts: TranslateOptions): {
+  baseURL: string;
+  apiKey: string;
+  model: string;
+} {
+  const apiType = opts.apiType ?? 'openrouter';
+
+  if (apiType === 'openrouter') {
+    const apiKey = opts.apiKey ?? process.env.OPENROUTER_API_KEY ?? '';
+    if (!apiKey) {
+      throw new Error(
+        'No API key found. Set OPENROUTER_API_KEY in .env or pass --api-key.',
+      );
+    }
+    return {
+      baseURL: opts.apiBaseUrl ?? 'https://openrouter.ai/api/v1',
+      apiKey,
+      model:
+        opts.model ??
+        process.env.OPENROUTER_MODEL ??
+        'deepseek/deepseek-chat-v3-0324:free',
+    };
+  }
+
+  if (apiType === 'openai') {
+    const apiKey = opts.apiKey ?? process.env.OPENAI_API_KEY ?? '';
+    if (!apiKey) {
+      throw new Error(
+        'No API key found. Set OPENAI_API_KEY or pass --api-key.',
+      );
+    }
+    return {
+      baseURL: opts.apiBaseUrl ?? 'https://api.deepseek.com',
+      apiKey,
+      model: opts.model ?? 'deepseek-chat',
+    };
+  }
+
+  // anthropic — use OpenAI-compatible endpoint
+  const apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY ?? '';
   if (!apiKey) {
     throw new Error(
-      'No API key found. Set apiKey option, ANTHROPIC_API_KEY, or MINIMAX_API_KEY.',
+      'No API key found. Set ANTHROPIC_API_KEY or pass --api-key.',
     );
   }
-
-  const client = new Anthropic({
-    baseURL: opts.apiBaseUrl ?? 'https://api.minimax.io/anthropic',
+  return {
+    baseURL: opts.apiBaseUrl ?? 'https://api.anthropic.com/v1',
     apiKey,
-  });
-
-  const model = opts.model ?? 'MiniMax-M2.1';
-
-  const response = await client.messages.create({
-    model,
-    max_tokens: 16384,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: opts.assembledContent }],
-  });
-
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('Empty response from Anthropic API');
-  }
-
-  return stripThinkingBlock(textBlock.text);
+    model: opts.model ?? 'claude-sonnet-4-20250514',
+  };
 }
 
 /**
- * Translate via OpenAI-compatible API (used by DeepSeek, etc.)
+ * Translate via OpenAI-compatible API with retry and truncation detection.
+ * Works with OpenRouter, DeepSeek, and any OpenAI-compatible endpoint.
  */
-async function translateWithOpenAI(
+async function translateWithRetry(
   opts: TranslateOptions,
   systemPrompt: string,
 ): Promise<string> {
-  const apiKey = opts.apiKey ?? process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('No API key found. Set apiKey option or OPENAI_API_KEY.');
+  const { baseURL, apiKey, model } = resolveApiConfig(opts);
+  const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+
+  const client = new OpenAI({ baseURL, apiKey });
+
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: opts.assembledContent },
+        ],
+        max_tokens: maxTokens,
+      });
+
+      const choice = response.choices?.[0];
+      if (!choice?.message?.content) {
+        throw new Error('Empty response from API');
+      }
+
+      // Check for truncated output
+      if (choice.finish_reason === 'length') {
+        throw new Error(
+          `Output truncated (finish_reason=length). Model hit max_tokens=${maxTokens}. Try increasing --max-tokens or using a model with higher output limits.`,
+        );
+      }
+
+      return stripThinkingBlock(choice.message.content);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const isRetryable =
+        lastError.message.includes('429') ||
+        lastError.message.includes('503') ||
+        lastError.message.includes('timeout') ||
+        lastError.message.includes('ECONNRESET') ||
+        lastError.message.includes('truncated');
+
+      if (!isRetryable || attempt === MAX_RETRIES) {
+        throw lastError;
+      }
+
+      const backoff = INITIAL_BACKOFF_MS * 2 ** (attempt - 1);
+      console.warn(
+        `⚠️ Attempt ${attempt}/${MAX_RETRIES} failed: ${lastError.message}. Retrying in ${backoff / 1000}s...`,
+      );
+      await sleep(backoff);
+    }
   }
 
-  const client = new OpenAI({
-    baseURL: opts.apiBaseUrl ?? 'https://api.deepseek.com',
-    apiKey,
-  });
-
-  const model = opts.model ?? 'deepseek-chat';
-
-  const response = await client.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: opts.assembledContent },
-    ],
-    max_tokens: 8192,
-  });
-
-  const content = response.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('Empty response from OpenAI API');
-  }
-
-  return stripThinkingBlock(content);
+  throw lastError ?? new Error('Translation failed after retries');
 }
 
 /**
  * Translate assembled content.
- * Supports: 'pi' (pi CLI), 'openai' (OpenAI-compatible), 'anthropic' (Anthropic API).
+ * Supports: 'openrouter' (default), 'openai' (OpenAI-compatible), 'anthropic'.
+ * Includes retry with exponential backoff and truncation detection.
  */
 export async function translateAssembled(
   opts: TranslateOptions,
@@ -222,13 +233,5 @@ export async function translateAssembled(
     docsContext: opts.docsContext,
   });
 
-  const apiType = opts.apiType ?? 'pi';
-
-  if (apiType === 'pi') {
-    return translateWithPi(opts, systemPrompt);
-  }
-  if (apiType === 'anthropic') {
-    return translateWithAnthropic(opts, systemPrompt);
-  }
-  return translateWithOpenAI(opts, systemPrompt);
+  return translateWithRetry(opts, systemPrompt);
 }

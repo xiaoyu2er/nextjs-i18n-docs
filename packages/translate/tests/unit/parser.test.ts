@@ -96,10 +96,18 @@ describe('parseMdx', () => {
     expect(hash1).toBe(hash2);
   });
 
-  it('should normalize heading level before hashing', () => {
+  it('should produce different hashes for different heading levels', () => {
     const nodes1 = parseMdx('## Title');
     const nodes2 = parseMdx('### Title');
-    expect(nodes1[0].md5).toBe(nodes2[0].md5);
+    expect(nodes1[0].md5).not.toBe(nodes2[0].md5);
+  });
+
+  it('should produce same hash for same heading level and text', () => {
+    const nodes1 = parseMdx('## Installation');
+    const nodes2 = parseMdx('Some text\n\n## Installation');
+    const h1 = nodes1.find((n) => n.type === 'heading')?.md5;
+    const h2 = nodes2.find((n) => n.type === 'heading')?.md5;
+    expect(h1).toBe(h2);
   });
 
   it('should preserve node order matching original content', () => {

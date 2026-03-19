@@ -75,6 +75,20 @@ describe('validate', () => {
     expect(result.diffs).toHaveLength(0);
   });
 
+  it('should skip cache update when node count mismatches', () => {
+    const sourceContent = '## Heading\n\nParagraph one.\n\nParagraph two.';
+    // LLM merged two paragraphs into one
+    const piOutput = '## 标题\n\n段落一和段落二合并了。';
+    const cache = new TranslationCache('/tmp/unused');
+
+    const result = validate(sourceContent, piOutput, 'zh-hans', cache);
+    // Should NOT update cache (node count mismatch: 3 source vs 2 output)
+    expect(result.newTranslations).toBe(0);
+    expect(result.diffs).toHaveLength(0);
+    // Should still return the raw output as correctedContent
+    expect(result.correctedContent).toContain('标题');
+  });
+
   it('should handle code blocks as pass-through', () => {
     const sourceContent = '```js\ncode\n```\n\n<AppOnly>\n\nText\n\n</AppOnly>';
     const piOutput = '```js\ncode\n```\n\n<AppOnly>\n\n文本\n\n</AppOnly>';

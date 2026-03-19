@@ -1,39 +1,55 @@
+#!/usr/bin/env node
 /**
- * Batch translation pipeline — translate multiple files.
+ * Unified translation pipeline CLI.
  *
  * Usage:
  *   bun run packages/translate/src/batch.pipeline.ts [options]
  *
+ * Modes:
+ *   --status          Report translation coverage (no API calls)
+ *   --lang <code>     Translate to a specific language (e.g., zh-hans)
+ *   --lang all        Translate to all configured languages
+ *   --dry-run         Assemble only, show what would be translated
+ *
  * Options:
- *   --docs-root     Source docs root (default: apps/docs/content/en)
- *   --output-dir    Output directory (default: tmp/batch-output)
- *   --cache-dir     Cache directory (default: tmp/batch-output/cache)
- *   --lang          Target language code (default: zh-hans)
- *   --lang-name     Target language name (default: Simplified Chinese)
- *   --pattern       Glob pattern to match files (default: all .mdx)
- *   --max           Max files to process (default: all)
- *   --api-type      Translation engine: pi, openai, anthropic (default: openai)
- *   --api-base-url  API base URL
- *   --api-key       API key
- *   --model         Model name
- *   --provider      Provider (for pi mode)
- *   --dry-run       Only assemble, don't translate
- *   --concurrency   Number of concurrent translations (default: 1, only for sdk modes)
+ *   --docs-root <dir>   Source English content (default: content/en)
+ *   --output-dir <dir>  Output directory (default: content)
+ *   --cache-dir <dir>   Cache directory (default: .cache)
+ *   --pattern <glob>    File pattern (default: **\/*.mdx)
+ *   --max <n>           Max files to process
+ *   --concurrency <n>   Parallel API calls (default: 3)
+ *   --model <name>      Override model from .env
+ *   --api-type <type>   API type: openrouter, openai, anthropic (default: openrouter)
+ *   --api-key <key>     API key override
+ *   --api-base-url <u>  API base URL override
+ *   --max-tokens <n>    Max output tokens (default: 16384)
+ *   --config <path>     Translation config file (default: translation.config.example.mjs)
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
 import {
+  assemble,
   NEEDS_TRANSLATION_END,
   NEEDS_TRANSLATION_START,
-  assemble,
 } from './assembler';
 import { executeInBatches } from './batch';
 import { TranslationCache } from './cache';
 import { validateMdx } from './mdx-validator';
-import { needsTranslation, translateAssembled } from './translator';
+import { parseMdx } from './parser';
+import {
+  needsTranslation,
+  type TranslateOptions,
+  translateAssembled,
+} from './translator';
 import { validate } from './validator';
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 
 function formatDuration(ms: number): string {
   const secs = Math.floor(ms / 1000);
@@ -46,11 +62,34 @@ function formatDuration(ms: number): string {
   return `${hours}h${remainMins}m`;
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+// ── CLI Arg Parsing ──────────────────────────────────────────────────
 
-function parseArgs(argv: string[]) {
+interface CliOptions {
+  docsRoot: string;
+  outputDir: string;
+  cacheDir: string;
+  lang: string;
+  pattern: string;
+  max: number;
+  apiType: TranslateOptions['apiType'];
+  apiBaseUrl: string;
+  apiKey: string;
+  model: string;
+  maxTokens: number;
+  concurrency: number;
+  dryRun: boolean;
+  status: boolean;
+  configPath: string;
+  docsContext?: string;
+}
+
+interface LangConfig {
+  locale: string;
+  name: string;
+  guide?: string;
+}
+
+function parseArgs(argv: string[]): CliOptions {
   const args = argv.slice(2);
   const getOpt = (name: string, def: string) => {
     const idx = args.indexOf(`--${name}`);
@@ -59,51 +98,130 @@ function parseArgs(argv: string[]) {
   const hasFlag = (name: string) => args.includes(`--${name}`);
 
   return {
-    docsRoot: path.resolve(
-      PROJECT_ROOT,
-      getOpt('docs-root', 'apps/docs/content/en'),
-    ),
-    outputDir: path.resolve(
-      PROJECT_ROOT,
-      getOpt('output-dir', 'tmp/batch-output'),
-    ),
+    docsRoot: path.resolve(PROJECT_ROOT, getOpt('docs-root', 'content/en')),
+    outputDir: path.resolve(PROJECT_ROOT, getOpt('output-dir', 'content')),
     cacheDir: path.resolve(PROJECT_ROOT, getOpt('cache-dir', '.cache')),
     lang: getOpt('lang', 'zh-hans'),
-    langName: getOpt('lang-name', 'Simplified Chinese'),
     pattern: getOpt('pattern', '**/*.mdx'),
     max: Number.parseInt(getOpt('max', '999999'), 10),
-    apiType: getOpt('api-type', 'openai') as 'openai' | 'anthropic' | 'pi',
+    apiType: getOpt('api-type', 'openrouter') as TranslateOptions['apiType'],
     apiBaseUrl: getOpt('api-base-url', ''),
     apiKey: getOpt('api-key', ''),
     model: getOpt('model', ''),
-    provider: getOpt('provider', ''),
-    concurrency: Number.parseInt(getOpt('concurrency', '1'), 10),
+    maxTokens: Number.parseInt(getOpt('max-tokens', '16384'), 10),
+    concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
-    guide: getOpt('guide', ''),
-    configPath: getOpt('config', 'apps/docs/translation.config.mjs'),
+    status: hasFlag('status'),
+    configPath: getOpt('config', 'translation.config.example.mjs'),
   };
+}
+
+// ── Load language config ─────────────────────────────────────────────
+
+async function loadLangConfigs(
+  configPath: string,
+): Promise<{ langs: Record<string, LangConfig>; docsContext?: string }> {
+  try {
+    const fullPath = path.resolve(PROJECT_ROOT, configPath);
+    const config = (await import(fullPath)).default;
+    return {
+      langs: config.langs ?? {},
+      docsContext: config.docsContext,
+    };
+  } catch {
+    // Fallback: minimal zh-hans config
+    return {
+      langs: {
+        'zh-hans': { locale: 'zh-hans', name: 'Simplified Chinese' },
+      },
+    };
+  }
+}
+
+// ── Status Mode ──────────────────────────────────────────────────────
+
+async function runStatus(opts: CliOptions): Promise<void> {
+  const { langs } = await loadLangConfigs(opts.configPath);
+  const targetLangs = opts.lang === 'all' ? Object.keys(langs) : [opts.lang];
+
+  // Scan source files
+  const files = await glob(opts.pattern, { cwd: opts.docsRoot });
+  let totalNodes = 0;
+  const allMd5s = new Set<string>();
+
+  for (const relPath of files) {
+    const content = fs.readFileSync(path.join(opts.docsRoot, relPath), 'utf8');
+    const nodes = parseMdx(content);
+    for (const node of nodes) {
+      if (node.needsTranslation && node.md5) {
+        totalNodes++;
+        allMd5s.add(node.md5);
+      }
+    }
+  }
+
+  console.log(`\n📊 Translation Coverage Report`);
+  console.log(
+    `   Source: ${opts.docsRoot} (${files.length} files, ${totalNodes} translatable nodes, ${allMd5s.size} unique)\n`,
+  );
+  console.log(
+    `${'Language'.padEnd(12)} ${'Cached'.padStart(8)} ${'Missing'.padStart(8)} ${'Coverage'.padStart(10)}`,
+  );
+  console.log('─'.repeat(42));
+
+  for (const lang of targetLangs) {
+    const cache = new TranslationCache(opts.cacheDir);
+    try {
+      cache.load(lang);
+    } catch {
+      // No cache for this language
+    }
+
+    let cached = 0;
+    let missing = 0;
+    for (const md5 of allMd5s) {
+      if (cache.get(lang, md5)) {
+        cached++;
+      } else {
+        missing++;
+      }
+    }
+
+    const coverage =
+      allMd5s.size > 0
+        ? `${((cached / allMd5s.size) * 100).toFixed(1)}%`
+        : '0.0%';
+    console.log(
+      `${lang.padEnd(12)} ${String(cached).padStart(8)} ${String(missing).padStart(8)} ${coverage.padStart(10)}`,
+    );
+  }
+  console.log('');
+}
+
+// ── Translate Mode ───────────────────────────────────────────────────
+
+interface TranslateFileResult {
+  status: 'cached' | 'translated' | 'skipped' | 'error';
+  newTranslations: number;
+  diffs: number;
+  mdxErrors: string[];
+  error?: string;
 }
 
 async function translateFile(
   sourcePath: string,
   relPath: string,
-  opts: ReturnType<typeof parseArgs> & { docsContext?: string },
+  opts: CliOptions,
+  langConfig: LangConfig,
   cache: TranslationCache,
-): Promise<{
-  status: 'cached' | 'translated' | 'skipped';
-  newTranslations: number;
-  diffs: number;
-  mdxErrors: string[];
-}> {
+): Promise<TranslateFileResult> {
   const sourceContent = fs.readFileSync(sourcePath, 'utf8');
   const assembleResult = assemble(sourceContent, opts.lang, cache, relPath);
 
   if (assembleResult.allCached) {
-    // Write directly from cache
     const finalPath = path.join(opts.outputDir, opts.lang, relPath);
     fs.mkdirSync(path.dirname(finalPath), { recursive: true });
     fs.writeFileSync(finalPath, assembleResult.content, 'utf8');
-
     const mdxResult = validateMdx(assembleResult.content);
     return {
       status: 'cached',
@@ -117,22 +235,22 @@ async function translateFile(
     return { status: 'skipped', newTranslations: 0, diffs: 0, mdxErrors: [] };
   }
 
-  // Translate
+  // Translate via API
   const translatedContent = await translateAssembled({
     assembledContent: assembleResult.content,
-    langName: opts.langName,
-    guide: opts.guide,
+    langName: langConfig.name,
+    guide: langConfig.guide,
     apiType: opts.apiType,
     apiBaseUrl: opts.apiBaseUrl || undefined,
     apiKey: opts.apiKey || undefined,
     model: opts.model || undefined,
-    provider: opts.provider || undefined,
+    maxTokens: opts.maxTokens,
     docsContext:
       opts.docsContext ||
       'Next.js is a React framework for building full-stack web applications.',
   });
 
-  // Validate
+  // Validate and update cache
   const validateResult = validate(
     sourceContent,
     translatedContent,
@@ -140,32 +258,20 @@ async function translateFile(
     cache,
   );
 
-  if (validateResult.diffs.length > 0) {
-    const diffLogPath = path.join(opts.outputDir, 'diffs', `${relPath}.json`);
-    fs.mkdirSync(path.dirname(diffLogPath), { recursive: true });
-    fs.writeFileSync(
-      diffLogPath,
-      JSON.stringify(validateResult.diffs, null, 2),
-      'utf8',
-    );
-  }
-
   // Write final output
-  const finalPath = path.join(opts.outputDir, opts.lang, relPath);
-  fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-  fs.writeFileSync(finalPath, validateResult.correctedContent, 'utf8');
-
-  // Strip any leftover NEEDS_TRANSLATION markers (model didn't remove them)
   let finalContent = validateResult.correctedContent;
+
+  // Strip any leftover NEEDS_TRANSLATION markers
   if (finalContent.includes(NEEDS_TRANSLATION_START)) {
     finalContent = finalContent
       .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
       .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
-    // Re-write the file with cleaned content
-    fs.writeFileSync(finalPath, finalContent, 'utf8');
   }
 
-  // Validate MDX
+  const finalPath = path.join(opts.outputDir, opts.lang, relPath);
+  fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+  fs.writeFileSync(finalPath, finalContent, 'utf8');
+
   const mdxResult = validateMdx(finalContent);
 
   return {
@@ -176,189 +282,180 @@ async function translateFile(
   };
 }
 
-async function main() {
-  const opts = parseArgs(process.argv) as ReturnType<typeof parseArgs> & {
-    docsContext?: string;
-  };
+async function runTranslate(opts: CliOptions): Promise<void> {
+  const { langs, docsContext } = await loadLangConfigs(opts.configPath);
+  opts.docsContext = docsContext;
 
-  // Load language config from translation.config.mjs if no guide provided
-  if (!opts.guide) {
-    try {
-      const configPath = path.resolve(PROJECT_ROOT, opts.configPath);
-      const config = (await import(configPath)).default;
-      const langConfig = config.langs?.[opts.lang];
-      if (langConfig) {
-        if (opts.langName === 'Simplified Chinese') {
-          opts.langName = langConfig.name;
-        }
-        opts.guide = langConfig.guide || '';
-      }
-      if (config.docsContext) {
-        opts.docsContext = config.docsContext;
-      }
-    } catch {
-      // Config not found, use defaults
-    }
-  }
+  const targetLangs = opts.lang === 'all' ? Object.keys(langs) : [opts.lang];
 
-  console.log('\n📦 Batch Translation Pipeline');
-  console.log(`   Source: ${opts.docsRoot}`);
-  console.log(`   Target: ${opts.lang} (${opts.langName})`);
-  console.log(`   Engine: ${opts.apiType}`);
-  console.log(`   Pattern: ${opts.pattern}`);
-
-  // Find files
-  const files = await glob(opts.pattern, { cwd: opts.docsRoot });
-  const filesToProcess = files.slice(0, opts.max);
-  console.log(
-    `   Files: ${filesToProcess.length}${files.length > opts.max ? ` (limited from ${files.length})` : ''}\n`,
-  );
-
-  // Load cache
-  const cache = new TranslationCache(opts.cacheDir);
-  try {
-    cache.load(opts.lang);
-    console.log(`📦 Cache loaded: ${cache.stats(opts.lang).size} entries`);
-    // Clear source locations for fresh rebuild
-    cache.clearSources(opts.lang);
-  } catch {
-    console.log('📦 No existing cache');
-  }
-
-  let totalCached = 0;
-  let totalTranslated = 0;
-  let totalSkipped = 0;
-  let totalNewTranslations = 0;
-  let totalDiffs = 0;
-  let totalMdxErrors = 0;
-  let totalErrors = 0;
-  const mdxErrorFiles: string[] = [];
-  const startTime = Date.now();
-  const fileTimes: number[] = [];
-  let completed = 0;
-
-  // Separate cached files (instant) from files needing translation (API calls)
-  const cachedFiles: string[] = [];
-  const translateFiles: string[] = [];
-
-  for (const relPath of filesToProcess) {
-    const sourcePath = path.join(opts.docsRoot, relPath);
-    const sourceContent = fs.readFileSync(sourcePath, 'utf8');
-    const assembleResult = assemble(sourceContent, opts.lang, cache, relPath);
-
-    if (assembleResult.allCached) {
-      cachedFiles.push(relPath);
-      // Write immediately
-      const finalPath = path.join(opts.outputDir, opts.lang, relPath);
-      fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-      fs.writeFileSync(finalPath, assembleResult.content, 'utf8');
-
-      const mdxResult = validateMdx(assembleResult.content);
-      const mdxStatus =
-        mdxResult.errors.length > 0
-          ? ` ⚠️ MDX: ${mdxResult.errors.map((e) => e.message).join('; ')}`
-          : '';
-      if (mdxResult.errors.length > 0) {
-        totalMdxErrors += mdxResult.errors.length;
-        mdxErrorFiles.push(relPath);
-      }
-      totalCached++;
-      completed++;
-      console.log(
-        `[${completed}/${filesToProcess.length}] 💾 ${relPath} (all cached)${mdxStatus}`,
+  for (const lang of targetLangs) {
+    const langConfig = langs[lang];
+    if (!langConfig) {
+      console.error(
+        `❌ Language "${lang}" not found in config. Available: ${Object.keys(langs).join(', ')}`,
       );
-    } else {
-      translateFiles.push(relPath);
+      continue;
     }
-  }
 
-  console.log(
-    `\n📦 ${cachedFiles.length} files from cache, ${translateFiles.length} files need translation (concurrency: ${opts.concurrency})\n`,
-  );
+    // Update opts.lang for this iteration
+    opts.lang = lang;
 
-  // Translate files with concurrency
-  await executeInBatches(
-    translateFiles,
-    async (relPath) => {
+    console.log(`\n📦 Translating to ${lang} (${langConfig.name})`);
+    console.log(`   Source: ${opts.docsRoot}`);
+    console.log(`   Engine: ${opts.apiType}`);
+    console.log(
+      `   Model: ${opts.model || process.env.OPENROUTER_MODEL || 'default'}`,
+    );
+
+    // Find files
+    const files = await glob(opts.pattern, { cwd: opts.docsRoot });
+    const filesToProcess = files.slice(0, opts.max);
+    console.log(
+      `   Files: ${filesToProcess.length}${files.length > opts.max ? ` (limited from ${files.length})` : ''}\n`,
+    );
+
+    // Load cache
+    const cache = new TranslationCache(opts.cacheDir);
+    try {
+      cache.load(lang);
+      console.log(`📦 Cache loaded: ${cache.stats(lang).size} entries`);
+      cache.clearSources(lang);
+    } catch {
+      console.log('📦 No existing cache');
+    }
+
+    // Separate cached vs needs-translation
+    const cachedFiles: string[] = [];
+    const translateFiles: string[] = [];
+
+    for (const relPath of filesToProcess) {
       const sourcePath = path.join(opts.docsRoot, relPath);
-      const fileStart = Date.now();
+      const sourceContent = fs.readFileSync(sourcePath, 'utf8');
+      const assembleResult = assemble(sourceContent, lang, cache, relPath);
 
-      completed++;
-      const progress = `[${completed}/${filesToProcess.length}]`;
-      console.log(`${progress} ⏳ ${relPath}...`);
-
-      try {
-        const result = await translateFile(sourcePath, relPath, opts, cache);
-
-        const fileElapsed = Date.now() - fileStart;
-        fileTimes.push(fileElapsed);
-
-        const elapsed = Date.now() - startTime;
-        const remaining = filesToProcess.length - completed;
-        const avgTime =
-          fileTimes.length > 0
-            ? fileTimes.reduce((a, b) => a + b, 0) / fileTimes.length
-            : 0;
-        const eta = remaining * (avgTime / opts.concurrency);
-        const elapsedStr = formatDuration(elapsed);
-        const etaStr = remaining > 0 && avgTime > 0 ? formatDuration(eta) : '-';
-        const timeInfo = `[${elapsedStr} elapsed, ETA ${etaStr}]`;
-
-        const mdxStatus =
-          result.mdxErrors.length > 0
-            ? ` ⚠️ MDX: ${result.mdxErrors.join('; ')}`
-            : '';
-        if (result.mdxErrors.length > 0) {
-          totalMdxErrors += result.mdxErrors.length;
-          mdxErrorFiles.push(relPath);
-        }
-
-        if (result.status === 'translated') {
-          totalTranslated++;
-          totalNewTranslations += result.newTranslations;
-          totalDiffs += result.diffs;
-          console.log(
-            `${progress} ✅ ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''})${mdxStatus} ${timeInfo}`,
-          );
-          cache.save(opts.lang);
-        } else {
-          totalSkipped++;
-          console.log(`${progress} ⏭️  ${relPath} (skipped)`);
-        }
-      } catch (err) {
-        totalErrors++;
-        console.error(
-          `${progress} ❌ ${relPath}: ${err instanceof Error ? err.message : err}`,
-        );
+      if (assembleResult.allCached) {
+        cachedFiles.push(relPath);
+        const finalPath = path.join(opts.outputDir, lang, relPath);
+        fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+        fs.writeFileSync(finalPath, assembleResult.content, 'utf8');
+      } else {
+        translateFiles.push(relPath);
       }
-    },
-    opts.concurrency,
-  );
+    }
 
-  // Final cache save
-  cache.save(opts.lang);
-  cache.exportIndex(opts.lang);
+    console.log(
+      `📦 ${cachedFiles.length} from cache, ${translateFiles.length} need translation (concurrency: ${opts.concurrency})\n`,
+    );
 
-  console.log(`\n${'='.repeat(60)}`);
-  console.log('📊 Summary:');
-  console.log(`   Cached (no API call): ${totalCached}`);
-  console.log(`   Translated: ${totalTranslated}`);
-  console.log(`   Skipped: ${totalSkipped}`);
-  console.log(`   New translations cached: ${totalNewTranslations}`);
-  console.log(`   Errors: ${totalErrors}`);
-  console.log(`   Diffs: ${totalDiffs}`);
-  console.log(`   MDX errors: ${totalMdxErrors}`);
-  if (mdxErrorFiles.length > 0) {
-    for (const f of mdxErrorFiles) {
-      console.log(`     ⚠️  ${f}`);
+    // Stats
+    const totalCached = cachedFiles.length;
+    let totalTranslated = 0;
+    let totalSkipped = 0;
+    let totalNewTranslations = 0;
+    let totalDiffs = 0;
+    let totalErrors = 0;
+    let totalMdxErrors = 0;
+    const failedFiles: string[] = [];
+    const startTime = Date.now();
+    const fileTimes: number[] = [];
+    let completed = cachedFiles.length;
+
+    // Translate
+    await executeInBatches(
+      translateFiles,
+      async (relPath) => {
+        const sourcePath = path.join(opts.docsRoot, relPath);
+        const fileStart = Date.now();
+        completed++;
+        const progress = `[${completed}/${filesToProcess.length}]`;
+        console.log(`${progress} ⏳ ${relPath}...`);
+
+        try {
+          const result = await translateFile(
+            sourcePath,
+            relPath,
+            opts,
+            langConfig,
+            cache,
+          );
+
+          const fileElapsed = Date.now() - fileStart;
+          fileTimes.push(fileElapsed);
+
+          const elapsed = Date.now() - startTime;
+          const remaining = filesToProcess.length - completed;
+          const avgTime =
+            fileTimes.length > 0
+              ? fileTimes.reduce((a, b) => a + b, 0) / fileTimes.length
+              : 0;
+          const eta = remaining * (avgTime / opts.concurrency);
+          const timeInfo = `[${formatDuration(elapsed)} elapsed, ETA ${remaining > 0 && avgTime > 0 ? formatDuration(eta) : '-'}]`;
+
+          if (result.mdxErrors.length > 0) {
+            totalMdxErrors += result.mdxErrors.length;
+          }
+
+          if (result.status === 'translated') {
+            totalTranslated++;
+            totalNewTranslations += result.newTranslations;
+            totalDiffs += result.diffs;
+            console.log(
+              `${progress} ✅ ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''}) ${timeInfo}`,
+            );
+            cache.save(lang);
+          } else {
+            totalSkipped++;
+            console.log(`${progress} ⏭️  ${relPath} (skipped)`);
+          }
+        } catch (err) {
+          totalErrors++;
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`${progress} ❌ ${relPath}: ${msg}`);
+          failedFiles.push(relPath);
+        }
+      },
+      opts.concurrency,
+    );
+
+    // Final save
+    cache.save(lang);
+
+    // Summary
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`📊 Summary (${lang}):`);
+    console.log(`   Cached (no API call): ${totalCached}`);
+    console.log(`   Translated: ${totalTranslated}`);
+    console.log(`   Skipped: ${totalSkipped}`);
+    console.log(`   New translations cached: ${totalNewTranslations}`);
+    console.log(`   Errors: ${totalErrors}`);
+    console.log(`   Diffs: ${totalDiffs}`);
+    console.log(`   MDX errors: ${totalMdxErrors}`);
+    console.log(`   Cache size: ${cache.stats(lang).size} entries`);
+    console.log(`   Total time: ${formatDuration(Date.now() - startTime)}`);
+    console.log(`   Output: ${path.join(opts.outputDir, lang)}`);
+
+    if (failedFiles.length > 0) {
+      console.log(`\n❌ Failed files (${failedFiles.length}):`);
+      for (const f of failedFiles) {
+        console.log(`   - ${f}`);
+      }
     }
   }
-  console.log(`   Cache size: ${cache.stats(opts.lang).size} entries`);
-  console.log(`   Total time: ${formatDuration(Date.now() - startTime)}`);
-  console.log(`   Output: ${path.join(opts.outputDir, opts.lang)}`);
+}
+
+// ── Main ─────────────────────────────────────────────────────────────
+
+async function main() {
+  const opts = parseArgs(process.argv);
+
+  if (opts.status) {
+    await runStatus(opts);
+  } else {
+    await runTranslate(opts);
+  }
 }
 
 main().catch((err) => {
-  console.error('❌ Batch pipeline failed:', err.message);
+  console.error('❌ Pipeline failed:', err.message);
   process.exit(1);
 });

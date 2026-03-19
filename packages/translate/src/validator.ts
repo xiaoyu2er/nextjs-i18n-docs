@@ -49,7 +49,20 @@ export function validate(
 
   // Align translatable nodes by index
   const sourceTranslatable = sourceNodes.filter((n) => n.needsTranslation);
-  const _outputTranslatable = outputNodes.filter((n) => n.needsTranslation);
+  const outputTranslatable = outputNodes.filter((n) => n.needsTranslation);
+
+  // Guard: if node counts don't match, the LLM merged/split nodes.
+  // Skip cache updates to avoid silent corruption; return raw output as-is.
+  if (sourceTranslatable.length !== outputTranslatable.length) {
+    console.warn(
+      `⚠️ Node count mismatch: source has ${sourceTranslatable.length} translatable nodes, output has ${outputTranslatable.length}. Skipping cache update for this file.`,
+    );
+    return {
+      correctedContent: normalizedOutput,
+      diffs: [],
+      newTranslations: 0,
+    };
+  }
 
   // Build corrected content by replacing output nodes where needed
   let correctedContent = '';
