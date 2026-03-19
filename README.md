@@ -152,12 +152,89 @@ bash scripts/sync-and-translate.sh
 | Français | `fr` | 1,117 |
 | Русский | `ru` | 1,117 |
 
-## CI/CD
+## Deployment
 
-Deployment is handled by **Cloudflare Builds** (native Git integration):
-- Push to `main` triggers automatic builds and deployments
-- Sync workflow (`sync-docs.yml`) creates PRs when upstream Next.js docs change
-- Translation workflow (`translate-docs.yml`) runs after sync PRs are merged
+The project uses a microfrontend architecture with 5 Cloudflare Workers connected via [Service Bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/). Deployment is automated through [Cloudflare Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) with [Git integration](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/).
+
+### How it works
+
+```
+                    ┌─────────────────────┐
+                    │  nextjs-docs-router  │
+                    │  (Service Bindings)  │
+                    └──────┬──┬──┬──┬─────┘
+                           │  │  │  │
+            ┌──────────────┘  │  │  └──────────────┐
+            ▼                 ▼  ▼                  ▼
+    ┌──────────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+    │ docs-latest  │ │ docs-v15│ │ docs-v14│ │ docs-v13│
+    │ (Astro+SL)   │ │(Astro+SL│ │(Astro+SL│ │(Astro+SL│
+    └──────────────┘ └─────────┘ └─────────┘ └─────────┘
+```
+
+The **Router Worker** receives all requests and forwards them to the appropriate version worker based on URL path:
+- `/docs/13/*` → `nextjs-docs-v13`
+- `/docs/14/*` → `nextjs-docs-v14`
+- `/docs/15/*` → `nextjs-docs-v15`
+- Everything else → `nextjs-docs-latest`
+
+### Cloudflare Builds setup
+
+Each worker has its own [Cloudflare Build](https://developers.cloudflare.com/workers/ci-cd/builds/) connected to this repo's `main` branch:
+
+| Build project | Build command | Deploy directory |
+|---------------|---------------|------------------|
+| `nextjs-docs-latest` | `bun install && bun run build:latest` | `apps/web/dist` |
+| `nextjs-docs-v13` | `bun install && VERSION=13 bun run build:v` | `apps/web-v/dist` |
+| `nextjs-docs-v14` | `bun install && VERSION=14 bun run build:v` | `apps/web-v/dist` |
+| `nextjs-docs-v15` | `bun install && VERSION=15 bun run build:v` | `apps/web-v/dist` |
+| `nextjs-docs-router` | `bun install && cd apps/router && bun run generate-wrangler` | — (Worker script) |
+
+To set up from scratch:
+
+1. **Connect the repo** — In the [Cloudflare dashboard](https://dash.cloudflare.com/), go to **Workers & Pages → Builds → Connect** and link this GitHub repo ([docs](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/))
+2. **Create 5 Build projects** — One for each worker, with the build commands above
+3. **Configure branch** — Set each project to deploy from `main`
+4. **Set `account_id`** — Update `account_id` in each `wrangler.toml` to your Cloudflare account ID
+5. **Generate router config** — Run `bun run --filter @next-i18n/router generate-wrangler` to regenerate `apps/router/wrangler.toml` with correct service bindings
+6. **Custom domain** (optional) — Add a [Custom Domain](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) to the router worker
+
+### Manual deployment
+
+You can also deploy manually using the [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/):
+
+```bash
+# Deploy latest docs
+bun run deploy:latest
+
+# Deploy versioned docs
+VERSION=13 bun run deploy:v
+VERSION=14 bun run deploy:v
+VERSION=15 bun run deploy:v
+
+# Deploy router (regenerates wrangler.toml from nextjs-versions.json)
+bun run deploy:router
+```
+
+> **Note**: Deploy the version workers **before** the router, since the router's Service Bindings reference them.
+
+### Content pipeline
+
+The build process for each Astro worker runs `scripts/prepare-content.ts` which:
+1. Strips numeric prefixes from directories (`01-app` → `app`)
+2. Resolves `source` references (Pages Router docs that share content with App Router)
+3. Maps locale directories to Starlight's i18n structure
+4. Strips MDX comments
+
+## CI/CD Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `sync-docs.yml` | Manual / Schedule | Syncs English docs from [Next.js repo](https://github.com/vercel/next.js), creates PR |
+| `translate-docs.yml` | Manual | Runs incremental translation pipeline on new/changed content |
+| `submit-sitemaps.yml` | Manual | Submits sitemaps to Google Search Console |
+
+Push to `main` triggers automatic Cloudflare Builds for all workers.
 
 ## License
 
