@@ -40,7 +40,11 @@ import { executeInBatches } from './batch';
 import { TranslationCache } from './cache';
 import { validateMdx } from './mdx-validator';
 import { parseMdx } from './parser';
-import { type TranslateOptions, translateJson } from './translator';
+import {
+  rebuildFrontmatter,
+  type TranslateOptions,
+  translateJson,
+} from './translator';
 
 // Note: translateAssembled (legacy whole-file mode) still exported for backward compatibility
 
@@ -319,14 +323,18 @@ async function translateFile(
       'Next.js is a React framework for building full-stack web applications.',
   });
 
-  // Update cache with translations (validate frontmatter before caching)
+  // Update cache with translations (rebuild frontmatter, validate YAML)
   let newTranslations = 0;
   let _badTranslations = 0;
   for (const [md5, translation] of Object.entries(jsonResult.translations)) {
     const srcText = uncached[md5] ?? '';
-    // Validate frontmatter: if source looks like YAML frontmatter, check translation is valid
+    let finalTranslation = translation;
+
+    // For frontmatter: LLM only translated title+description.
+    // Rebuild full frontmatter with original author/date/image fields.
     if (isFrontmatter(srcText)) {
-      if (!validateFrontmatter(translation)) {
+      finalTranslation = rebuildFrontmatter(srcText, translation);
+      if (!validateFrontmatter(finalTranslation)) {
         _badTranslations++;
         console.warn(
           `   ⚠️ Bad YAML in translation for ${md5.substring(0, 12)}…, skipping cache`,
@@ -334,7 +342,7 @@ async function translateFile(
         continue;
       }
     }
-    cache.set(opts.lang, md5, translation);
+    cache.set(opts.lang, md5, finalTranslation);
     newTranslations++;
   }
 

@@ -396,6 +396,78 @@ Output: {"a1":"title: 入门指南\\ndescription: 学习 Next.js\\n---","b2":"##
  * Build structured JSON user message from uncached nodes.
  * Each node gets a type based on its AST classification.
  */
+/**
+ * Extract only translatable fields from frontmatter YAML.
+ * Only title and description need translation.
+ * Other fields (author, date, image, etc.) are kept as-is.
+ */
+function extractTranslatableFrontmatter(text: string): {
+  translatable: string;
+  template: string;
+} {
+  const lines = text.split('\n');
+  const titleLine = lines.find((l) => l.startsWith('title:'));
+  const descLines: string[] = [];
+  let inDesc = false;
+  for (const line of lines) {
+    if (line.startsWith('description:')) {
+      inDesc = true;
+      descLines.push(line);
+    } else if (inDesc && (line.startsWith('  ') || line.startsWith('\t'))) {
+      descLines.push(line);
+    } else {
+      inDesc = false;
+    }
+  }
+  const translatable =
+    (titleLine || '') + (descLines.length ? `\n${descLines.join('\n')}` : '');
+  return { translatable, template: text };
+}
+
+/**
+ * Rebuild full frontmatter by replacing title/description with translations.
+ */
+export function rebuildFrontmatter(
+  original: string,
+  translated: string,
+): string {
+  const lines = original.split('\n');
+  const transLines = translated.split('\n');
+
+  // Extract translated title and description
+  const transTitle = transLines.find((l) => l.startsWith('title:'));
+  const transDescLines: string[] = [];
+  let inDesc = false;
+  for (const line of transLines) {
+    if (line.startsWith('description:')) {
+      inDesc = true;
+      transDescLines.push(line);
+    } else if (inDesc && (line.startsWith('  ') || line.startsWith('\t'))) {
+      transDescLines.push(line);
+    } else {
+      inDesc = false;
+    }
+  }
+
+  // Replace in original
+  const result: string[] = [];
+  let skipDesc = false;
+  for (const line of lines) {
+    if (line.startsWith('title:') && transTitle) {
+      result.push(transTitle);
+    } else if (line.startsWith('description:')) {
+      skipDesc = true;
+      result.push(...transDescLines);
+    } else if (skipDesc && (line.startsWith('  ') || line.startsWith('\t'))) {
+      // skip continuation of original description
+    } else {
+      skipDesc = false;
+      result.push(line);
+    }
+  }
+  return result.join('\n');
+}
+
 export function buildJsonUserMessage(
   uncached: Record<string, string>,
   nodeTypes: Record<string, string>,
@@ -403,12 +475,16 @@ export function buildJsonUserMessage(
   const nodes: TranslationNode[] = [];
   for (const [md5, text] of Object.entries(uncached)) {
     const type = nodeTypes[md5] ?? 'paragraph';
-    // Map parser types to simpler categories
     let simpleType = type;
+    let nodeText = text;
+
     if (text.includes('title:') && text.includes('---')) {
       simpleType = 'frontmatter';
+      // Only send translatable fields (title + description)
+      const { translatable } = extractTranslatableFrontmatter(text);
+      nodeText = translatable;
     }
-    nodes.push({ key: md5, type: simpleType, text });
+    nodes.push({ key: md5, type: simpleType, text: nodeText });
   }
   return JSON.stringify({ nodes });
 }
