@@ -5,7 +5,7 @@ export const NEXT_JS_URL = 'https://nextjs.org';
 export const CONTENT_DIR = path.join(
   import.meta.filename,
   '../../../..',
-  'apps/docs/content/en',
+  'content/en',
 );
 
 export const userAgents = [
