@@ -284,7 +284,7 @@ for (const locale of LOCALES) {
 
           let dstRel: string;
           if (version) {
-            dstRel = join('docs', version, cleanRel);
+            dstRel = join('docs', version, stripNumericPrefix(docsDir.name), cleanRel);
           } else {
             dstRel = join('docs', stripNumericPrefix(docsDir.name), cleanRel);
           }
