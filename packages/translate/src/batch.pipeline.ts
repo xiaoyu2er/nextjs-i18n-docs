@@ -344,8 +344,18 @@ async function runTranslate(opts: CliOptions): Promise<void> {
     }
 
     console.log(
-      `📦 ${cachedFiles.length} from cache, ${translateFiles.length} need translation (concurrency: ${opts.concurrency})\n`,
+      `📦 ${cachedFiles.length} from cache, ${translateFiles.length} need translation`,
     );
+
+    if (translateFiles.length === 0) {
+      console.log(
+        `\n✅ All ${cachedFiles.length} files fully cached. Nothing to translate.\n`,
+      );
+      cache.save(lang);
+      continue;
+    }
+
+    console.log(`   Concurrency: ${opts.concurrency}\n`);
 
     // Stats
     const totalCached = cachedFiles.length;
