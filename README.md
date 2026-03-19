@@ -182,19 +182,19 @@ The **Router Worker** receives all requests and forwards them to the appropriate
 
 Each worker has its own [Cloudflare Build](https://developers.cloudflare.com/workers/ci-cd/builds/) connected to this repo's `main` branch:
 
-| Build project | Build command | Deploy directory |
-|---------------|---------------|------------------|
-| `nextjs-docs-latest` | `bun install && bun run build:latest` | `apps/web/dist` |
-| `nextjs-docs-v13` | `bun install && VERSION=13 bun run build:v` | `apps/web-v/dist` |
-| `nextjs-docs-v14` | `bun install && VERSION=14 bun run build:v` | `apps/web-v/dist` |
-| `nextjs-docs-v15` | `bun install && VERSION=15 bun run build:v` | `apps/web-v/dist` |
-| `nextjs-docs-router` | `bun install && cd apps/router && bun run generate-wrangler` | — (Worker script) |
+| Build project | Build command | Deploy directory | Watch paths |
+|---------------|---------------|------------------|-------------|
+| `nextjs-docs-latest` | `bun install && bun run build:latest` | `apps/web/dist` | `apps/web/`, `packages/shared/`, `packages/const/`, `content/`, `content-astro/`, `scripts/prepare-content.ts` |
+| `nextjs-docs-v13` | `bun install && VERSION=13 bun run build:v` | `apps/web-v/dist` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/13/`, `scripts/prepare-content.ts` |
+| `nextjs-docs-v14` | `bun install && VERSION=14 bun run build:v` | `apps/web-v/dist` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/14/`, `scripts/prepare-content.ts` |
+| `nextjs-docs-v15` | `bun install && VERSION=15 bun run build:v` | `apps/web-v/dist` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/15/`, `scripts/prepare-content.ts` |
+| `nextjs-docs-router` | `bun install && cd apps/router && bun run generate-wrangler` | — (Worker script) | `apps/router/`, `.github/nextjs-versions.json` |
 
 To set up from scratch:
 
 1. **Connect the repo** — In the [Cloudflare dashboard](https://dash.cloudflare.com/), go to **Workers & Pages → Builds → Connect** and link this GitHub repo ([docs](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/))
 2. **Create 5 Build projects** — One for each worker, with the build commands above
-3. **Configure branch** — Set each project to deploy from `main`
+3. **Configure branch & watch paths** — Set each project to deploy from `main`, and configure [watch paths](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/#watch-paths) per the table above so only affected workers rebuild
 4. **Set `account_id`** — Update `account_id` in each `wrangler.toml` to your Cloudflare account ID
 5. **Generate router config** — Run `bun run --filter @next-i18n/router generate-wrangler` to regenerate `apps/router/wrangler.toml` with correct service bindings
 6. **Custom domain** (optional) — Add a [Custom Domain](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) to the router worker
