@@ -309,10 +309,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
 
     // Find files
     const files = await glob(opts.pattern, { cwd: opts.docsRoot });
-    const filesToProcess = files.slice(0, opts.max);
-    console.log(
-      `   Files: ${filesToProcess.length}${files.length > opts.max ? ` (limited from ${files.length})` : ''}\n`,
-    );
+    console.log(`   Files: ${files.length} total\n`);
 
     // Load cache
     const cache = new TranslationCache(opts.cacheDir);
@@ -324,11 +321,12 @@ async function runTranslate(opts: CliOptions): Promise<void> {
       console.log('📦 No existing cache');
     }
 
-    // Separate cached vs needs-translation
+    // Scan all files, separate cached vs needs-translation
+    // --max limits the number of files to TRANSLATE, not scan
     const cachedFiles: string[] = [];
     const translateFiles: string[] = [];
 
-    for (const relPath of filesToProcess) {
+    for (const relPath of files) {
       const sourcePath = path.join(opts.docsRoot, relPath);
       const sourceContent = fs.readFileSync(sourcePath, 'utf8');
       const assembleResult = assemble(sourceContent, lang, cache, relPath);
@@ -340,11 +338,12 @@ async function runTranslate(opts: CliOptions): Promise<void> {
         fs.writeFileSync(finalPath, assembleResult.content, 'utf8');
       } else {
         translateFiles.push(relPath);
+        if (translateFiles.length >= opts.max) break;
       }
     }
 
     console.log(
-      `📦 ${cachedFiles.length} from cache, ${translateFiles.length} need translation`,
+      `📦 ${cachedFiles.length} fully cached, ${translateFiles.length} need translation${translateFiles.length === opts.max ? ` (max ${opts.max})` : ''}`,
     );
 
     if (translateFiles.length === 0) {
@@ -368,7 +367,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
     const failedFiles: string[] = [];
     const startTime = Date.now();
     const fileTimes: number[] = [];
-    let completed = cachedFiles.length;
+    let completed = 0;
 
     // Translate
     await executeInBatches(
@@ -377,7 +376,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
         const sourcePath = path.join(opts.docsRoot, relPath);
         const fileStart = Date.now();
         completed++;
-        const progress = `[${completed}/${filesToProcess.length}]`;
+        const progress = `[${completed}/${translateFiles.length}]`;
         console.log(`${progress} ⏳ ${relPath}...`);
 
         try {
@@ -393,7 +392,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
           fileTimes.push(fileElapsed);
 
           const elapsed = Date.now() - startTime;
-          const remaining = filesToProcess.length - completed;
+          const remaining = translateFiles.length - completed;
           const avgTime =
             fileTimes.length > 0
               ? fileTimes.reduce((a, b) => a + b, 0) / fileTimes.length
