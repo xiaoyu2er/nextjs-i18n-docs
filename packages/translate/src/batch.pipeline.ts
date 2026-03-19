@@ -507,11 +507,25 @@ async function runAnnotate(opts: CliOptions): Promise<void> {
     }
 
     // Try to find corresponding English source file
-    // Translated file: content-v15/zh-hans/docs/foo.mdx → English: content-v15/en/docs/foo.mdx
-    // Or: content/zh-hans/docs/foo.mdx → English: content/en/docs/foo.mdx
-    const enSourcePath = path.join(opts.docsRoot, relPath);
+    // Strategy: replace the language code segment in the path with 'en'
+    // e.g., content/zh-hans/docs/foo.mdx → content/en/docs/foo.mdx
+    //        content-v15/ja/docs/foo.mdx → content-v15/en/docs/foo.mdx
+    const fullPath = path.resolve(filePath);
+    const langs = ['zh-hans', 'zh-hant', 'ja', 'es', 'de', 'fr', 'ru', 'ar'];
+    let enSourcePath = '';
+    for (const lang of langs) {
+      const langSegment = `/${lang}/`;
+      if (fullPath.includes(langSegment)) {
+        enSourcePath = fullPath.replace(langSegment, '/en/');
+        break;
+      }
+    }
+    // Fallback: try --docs-root + relPath
+    if (!enSourcePath) {
+      enSourcePath = path.join(opts.docsRoot, relPath);
+    }
     let sourceText: string | undefined;
-    if (fs.existsSync(enSourcePath)) {
+    if (enSourcePath && fs.existsSync(enSourcePath)) {
       sourceText = fs.readFileSync(enSourcePath, 'utf8');
     }
 
