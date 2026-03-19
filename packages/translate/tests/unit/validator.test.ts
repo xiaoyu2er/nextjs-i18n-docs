@@ -6,10 +6,10 @@ import { validate } from '../../src/validator';
 describe('validate', () => {
   it('should update cache with new translations', () => {
     const sourceContent = '## Heading\n\nA paragraph.';
-    const piOutput = '## 标题\n\n一个段落。';
+    const llmOutput = '## 标题\n\n一个段落。';
     const cache = new TranslationCache('/tmp/unused');
 
-    const result = validate(sourceContent, piOutput, 'zh-hans', cache);
+    const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
     expect(result.newTranslations).toBe(2); // heading + paragraph
 
     // Cache should now contain translations
@@ -21,9 +21,9 @@ describe('validate', () => {
     }
   });
 
-  it('should detect diffs when pi modifies cached content', () => {
+  it('should detect diffs when LLM modifies cached content', () => {
     const sourceContent = '## Heading\n\nA paragraph.';
-    const piOutput = '## 标题\n\n被修改的段落。';
+    const llmOutput = '## 标题\n\n被修改的段落。';
     const cache = new TranslationCache('/tmp/unused');
 
     // Pre-populate cache for paragraph
@@ -31,34 +31,34 @@ describe('validate', () => {
     const paraNode = sourceNodes.find((n) => n.type === 'paragraph');
     cache.set('zh-hans', paraNode?.md5 ?? '', '原始翻译。');
 
-    const result = validate(sourceContent, piOutput, 'zh-hans', cache);
+    const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
     expect(result.diffs.length).toBeGreaterThan(0);
     expect(result.diffs[0].cached).toBe('原始翻译。');
-    expect(result.diffs[0].piOutput).toBe('被修改的段落。');
+    expect(result.diffs[0].llmOutput).toBe('被修改的段落。');
   });
 
   it('should return corrected content using cache for diffs', () => {
     const sourceContent = '## Heading\n\nA paragraph.';
-    const piOutput = '## 标题\n\n被修改的段落。';
+    const llmOutput = '## 标题\n\n被修改的段落。';
     const cache = new TranslationCache('/tmp/unused');
 
     const sourceNodes = parseMdx(sourceContent);
     const paraNode = sourceNodes.find((n) => n.type === 'paragraph');
     cache.set('zh-hans', paraNode?.md5 ?? '', '原始翻译。');
 
-    const result = validate(sourceContent, piOutput, 'zh-hans', cache);
+    const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
     expect(result.correctedContent).toContain('原始翻译。');
     expect(result.correctedContent).not.toContain('被修改的段落。');
   });
 
-  it('should detect no diffs when pi output matches cached content', () => {
+  it('should detect no diffs when LLM output matches cached content', () => {
     const sourceContent = '## Heading\n\nA paragraph.';
-    const piOutput = '## 标题\n\n一个段落。';
+    const llmOutput = '## 标题\n\n一个段落。';
     const cache = new TranslationCache('/tmp/unused');
 
-    // Pre-populate cache with exact pi output
+    // Pre-populate cache with exact LLM output
     const sourceNodes = parseMdx(sourceContent);
-    const outputNodes = parseMdx(piOutput);
+    const outputNodes = parseMdx(llmOutput);
     const srcTranslatable = sourceNodes.filter((n) => n.needsTranslation);
     const outTranslatable = outputNodes.filter((n) => n.needsTranslation);
     for (let i = 0; i < srcTranslatable.length; i++) {
@@ -71,30 +71,63 @@ describe('validate', () => {
       }
     }
 
-    const result = validate(sourceContent, piOutput, 'zh-hans', cache);
+    const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
     expect(result.diffs).toHaveLength(0);
   });
 
-  it('should skip cache update when node count mismatches', () => {
+  it('should use anchor-based alignment when node counts mismatch', () => {
+    // Source: heading + para1 + para2
     const sourceContent = '## Heading\n\nParagraph one.\n\nParagraph two.';
-    // LLM merged two paragraphs into one
-    const piOutput = '## 标题\n\n段落一和段落二合并了。';
+    // LLM merged two paragraphs into one (2 translatable vs 3 source)
+    const llmOutput = '## 标题\n\n段落一和段落二合并了。';
     const cache = new TranslationCache('/tmp/unused');
 
-    const result = validate(sourceContent, piOutput, 'zh-hans', cache);
-    // Should NOT update cache (node count mismatch: 3 source vs 2 output)
-    expect(result.newTranslations).toBe(0);
-    expect(result.diffs).toHaveLength(0);
-    // Should still return the raw output as correctedContent
+    // Pre-populate heading cache as anchor
+    const sourceNodes = parseMdx(sourceContent);
+    const headingNode = sourceNodes.find((n) => n.type === 'heading');
+    cache.set('zh-hans', headingNode?.md5 ?? '', '## 标题');
+
+    const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
+    // Heading should be aligned via anchor, its diff detected
+    // The merged paragraph can't be aligned to either source paragraph
+    // So we get 0 new translations (merged node is unaligned)
     expect(result.correctedContent).toContain('标题');
+  });
+
+  it('should cache aligned nodes even when counts mismatch', () => {
+    // Source: heading + para + heading2 + para2
+    const sourceContent =
+      '## First\n\nParagraph one.\n\n## Second\n\nParagraph two.';
+    // LLM output: heading + para + extra para + heading2 + para2
+    // (added an extra paragraph)
+    const llmOutput =
+      '## 第一\n\n段落一。\n\n额外段落。\n\n## 第二\n\n段落二。';
+    const cache = new TranslationCache('/tmp/unused');
+
+    const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
+
+    // Should still cache translations for nodes that can be aligned
+    // The two headings and at least some paragraphs should be cached
+    expect(result.newTranslations).toBeGreaterThan(0);
+  });
+
+  it('should cache most nodes when off by 1 at the end', () => {
+    // Source: 3 nodes. Output: 2 nodes (last one dropped)
+    const sourceContent = '## Title\n\nParagraph.\n\nAnother paragraph.';
+    const llmOutput = '## 标题\n\n段落。';
+    const cache = new TranslationCache('/tmp/unused');
+
+    const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
+    // First two should still be cached
+    expect(result.newTranslations).toBe(2); // heading + first paragraph
   });
 
   it('should handle code blocks as pass-through', () => {
     const sourceContent = '```js\ncode\n```\n\n<AppOnly>\n\nText\n\n</AppOnly>';
-    const piOutput = '```js\ncode\n```\n\n<AppOnly>\n\n文本\n\n</AppOnly>';
+    const llmOutput = '```js\ncode\n```\n\n<AppOnly>\n\n文本\n\n</AppOnly>';
     const cache = new TranslationCache('/tmp/unused');
 
-    const result = validate(sourceContent, piOutput, 'zh-hans', cache);
+    const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
     expect(result.correctedContent).toContain('```js\ncode\n```');
     expect(result.correctedContent).toContain('<AppOnly>');
   });

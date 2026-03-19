@@ -1,0 +1,137 @@
+---
+title: 如何使用多区域和 Next.js 构建微前端
+nav_title: 多区域
+description: 了解如何使用 Next.js 多区域在单一域名下部署多个 Next.js 应用，从而构建微前端。
+---
+
+{/* 本文档的内容在应用路由和页面路由之间共享。您可以使用 `<PagesOnly>Content</PagesOnly>` 组件来添加仅适用于页面路由的内容。任何共享内容不应包裹在组件中。 */}
+
+<details open>
+
+  <summary>示例</summary>
+
+- [使用多区域](https://github.com/vercel/next.js/tree/canary/examples/with-zones)
+
+</details>
+
+多区域是一种微前端方法，它将一个域名上的大型应用拆分为更小的 Next.js 应用，每个应用负责一组路径。当应用中存在与其他页面无关的页面集合时，这非常有用。通过将这些页面移动到单独的区域（即单独的应用），你可以减小每个应用的规模，从而缩短构建时间，并移除仅对某个区域必要的代码。由于应用是解耦的，多区域也允许同一域名下的其他应用使用自己选择的框架。
+
+例如，假设你有一组希望拆分的页面：
+
+- `/blog/*` 用于所有博客文章
+- `/dashboard/*` 用于用户登录仪表板后的所有页面
+- `/*` 用于其他区域未涵盖的网站其余部分
+
+借助多区域支持，你可以创建三个在相同域名上提供服务且对用户而言外观一致的应用，但你可以独立开发和部署每个应用。
+
+<Image
+  alt="三个区域：A、B、C。显示了来自不同区域的路由之间的硬导航，以及同一区域内路由之间的软导航。"
+  srcLight="/docs/light/multi-zones.png"
+  srcDark="/docs/dark/multi-zones.png"
+  width="1600"
+  height="750"
+/>
+
+同一区域内页面之间的导航将执行软导航，即无需重新加载页面的导航。例如，在此图中，从 `/` 导航到 `/products` 将是一个软导航。
+
+从一个区域中的页面导航到另一个区域中的页面，例如从 `/` 到 `/dashboard`，将执行硬导航，卸载当前页面的资源并加载新页面的资源。经常一起访问的页面应位于同一区域内，以避免硬导航。
+
+## 如何定义区域
+区域是一个普通的 Next.js 应用，你还需要配置 [assetPrefix](/docs/app/api-reference/config/next-config-js/assetPrefix)，以避免与其他区域中的页面和静态文件发生冲突。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+}
+```
+
+Next.js 资产（如 JavaScript 和 CSS）将以 `assetPrefix` 为前缀，以确保它们不会与其他区域的资产冲突。这些资产将为每个区域在 `/assetPrefix/_next/...` 下提供服务。
+
+处理所有未路由到另一个更特定区域的路径的默认应用不需要 `assetPrefix`。
+
+在 Next.js 15 之前的版本中，你可能还需要额外的重写来处理静态资产。在 Next.js 15 中不再需要这样做。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/blog-static/_next/:path+',
+          destination: '/_next/:path+',
+        },
+      ],
+    }
+  },
+}
+```
+
+## 如何将请求路由到正确的区域
+使用多区域设置时，你需要将路径路由到正确的区域，因为它们由不同的应用提供服务。你可以使用任何 HTTP 代理来完成此操作，但其中一个 Next.js 应用也可以用于路由整个域的请求。
+
+要使用 Next.js 应用路由到正确的区域，你可以使用 [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites)。对于由不同区域提供的每个路径，你需要添加一个重写规则，将该路径发送到另一个区域的域名，并且你还需要重写对静态资产的请求。例如：
+
+```js filename="next.config.js"
+async rewrites() {
+    return [
+        {
+            source: '/blog',
+            destination: `${process.env.BLOG_DOMAIN}/blog`,
+        },
+        {
+            source: '/blog/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog/:path+`,
+        },
+        {
+            source: '/blog-static/:path+',
+            destination: `${process.env.BLOG_DOMAIN}/blog-static/:path+`,
+        }
+    ];
+}
+```
+
+`destination` 应该是一个由区域提供服务的 URL，包括协议和域名。这应指向该区域的生产域名，但也可以用于在本地开发中将请求路由到 `localhost`。
+
+> **须知**：URL 路径在区域内应该是唯一的。例如，两个区域试图提供 `/blog` 将会导致路由冲突。
+
+### 使用中间件路由请求
+通过 [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites) 路由请求是推荐的方式，以最小化请求的延迟开销，但当需要在路由时做出动态决策时，也可以使用中间件。例如，如果你正在使用功能标志来决定路径应路由到何处（例如在迁移期间），则可以使用中间件。
+
+```js filename="middleware.js"
+export async function middleware(request) {
+  const { pathname, search } = req.nextUrl;
+  if (pathname === '/your-path' && myFeatureFlag.isEnabled()) {
+    return NextResponse.rewrite(`${rewriteDomain}${pathname}${search});
+  }
+}
+```
+
+## 在区域之间链接
+指向不同区域中路径的链接应使用 `a` 标签，而不是 Next.js 的 [`<Link>`](/docs/pages/api-reference/components/link) 组件。这是因为 Next.js 会尝试预取并软导航到 `<Link>` 组件中的任何相对路径，而这在区域之间不起作用。
+
+## 共享代码
+构成不同区域的 Next.js 应用可以存在于任何代码仓库中。然而，为了更轻松地共享代码，将这些区域放在 [monorepo](https://en.wikipedia.org/wiki/Monorepo) 中通常更方便。对于位于不同仓库的区域，也可以使用公共或私有 NPM 包共享代码。
+
+由于不同区域中的页面可能在不同时间发布，功能标志可能有助于在不同区域之间统一启用或禁用功能。
+
+<AppOnly>
+
+## Server Actions
+使用多区域时，您必须显式允许用户访问的源，因为您的用户访问域名可能提供多个应用程序。在 `next.config.js` 文件中，添加以下行：
+
+```js filename="next.config.js"
+const nextConfig = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['your-production-domain.com'],
+    },
+  },
+}
+```
+
+更多信息请参阅 [`serverActions.allowedOrigins`](/docs/app/api-reference/config/next-config-js/serverActions#allowedorigins)。
+
+</AppOnly>

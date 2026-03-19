@@ -200,6 +200,7 @@ async function translateWithRetry(
       const isRetryable =
         lastError.message.includes('429') ||
         lastError.message.includes('503') ||
+        lastError.message.includes('405') ||
         lastError.message.includes('timeout') ||
         lastError.message.includes('ECONNRESET') ||
         lastError.message.includes('truncated');
