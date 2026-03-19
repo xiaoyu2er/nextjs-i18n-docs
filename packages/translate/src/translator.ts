@@ -367,6 +367,7 @@ RULES:
 4. Preserve Markdown: heading levels (##), links [text](url), inline \`code\`, **bold**, *italic*.
 5. Keep code blocks, file paths, URLs, variable names, component names unchanged.
 6. Keep HTML/JSX tags balanced: <AppOnly></AppOnly>, <PagesOnly></PagesOnly>.
+7. CRITICAL: Inline code wrapped in backticks (\`...\`) MUST keep the backticks. Example: \`<Link>\` must stay as \`<Link>\`, NOT become bare <Link>. Bare HTML tags will BREAK the document.
 
 TYPE-SPECIFIC RULES:
 - "frontmatter": YAML metadata. Translate values only, keep keys unchanged.
