@@ -86,6 +86,22 @@ bun run build:latest
 VERSION=15 bun run build:v
 ```
 
+### Linting & Type Checking
+
+```bash
+# Lint (biome)
+bun run lint
+
+# Auto-fix lint issues
+bun run lint:fix
+
+# Format
+bun run format
+
+# Type check all non-Astro apps & packages
+bun run typecheck
+```
+
 ### Deploying
 
 ```bash
