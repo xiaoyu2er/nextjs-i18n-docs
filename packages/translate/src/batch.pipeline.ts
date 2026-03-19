@@ -271,13 +271,24 @@ async function translateFile(
   // This guarantees the output structure matches the English source exactly,
   // regardless of how the LLM formatted its output.
   const reassembled = assemble(sourceContent, opts.lang, cache, relPath);
-  let finalContent = reassembled.content;
 
-  // Strip any leftover NEEDS_TRANSLATION markers (uncached nodes)
-  if (finalContent.includes(NEEDS_TRANSLATION_START)) {
-    finalContent = finalContent
-      .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
-      .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
+  let finalContent: string;
+  if (reassembled.allCached) {
+    // All nodes cached — use clean re-assembled output (structure matches EN exactly)
+    finalContent = reassembled.content;
+  } else {
+    // Some nodes still uncached after translation (anchor couldn't align them).
+    // Fall back to LLM's output to avoid English text in translated file.
+    // Strip leftover NEEDS_TRANSLATION markers from LLM output.
+    finalContent = validateResult.correctedContent;
+    if (finalContent.includes(NEEDS_TRANSLATION_START)) {
+      finalContent = finalContent
+        .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
+        .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
+    }
+    console.warn(
+      `⚠️ ${relPath}: ${reassembled.uncachedCount} nodes uncached after translation. Using LLM output (structure may differ).`,
+    );
   }
 
   const finalPath = path.join(opts.outputDir, opts.lang, relPath);
