@@ -25,7 +25,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join, relative, resolve, dirname } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 
 // ── CLI Args ──
 
@@ -40,7 +40,9 @@ function parseArgs(): { target: string; version: string | null } {
   }
 
   if (!target) {
-    console.error('Usage: bun run scripts/prepare-content.ts --target <app-dir> [--version <13|14|15>]');
+    console.error(
+      'Usage: bun run scripts/prepare-content.ts --target <app-dir> [--version <13|14|15>]',
+    );
     process.exit(1);
   }
 
@@ -50,11 +52,26 @@ function parseArgs(): { target: string; version: string | null } {
 const { target, version } = parseArgs();
 
 const ROOT_LOCALE = 'en';
-const LOCALES = ['en', 'zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
+const LOCALES = [
+  'en',
+  'zh-hans',
+  'zh-hant',
+  'ja',
+  'ar',
+  'de',
+  'es',
+  'fr',
+  'ru',
+];
 const CONTENT_SRC = version
   ? resolve(import.meta.dirname!, `../content-v${version}`)
   : resolve(import.meta.dirname!, '../content');
-const CONTENT_DST = resolve(import.meta.dirname!, '..', target, 'src/content/docs');
+const CONTENT_DST = resolve(
+  import.meta.dirname!,
+  '..',
+  target,
+  'src/content/docs',
+);
 const VERSIONED_DIRS = ['13', '14', '15'];
 
 // ── Helpers ──
@@ -66,7 +83,7 @@ function stripNumericPrefix(name: string): string {
 /** Extract the numeric prefix from a filename: "01-getting-started" → 1, "index.mdx" → -1 */
 function extractOrder(name: string): number | null {
   const match = name.match(/^(\d+)-/);
-  return match ? parseInt(match[1], 10) : null;
+  return match ? Number.parseInt(match[1], 10) : null;
 }
 
 /**
@@ -116,15 +133,22 @@ function parseFrontmatter(content: string): {
     if (colonIdx > 0 && !line.startsWith(' ') && !line.startsWith('\t')) {
       const key = line.slice(0, colonIdx).trim();
       let value = line.slice(colonIdx + 1).trim();
-      while (i + 1 < lines.length && (lines[i + 1].startsWith('  ') || lines[i + 1].startsWith('\t'))) {
+      while (
+        i + 1 < lines.length &&
+        (lines[i + 1].startsWith('  ') || lines[i + 1].startsWith('\t'))
+      ) {
         i++;
-        value += '\n' + lines[i];
+        value += `\n${lines[i]}`;
       }
       fm[key] = value;
     }
   }
 
-  return { frontmatter: fm, body: content.slice(match[0].length), raw: match[1] };
+  return {
+    frontmatter: fm,
+    body: content.slice(match[0].length),
+    raw: match[1],
+  };
 }
 
 function resolveSourceFile(locale: string, sourceRef: string): string | null {
@@ -133,22 +157,32 @@ function resolveSourceFile(locale: string, sourceRef: string): string | null {
   return resolveSourceInDir(join(CONTENT_SRC, locale, 'docs'), parts);
 }
 
-function resolveSourceInDir(currentDir: string, parts: string[]): string | null {
+function resolveSourceInDir(
+  currentDir: string,
+  parts: string[],
+): string | null {
   for (let i = 0; i < parts.length; i++) {
     const target = parts[i];
     if (!existsSync(currentDir)) return null;
 
     const entries = readdirSync(currentDir);
-    const match = entries.find((e) => stripNumericPrefix(e).replace(/\.mdx$/, '') === target);
+    const match = entries.find(
+      (e) => stripNumericPrefix(e).replace(/\.mdx$/, '') === target,
+    );
     if (!match) return null;
 
     if (i === parts.length - 1) {
-      const asFile = join(currentDir, match.endsWith('.mdx') ? match : `${match}.mdx`);
+      const asFile = join(
+        currentDir,
+        match.endsWith('.mdx') ? match : `${match}.mdx`,
+      );
       if (existsSync(asFile)) return asFile;
       const asIndex = join(currentDir, match, 'index.mdx');
       if (existsSync(asIndex)) return asIndex;
       const withPrefix = entries.find(
-        (e) => stripNumericPrefix(e.replace(/\.mdx$/, '')) === target && e.endsWith('.mdx')
+        (e) =>
+          stripNumericPrefix(e.replace(/\.mdx$/, '')) === target &&
+          e.endsWith('.mdx'),
       );
       if (withPrefix) return join(currentDir, withPrefix);
       return null;
@@ -168,7 +202,7 @@ function filterContent(body: string): string {
   // The "![](#anchor)" is image syntax that MDX/Rollup tries to resolve as a module import.
   result = result.replace(
     /^(#{1,6})\s+(.+?)!\[]\(#([^)]+)\)\s*$/gm,
-    '$1 [$2](#$3)'
+    '$1 [$2](#$3)',
   );
 
   // For versioned builds, rewrite internal doc links:
@@ -178,12 +212,12 @@ function filterContent(body: string): string {
   if (version) {
     result = result.replace(
       /\]\(\/docs\/(app|pages|getting-started)(\/[^)]*)\)/g,
-      `](/docs/${version}/$1$2)`
+      `](/docs/${version}/$1$2)`,
     );
     // Also handle links without trailing path
     result = result.replace(
       /\]\(\/docs\/(app|pages|getting-started)\)/g,
-      `](/docs/${version}/$1)`
+      `](/docs/${version}/$1)`,
     );
   }
 
@@ -238,7 +272,9 @@ if (!version) {
       if (!file.endsWith('.mdx') || file === 'index.mdx') continue;
       const content = readFileSync(join(blogDir, file), 'utf-8');
       const { frontmatter } = parseFrontmatter(content);
-      const date = frontmatter.date ? new Date(frontmatter.date.trim()).getTime() : 0;
+      const date = frontmatter.date
+        ? new Date(frontmatter.date.trim()).getTime()
+        : 0;
       posts.push({ slug: file.replace(/\.mdx$/, ''), date });
     }
     posts.sort((a, b) => b.date - a.date); // newest first
@@ -246,7 +282,9 @@ if (!version) {
   }
 }
 
-console.log(`Preparing content: ${version ? `v${version}` : 'latest'} → ${CONTENT_DST}`);
+console.log(
+  `Preparing content: ${version ? `v${version}` : 'latest'} → ${CONTENT_DST}`,
+);
 
 for (const locale of LOCALES) {
   const localeSrc = join(CONTENT_SRC, locale);
@@ -268,8 +306,9 @@ for (const locale of LOCALES) {
     if (sectionName === 'docs') {
       // Process root-level MDX files in docs/ (e.g., index.mdx)
       if (!version) {
-        const rootFiles = readdirSync(sectionSrc, { withFileTypes: true })
-          .filter((e) => !e.isDirectory() && e.name.endsWith('.mdx'));
+        const rootFiles = readdirSync(sectionSrc, {
+          withFileTypes: true,
+        }).filter((e) => !e.isDirectory() && e.name.endsWith('.mdx'));
         for (const file of rootFiles) {
           const srcPath = join(sectionSrc, file.name);
           const dstPath = join(CONTENT_DST, localePrefix, 'docs', file.name);
@@ -291,7 +330,12 @@ for (const locale of LOCALES) {
 
           let dstRel: string;
           if (version) {
-            dstRel = join('docs', version, stripNumericPrefix(docsDir.name), cleanRel);
+            dstRel = join(
+              'docs',
+              version,
+              stripNumericPrefix(docsDir.name),
+              cleanRel,
+            );
           } else {
             dstRel = join('docs', stripNumericPrefix(docsDir.name), cleanRel);
           }
@@ -319,24 +363,28 @@ function processFile(
   dstPath: string,
   locale: string,
   cleanRel: string,
-  originalRel: string
+  originalRel: string,
 ) {
   const content = readFileSync(srcPath, 'utf-8');
   const { frontmatter, body, raw } = parseFrontmatter(content);
 
   // Inject sidebar metadata based on original numeric prefix or blog date
-  const isBlogPost = dstPath.includes('/blog/') && !cleanRel.endsWith('index.mdx');
+  const isBlogPost =
+    dstPath.includes('/blog/') && !cleanRel.endsWith('index.mdx');
   const order = isBlogPost
     ? blogDateOrder.get(cleanRel.replace(/\.mdx$/, ''))
     : getSidebarOrder(originalRel);
   let enrichedRaw = raw;
   if (!raw.includes('sidebar:')) {
     const sidebarParts: string[] = [];
-    if (order !== null && order !== undefined) sidebarParts.push(`  order: ${order}`);
+    if (order !== null && order !== undefined)
+      sidebarParts.push(`  order: ${order}`);
     // Use nav_title as sidebar label (short name for navigation)
     // Falls back to title for index files (used as group label)
     if (frontmatter.nav_title) {
-      sidebarParts.push(`  label: "${frontmatter.nav_title.replace(/"/g, '\\"')}"`);
+      sidebarParts.push(
+        `  label: "${frontmatter.nav_title.replace(/"/g, '\\"')}"`,
+      );
     } else if (originalRel.endsWith('index.mdx') && frontmatter.title) {
       sidebarParts.push(`  label: "${frontmatter.title.replace(/"/g, '\\"')}"`);
     }
@@ -361,7 +409,9 @@ function processFile(
       writeFileSync(dstPath, content);
       sourceErrors++;
       if (sourceErrors <= 5) {
-        console.log(`  ⚠ Source not found: ${frontmatter.source} (in ${locale}/${cleanRel})`);
+        console.log(
+          `  ⚠ Source not found: ${frontmatter.source} (in ${locale}/${cleanRel})`,
+        );
       }
     }
   } else {
@@ -426,7 +476,12 @@ function generateBlogIndex(contentRoot: string) {
   const blogDir = join(contentRoot, 'en', 'blog');
   if (!existsSync(blogDir)) return;
 
-  interface BlogPost { slug: string; title: string; date: Date; dateStr: string }
+  interface BlogPost {
+    slug: string;
+    title: string;
+    date: Date;
+    dateStr: string;
+  }
   const posts: BlogPost[] = [];
 
   for (const file of readdirSync(blogDir)) {
@@ -438,11 +493,15 @@ function generateBlogIndex(contentRoot: string) {
     posts.push({
       slug: file.replace(/\.mdx$/, ''),
       title: frontmatter.title
-        .replace(/^['"]|['"]$/g, '')  // strip wrapping quotes
-        .replace(/&apos;/g, "'")      // decode HTML entities
-        .replace(/"/g, '&quot;'),     // escape for MDX attribute
+        .replace(/^['"]|['"]$/g, '') // strip wrapping quotes
+        .replace(/&apos;/g, "'") // decode HTML entities
+        .replace(/"/g, '&quot;'), // escape for MDX attribute
       date,
-      dateStr: date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      dateStr: date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
     });
   }
 
@@ -453,7 +512,7 @@ function generateBlogIndex(contentRoot: string) {
   for (const post of posts) {
     const year = post.date.getFullYear();
     if (!byYear.has(year)) byYear.set(year, []);
-    byYear.get(year)!.push(post);
+    byYear.get(year)?.push(post);
   }
 
   let mdx = `---
@@ -475,7 +534,7 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
     for (const post of byYear.get(year)!) {
       mdx += `  <LinkCard title="${post.title}" href="/blog/${post.slug}/" description="${post.dateStr}" />\n`;
     }
-    mdx += `</CardGrid>\n\n`;
+    mdx += '</CardGrid>\n\n';
   }
 
   const dstPath = join(CONTENT_DST, 'blog', 'index.mdx');
@@ -493,10 +552,15 @@ function generateLearnIndex(contentRoot: string) {
     'react-foundations': 'rocket',
     'dashboard-app': 'laptop',
     'pages-router': 'document',
-    'seo': 'magnifier',
+    seo: 'magnifier',
   };
 
-  interface Course { name: string; slug: string; chapters: number; icon: string }
+  interface Course {
+    name: string;
+    slug: string;
+    chapters: number;
+    icon: string;
+  }
   const courses: Course[] = [];
 
   const titleOverrides: Record<string, string> = { seo: 'SEO' };
@@ -507,10 +571,15 @@ function generateLearnIndex(contentRoot: string) {
 
   for (const entry of entries) {
     const slug = stripNumericPrefix(entry.name);
-    const chapters = readdirSync(join(learnDir, entry.name))
-      .filter((f) => f.endsWith('.mdx')).length;
-    const name = titleOverrides[slug]
-      || slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const chapters = readdirSync(join(learnDir, entry.name)).filter((f) =>
+      f.endsWith('.mdx'),
+    ).length;
+    const name =
+      titleOverrides[slug] ||
+      slug
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
     courses.push({ name, slug, chapters, icon: icons[slug] || 'open-book' });
   }
 
@@ -538,7 +607,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 `;
   }
 
-  mdx += `</CardGrid>\n`;
+  mdx += '</CardGrid>\n';
 
   const dstPath = join(CONTENT_DST, 'learn', 'index.mdx');
   ensureDir(dstPath);
