@@ -277,18 +277,59 @@ async function translateFile(
     // All nodes cached — use clean re-assembled output (structure matches EN exactly)
     finalContent = reassembled.content;
   } else {
-    // Some nodes still uncached after translation (anchor couldn't align them).
-    // Fall back to LLM's output to avoid English text in translated file.
-    // Strip leftover NEEDS_TRANSLATION markers from LLM output.
-    finalContent = validateResult.correctedContent;
-    if (finalContent.includes(NEEDS_TRANSLATION_START)) {
-      finalContent = finalContent
-        .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
-        .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
+    // Some nodes still uncached after translation.
+    // Backfill cache from LLM output (align by type), then re-assemble.
+    const llmContent = validateResult.correctedContent;
+    const llmNodes = parseMdx(llmContent).filter((n) => n.needsTranslation);
+    const srcNodes = parseMdx(sourceContent).filter((n) => n.needsTranslation);
+
+    // Type-based backfill: walk both lists, cache matching types
+    let si = 0;
+    let li = 0;
+    let backfilled = 0;
+    while (si < srcNodes.length && li < llmNodes.length) {
+      if (srcNodes[si].type === llmNodes[li].type) {
+        if (
+          srcNodes[si].md5 &&
+          !cache.get(opts.lang, srcNodes[si].md5 as string)
+        ) {
+          cache.set(
+            opts.lang,
+            srcNodes[si].md5 as string,
+            llmNodes[li].rawText,
+          );
+          backfilled++;
+        }
+        si++;
+        li++;
+      } else if (llmNodes.length > srcNodes.length) {
+        li++; // skip extra LLM node
+      } else {
+        si++; // skip missing source node
+      }
     }
-    console.warn(
-      `⚠️ ${relPath}: ${reassembled.uncachedCount} nodes uncached after translation. Using LLM output (structure may differ).`,
-    );
+
+    // Re-assemble again with backfilled cache
+    const reassembled2 = assemble(sourceContent, opts.lang, cache, relPath);
+    if (reassembled2.allCached) {
+      finalContent = reassembled2.content;
+      if (backfilled > 0) {
+        console.log(
+          `   ↳ Backfilled ${backfilled} nodes from LLM output → re-assembled clean.`,
+        );
+      }
+    } else {
+      // Still not fully cached — use LLM output as final fallback
+      finalContent = llmContent;
+      if (finalContent.includes(NEEDS_TRANSLATION_START)) {
+        finalContent = finalContent
+          .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
+          .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
+      }
+      console.warn(
+        `⚠️ ${relPath}: ${reassembled2.uncachedCount} nodes still uncached after backfill. Using LLM output.`,
+      );
+    }
   }
 
   const finalPath = path.join(opts.outputDir, opts.lang, relPath);

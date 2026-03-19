@@ -1,0 +1,596 @@
+---
+title: 快取機制在 Next.js
+nav_title: 快取
+description: Next.js 快取機制的概述。
+---
+
+Next.js 透過快取渲染工作和資料請求來提升你的應用程式效能並降低成本。本頁深入介紹了 Next.js 的快取機制、可用於設定它們的 API，以及它們如何互相交互。
+
+> **值得了解**: 本頁協助你理解 Next.js 在底層如何運作，但對於使用 Next.js 進行生產工作而言，這**並非**必要知識。大多數 Next.js 的快取啟發式規則取決於你的 API 用法，並有預設值以提供零或少量配置的最優效能。如果你想直接跳轉到範例，請 [開始於此](/docs/app/getting-started/fetching-data)。
+
+## 總覽
+
+以下是不同快取機制及其用途的層級概述：
+
+| 機制 | 說明 | 位置 | 目的 | 持續時間 |
+| :--- | :--- | :--- | :--- | :--- |
+| [請求記憶體化 (Request Memoization)](#request-memoization) | 函數的回傳值 | 伺服器 | 重用在 React 元件樹中的資料 | 每個請求的生命週期 |
+| [資料快取 (Data Cache)](#data-cache) | 資料 | 伺服器 | 跨使用者請求和部署儲存資料 | 持久 (可重新驗證) |
+| [完整路由快取 (Full Route Cache)](#full-route-cache) | HTML 和 RSC 負載 | 伺服器 | 降低渲染成本並提升效能 | 持久 (可重新驗證) |
+| [路由快取 (Router Cache)](#client-side-router-cache) | RSC 負載 | 客戶端 | 減少導航時的伺服器請求 | 使用者工作階段或基於時間 |
+
+預設情況下，Next.js 會快取盡可能多的內容以提升效能並降低成本。這意味著路徑會以**靜態渲染 (Statically Rendered)**，資料請求會被**快取 (Cached)**，除非你選擇退出。下表圖示預設快取行為：路徑在建構時如何靜態渲染，以及在首次訪問靜態路由時。
+
+<Image
+  alt="圖示顯示 Next.js 四種快取機制的預設快取行為，包含建構時和首次訪問路徑時的 HIT, MISS 和 SET。"
+  srcLight="/docs/light/caching-overview.png"
+  srcDark="/docs/dark/caching-overview.png"
+  width="1600"
+  height="1179"
+/>
+
+快取行為會根據路徑是以靜態或動態方式渲染、資料是否快取，以及請求是初次訪問還是後續導航而有所不同。根據你的使用案例，你可以針對個別路徑和資料請求設定快取行為。
+
+`middleware` 中不支援 `fetch` 快取。在 `middleware` 內部進行的任何 `fetch` 操作都將不會被快取。
+
+## 請求記憶體化 (Request Memoization)
+
+Next.js 擴充了 [`fetch` API](#fetch)，會自動 **記憶體化 (Memoize)**具有相同 URL 和選項的請求。這意味著你可以在 React 元件樹中的多個位置呼叫相同的資料 fetch 函數，同時只執行一次。
+
+<Image
+  alt="去重複的 Fetch 請求"
+  srcLight="/docs/light/deduplicated-fetch-requests.png"
+  srcDark="/docs/dark/deduplicated-fetch-requests.png"
+  width="1600"
+  height="857"
+/>
+
+例如，如果你需要在整個路徑中（例如在佈局、頁面和多個元件中）使用相同的資料，則無需在樹頂部取得資料，並在元件之間傳遞 props。相反，你可以在需要它們的元件中取得資料，而無需擔心在網路上多次取得相同資料的效能影響。
+
+```tsx filename="app/example.tsx" switcher
+async function getItem() {
+  // `fetch` 函數會自動記憶體化，結果
+  // 會快取
+  const res = await fetch('https://.../item/1')
+  return res.json()
+}
+
+// 此函數被呼叫兩次，但只執行第一次
+const item = await getItem() // 快取未命中 (MISS)
+
+// 第二次呼叫可以在路徑中的任何位置
+const item = await getItem() // 快取命中 (HIT)
+```
+
+```jsx filename="app/example.js" switcher
+async function getItem() {
+  // `fetch` 函數會自動記憶體化，結果
+  // 會快取
+  const res = await fetch('https://.../item/1')
+  return res.json()
+}
+
+// 此函數被呼叫兩次，但只執行第一次
+const item = await getItem() // 快取未命中 (MISS)
+
+// 第二次呼叫可以在路徑中的任何位置
+const item = await getItem() // 快取命中 (HIT)
+```
+
+**請求記憶體化如何運作**
+
+<Image
+  alt="圖示顯示在 React 渲染期間 fetch 記憶體化如何運作。"
+  srcLight="/docs/light/request-memoization.png"
+  srcDark="/docs/dark/request-memoization.png"
+  width="1600"
+  height="742"
+/>
+
+- 在渲染路徑時，首次呼叫特定請求時，其結果將不在記憶體中，並且會是快取 `MISS`（未命中）。
+- 因此，函數將會執行，資料將從外部來源取得，結果將儲存於記憶體中。
+- 在同一批次渲染期間的後續函數呼叫將是快取 `HIT`（命中），並將從記憶體回傳資料而無需執行函數。
+- 一旦路徑渲染完成且渲染過程結束，記憶體將被「重置」，所有請求記憶體化條目都會被清除。
+
+> **值得了解**:
+>
+> - 請求記憶體化 (Request Memoization) 是 React 功能，而非 Next.js 功能。此處包含它是為了展示它如何與其他快取機制交互。
+> - 記憶體化僅適用於 `fetch` 請求中的 `GET` 方法。
+> - 記憶體化僅適用於 React 元件樹，這意味著：
+>   - 它適用於 `generateMetadata`、`generateStaticParams`、佈局、頁面和其他伺服器元件中的 `fetch` 請求。
+>   - 它不適用於路由處理器 (Route Handlers) 中的 `fetch` 請求，因為它們不是 React 元件樹的一部分。
+> - 在 `fetch` 不適用的情況下（例如某些資料庫客戶端、CMS 客戶端或 GraphQL 客戶端），你可以使用 [React `cache` 函數](#react-cache-function) 來記憶體化函數。
+
+### 持續時間
+
+快取持續整個伺服器請求的生命週期，直到 React 元件樹完成渲染。
+
+### 重新驗證
+
+由於記憶體化不會跨伺服器請求共用，並且僅適用於渲染期間，因此無需重新驗證它。
+
+### 退出
+
+記憶體化僅適用於 `fetch` 請求中的 `GET` 方法，其他方法如 `POST` 和 `DELETE` 則不被記憶體化。此預設行為是 React 優化，我們不建議退出它。
+
+若要管理個別請求，你可以使用 [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController) 中的 [`signal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController/signal) 屬性。
+
+```js filename="app/example.js"
+const { signal } = new AbortController()
+fetch(url, { signal })
+```
+
+## 資料快取 (Data Cache)
+
+Next.js 內建資料快取 (Data Cache)，會跨多個**伺服器請求**和**部署**持久化資料取得的結果。這是因為 Next.js 擴充了原生 `fetch` API，允許伺服器的每個請求設定其自己的持久化快取語義。
+
+> **值得了解**: 在瀏覽器中，`fetch` 的 `cache` 選項表示請求將如何與瀏覽器的 HTTP 快取交互，在 Next.js 中，`cache` 選項表示伺服器端請求將如何與伺服器的資料快取交互。
+
+你可以使用 `fetch` 的 [`cache`](#fetch-optionscache) 和 [`next.revalidate`](#fetch-optionsnextrevalidate) 選項來設定快取行為。
+
+在開發模式下，`fetch` 資料會 [為熱模組替換 (HMR)](/docs/app/api-reference/functions/fetch#fetch-default-auto-no-store-and-cache-no-store-not-showing-fresh-data-in-development) 重複使用，並且快取選項對於 [硬重新整理](/docs/app/api-reference/functions/fetch#hard-refresh-and-caching-in-development) 會受到忽略。
+
+**資料快取如何運作**
+
+<Image
+  alt="圖示顯示快取和未快取的 Fetch 請求如何與資料快取交互。快取請求儲存於資料快取中，未快取且記憶體化的請求則從資料來源取得、不儲存於資料快取，並記憶體化。"
+  srcLight="/docs/light/data-cache.png"
+  srcDark="/docs/dark/data-cache.png"
+  width="1600"
+  height="661"
+/>
+
+- 在渲染期間，首次呼叫具有 `'force-cache'` 選項的 `fetch` 請求時，Next.js 會在資料快取中檢查快取的回應。
+- 如果找到快取的回應，將立即回傳並 [記憶體化](#request-memoization)。
+- 如果未找到快取的回應，則向資料來源發出請求，結果將儲存於資料快取，並記憶體化。
+- 對於未快取的資料（例如未定義 `cache` 選項或使用 `{ cache: 'no-store' }`），結果將總是從資料來源取得，並記憶體化。
+- 無論資料是否快取，請求都會始終被記憶體化，以避免在 React 渲染期間發出相同資料的重複請求。
+
+**資料快取與請求記憶體化的差異**
+
+雖然兩種快取機制都透過重用快取資料來幫助提升效能，但資料快取是跨 incoming 請求和部署持久化的，而記憶體化僅持續請求生命週期。
+
+### 持續時間
+
+資料快取 (Data Cache) 是持久的，跨 incoming 請求和部署持久化，除非你重新驗證或選擇退出。
+
+### 重新驗證
+
+快取資料可透過兩種方式重新驗證：
+
+- **基於時間的重新驗證 (Time-based Revalidation)**：經過一段時間後重新驗證資料，並發出新請求。這對於不常變化且新鮮度不那麼關鍵的資料很有用。
+- **按需重新驗證 (On-demand Revalidation)**：根據事件（如表單提交）重新驗證資料。按需重新驗證可以使用基於標籤或基於路徑的方法一次性重新驗證一組資料。這在你想盡快顯示最新資料時很有用（例如來自你的無頭 CMS 的內容更新時）。
+
+#### 基於時間的重新驗證
+
+若要按時間間隔重新驗證資料，你可以使用 `fetch` 的 `next.revalidate` 選項來設定資源的快取有效時間（以秒為單位）。
+
+```js
+// 最多每小時重新驗證一次
+fetch('https://...', { next: { revalidate: 3600 } })
+```
+
+或者，你可以使用 [路由區塊設定選項](#segment-config-options) 來設定區塊中的所有 `fetch` 請求，或在不使用 `fetch` 的情況下使用。
+
+**基於時間的重新驗證如何運作**
+
+<Image
+  alt="圖示顯示基於時間的重新驗證如何運作，重新驗證期後，對於第一個請求會回傳過期資料，然後資料會重新驗證。"
+  srcLight="/docs/light/time-based-revalidation.png"
+  srcDark="/docs/dark/time-based-revalidation.png"
+  width="1600"
+  height="1252"
+/>
+
+- 首次呼叫具有 `revalidate` 的 fetch 請求時，資料將從外部資料來源取得並儲存於資料快取。
+- 在指定時間範圍內（例如 60 秒）呼叫的任何請求都將回傳快取資料。
+- 時間範圍過後，下一個請求仍將回傳快取的（現已過期的）資料。
+  - Next.js 將在背景觸發資料的重新驗證。
+  - 一旦資料取得成功，Next.js 將使用新資料更新資料快取。
+  - 若背景重新驗證失敗，先前資料將保持不變。
+
+這類似於 [**過期並重新驗證 (Stale-while-revalidate)**](https://web.dev/articles/stale-while-revalidate) 行為。
+
+#### 按需重新驗證
+
+資料可透過路徑 [`revalidatePath`](#revalidatepath) 或快取標籤 [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag) 進行按需重新驗證。
+
+**按需重新驗證如何運作**
+
+<Image
+  alt="圖示顯示按需重新驗證如何運作，重新驗證請求後資料快取會更新為新鮮資料。"
+  srcLight="/docs/light/on-demand-revalidation.png"
+  srcDark="/docs/dark/on-demand-revalidation.png"
+  width="1600"
+  height="1082"
+/>
+
+- 首次呼叫 `fetch` 請求時，資料將從外部資料來源取得並儲存於資料快取。
+- 當觸發按需重新驗證時，相應的快取條目將從快取中清除。
+  - 這與基於時間的重新驗證不同，後者會將過期資料保留在快取中，直到取得新資料為止。
+- 下次發出請求時，它將再次成為快取 `MISS`，並將從外部資料來源取得資料並儲存於資料快取。
+
+### 退出
+
+如果你**不**想要快取 `fetch` 的回應，你可以進行以下操作：
+
+```js
+let data = await fetch('https://api.vercel.app/blog', { cache: 'no-store' })
+```
+
+## 完整路由快取 (Full Route Cache)
+
+> **相關術語**:
+>
+> 你可能看到**自動靜態優化 (Automatic Static Optimization)**、**靜態網站生成 (Static Site Generation)** 或 **靜態渲染 (Static Rendering)** 這些術語被交替使用來指代建置時渲染和快取應用程式路徑的過程。
+
+Next.js 在建構時自動渲染和快取路徑。這是一個優化，允許你提供快取的路徑，而不是為每個請求在伺服器上渲染，從而加快頁面載入速度。
+
+要了解完整路由快取 (Full Route Cache) 如何運作，最好看看 React 如何處理渲染，以及 Next.js 如何快取結果：
+
+### 持續時間
+
+在伺服器上，Next.js 使用 React 的 API 來協調渲染。渲染工作分為區塊：按個別路徑區塊和 Suspense 邊界。
+
+每個區塊分兩步渲染：
+
+1. React 將伺服器元件 (Server Components) 渲染為一種特殊的資料格式，稱為 **React 伺服器元件負載 (React Server Component Payload)**，經過優化用於串流。
+2. Next.js 使用 React 伺服器元件負載和客戶端元件 JavaScript 指令，在伺服器上渲染 **HTML**。
+
+這意味著我們不必等待所有內容渲染完成再快取工作或回應。相反，我們可以在工作完成時串流回應。
+
+> **React 伺服器元件負載是什麼？ (What is the React Server Component Payload?)**
+>
+> React 伺服器元件負載 (React Server Component Payload) 是渲染的 React 元件樹的緊湊二進位表示。它由客戶端上的 React 使用來更新瀏覽器的 DOM。React 伺服器元件負載包含：
+>
+> - 伺服器元件的渲染結果
+> - 客戶端元件應渲染位置的佔位符，及其 JavaScript 檔案的參照
+> - 從伺服器元件傳遞給客戶端元件的任何 props
+>
+> 如需了解更多，請參閱 [伺服器元件 (Server Components)](/docs/app/getting-started/server-and-client-components) 文件。
+
+### 重新驗證
+
+<Image
+  alt="完整路由快取的預設行為，顯示 React 伺服器元件負載和 HTML 如何在靜態渲染路徑的伺服器上被快取。"
+  srcLight="/docs/light/full-route-cache.png"
+  srcDark="/docs/dark/full-route-cache.png"
+  width="1600"
+  height="888"
+/>
+
+Next.js 的預設行為是在伺服器上快取路徑的渲染結果（React 伺服器元件負載和 HTML）。這適用於建構時的靜態渲染路徑，或重新驗證時。
+
+### 3. 客戶端上的 React 水合與對齊
+
+在請求時，於客戶端：
+
+1. HTML 用於立即顯示客戶端和伺服器元件的迅速非互動式初始預覽。
+2. React 伺服器元件負載用於對齊客戶端和渲染的伺服器元件樹，並更新 DOM。
+3. JavaScript 指令用於 [水合 (Hydrate)](https://react.dev/reference/react-dom/client/hydrateRoot) 客戶端元件並使應用程式互動。
+
+### 4. 客戶端上的 Next.js 快取 (路由快取)
+
+React 伺服器元件負載儲存於客戶端 [路由快取 (Router Cache)](#client-side-router-cache) – 一個分開的記憶體內快取，按個別路徑區塊分。此路由快取用於透過儲存已訪問的路徑並預取未來路徑來改善導航體驗。
+
+### 5. 後續導航
+
+在後續導航或預取期間，Next.js 會檢查 React 伺服器元件負載是否儲存於路由快取中。如果是，它將跳過向伺服器發出新請求。
+
+如果路徑區塊不在快取中，Next.js 將從伺服器取得新 React 伺服器元件負載，並填充客戶端上的路由快取。
+
+### 靜態和動態渲染
+
+路徑在建構時是否快取，取決於它是以靜態或動態方式渲染。靜態路徑預設會快取，而動態路徑則在請求時渲染，且不會快取。
+
+下表圖示靜態和動態渲染路徑之間的差異，包含快取和未快取的資料：
+
+<Image
+  alt="靜態和動態渲染如何影響完整路由快取。靜態路徑在建構時或資料重新驗證後被快取，而動態路徑則永不快取。"
+  srcLight="/docs/light/static-and-dynamic-routes.png"
+  srcDark="/docs/dark/static-and-dynamic-routes.png"
+  width="1600"
+  height="1314"
+/>
+
+了解更多關於 [靜態和動態渲染](/docs/app/getting-started/partial-prerendering#static-rendering)。
+
+### 持續時間
+
+預設情況下，完整路由快取 (Full Route Cache) 是持久的。這意味著渲染輸出會跨使用者請求進行快取。
+
+### 無效化
+
+你有兩種方式可以無效化完整路由快取：
+
+- **[重新驗證資料 (Revalidating Data)](/docs/app/guides/caching#revalidating)**：重新驗證 [資料快取 (Data Cache)](#data-cache)，將進而無效化路由快取，透過在伺服器上重新渲染元件並快取新的渲染輸出。
+- **重新部署 (Redeploying)**：與跨部署持久化的資料快取不同，在新增部署期間會清除完整路由快取。
+
+### 退出
+
+你可以選擇退出完整路由快取，換句話說，為每個 incoming 請求動態渲染元件，透過：
+
+- **使用 [動態 API (Dynamic API)](#dynamic-apis)**：這將使路徑退出完整路由快取，並在請求時動態渲染它。資料快取仍可使用。
+- **使用 `dynamic = 'force-dynamic'` 或 `revalidate = 0` 路徑區塊設定選項**：這將跳過完整路由快取和資料快取。意味著元件將為每個 incoming 請求渲染，並且資料將在伺服器上取得。路由快取仍適用，因為它是在客戶端快取。
+- **退出 [資料快取 (Data Cache)](#data-cache)**：如果路徑具有未快取的 `fetch` 請求，這將使路徑退出完整路由快取。特定 `fetch` 請求的資料將為每個 incoming 請求取得。其他明確啟用快取的 `fetch` 請求仍將儲存於資料快取中。這允許快取和未快取資料的混合。
+
+## 客戶端路由快取 (Client-side Router Cache)
+
+Next.js 有一個記憶體內客戶端路由器快取，儲存路徑區塊的 RSC 負載，按佈局、載入狀態和頁面區分。
+
+當使用者在路徑之間導航時，Next.js 會快取已訪問的路徑區塊，並 [預取](/docs/app/getting-started/linking-and-navigating#prefetching) 使用者可能導航至的路徑。這導致立即回/正向導航，沒有導航之間的全頁面重新整理，並保留共用佈景中的瀏覽器狀態和 React 狀態。
+
+使用路由快取 (Router Cache)：
+
+- **佈局 (Layouts)** 會被快取並在導航時重用 ([部分渲染](/docs/app/getting-started/linking-and-navigating#client-side-transitions))。
+- **載入狀態 (Loading states)** 會在導航時快取並重用，用於 [立即載入狀態](/docs/app/api-reference/file-conventions/loading#instant-loading-states)。
+- **頁面 (Pages)** 預設不被快取，但在瀏覽器倒退和前進導航期間會被重用。你可以透過使用實驗性 [`staleTimes`](/docs/app/api-reference/config/next-config-js/staleTimes) 設定選項為頁面區塊啟用快取。
+
+{/* TODO: Update diagram to match v15 behavior */}
+
+> **值得了解**: 此快取特別適用於 Next.js 和伺服器元件，與瀏覽器的 [bfcache](https://web.dev/bfcache/) 不同，儘管它具有類似結果。
+
+### 退出
+
+快取儲存於瀏覽器的臨時記憶體中。兩個因素決定路由器快取持續多久：
+
+- **工作階段 (Session)**：快取跨導航持久化。但在頁面重新整理時會清除。
+- **自動無效化期間 (Automatic Invalidation Period)**：佈局和載入狀態的快取會在特定時間後自動無效化。持續時間取決於資源如何 [預取](/docs/app/api-reference/components/link#prefetch)，以及資源是否 [靜態生成](/docs/app/getting-started/partial-prerendering#static-rendering)：
+  - **預設預取 (Default Prefetching)** (`prefetch={null}` 或未指定)：動態頁面不快取，靜態頁面 5 分鐘。
+  - **完整預取 (Full Prefetching)** (`prefetch={true}` 或 `router.prefetch`)：靜態及動態頁面皆為 5 分鐘。
+
+頁面重新整理將清除**所有**快取區塊，但自動無效化期間僅影響從預取時起的個別區塊。
+
+> **值得了解**: 實驗性 [`staleTimes`](/docs/app/api-reference/config/next-config-js/staleTimes) 設定選項可用於調整上述自動無效化時間。
+
+### 無效化
+
+你有兩種方式可以無效化路由快取：
+
+- 在 **伺服器動作 (Server Action)** 中：
+  - 透過路徑 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) 或快取標籤 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) 按需重新驗證資料
+  - 使用 [`cookies.set`](/docs/app/api-reference/functions/cookies#setting-a-cookie) 或 [`cookies.delete`](/docs/app/api-reference/functions/cookies#deleting-cookies) 會無效化路由快取，以防止使用快取的路徑變過期（例如身份驗證）。
+- 呼叫 [`router.refresh`](/docs/app/api-reference/functions/use-router) 將無效化路由快取，並為當前路徑向伺服器發出新請求。
+
+### 退出
+
+自 Next.js 15 起，頁面區塊預設已選擇退出。
+
+> **值得了解**: 你也可以透過將 `<Link>` 元件的 `prefetch` prop 設定為 `false` 來停用 [預取](/docs/app/getting-started/linking-and-navigating#prefetching)。
+
+## 快取交互 (Cache Interactions)
+
+在設定不同快取機制時，了解它們如何互相交互很重要：
+
+### 資料快取與完整路由快取
+
+- 重新驗證或退出資料快取 (Data Cache) **將** 無效化完整路由快取，因為渲染輸出取決於資料。
+- 無效化或退出完整路由快取 **不** 會影響資料快取。你可以動態渲染一個同時具有快取和未快取資料的路徑。這在你的頁面大部分使用快取資料，但你有幾個元件依賴請求時需要取得的資料時很有用。你可以動態渲染而不必擔心重新取得所有資料的效能影響。
+
+### 資料快取與客戶端路由快取
+
+- 要立即無效化資料快取和路由快取，你可以在 [伺服器動作](/docs/app/getting-started/updating-data) 中使用 [`revalidatePath`](#revalidatepath) 或 [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag)。
+- 在 [路由處理器](/docs/app/api-reference/file-conventions/route) 中重新驗證資料快取 **不會** 立即無效化路由快取，因為路由處理器與特定路徑無關。這意味著路由快取仍將提供先前的負載，直到硬重新整理或自動無效化期間經過。
+
+## API
+
+下表提供了不同 Next.js API 如何影響快取的概述：
+
+| API | 路由快取 | 完整路由快取 | 資料快取 | React 快取 |
+| :--- | :--- | :--- | :--- | :--- |
+| [`<Link prefetch>`](#link) | 快取 (Cache) | | | |
+| [`router.prefetch`](#routerprefetch) | 快取 (Cache) | | | |
+| [`router.refresh`](#routerrefresh) | 重新驗證 (Revalidate) | | | |
+| [`fetch`](#fetch) | | | 快取 (Cache) | 快取 (Cache) (GET 和 HEAD) |
+| [`fetch` `options.cache`](#fetch-optionscache) | | | 快取或退出 (Cache or Opt out) | |
+| [`fetch` `options.next.revalidate`](#fetch-optionsnextrevalidate) | | 重新驗證 (Revalidate) | 重新驗證 (Revalidate) | |
+| [`fetch` `options.next.tags`](#fetch-optionsnexttags-and-revalidatetag) | | 快取 (Cache) | 快取 (Cache) | |
+| [`revalidateTag`](#fetch-optionsnexttags-and-revalidatetag) | 重新驗證 (伺服器動作) | 重新驗證 (Revalidate) | 重新驗證 (Revalidate) | |
+| [`revalidatePath`](#revalidatepath) | 重新驗證 (伺服器動作) | 重新驗證 (Revalidate) | 重新驗證 (Revalidate) | |
+| [`const revalidate`](#segment-config-options) | | 重新驗證或退出 (Revalidate or Opt out) | 重新驗證或退出 (Revalidate or Opt out) | |
+| [`const dynamic`](#segment-config-options) | | 快取或退出 (Cache or Opt out) | 快取或退出 (Cache or Opt out) | |
+| [`cookies`](#cookies) | 重新驗證 (伺服器動作) | 退出 (Opt out) | | |
+| [`headers`, `searchParams`](#dynamic-apis) | | 退出 (Opt out) | | |
+| [`generateStaticParams`](#generatestaticparams) | | 快取 (Cache) | | |
+| [`React.cache`](#react-cache-function) | | | | 快取 (Cache) |
+| [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache) | | | 快取 (Cache) | |
+
+### `<Link>`
+
+預設情況下，`<Link>` 元件會從完整路由快取中自動預取路徑，並將 React 伺服器元件負載新增至路由快取。
+
+若要停用預取，你可以將 `prefetch` prop 設定為 `false`。但這不會永久跳過快取，當使用者訪問路徑時，路徑區塊仍會被快取在客戶端。
+
+了解更多關於 [`<Link>` 元件](/docs/app/api-reference/components/link)。
+
+### `router.prefetch`
+
+`useRouter` 鉤子的 `prefetch` 選項可用於手動預取路徑。這將 React 伺服器元件負載新增至路由快取。
+
+請參閱 [`useRouter` 鉤子](/docs/app/api-reference/functions/use-router) API 參考。
+
+### `router.refresh`
+
+`useRouter` 鉤子的 `refresh` 選項可用於手動重新整理路徑。這將完全清除路由快取，並為當前路徑向伺服器發出新請求。`refresh` 不影響資料或完整路由快取。
+
+渲染結果將與客戶端對齊，同時保留 React 狀態和瀏覽器狀態。
+
+請參閱 [`useRouter` 鉤子](/docs/app/api-reference/functions/use-router) API 參考。
+
+### `fetch`
+
+`fetch` 回傳的資料**不會**自動儲存於資料快取中。
+
+`fetch` 的預設快取行為（例如，當未指定 `cache` 選項時）等於將 `cache` 選項設定為 `no-store`：
+
+```js
+let data = await fetch('https://api.vercel.app/blog', { cache: 'no-store' })
+```
+
+請參閱 [`fetch` API 參考](/docs/app/api-reference/functions/fetch) 以了解更多選項。
+
+### `fetch 選項 cache`
+
+你可以將個別 `fetch` 選擇進入快取，將 `cache` 選項設定為 `force-cache`：
+
+```jsx
+// 選擇進入快取
+fetch(`https://...`, { cache: 'force-cache' })
+```
+
+請參閱 [`fetch` API 參考](/docs/app/api-reference/functions/fetch) 以了解更多選項。
+
+### `fetch 選項 next.revalidate`
+
+你可以使用 `fetch` 的 `next.revalidate` 選項來設定個別 `fetch` 請求的重新驗證期間（以秒為單位）。這將重新驗證資料快取，進而重新驗證完整路由快取。將取得新鮮資料，元件將在伺服器上重新渲染。
+
+```jsx
+// 最多 1 小時後重新驗證一次
+fetch(`https://...`, { next: { revalidate: 3600 } })
+```
+
+請參閱 [`fetch` API 參考](/docs/app/api-reference/functions/fetch) 以了解更多選項。
+
+### `fetch 選項 next.tags` 和 `revalidateTag`
+
+Next.js 具有快取標籤系統，用於細粒度的資料快取和重新驗證。
+
+1. 使用 `fetch` 或 [`unstable_cache`](/docs/app/api-reference/functions/unstable_cache) 時，你有選項為快取條目標籤設定一或多個標籤。
+2. 接著，你可以呼叫 `revalidateTag` 以清除關聯於該標籤的快取條目。
+
+例如，你可以在取得資料時設定標籤：
+
+```jsx
+// 帶標籤快取資料
+fetch(`https://...`, { next: { tags: ['a', 'b', 'c'] } })
+```
+
+接著，呼叫 `revalidateTag` 並附上標籤以清除快取條目：
+
+```jsx
+// 重新驗證特定標籤的條目
+revalidateTag('a')
+```
+
+你可以使用 `revalidateTag` 的兩個地方，取決於你想要達成的目標：
+
+1. [路由處理器](/docs/app/api-reference/file-conventions/route) - 在外部事件回應時重新驗證資料（例如 Webhook）。這不會立即無效化路由快取，因為路由處理器與特定路徑無關。
+2. [伺服器動作](/docs/app/getting-started/updating-data) - 在用戶操作後重新驗證資料（例如表單提交）。這將無效化關聯路徑的路由快取。
+
+### `revalidatePath`
+
+`revalidatePath` 允許你手動重新驗證資料**並**在單一操作中重新渲染特定路徑下方的路徑區塊。呼叫 `revalidatePath` 方法會重新驗證資料快取，進而無效化完整路由快取。
+
+```jsx
+revalidatePath('/')
+```
+
+你可以使用 `revalidatePath` 的兩個地方，取決於你想要達成的目標：
+
+1. [路由處理器](/docs/app/api-reference/file-conventions/route) - 在外部事件回應時重新驗證資料（例如 Webhook）。
+2. [伺服器動作](/docs/app/getting-started/updating-data) - 在用戶互動後重新驗證資料（例如表單提交、點擊按鈕）。
+
+請參閱 [`revalidatePath` API 參考](/docs/app/api-reference/functions/revalidatePath) 以了解更多資訊。
+
+> **`revalidatePath`** 與 **`router.refresh`**:
+>
+> 呼叫 `router.refresh` 將清除路由快取，並在伺服器上重新渲染路徑區塊而無需無效化資料快取或完整路由快取。
+>
+> 差別在於 `revalidatePath` 清除資料快取和完整路由快取，而 `router.refresh()` 不改變資料快取和完整路由快取，因為它是一個客戶端 API。
+
+### 動態 API
+
+`cookies` 和 `headers` 等動態 API，以及「頁面 (Pages)」中的 `searchParams` prop，取決於執行時 incoming 請求資訊。使用它們將使路徑退出完整路由快取，換句話說，將動態渲染路徑。
+
+#### `cookies`
+
+在伺服器動作中使用 `cookies.set` 或 `cookies.delete` 會無效化路由快取，以防止使用快取的路徑變過期（例如反映身份驗證變更）。
+
+請參閱 [`cookies`](/docs/app/api-reference/functions/cookies) API 參考。
+
+### 區塊設定選項 (Segment Config Options)
+
+路由區塊設定選項可用於覆蓋路徑區塊預設值，或當你無法使用 `fetch` API 時（例如資料庫客戶端或 3rd 方函式庫）。
+
+以下路由區塊設定選項將退出完整路由快取：
+
+- `const dynamic = 'force-dynamic'`
+
+此設定選項將使所有 fetch 退出資料快取（即 `no-store`）：
+
+- `const fetchCache = 'default-no-store'`
+
+請參閱 [`fetchCache`](/docs/app/api-reference/file-conventions/route-segment-config#fetchcache) 以了解更多進階選項。
+
+請參閱 [路由區塊設定 (Route Segment Config)](/docs/app/api-reference/file-conventions/route-segment-config) 文件以了解更多選項。
+
+### `generateStaticParams`
+
+對於 [動態區塊 (Dynamic Segments)](/docs/app/api-reference/file-conventions/dynamic-routes)（例如 `app/blog/[slug]/page.js`），`generateStaticParams` 提供的路徑在建構時儲存於完整路由快取中。在請求時，Next.js 還會在首次訪問時快取在建構時未知的路徑。
+
+若要建構時靜態渲染所有路徑，請向 `generateStaticParams` 提供完整路徑清單：
+
+```jsx filename="app/blog/[slug]/page.js"
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+若要建構時靜態渲染部分路徑，其餘路徑在執行時首次訪問時渲染，請回傳部分路徑清單：
+
+```jsx filename="app/blog/[slug]/page.js"
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+
+  // 在建構時渲染前 10 篇文章
+  return posts.slice(0, 10).map((post) => ({
+    slug: post.slug,
+  }))
+}
+```
+
+若要首次訪問時靜態渲染所有路徑，請回傳空陣列（建構時不會渲染路徑）或使用 [`export const dynamic = 'force-static'`](/docs/app/api-reference/file-conventions/route-segment-config#dynamic)：
+
+```jsx filename="app/blog/[slug]/page.js"
+export async function generateStaticParams() {
+  return []
+}
+```
+
+> **值得了解**: 你必須從 `generateStaticParams` 回傳陣列，即使它是空的。否則，路徑將動態渲染。
+
+```jsx filename="app/changelog/[slug]/page.js"
+export const dynamic = 'force-static'
+```
+
+若要停用請求時的快取，在路徑區塊中加入 `export const dynamicParams = false` 選項。當使用此設定選項時，僅 `generateStaticParams` 提供的路徑將被提供，其他路徑將 404 或匹配（在 [全部路徑 (Catch-all Routes)](/docs/app/api-reference/file-conventions/dynamic-routes#catch-all-segments) 的情況下）。
+
+### React `cache` 函數
+
+React `cache` 函數允許你記憶體化函數的回傳值，允許你多次呼叫同一函數，但只執行一次。
+
+`GET` 或 `HEAD` 方法的 `fetch` 請求會自動進行記憶體化，因此你不需要將它包裝在 React `cache` 中。然而，對於其他 `fetch` 方法，或使用不 inherently 記憶體化請求的資料取得函式庫（如某些資料庫、CMS 或 GraphQL 客戶端），你可以使用 `cache` 來手動記憶體化資料請求。
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import db from '@/lib/db'
+
+export const getItem = cache(async (id: string) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import db from '@/lib/db'
+
+export const getItem = cache(async (id) => {
+  const item = await db.item.findUnique({ id })
+  return item
+})
+```
