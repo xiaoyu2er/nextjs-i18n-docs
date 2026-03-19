@@ -184,11 +184,11 @@ Each worker has its own [Cloudflare Build](https://developers.cloudflare.com/wor
 
 | Build project | Build command | Deploy command | Watch paths |
 |---------------|---------------|----------------|-------------|
-| `nextjs-docs-latest` | `bun install && bun run build:latest` | `npx wrangler deploy --config apps/web/wrangler.toml` | `apps/web/`, `packages/shared/`, `packages/const/`, `content/`, `content-astro/`, `scripts/prepare-content.ts` |
-| `nextjs-docs-v13` | `bun install && VERSION=13 bun run build:v` | `npx wrangler deploy --config apps/web-v/wrangler.toml --name nextjs-docs-v13` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/13/`, `scripts/prepare-content.ts` |
-| `nextjs-docs-v14` | `bun install && VERSION=14 bun run build:v` | `npx wrangler deploy --config apps/web-v/wrangler.toml --name nextjs-docs-v14` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/14/`, `scripts/prepare-content.ts` |
-| `nextjs-docs-v15` | `bun install && VERSION=15 bun run build:v` | `npx wrangler deploy --config apps/web-v/wrangler.toml --name nextjs-docs-v15` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/15/`, `scripts/prepare-content.ts` |
-| `nextjs-docs-router` | `bun install && cd apps/router && bun run generate-wrangler` | `npx wrangler deploy` | `apps/router/`, `.github/nextjs-versions.json` |
+| `nextjs-docs-latest` | `bun install && bun run build:latest` | `cd apps/web && npx wrangler deploy` | `apps/web/`, `packages/shared/`, `packages/const/`, `content/`, `content-astro/`, `scripts/prepare-content.ts` |
+| `nextjs-docs-v13` | `bun install && VERSION=13 bun run build:v` | `cd apps/web-v && npx wrangler deploy --name nextjs-docs-v13` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/13/`, `scripts/prepare-content.ts` |
+| `nextjs-docs-v14` | `bun install && VERSION=14 bun run build:v` | `cd apps/web-v && npx wrangler deploy --name nextjs-docs-v14` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/14/`, `scripts/prepare-content.ts` |
+| `nextjs-docs-v15` | `bun install && VERSION=15 bun run build:v` | `cd apps/web-v && npx wrangler deploy --name nextjs-docs-v15` | `apps/web-v/`, `packages/shared/`, `packages/const/`, `content/*/docs/15/`, `scripts/prepare-content.ts` |
+| `nextjs-docs-router` | `bun install && cd apps/router && bun run generate-wrangler` | `cd apps/router && npx wrangler deploy` | `apps/router/`, `.github/nextjs-versions.json` |
 
 To set up from scratch:
 
