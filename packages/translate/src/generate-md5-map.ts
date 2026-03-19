@@ -39,7 +39,7 @@ function main() {
 
   for (const relPath of files) {
     const content = fs.readFileSync(path.join(DOCS_ROOT, relPath), 'utf8');
-    const normalizedContent = content; // parseMdx applies normalize internally
+    const _normalizedContent = content; // parseMdx applies normalize internally
     const nodes = parseMdx(content);
 
     // Count lines for source location

@@ -67,10 +67,7 @@ function parseArgs(argv: string[]) {
       PROJECT_ROOT,
       getOpt('output-dir', 'tmp/batch-output'),
     ),
-    cacheDir: path.resolve(
-      PROJECT_ROOT,
-      getOpt('cache-dir', '.cache'),
-    ),
+    cacheDir: path.resolve(PROJECT_ROOT, getOpt('cache-dir', '.cache')),
     lang: getOpt('lang', 'zh-hans'),
     langName: getOpt('lang-name', 'Simplified Chinese'),
     pattern: getOpt('pattern', '**/*.mdx'),

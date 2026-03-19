@@ -40,7 +40,7 @@ async function fetchBlogs(links: string[]) {
 
   const c = new Crawler({
     ...crawlerOptions,
-    // @ts-ignore
+    // @ts-expect-error
     callback: (error, res, done: () => void) => {
       const req = res.requestUrl;
       console.log(`Processing ${req.href}`);

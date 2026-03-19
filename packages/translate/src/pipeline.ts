@@ -45,10 +45,7 @@ function parseArgs(argv: string[]) {
       PROJECT_ROOT,
       getOpt('output-dir', 'tmp/pipeline-output'),
     ),
-    cacheDir: path.resolve(
-      PROJECT_ROOT,
-      getOpt('cache-dir', '.cache'),
-    ),
+    cacheDir: path.resolve(PROJECT_ROOT, getOpt('cache-dir', '.cache')),
     apiKey: getOpt('api-key', ''),
     apiType: getOpt('api-type', 'pi') as 'openai' | 'anthropic' | 'pi',
     apiBaseUrl: getOpt('api-base-url', ''),

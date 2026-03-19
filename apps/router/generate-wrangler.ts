@@ -5,14 +5,19 @@
 import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname!, '../..');
-const versionsData = JSON.parse(await Bun.file(resolve(ROOT, '.github/nextjs-versions.json')).text());
+const versionsData = JSON.parse(
+  await Bun.file(resolve(ROOT, '.github/nextjs-versions.json')).text(),
+);
 const latestMajor = versionsData.latestMajor;
-const olderVersions = Object.keys(versionsData.versions).filter((v) => v !== latestMajor);
+const olderVersions = Object.keys(versionsData.versions).filter(
+  (v) => v !== latestMajor,
+);
 
 const bindings = [
   `[[services]]\nbinding = "LATEST"\nservice = "nextjs-docs-latest"`,
-  ...olderVersions.map((v) =>
-    `[[services]]\nbinding = "V${v}_DOCS"\nservice = "nextjs-docs-v${v}"`
+  ...olderVersions.map(
+    (v) =>
+      `[[services]]\nbinding = "V${v}_DOCS"\nservice = "nextjs-docs-v${v}"`,
   ),
 ].join('\n\n');
 

@@ -33,7 +33,7 @@ export async function getTranslatedConfig(
   try {
     translatedConfig = JSON.parse(await fs$.readFile(configPath, 'utf8'));
     logger.debug(`Found existing config ${configPath}`);
-  } catch (error) {
+  } catch (_error) {
     logger.info(`No existing config ${configPath}`);
     translatedConfig = {};
   }
@@ -69,7 +69,7 @@ export async function getDocUpdateStatus({
 }> {
   try {
     await fs$.access(sourcePath);
-  } catch (error) {
+  } catch (_error) {
     logger.error(
       `Source file not found: ${sourcePath}, don't need updating, consider removing it`,
     );
@@ -83,7 +83,7 @@ export async function getDocUpdateStatus({
 
   try {
     await fs$.access(targetPath);
-  } catch (error) {
+  } catch (_error) {
     logger.debug(`Target file not found: ${targetPath}, needs updating`);
     return { shouldUpdate: true, reason: 'Target not found.', chunks };
   }

@@ -49,7 +49,7 @@ export function validate(
 
   // Align translatable nodes by index
   const sourceTranslatable = sourceNodes.filter((n) => n.needsTranslation);
-  const outputTranslatable = outputNodes.filter((n) => n.needsTranslation);
+  const _outputTranslatable = outputNodes.filter((n) => n.needsTranslation);
 
   // Build corrected content by replacing output nodes where needed
   let correctedContent = '';

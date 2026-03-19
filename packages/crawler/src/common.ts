@@ -1,7 +1,7 @@
 import { LANGUAGE_MAP } from '@next-i18n/const';
 import { getFileExtension } from '@next-i18n/utils';
 import TurndownService from 'turndown';
-// @ts-ignore
+// @ts-expect-error
 import turndownPluginGfm from 'turndown-plugin-gfm';
 
 export const CODE_LANGUAGE_SEP = '===CODE_LANGUAGE_SEP===';
@@ -20,7 +20,7 @@ turndownService.addRule(`data-state="closed"`, {
       node.nodeName === 'DIV' && node.getAttribute('data-state') === 'closed'
     );
   },
-  replacement: (content, node, options) => {
+  replacement: (_content, _node, _options) => {
     return '';
   },
 });
@@ -34,7 +34,7 @@ turndownService.addRule('in-this-chapter', {
       node.className.includes('__wrapper')
     );
   },
-  replacement: (content, node, options) => {
+  replacement: (_content, _node, _options) => {
     // const p1 = node.children[0] as HTMLElement;
     // const p2 = node.children[1] as HTMLElement;
     // const div = node.children[2] as HTMLElement;
@@ -46,7 +46,7 @@ turndownService.keep(['img']);
 
 turndownService.addRule('img', {
   filter: ['img'],
-  replacement: (content, node, options) => {
+  replacement: (_content, node, _options) => {
     const srcLight = (node as HTMLImageElement).getAttribute('srclight');
     const srcDark = (node as HTMLImageElement).getAttribute('srcdark');
     const src = (node as HTMLImageElement).getAttribute('src');

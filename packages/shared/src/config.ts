@@ -15,7 +15,11 @@ export const starlightLocales = {
 };
 
 export const starlightSocial = [
-  { icon: 'github' as const, label: 'GitHub', href: 'https://github.com/nicepkg/nextjs-i18n-docs' },
+  {
+    icon: 'github' as const,
+    label: 'GitHub',
+    href: 'https://github.com/nicepkg/nextjs-i18n-docs',
+  },
 ];
 
 export const sharedComponents = {

@@ -278,7 +278,9 @@ if (!version) {
       posts.push({ slug: file.replace(/\.mdx$/, ''), date });
     }
     posts.sort((a, b) => b.date - a.date); // newest first
-    posts.forEach((p, i) => blogDateOrder.set(p.slug, i + 1));
+    for (let i = 0; i < posts.length; i++) {
+      blogDateOrder.set(posts[i].slug, i + 1);
+    }
   }
 }
 

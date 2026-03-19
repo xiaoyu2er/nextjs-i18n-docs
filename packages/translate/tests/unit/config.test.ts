@@ -1,5 +1,5 @@
 import { cosmiconfig } from 'cosmiconfig';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getConfig } from '../../src/config';
 import type { MainConfig } from '../../src/types';
 

@@ -5,11 +5,14 @@
  * Recursively processes all nodes with children (including JSX elements
  * like `<AppOnly>`, `<PagesOnly>`, etc.).
  */
-import type { Root, Code, Parent } from 'mdast';
+import type { Root, Code } from 'mdast';
 
-function getPackageMeta(node: { type: string; meta?: string | null }): string | null {
+function getPackageMeta(node: {
+  type: string;
+  meta?: string | null;
+}): string | null {
   if (node.type !== 'code' || !(node as Code).meta) return null;
-  const match = (node as Code).meta!.match(/package="([^"]+)"/);
+  const match = (node as Code).meta?.match(/package="([^"]+)"/);
   return match ? match[1] : null;
 }
 
@@ -58,12 +61,14 @@ function processChildren(children: any[]): boolean {
             attributes: [
               { type: 'mdxJsxAttribute' as const, name: 'label', value: label },
             ],
-            children: [{
-              type: 'code' as const,
-              lang: code.lang,
-              meta: stripPackageMeta(code.meta),
-              value: code.value,
-            }],
+            children: [
+              {
+                type: 'code' as const,
+                lang: code.lang,
+                meta: stripPackageMeta(code.meta),
+                value: code.value,
+              },
+            ],
           };
         });
 
@@ -108,15 +113,23 @@ export function remarkPackageTabs() {
             estree: {
               type: 'Program' as const,
               sourceType: 'module' as const,
-              body: [{
-                type: 'ImportDeclaration' as const,
-                source: { type: 'Literal' as const, value: from, raw: `'${from}'` },
-                specifiers: [{
-                  type: 'ImportSpecifier' as const,
-                  imported: { type: 'Identifier' as const, name },
-                  local: { type: 'Identifier' as const, name },
-                }],
-              }],
+              body: [
+                {
+                  type: 'ImportDeclaration' as const,
+                  source: {
+                    type: 'Literal' as const,
+                    value: from,
+                    raw: `'${from}'`,
+                  },
+                  specifiers: [
+                    {
+                      type: 'ImportSpecifier' as const,
+                      imported: { type: 'Identifier' as const, name },
+                      local: { type: 'Identifier' as const, name },
+                    },
+                  ],
+                },
+              ],
             },
           },
         } as any);

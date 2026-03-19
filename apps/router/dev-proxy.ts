@@ -11,21 +11,27 @@ const LOCALES = ['zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
 
 // Read versions from single source of truth
 const ROOT = resolve(import.meta.dirname!, '../..');
-const versionsData = JSON.parse(await Bun.file(resolve(ROOT, '.github/nextjs-versions.json')).text());
+const versionsData = JSON.parse(
+  await Bun.file(resolve(ROOT, '.github/nextjs-versions.json')).text(),
+);
 const latestMajor = versionsData.latestMajor;
-const olderVersions = Object.keys(versionsData.versions).filter((v) => v !== latestMajor);
+const olderVersions = Object.keys(versionsData.versions).filter(
+  (v) => v !== latestMajor,
+);
 
-const ROUTES: Array<{ prefix: string; port: number }> = olderVersions.map((v, i) => ({
-  prefix: `/docs/${v}`,
-  port: 4322 + i,
-}));
+const ROUTES: Array<{ prefix: string; port: number }> = olderVersions.map(
+  (v, i) => ({
+    prefix: `/docs/${v}`,
+    port: 4322 + i,
+  }),
+);
 const DEFAULT_PORT = 4321;
 
 function getTargetPort(pathname: string): number {
   const segments = pathname.split('/').filter(Boolean);
   let matchPath = pathname;
   if (LOCALES.includes(segments[0])) {
-    matchPath = '/' + segments.slice(1).join('/');
+    matchPath = `/${segments.slice(1).join('/')}`;
   }
 
   for (const { prefix, port } of ROUTES) {
@@ -45,23 +51,32 @@ const server = Bun.serve({
 
     // Vite HMR websocket — can't proxy, return 426
     if (req.headers.get('upgrade') === 'websocket') {
-      return new Response('WebSocket not proxied — connect directly to worker port', { status: 426 });
+      return new Response(
+        'WebSocket not proxied — connect directly to worker port',
+        { status: 426 },
+      );
     }
 
     // Version root redirects (same logic as router worker)
     const segments = pathname.split('/').filter(Boolean);
     let matchPath = pathname;
     if (LOCALES.includes(segments[0])) {
-      matchPath = '/' + segments.slice(1).join('/');
+      matchPath = `/${segments.slice(1).join('/')}`;
     }
     const versionMatch = matchPath.match(/^\/docs\/(\d+)\/?$/);
     if (versionMatch) {
       const ver = versionMatch[1];
-      const localePrefix = LOCALES.includes(segments[0]) ? `/${segments[0]}` : '';
-      const defaultPage = Number(ver) >= 15
-        ? `/docs/${ver}/app/getting-started/`
-        : `/docs/${ver}/app/building-your-application/`;
-      return Response.redirect(`http://localhost:3000${localePrefix}${defaultPage}`, 302);
+      const localePrefix = LOCALES.includes(segments[0])
+        ? `/${segments[0]}`
+        : '';
+      const defaultPage =
+        Number(ver) >= 15
+          ? `/docs/${ver}/app/getting-started/`
+          : `/docs/${ver}/app/building-your-application/`;
+      return Response.redirect(
+        `http://localhost:3000${localePrefix}${defaultPage}`,
+        302,
+      );
     }
 
     let port = getTargetPort(pathname);

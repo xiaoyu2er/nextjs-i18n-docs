@@ -245,7 +245,7 @@ function main() {
       try {
         const changesContent = fs.readFileSync(changesJsonFile, 'utf8');
         changesJson = JSON.parse(changesContent);
-      } catch (error) {
+      } catch (_error) {
         console.error('Error: Failed to read or parse changes JSON file');
         process.exit(1);
       }

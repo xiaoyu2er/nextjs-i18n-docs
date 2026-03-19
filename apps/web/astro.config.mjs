@@ -3,7 +3,10 @@ import starlight from '@astrojs/starlight';
 import { remarkAutoImport } from './src/plugins/remark-auto-import.ts';
 import { remarkPackageTabs } from './src/plugins/remark-package-tabs.ts';
 import { remarkConvertCodeMeta } from '../../packages/shared/src/plugins/remark-convert-code-meta.ts';
-import { starlightLocales, starlightSocial } from '../../packages/shared/src/config.ts';
+import {
+  starlightLocales,
+  starlightSocial,
+} from '../../packages/shared/src/config.ts';
 
 export default defineConfig({
   site: 'https://nextjs.im',

@@ -10,15 +10,25 @@
  */
 
 import { spawn, spawnSync, type Subprocess } from 'bun';
-import { resolve, relative } from 'node:path';
-import { cpSync, rmSync, existsSync, mkdirSync, readdirSync, symlinkSync, lstatSync, readlinkSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  cpSync,
+  rmSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  symlinkSync,
+  lstatSync,
+} from 'node:fs';
 import { execSync } from 'node:child_process';
 
 const ROOT = resolve(import.meta.dirname!, '../..');
 const versionsFile = resolve(ROOT, '.github/nextjs-versions.json');
 const versionsData = JSON.parse(await Bun.file(versionsFile).text());
 const latestMajor = versionsData.latestMajor;
-const olderVersions = Object.keys(versionsData.versions).filter((v) => v !== latestMajor);
+const olderVersions = Object.keys(versionsData.versions).filter(
+  (v) => v !== latestMajor,
+);
 
 interface Worker {
   name: string;
@@ -47,8 +57,9 @@ const ALL_WORKERS: Worker[] = [
 // ── Parse args ──
 const args = process.argv.slice(2);
 const hasAll = args.includes('--all');
-const onlyArg = args.find((a) => a.startsWith('--only='))?.split('=')[1]
-  || (args.indexOf('--only') >= 0 ? args[args.indexOf('--only') + 1] : null);
+const onlyArg =
+  args.find((a) => a.startsWith('--only='))?.split('=')[1] ||
+  (args.indexOf('--only') >= 0 ? args[args.indexOf('--only') + 1] : null);
 
 let workers: Worker[];
 if (hasAll) {
@@ -59,7 +70,9 @@ if (hasAll) {
 } else {
   // Default: latest only (fast dev)
   workers = ALL_WORKERS.filter((w) => w.name === 'latest');
-  console.log(`${DIM}Tip: use --all for all versions, or --only=v14,v15${RESET}\n`);
+  console.log(
+    `${DIM}Tip: use --all for all versions, or --only=v14,v15${RESET}\n`,
+  );
 }
 
 if (workers.length === 0) {
@@ -73,13 +86,15 @@ function freePort(port: number) {
     const pids = execSync(`lsof -ti :${port} 2>/dev/null`).toString().trim();
     if (pids) {
       for (const pid of pids.split('\n')) {
-        try { process.kill(Number(pid), 9); } catch {}
+        try {
+          process.kill(Number(pid), 9);
+        } catch {}
       }
     }
   } catch {}
 }
 
-const allPorts = [3000, ...workers.map(w => w.port)];
+const allPorts = [3000, ...workers.map((w) => w.port)];
 for (const port of allPorts) freePort(port);
 
 // ── Create/update versioned worker copies ──
@@ -94,10 +109,14 @@ for (const w of workers) {
 
   if (hasCachedDir) {
     // Reuse cached copy — only update src/content/docs
-    console.log(`${w.color}[${w.name}]${RESET} Reusing cached .cache/web-v${version}/`);
+    console.log(
+      `${w.color}[${w.name}]${RESET} Reusing cached .cache/web-v${version}/`,
+    );
   } else {
     // First run: create fresh copy
-    console.log(`${w.color}[${w.name}]${RESET} Creating .cache/web-v${version}/...`);
+    console.log(
+      `${w.color}[${w.name}]${RESET} Creating .cache/web-v${version}/...`,
+    );
     rmSync(tmpDir, { recursive: true, force: true });
     mkdirSync(tmpDir, { recursive: true });
 
@@ -109,7 +128,6 @@ for (const w of workers) {
       if (entry === 'node_modules' || entry === 'dist') {
         symlinkSync(src, dst);
       } else if (entry === '.astro') {
-        continue; // Let Astro regenerate
       } else if (entry === 'src') {
         cpSync(src, dst, { recursive: true });
       } else if (stat.isDirectory()) {
@@ -120,7 +138,10 @@ for (const w of workers) {
     }
 
     if (!existsSync(resolve(tmpDir, 'node_modules'))) {
-      symlinkSync(resolve(ROOT, 'node_modules'), resolve(tmpDir, 'node_modules'));
+      symlinkSync(
+        resolve(ROOT, 'node_modules'),
+        resolve(tmpDir, 'node_modules'),
+      );
     }
   }
 
@@ -136,15 +157,26 @@ for (const w of workers) {
   const contentDir = resolve(ROOT, target, 'src/content/docs');
 
   // Skip if content already exists and source hasn't changed
-  const hasContent = existsSync(contentDir) && readdirSync(contentDir).length > 2;
+  const hasContent =
+    existsSync(contentDir) && readdirSync(contentDir).length > 2;
   if (hasContent) {
     const count = readdirSync(contentDir, { recursive: true }).length;
-    console.log(`${w.color}[${w.name}]${RESET} Content exists (${count} entries), skipping prepare`);
+    console.log(
+      `${w.color}[${w.name}]${RESET} Content exists (${count} entries), skipping prepare`,
+    );
     continue;
   }
 
   const prepArgs = version
-    ? ['bun', 'run', 'scripts/prepare-content.ts', '--target', target, '--version', version]
+    ? [
+        'bun',
+        'run',
+        'scripts/prepare-content.ts',
+        '--target',
+        target,
+        '--version',
+        version,
+      ]
     : ['bun', 'run', 'scripts/prepare-content.ts', '--target', target];
 
   console.log(`${w.color}[${w.name}]${RESET} Preparing content...`);
@@ -155,7 +187,10 @@ for (const w of workers) {
     stderr: 'pipe',
   });
   if (result.exitCode !== 0) {
-    console.error(`${w.color}[${w.name}]${RESET} Failed:`, new TextDecoder().decode(result.stderr));
+    console.error(
+      `${w.color}[${w.name}]${RESET} Failed:`,
+      new TextDecoder().decode(result.stderr),
+    );
   } else {
     const output = new TextDecoder().decode(result.stdout).trim();
     console.log(`${w.color}[${w.name}]${RESET} ${output.split('\n').pop()}`);
@@ -165,7 +200,11 @@ for (const w of workers) {
 // ── Start dev servers ──
 const procs: Subprocess[] = [];
 
-function prefixStream(stream: ReadableStream<Uint8Array>, prefix: string, color: string) {
+function prefixStream(
+  stream: ReadableStream<Uint8Array>,
+  prefix: string,
+  color: string,
+) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -188,12 +227,15 @@ console.log('');
 for (const w of workers) {
   console.log(`${w.color}[${w.name}]${RESET} Starting on :${w.port}...`);
 
-  const proc = spawn(['bunx', '--bun', 'astro', 'dev', '--port', String(w.port)], {
-    cwd: resolve(ROOT, w.dir),
-    stdout: 'pipe',
-    stderr: 'pipe',
-    env: { ...process.env, ...w.env },
-  });
+  const proc = spawn(
+    ['bunx', '--bun', 'astro', 'dev', '--port', String(w.port)],
+    {
+      cwd: resolve(ROOT, w.dir),
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, ...w.env },
+    },
+  );
 
   prefixStream(proc.stdout, w.name, w.color);
   prefixStream(proc.stderr, w.name, w.color);

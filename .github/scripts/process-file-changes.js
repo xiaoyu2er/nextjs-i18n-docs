@@ -105,7 +105,7 @@ function hasContentChanges(sourcePath, destPath) {
     const changeLines = diffOutput
       .split('\n')
       .filter((line) => !line.startsWith('renamed:') && !line.startsWith('─'))
-      .filter((line) => line.match(/^[\+\-]/));
+      .filter((line) => line.match(/^[+-]/));
 
     const changeCount = changeLines.length;
     console.log(

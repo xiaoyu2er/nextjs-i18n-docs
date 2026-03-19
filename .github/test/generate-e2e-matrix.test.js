@@ -23,9 +23,9 @@ test('generateE2EMatrix should create cross-product of locales and shards', () =
   assert.ok(
     result.include.every(
       (job) =>
-        Object.prototype.hasOwnProperty.call(job, 'locale') &&
-        Object.prototype.hasOwnProperty.call(job, 'shard') &&
-        Object.prototype.hasOwnProperty.call(job, 'secret_project_id'),
+        Object.hasOwn(job, 'locale') &&
+        Object.hasOwn(job, 'shard') &&
+        Object.hasOwn(job, 'secret_project_id'),
     ),
   );
 

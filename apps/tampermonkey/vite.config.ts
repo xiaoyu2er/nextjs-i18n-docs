@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     {
       name: 'tampermonkey-banner',
-      generateBundle(options, bundle) {
+      generateBundle(_options, bundle) {
         // Add banner to all JS files in the bundle
         for (const fileName of Object.keys(bundle)) {
           if (fileName.endsWith('.js')) {

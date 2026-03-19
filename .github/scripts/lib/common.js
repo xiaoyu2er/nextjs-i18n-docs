@@ -57,7 +57,7 @@ function validateJson(jsonString) {
   try {
     JSON.parse(stripJsonComments(jsonString));
     return true;
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }
@@ -210,7 +210,7 @@ function processAllEnabledLocales(localeConfig, fieldMapper, validator = null) {
 
       // Check if all required fields are present
       const missingFields = Object.entries(fields).filter(
-        ([key, value]) => !value,
+        ([_key, value]) => !value,
       );
       if (missingFields.length > 0) {
         log(

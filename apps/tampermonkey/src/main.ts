@@ -314,7 +314,7 @@ function addTranslationButton() {
         devLog(`🔍 Found Search button with selector: ${selector}`);
         break;
       }
-    } catch (error) {
+    } catch (_error) {
       // Skip invalid selectors
     }
   }
