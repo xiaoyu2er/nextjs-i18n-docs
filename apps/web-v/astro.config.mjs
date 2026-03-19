@@ -20,6 +20,7 @@ export default defineConfig({
       components: {
         Header: './src/overrides/Header.astro',
         PageFrame: './src/overrides/PageFrame.astro',
+        Pagination: './src/overrides/Pagination.astro',
         Sidebar: './src/overrides/Sidebar.astro',
         MarkdownContent: './src/overrides/MarkdownContent.astro',
       },
