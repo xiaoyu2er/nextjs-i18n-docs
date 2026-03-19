@@ -226,7 +226,7 @@ async function translateFile(
   if (assembleResult.allCached) {
     const finalPath = path.join(opts.outputDir, opts.lang, relPath);
     fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-    const annotated = annotate(assembleResult.content);
+    const annotated = annotate(assembleResult.content, sourceContent);
     fs.writeFileSync(finalPath, annotated, 'utf8');
     const mdxResult = validateMdx(annotated);
     return {
@@ -277,7 +277,7 @@ async function translateFile(
 
   const finalPath = path.join(opts.outputDir, opts.lang, relPath);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-  const annotatedFinal = annotate(finalContent);
+  const annotatedFinal = annotate(finalContent, sourceContent);
   fs.writeFileSync(finalPath, annotatedFinal, 'utf8');
 
   const mdxResult = validateMdx(annotatedFinal);
@@ -343,7 +343,11 @@ async function runTranslate(opts: CliOptions): Promise<void> {
         cachedFiles.push(relPath);
         const finalPath = path.join(opts.outputDir, lang, relPath);
         fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-        fs.writeFileSync(finalPath, annotate(assembleResult.content), 'utf8');
+        fs.writeFileSync(
+          finalPath,
+          annotate(assembleResult.content, sourceContent),
+          'utf8',
+        );
       } else {
         translateFiles.push(relPath);
         if (translateFiles.length >= opts.max) break;
@@ -486,26 +490,42 @@ async function runAnnotate(opts: CliOptions): Promise<void> {
     files = await glob(target);
   }
 
-  console.log(`📝 Annotating ${files.length} file(s)\n`);
+  console.log(`📝 Annotating ${files.length} file(s)`);
+  console.log(`   English source: ${opts.docsRoot}\n`);
 
-  let annotated = 0;
+  let annotatedCount = 0;
+  let skippedCount = 0;
+  let noSourceCount = 0;
   for (const relPath of files) {
     const filePath = path.join(baseDir, relPath);
     const content = fs.readFileSync(filePath, 'utf8');
 
     // Skip if already annotated
     if (content.includes('{/* md5:')) {
+      skippedCount++;
       continue;
     }
 
-    const result = annotate(content);
+    // Try to find corresponding English source file
+    // Translated file: content-v15/zh-hans/docs/foo.mdx → English: content-v15/en/docs/foo.mdx
+    // Or: content/zh-hans/docs/foo.mdx → English: content/en/docs/foo.mdx
+    const enSourcePath = path.join(opts.docsRoot, relPath);
+    let sourceText: string | undefined;
+    if (fs.existsSync(enSourcePath)) {
+      sourceText = fs.readFileSync(enSourcePath, 'utf8');
+    }
+
+    const result = annotate(content, sourceText);
     fs.writeFileSync(filePath, result, 'utf8');
-    annotated++;
-    console.log(`  ✅ ${filePath}`);
+    annotatedCount++;
+    if (!sourceText) noSourceCount++;
+    console.log(
+      `  ✅ ${filePath}${sourceText ? '' : ' (no EN source, using translated MD5)'}`,
+    );
   }
 
   console.log(
-    `\n📝 Annotated ${annotated} file(s), ${files.length - annotated} already had annotations.`,
+    `\n📝 Done: ${annotatedCount} annotated, ${skippedCount} already had annotations${noSourceCount > 0 ? `, ${noSourceCount} without EN source` : ''}.`,
   );
 }
 

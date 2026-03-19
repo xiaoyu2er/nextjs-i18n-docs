@@ -2,45 +2,66 @@ import { normalize } from './normalize';
 import { parseMdx } from './parser';
 
 /**
- * Inject `<!-- md5:hash -->` comments before each translatable node
- * in the final translated content. This makes MD5 hashes searchable
- * directly in the output files without running a CLI tool.
+ * Inject `{/* md5:hash * /}` comments before each translatable node
+ * in the translated content. The MD5 comes from the ENGLISH SOURCE
+ * (same key used in the translation cache), not the translated text.
  *
- * Only annotates translatable nodes (paragraph, heading, list, blockquote, html with text).
- * Non-translatable nodes (code blocks, pure HTML tags) are left untouched.
- * Skips frontmatter nodes (type === 'heading' whose rawText contains YAML-like content
- * parsed from the --- block) to avoid breaking YAML parsing.
+ * When sourceContent is provided, aligns source and translated nodes
+ * by index to map English MD5 → translated node position.
+ *
+ * When sourceContent is NOT provided (standalone annotate mode),
+ * falls back to hashing the translated text itself (less useful but
+ * still enables grep-based navigation).
  */
-export function annotate(content: string): string {
-  const normalized = normalize(content);
-  const nodes = parseMdx(content);
+export function annotate(
+  translatedContent: string,
+  sourceContent?: string,
+): string {
+  const normalized = normalize(translatedContent);
+  const transNodes = parseMdx(translatedContent);
+
+  // Build English MD5 map if source provided
+  let sourceMd5s: (string | undefined)[] | undefined;
+  if (sourceContent) {
+    const sourceNodes = parseMdx(sourceContent);
+    const sourceTranslatable = sourceNodes.filter((n) => n.needsTranslation);
+    sourceMd5s = sourceTranslatable.map((n) => n.md5);
+  }
 
   let result = '';
   let lastEnd = 0;
+  let transIdx = 0;
 
-  // Detect frontmatter: if content starts with ---, the first thematicBreak
-  // is the frontmatter delimiter. The next translatable node after it
-  // (before the first blank line gap) is the frontmatter content.
+  // Detect frontmatter
   let frontmatterEnd = 0;
   if (normalized.startsWith('---')) {
-    // Find the closing --- (second occurrence)
     const secondDash = normalized.indexOf('---', 3);
     if (secondDash > 0) {
       frontmatterEnd = secondDash + 3;
     }
   }
 
-  for (const node of nodes) {
+  for (const node of transNodes) {
     result += normalized.substring(lastEnd, node.startOffset);
 
-    if (
-      node.needsTranslation &&
-      node.md5 &&
-      node.startOffset >= frontmatterEnd
-    ) {
-      result += `{/* md5:${node.md5} */}\n${node.rawText}`;
+    if (node.needsTranslation && node.startOffset >= frontmatterEnd) {
+      // Use English source MD5 if available, otherwise fall back to translated text MD5
+      const md5 =
+        sourceMd5s && transIdx < sourceMd5s.length
+          ? sourceMd5s[transIdx]
+          : node.md5;
+
+      if (md5) {
+        result += `{/* md5:${md5} */}\n${node.rawText}`;
+      } else {
+        result += node.rawText;
+      }
     } else {
       result += node.rawText;
+    }
+
+    if (node.needsTranslation) {
+      transIdx++;
     }
 
     lastEnd = node.endOffset;
