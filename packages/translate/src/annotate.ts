@@ -38,7 +38,7 @@ export function annotate(content: string): string {
       node.md5 &&
       node.startOffset >= frontmatterEnd
     ) {
-      result += `<!-- md5:${node.md5} -->\n${node.rawText}`;
+      result += `{/* md5:${node.md5} */}\n${node.rawText}`;
     } else {
       result += node.rawText;
     }

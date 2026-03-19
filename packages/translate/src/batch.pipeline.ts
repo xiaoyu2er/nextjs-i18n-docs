@@ -494,7 +494,7 @@ async function runAnnotate(opts: CliOptions): Promise<void> {
     const content = fs.readFileSync(filePath, 'utf8');
 
     // Skip if already annotated
-    if (content.includes('<!-- md5:')) {
+    if (content.includes('{/* md5:')) {
       continue;
     }
 
