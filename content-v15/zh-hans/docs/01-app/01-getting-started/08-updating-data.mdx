@@ -1,0 +1,487 @@
+---
+title: 更新数据
+description: 学习如何使用服务器函数修改数据。
+related:
+  title: API 引用
+  description: 通过阅读 API 引用，了解更多关于本页面中提到的功能。
+  links:
+    - app/api-reference/functions/revalidatePath
+    - app/api-reference/functions/revalidateTag
+    - app/api-reference/functions/redirect
+---
+
+您可以使用 React 的 [Server Functions](https://react.dev/reference/rsc/server-functions) 在 Next.js 中更新数据。本页面将介绍如何 [创建](#creating-server-functions) 和 [调用](#invoking-server-functions) 服务器函数 (Server Functions)。
+
+## 什么是服务器函数？
+
+**服务器函数**是在服务器上运行的异步函数。它们可以通过网络请求从客户端调用，这就是为什么它们必须是异步的。
+
+在操作 (action) 或变更 (mutation) 的上下文中，它们也被称为**服务器操作 (Server Actions)**。
+
+按照约定，服务器操作是与 [`startTransition`](https://react.dev/reference/react/startTransition) 一起使用的异步函数。当函数满足以下条件时，此行为会自动发生：
+
+- 通过 `action` 属性传递给 `<form>`。
+- 通过 `formAction` 属性传递给 `<button>`。
+
+在 Next.js 中，服务器操作与框架的 [缓存](/docs/app/guides/caching) 架构集成。当操作被调用时，Next.js 可以在单次服务器往返中同时返回更新后的 UI 和新数据。
+
+在底层，操作使用 `POST` 方法，并且只有此 HTTP 方法可以调用它们。
+
+## 创建服务器函数
+
+可以通过使用 [`use server`](https://react.dev/reference/rsc/use-server) 指令来定义一个服务器函数。您可以将该指令放在一个**异步**函数的顶部，以将该函数标记为服务器函数，或者放在一个单独文件的顶部，以标记该文件的所有导出。
+
+```ts filename="app/lib/actions.ts" switcher
+export async function createPost(formData: FormData) {
+  'use server'
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // Update data
+  // Revalidate cache
+}
+
+export async function deletePost(formData: FormData) {
+  'use server'
+  const id = formData.get('id')
+
+  // Update data
+  // Revalidate cache
+}
+```
+
+```js filename="app/lib/actions.js" switcher
+export async function createPost(formData) {
+  'use server'
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // Update data
+  // Revalidate cache
+}
+
+export async function deletePost(formData) {
+  'use server'
+  const id = formData.get('id')
+
+  // Update data
+  // Revalidate cache
+}
+```
+
+### 服务器组件
+
+可以通过在函数体顶部添加 `"use server"` 指令，将服务器函数内联到服务器组件中：
+
+```tsx filename="app/page.tsx" switcher
+export default function Page() {
+  // Server Action
+  async function createPost(formData: FormData) {
+    'use server'
+    // ...
+  }
+
+  return <></>
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default function Page() {
+  // Server Action
+  async function createPost(formData: FormData) {
+    'use server'
+    // ...
+  }
+
+  return <></>
+}
+```
+
+> **须知：** 服务器组件默认支持渐进增强 (progressive enhancement)，意味着调用服务器操作的表单即使在 JavaScript 尚未加载或被禁用的情况下也能提交。
+
+### 客户端组件
+
+不能在客户端组件中定义服务器函数。但是，您可以通过从顶部有 `"use server"` 指令的文件中导入它们，从而在客户端组件中调用它们：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function createPost() {}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function createPost() {}
+```
+
+```tsx filename="app/ui/button.tsx" switcher
+'use client'
+
+import { createPost } from '@/app/actions'
+
+export function Button() {
+  return <button formAction={createPost}>Create</button>
+}
+```
+
+```jsx filename="app/ui/button.js" switcher
+'use client'
+
+import { createPost } from '@/app/actions'
+
+export function Button() {
+  return <button formAction={createPost}>Create</button>
+}
+```
+
+> **须知：** 在客户端组件中，调用服务器操作的表单如果 JavaScript 尚未加载，会将提交排队，并优先进行注水 (hydration)。注水后，浏览器在表单提交时不会刷新。
+
+### 将操作作为属性传递
+
+您也可以将操作作为属性传递给客户端组件：
+
+```jsx
+<ClientComponent updateItemAction={updateItem} />
+```
+
+```tsx filename="app/client-component.tsx" switcher
+'use client'
+
+export default function ClientComponent({
+  updateItemAction,
+}: {
+  updateItemAction: (formData: FormData) => void
+}) {
+  return <form action={updateItemAction}>{/* ... */}</form>
+}
+```
+
+```jsx filename="app/client-component.js" switcher
+'use client'
+
+export default function ClientComponent({ updateItemAction }) {
+  return <form action={updateItemAction}>{/* ... */}</form>
+}
+```
+
+## 调用服务器函数
+
+主要有两种方式可以调用服务器函数：
+
+1. [表单](#forms)，用于服务器和客户端组件
+2. [事件处理器](#event-handlers)和 [useEffect](#useeffect)，用于客户端组件
+
+> **须知：** 服务器函数是为服务器端变更设计的。客户端目前一次只分派并等待一个操作。这是一个实现细节，未来可能会改变。如果您需要并行数据获取，请使用服务器组件中的[数据获取](/docs/app/getting-started/fetching-data#server-components)，或在单个服务器函数或[路由处理器](/docs/app/guides/backend-for-frontend#manipulating-data)内执行并行工作。
+
+### 表单
+
+React 扩展了 HTML [`<form>`](https://react.dev/reference/react-dom/components/form) 元素，允许通过 HTML `action` prop 调用服务器函数。
+
+在表单中调用时，函数会自动接收 [`FormData`](https://developer.mozilla.org/docs/Web/API/FormData/FormData) 对象。您可以使用原生的 [`FormData` 方法](https://developer.mozilla.org/en-US/docs/Web/API/FormData#instance_methods) 提取数据：
+
+```tsx filename="app/ui/form.tsx" switcher
+import { createPost } from '@/app/actions'
+
+export function Form() {
+  return (
+    <form action={createPost}>
+      <input type="text" name="title" />
+      <input type="text" name="content" />
+      <button type="submit">Create</button>
+    </form>
+  )
+}
+```
+
+```jsx filename="app/ui/form.js" switcher
+import { createPost } from '@/app/actions'
+
+export function Form() {
+  return (
+    <form action={createPost}>
+      <input type="text" name="title" />
+      <input type="text" name="content" />
+      <button type="submit">Create</button>
+    </form>
+  )
+}
+```
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+export async function createPost(formData: FormData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // Update data
+  // Revalidate cache
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+export async function createPost(formData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // Update data
+  // Revalidate cache
+}
+```
+
+### 事件处理器
+
+您可以在客户端组件中通过使用事件处理器（如 `onClick`）来调用服务器函数。
+
+```tsx filename="app/like-button.tsx" switcher
+'use client'
+
+import { incrementLike } from './actions'
+import { useState } from 'react'
+
+export default function LikeButton({ initialLikes }: { initialLikes: number }) {
+  const [likes, setLikes] = useState(initialLikes)
+
+  return (
+    <>
+      <p>Total Likes: {likes}</p>
+      <button
+        onClick={async () => {
+          const updatedLikes = await incrementLike()
+          setLikes(updatedLikes)
+        }}
+      >
+        Like
+      </button>
+    </>
+  )
+}
+```
+
+```jsx filename="app/like-button.js" switcher
+'use client'
+
+import { incrementLike } from './actions'
+import { useState } from 'react'
+
+export default function LikeButton({ initialLikes }) {
+  const [likes, setLikes] = useState(initialLikes)
+
+  return (
+    <>
+      <p>Total Likes: {likes}</p>
+      <button
+        onClick={async () => {
+          const updatedLikes = await incrementLike()
+          setLikes(updatedLikes)
+        }}
+      >
+        Like
+      </button>
+    </>
+  )
+}
+```
+
+## 示例
+
+### 显示等待状态
+
+在执行服务器函数时，您可以使用 React 的 [`useActionState`](https://react.dev/reference/react/useActionState) hook 显示加载指示器。此 hook 返回一个 `pending` 布尔值：
+
+```tsx filename="app/ui/button.tsx" switcher
+'use client'
+
+import { useActionState, startTransition } from 'react'
+import { createPost } from '@/app/actions'
+import { LoadingSpinner } from '@/app/ui/loading-spinner'
+
+export function Button() {
+  const [state, action, pending] = useActionState(createPost, false)
+
+  return (
+    <button onClick={() => startTransition(action)}>
+      {pending ? <LoadingSpinner /> : 'Create Post'}
+    </button>
+  )
+}
+```
+
+```jsx filename="app/ui/button.js" switcher
+'use client'
+
+import { useActionState, startTransition } from 'react'
+import { createPost } from '@/app/actions'
+import { LoadingSpinner } from '@/app/ui/loading-spinner'
+
+export function Button() {
+  const [state, action, pending] = useActionState(createPost, false)
+
+  return (
+    <button onClick={() => startTransition(action)}>
+      {pending ? <LoadingSpinner /> : 'Create Post'}
+    </button>
+  )
+}
+```
+
+### 重新验证
+
+执行更新后，您可以通过在服务器函数中调用 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) 或 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) 来重新验证 Next.js 缓存并显示更新后的数据：
+
+```ts filename="app/lib/actions.ts" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(formData: FormData) {
+  'use server'
+  // Update data
+  // ...
+
+  revalidatePath('/posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(formData) {
+  'use server'
+  // Update data
+  // ...
+  revalidatePath('/posts')
+}
+```
+
+### 重定向
+
+您可能希望在执行更新后将用户重定向到其他页面。您可以通过在服务器函数内调用 [`redirect`](/docs/app/api-reference/functions/redirect) 来实现。
+
+```ts filename="app/lib/actions.ts" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData: FormData) {
+  // Update data
+  // ...
+
+  revalidatePath('/posts')
+  redirect('/posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData) {
+  // Update data
+  // ...
+
+  revalidatePath('/posts')
+  redirect('/posts')
+}
+```
+
+调用 `redirect` 会[抛出](/docs/app/api-reference/functions/redirect#behavior)一个由框架处理的控制流异常。其后的任何代码都不会执行。如果您需要新鲜数据，请事先调用 [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) 或 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)。
+
+### Cookie
+
+您可以使用 [`cookies`](/docs/app/api-reference/functions/cookies) API 在服务器操作内部 `获取`、`设置` 和 `删除` cookies。
+
+当您在服务器操作 [设置或删除](/docs/app/api-reference/functions/cookies#understanding-cookie-behavior-in-server-actions) Cookie 时，Next.js 会在服务器上重新渲染当前页面及其布局，以便 **UI 反映新的 Cookie 值**。
+
+> **须知**：服务器更新应用于当前 React 树，根据需要重新渲染、挂载或卸载组件。客户端状态对于重新渲染的组件是保留的，并且如果依赖项发生变化，副作用会重新运行。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function exampleAction() {
+  const cookieStore = await cookies()
+
+  // Get cookie
+  cookieStore.get('name')?.value
+
+  // Set cookie
+  cookieStore.set('name', 'Delba')
+
+  // Delete cookie
+  cookieStore.delete('name')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function exampleAction() {
+  // Get cookie
+  const cookieStore = await cookies()
+
+  // Get cookie
+  cookieStore.get('name')?.value
+
+  // Set cookie
+  cookieStore.set('name', 'Delba')
+
+  // Delete cookie
+  cookieStore.delete('name')
+}
+```
+
+### useEffect
+
+您可以使用 React [`useEffect`](https://react.dev/reference/react/useEffect) hook 在组件挂载或依赖项更改时调用服务器操作。这对于依赖全局事件或需要自动触发的变更很有用。例如，用于应用快捷键的 `onKeyDown`、用于无限滚动的交叉观察器 hook，或在组件挂载时更新查看计数：
+
+```tsx filename="app/view-count.tsx" switcher
+'use client'
+
+import { incrementViews } from './actions'
+import { useState, useEffect, useTransition } from 'react'
+
+export default function ViewCount({ initialViews }: { initialViews: number }) {
+  const [views, setViews] = useState(initialViews)
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    startTransition(async () => {
+      const updatedViews = await incrementViews()
+      setViews(updatedViews)
+    })
+  }, [])
+
+  // You can use `isPending` to give users feedback
+  return <p>Total Views: {views}</p>
+}
+```
+
+```jsx filename="app/view-count.js" switcher
+'use client'
+
+import { incrementViews } from './actions'
+import { useState, useEffect, useTransition } from 'react'
+
+export default function ViewCount({ initialViews }) {
+  const [views, setViews] = useState(initialViews)
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    startTransition(async () => {
+      const updatedViews = await incrementViews()
+      setViews(updatedViews)
+    })
+  }, [])
+
+  // You can use `isPending` to give users feedback
+  return <p>Total Views: {views}</p>
+}
+```

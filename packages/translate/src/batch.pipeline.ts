@@ -79,6 +79,7 @@ interface CliOptions {
   concurrency: number;
   dryRun: boolean;
   status: boolean;
+  lookup: string;
   configPath: string;
   docsContext?: string;
 }
@@ -112,6 +113,7 @@ function parseArgs(argv: string[]): CliOptions {
     concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
     status: hasFlag('status'),
+    lookup: getOpt('lookup', ''),
     configPath: getOpt('config', 'translation.config.example.mjs'),
   };
 }
@@ -453,12 +455,67 @@ async function runTranslate(opts: CliOptions): Promise<void> {
   }
 }
 
+// ── Lookup Mode ──────────────────────────────────────────────────────
+
+async function runLookup(opts: CliOptions): Promise<void> {
+  const md5 = opts.lookup;
+  const files = await glob(opts.pattern, { cwd: opts.docsRoot });
+
+  console.log(`🔍 Looking up MD5: ${md5}`);
+  console.log(`   Scanning: ${opts.docsRoot} (${files.length} files)\n`);
+
+  let found = false;
+  for (const relPath of files) {
+    const content = fs.readFileSync(path.join(opts.docsRoot, relPath), 'utf8');
+    const nodes = parseMdx(content);
+    for (const node of nodes) {
+      if (node.md5 === md5) {
+        console.log(`📄 ${relPath}:`);
+        console.log(`   Type: ${node.type}`);
+        console.log(`   Text:\n${node.rawText}\n`);
+        found = true;
+      }
+    }
+  }
+
+  if (!found) {
+    console.log('❌ Not found in any source file.');
+  }
+
+  // Also show cached translations
+  const { langs } = await loadLangConfigs(opts.configPath);
+  let hasTranslation = false;
+  for (const lang of Object.keys(langs)) {
+    const cache = new TranslationCache(opts.cacheDir);
+    try {
+      cache.load(lang);
+    } catch {
+      continue;
+    }
+    const val = cache.get(lang, md5);
+    if (val) {
+      if (!hasTranslation) {
+        console.log('🌐 Cached translations:');
+        hasTranslation = true;
+      }
+      console.log(
+        `   ${lang}: ${val.substring(0, 120).replace(/\n/g, '↵')}${val.length > 120 ? '...' : ''}`,
+      );
+    }
+  }
+  if (!hasTranslation) {
+    console.log('🌐 No cached translations found.');
+  }
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 
 async function main() {
   const opts = parseArgs(process.argv);
 
-  if (opts.status) {
+  if (opts.lookup) {
+    await runLookup(opts);
+  } else if (opts.status) {
     await runStatus(opts);
   } else {
     await runTranslate(opts);
