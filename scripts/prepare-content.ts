@@ -221,6 +221,24 @@ let totalFiles = 0;
 let sourceResolved = 0;
 let sourceErrors = 0;
 
+// Pre-compute blog post ordering by date (newest first)
+const blogDateOrder = new Map<string, number>();
+if (!version) {
+  const blogDir = join(CONTENT_SRC, 'en', 'blog');
+  if (existsSync(blogDir)) {
+    const posts: { slug: string; date: number }[] = [];
+    for (const file of readdirSync(blogDir)) {
+      if (!file.endsWith('.mdx') || file === 'index.mdx') continue;
+      const content = readFileSync(join(blogDir, file), 'utf-8');
+      const { frontmatter } = parseFrontmatter(content);
+      const date = frontmatter.date ? new Date(frontmatter.date.trim()).getTime() : 0;
+      posts.push({ slug: file.replace(/\.mdx$/, ''), date });
+    }
+    posts.sort((a, b) => b.date - a.date); // newest first
+    posts.forEach((p, i) => blogDateOrder.set(p.slug, i + 1));
+  }
+}
+
 console.log(`Preparing content: ${version ? `v${version}` : 'latest'} → ${CONTENT_DST}`);
 
 for (const locale of LOCALES) {
@@ -299,12 +317,15 @@ function processFile(
   const content = readFileSync(srcPath, 'utf-8');
   const { frontmatter, body, raw } = parseFrontmatter(content);
 
-  // Inject sidebar metadata based on original numeric prefix
-  const order = getSidebarOrder(originalRel);
+  // Inject sidebar metadata based on original numeric prefix or blog date
+  const isBlogPost = dstPath.includes('/blog/') && !cleanRel.endsWith('index.mdx');
+  const order = isBlogPost
+    ? blogDateOrder.get(cleanRel.replace(/\.mdx$/, ''))
+    : getSidebarOrder(originalRel);
   let enrichedRaw = raw;
   if (!raw.includes('sidebar:')) {
     const sidebarParts: string[] = [];
-    if (order !== null) sidebarParts.push(`  order: ${order}`);
+    if (order !== null && order !== undefined) sidebarParts.push(`  order: ${order}`);
     // Use nav_title as sidebar label (short name for navigation)
     // Falls back to title for index files (used as group label)
     if (frontmatter.nav_title) {
