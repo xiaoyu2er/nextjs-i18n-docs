@@ -1,0 +1,323 @@
+---
+title: 元數據及 OG 圖片
+description: 學習如何為您的頁面新增元數據並建立動態 OG 圖片。
+related:
+  title: API 參考 (API Reference)
+  description: 深入瞭解本頁提及的元數據 APIs。
+  links:
+    - app/api-reference/functions/generate-metadata
+    - app/api-reference/functions/generate-viewport
+    - app/api-reference/functions/image-response
+    - app/api-reference/file-conventions/metadata
+    - app/api-reference/file-conventions/metadata/app-icons
+    - app/api-reference/file-conventions/metadata/opengraph-image
+    - app/api-reference/file-conventions/metadata/robots
+    - app/api-reference/file-conventions/metadata/sitemap
+    - app/api-reference/config/next-config-js/htmlLimitedBots
+---
+
+元數據 API 可用於定義應用程式元數據，以改善 SEO 和網路分享性，內容包含：
+1. [靜態 `metadata` 物件](#static-metadata)
+2. [動態 `generateMetadata` 函式](#generated-metadata)
+3. 特殊的 [文件規範](/docs/app/api-reference/file-conventions/metadata)，可用來新增靜態或動態產生的 [favicons](#favicons) 和 [OG 圖片](#static-open-graph-images)。
+
+使用上述所有選項後，Next.js 將會自動為您產生相應的 `<head>` 標籤，您可在瀏覽器的開發者工具中檢視。
+
+「`metadata` 物件」和 `generateMetadata` 函式的匯出僅在 Server Components 中支援。
+
+## 預設欄位
+
+即使路由未定義元數據，始終有兩個預設的 `meta` 標籤會被加入：
+- [meta charset 標籤](https://developer.mozilla.org/docs/Web/HTML/Element/meta#attr-charset) 設定網站的字元編碼。
+- [meta viewport 標籤](https://developer.mozilla.org/docs/Web/HTML/Viewport_meta_tag) 設定網站的視窗寬度和縮放比例，以適應不同的裝置。
+
+```html
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+```
+
+其他元數據欄位可使用 `Metadata` 物件（針對 [靜態元數據](#static-metadata)）或 `generateMetadata` 函式（針對 [產生的元數據](#generated-metadata)）來定義。
+
+## 靜態元數據
+
+要定義靜態元數據，請從靜態的 [`layout.js`](/docs/app/api-reference/file-conventions/layout) 或 [`page.js`](/docs/app/api-reference/file-conventions/page) 檔案匯出 [`Metadata` 物件](/docs/app/api-reference/functions/generate-metadata#metadata-object)。例如，要為 blog 路由新增標題和說明：
+
+```tsx filename="app/blog/layout.tsx" switcher
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My Blog',
+  description: '...',
+}
+
+export default function Layout() {}
+```
+
+```jsx filename="app/blog/layout.tsx" switcher
+export const metadata = {
+  title: 'My Blog',
+  description: '...',
+}
+
+export default function Layout() {}
+```
+
+您可以在 [`generateMetadata` 文件](/docs/app/api-reference/functions/generate-metadata#metadata-fields) 中查看所有可用選項的完整清單。
+
+## 產生的元數據
+
+您可使用 [`generateMetadata`](/docs/app/api-reference/functions/generate-metadata) 函式來 `fetch` 取決於資料的元數據。例如，要擷取特定博客文章的標題和說明：
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+import type { Metadata, ResolvingMetadata } from 'next'
+
+type Props = {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export async function generateMetadata(
+  { params, searchParams }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const slug = (await params).slug
+
+  // fetch post information
+  const post = await fetch(`https://api.vercel.app/blog/${slug}`).then((res) =>
+    res.json()
+  )
+
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default function Page({ params, searchParams }: Props) {}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+export async function generateMetadata({ params, searchParams }, parent) {
+  const slug = (await params).slug
+
+  // fetch post information
+  const post = await fetch(`https://api.vercel.app/blog/${slug}`).then((res) =>
+    res.json()
+  )
+
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default function Page({ params, searchParams }) {}
+```
+
+### 流式元數據
+
+對於動態渲染的頁面，Next.js 會分別處理元數據的串流，當 `generateMetadata` 解析後將注入 HTML，且不阻塞 UI 渲染。
+
+流式元數據允許視覺內容先串流，從而改善感知效能。
+
+對於預期 `<head>` 標籤包含元數據的 **機器人和爬蟲**（例如 `Twitterbot`、`Slackbot`、`Bingbot`），流式元數據將 **被停用**。這些是透過來自請求的 User Agent 標頭來偵測的。
+
+您可以在 Next.js 設定檔中使用 [`htmlLimitedBots`](/docs/app/api-reference/config/next-config-js/htmlLimitedBots#disabling) 選項來自訂或完全 **停用** 流式元數據。
+
+靜態渲染的頁面不串流，因為元數據是在建置時解析的。
+
+深入瞭解 [流式元數據](/docs/app/api-reference/functions/generate-metadata#streaming-metadata)。
+
+### 快取資料請求
+
+在某些情況下，您可能需要為元數據和頁面本身擷取 **相同** 的資料。為了避免重複請求，您可以使用 React 的 [`cache` 函式](https://react.dev/reference/react/cache) 來快取返回值，僅擷取資料一次。例如，要同時為元數據和頁面擷取博客文章資訊：
+
+```tsx filename="app/lib/data.ts" highlight={5} switcher
+import { cache } from 'react'
+import { db } from '@/app/lib/db'
+
+// getPost will be used twice, but execute only once
+export const getPost = cache(async (slug: string) => {
+  const res = await db.query.posts.findFirst({ where: eq(posts.slug, slug) })
+  return res
+})
+```
+
+```jsx filename="app/lib/data.js" highlight={5} switcher
+import { cache } from 'react'
+import { db } from '@/app/lib/db'
+
+// getPost will be used twice, but execute only once
+export const getPost = cache(async (slug) => {
+  const res = await db.query.posts.findFirst({ where: eq(posts.slug, slug) })
+  return res
+})
+```
+
+```tsx filename="app/blog/[slug]/page.tsx" switcher
+import { getPost } from '@/app/lib/data'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}) {
+  const post = await getPost(params.slug)
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default async function Page({ params }: { params: { slug: string } }) {
+  const post = await getPost(params.slug)
+  return <div>{post.title}</div>
+}
+```
+
+```jsx filename="app/blog/[slug]/page.js" switcher
+import { getPost } from '@/app/lib/data'
+
+export async function generateMetadata({ params }) {
+  const post = await getPost(params.slug)
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default async function Page({ params }) {
+  const post = await getPost(params.slug)
+  return <div>{post.title}</div>
+}
+```
+
+## 基於檔案的元數據
+
+以下特殊檔案可用於元數據：
+- [favicon.ico、apple-icon.jpg 及 icon.jpg](/docs/app/api-reference/file-conventions/metadata/app-icons)
+- [opengraph-image.jpg 及 twitter-image.jpg](/docs/app/api-reference/file-conventions/metadata/opengraph-image)
+- [robots.txt](/docs/app/api-reference/file-conventions/metadata/robots)
+- [sitemap.xml](/docs/app/api-reference/file-conventions/metadata/sitemap)
+
+您可以使用這些進行靜態元數據設定，也可以程式化地透過程式碼產生這些檔案。
+
+## Favicon
+
+Favicon 是用來表示網站於書籤和搜尋結果中的小圖示。要在應用程式中加入 Favicon，請建立 `favicon.ico` 並放到 app 資料夾的根目錄。
+<Image
+  alt="Favicon Special File inside the App Folder with sibling layout and page files"
+  srcLight="/docs/light/favicon-ico.png"
+  srcDark="/docs/dark/favicon-ico.png"
+  width="1600"
+  height="444"
+/>
+> 您也可以透過程式碼程式化地產生 Favicon。請參閱 [Favicon 文件](/docs/app/api-reference/file-conventions/metadata/app-icons) 以取得更多資訊。
+
+## 靜態 Open Graph 圖片
+
+Open Graph (OG) 圖片是用來表示網站於社群媒體上的圖片。要在應用程式中加入靜態 OG 圖片，請在 app 資料夾的根目錄建立 `opengraph-image.png` 檔案。
+<Image
+  alt="OG image special file inside the App folder with sibling layout and page files"
+  srcLight="/docs/light/opengraph-image.png"
+  srcDark="/docs/dark/opengraph-image.png"
+  width="1600"
+  height="444"
+/>
+您也可以在資料夾結構中更深處建立 `opengraph-image.png` 來為特定路由新增 OG 圖片。例如，要為 `/blog` 路由建立專屬的 OG 圖片，請在 `blog` 資料夾內新增 `opengraph-image.jpg` 檔案。
+<Image
+  alt="OG image special file inside the blog folder"
+  srcLight="/docs/light/opengraph-image-blog.png"
+  srcDark="/docs/dark/opengraph-image-blog.png"
+  width="1600"
+  height="525"
+/>
+
+資料夾結構中較為特定的圖片將優先於其上方的任何 OG 圖片。
+> 其他影像格式如 `jpeg`、`png` 和 `gif` 也受支援。請參閱 [Open Graph 影像文件](/docs/app/api-reference/file-conventions/metadata/opengraph-image) 以取得更多資訊。
+
+## 產生的 Open Graph 圖片
+
+[`ImageResponse` 建構子](/docs/app/api-reference/functions/image-response) 讓您可以使用 JSX 和 CSS 產生動態圖片。這對取決於資料的 OG 圖片很有用。
+
+例如，要為每篇博客文章產生獨特的 OG 圖片，請在 `blog` 資料夾內新增 `opengraph-image.ts` 檔案，並從 `next/og` 匯入 `ImageResponse` 建構子：
+
+```tsx filename="app/blog/[slug]/opengraph-image.ts" switcher
+import { ImageResponse } from 'next/og'
+import { getPost } from '@/app/lib/data'
+
+// Image metadata
+export const size = {
+  width: 1200,
+  height: 630,
+}
+
+export const contentType = 'image/png'
+
+// Image generation
+export default async function Image({ params }: { params: { slug: string } }) {
+  const post = await getPost(params.slug)
+
+  return new ImageResponse(
+    (
+      // ImageResponse JSX element
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    )
+  )
+}
+```
+
+```jsx filename="app/blog/[slug]/opengraph-image.js" switcher
+import { ImageResponse } from 'next/og'
+import { getPost } from '@/app/lib/data'
+
+// Image metadata
+export const size = {
+  width: 1200,
+  height: 630,
+}
+
+export const contentType = 'image/png'
+
+// Image generation
+export default async function Image({ params }) {
+  const post = await getPost(params.slug)
+
+  return new ImageResponse(
+    (
+      // ImageResponse JSX element
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    )
+  )
+}
+```
+
+`ImageResponse` 支援常見的 CSS 屬性，包括 flexbox 和絕對定位、自訂字型、文字換行、置中及嵌套圖片。 [請參閱支援的 CSS 屬性完整清單](/docs/app/api-reference/functions/image-response)。
+> **小提示**：
+> - 範例可在 [Vercel OG Playground](https://og-playground.vercel.app/) 取得。
+> - `ImageResponse` 使用 [`@vercel/og`](https://vercel.com/docs/og-image-generation)、[`satori`](https://github.com/vercel/satori) 和 `resvg` 將 HTML 和 CSS 轉換為 PNG。
+> - 僅支援 flexbox 及部分 CSS 屬性。進階佈局（例如 `display: grid`）將無法運作。

@@ -80,6 +80,7 @@ interface CliOptions {
   concurrency: number;
   dryRun: boolean;
   status: boolean;
+  repair: boolean;
   annotateFiles: string;
   lookup: string;
   configPath: string;
@@ -115,6 +116,7 @@ function parseArgs(argv: string[]): CliOptions {
     concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
     status: hasFlag('status'),
+    repair: hasFlag('repair'),
     annotateFiles: getOpt('annotate', ''),
     lookup: getOpt('lookup', ''),
     configPath: getOpt(
@@ -516,6 +518,120 @@ async function runTranslate(opts: CliOptions): Promise<void> {
   }
 }
 
+// ── Repair Mode ──────────────────────────────────────────────────────
+
+async function runRepair(opts: CliOptions): Promise<void> {
+  const { langs } = await loadLangConfigs(opts.configPath);
+  const targetLangs = opts.lang === 'all' ? Object.keys(langs) : [opts.lang];
+  const files = await glob(opts.pattern, { cwd: opts.docsRoot });
+
+  for (const lang of targetLangs) {
+    const langDir = path.join(opts.outputDir, lang);
+    if (!fs.existsSync(langDir)) {
+      console.log(`⏭️  ${lang}: no translated files found`);
+      continue;
+    }
+
+    const cache = new TranslationCache(opts.cacheDir);
+    try {
+      cache.load(lang);
+    } catch {
+      console.log(`⏭️  ${lang}: no cache found`);
+      continue;
+    }
+
+    let repaired = 0;
+    let skipped = 0;
+    let partial = 0;
+
+    for (const relPath of files) {
+      const enPath = path.join(opts.docsRoot, relPath);
+      const langPath = path.join(langDir, relPath);
+      if (!fs.existsSync(langPath)) continue;
+
+      const enContent = fs.readFileSync(enPath, 'utf8');
+      const langContent = fs.readFileSync(langPath, 'utf8');
+
+      const enNodes = parseMdx(enContent).filter((n) => n.needsTranslation);
+      const langNodes = parseMdx(langContent).filter((n) => n.needsTranslation);
+
+      // Check alignment
+      let aligned = true;
+      if (enNodes.length !== langNodes.length) {
+        aligned = false;
+      } else {
+        for (let i = 0; i < enNodes.length; i++) {
+          if (enNodes[i].type !== langNodes[i].type) {
+            aligned = false;
+            break;
+          }
+        }
+      }
+
+      if (aligned) {
+        skipped++;
+        continue;
+      }
+
+      // Try re-assemble from cache
+      const reassembled = assemble(enContent, lang, cache, relPath);
+      if (reassembled.allCached) {
+        fs.writeFileSync(langPath, reassembled.content, 'utf8');
+        repaired++;
+        console.log(`  ✅ ${relPath} (re-assembled from cache)`);
+      } else {
+        // Backfill from existing translation, then re-assemble
+        const existingNodes = parseMdx(langContent).filter(
+          (n) => n.needsTranslation,
+        );
+        let si = 0;
+        let li = 0;
+        let backfilled = 0;
+        while (si < enNodes.length && li < existingNodes.length) {
+          if (enNodes[si].type === existingNodes[li].type) {
+            if (
+              enNodes[si].md5 &&
+              !cache.get(lang, enNodes[si].md5 as string)
+            ) {
+              cache.set(
+                lang,
+                enNodes[si].md5 as string,
+                existingNodes[li].rawText,
+              );
+              backfilled++;
+            }
+            si++;
+            li++;
+          } else if (existingNodes.length > enNodes.length) {
+            li++;
+          } else {
+            si++;
+          }
+        }
+
+        const reassembled2 = assemble(enContent, lang, cache, relPath);
+        if (reassembled2.allCached) {
+          fs.writeFileSync(langPath, reassembled2.content, 'utf8');
+          repaired++;
+          console.log(
+            `  ✅ ${relPath} (backfilled ${backfilled} + re-assembled)`,
+          );
+        } else {
+          partial++;
+          console.log(
+            `  ⚠️  ${relPath} (${reassembled2.uncachedCount} nodes still uncached)`,
+          );
+        }
+      }
+    }
+
+    cache.save(lang);
+    console.log(
+      `\n📊 ${lang}: ${repaired} repaired, ${skipped} already aligned, ${partial} partial\n`,
+    );
+  }
+}
+
 // ── Lookup Mode ──────────────────────────────────────────────────────
 
 // ── Annotate Mode ────────────────────────────────────────────────────
@@ -691,7 +807,9 @@ async function runLookup(opts: CliOptions): Promise<void> {
 async function main() {
   const opts = parseArgs(process.argv);
 
-  if (opts.annotateFiles) {
+  if (opts.repair) {
+    await runRepair(opts);
+  } else if (opts.annotateFiles) {
     await runAnnotate(opts);
   } else if (opts.lookup) {
     await runLookup(opts);

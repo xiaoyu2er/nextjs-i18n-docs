@@ -1,0 +1,619 @@
+---
+title: 代码修改工具
+description: 当新功能发布时，使用代码修改工具来升级您的 Next.js 代码库。
+---
+
+代码修改工具是可以在您的代码库上程序化运行的转换工具。这允许通过程序化方式应用大量更改，而无需手动遍历每个文件。
+
+Next.js 提供了代码修改转换工具，以在 API 更新或弃用时帮助升级您的 Next.js 代码库。
+
+## 使用方法
+
+在您的终端中，导航 (`cd`) 进入项目的文件夹，然后运行：
+
+```bash filename="Terminal"
+npx @next/codemod <transform> <path>
+```
+
+将 `<transform>` 和 `<path>` 替换为适当的值。
+
+- `transform` - 转换工具的名称
+- `path` - 要转换的文件或目录
+- `--dry` 进行演练，不会编辑任何代码
+- `--print` 打印更改后的输出以进行比较
+
+## Codemods
+
+### 16.0
+
+#### 从 `next lint`迁移到 ESLint CLI
+
+##### `next-lint-to-eslint-cli`
+
+```bash filename="Terminal"
+npx @next/codemod@canary next-lint-to-eslint-cli .
+```
+
+此代码修改工具将项目从使用 `next lint` 迁移到使用带有本地 ESLint 配置的 ESLint CLI。它执行以下操作：
+
+- 创建包含 Next.js 推荐配置的 `eslint.config.mjs` 文件
+- 更新 `package.json` 脚本以使用 `eslint .` 代替 `next lint`
+- 将必要的 ESLint 依赖项添加到 `package.json`
+- 当找到时保留现有的 ESLint 配置
+
+例如：
+
+```json filename="package.json"
+{
+  "scripts": {
+    "lint": "next lint"
+  }
+}
+```
+
+变为：
+
+```json filename="package.json"
+{
+  "scripts": {
+    "lint": "eslint ."
+  }
+}
+```
+
+并创建：
+
+```js filename="eslint.config.mjs"
+import { dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { FlatCompat } from '@eslint/eslintrc'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+})
+
+const eslintConfig = [
+  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  {
+    ignores: [
+      'node_modules/**',
+      '.next/**',
+      'out/**',
+      'build/**',
+      'next-env.d.ts',
+    ],
+  },
+]
+
+export default eslintConfig
+```
+
+### 15.0
+
+#### 转换 App Router 路由段配置 `runtime` 值从 `experimental-edge` 到 `edge`
+
+##### `app-dir-runtime-config-experimental-edge`
+
+> **注意**：此代码修改工具仅适用于 App Router。
+
+```bash filename="Terminal"
+npx @next/codemod@latest app-dir-runtime-config-experimental-edge .
+```
+
+此代码修改工具将 [路由段配置 `runtime`](https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config#runtime) 的值 `experimental-edge` 转换为 `edge`。
+
+例如：
+
+```ts
+export const runtime = 'experimental-edge'
+```
+
+转换为：
+
+```ts
+export const runtime = 'edge'
+```
+
+#### 迁移到异步动态 APIs
+
+之前支持同步访问的、选择加入动态渲染的 API 现在变为异步。您可以在 [升级指南](/docs/app/guides/upgrading/version-15) 中阅读有关此重大更改的更多信息。
+
+##### `next-async-request-api`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-async-request-api .
+```
+
+此代码修改工具将把现在是异步的动态 API（`next/headers` 中的 `cookies()`、`headers()` 和 `draftMode()`）转换为正确地使用 `await` 或在适用时用 `React.use()` 包装。
+当无法进行自动迁移时，代码修改工具将添加类型转换（如果是 TypeScript 文件）或注释，以通知用户需要手动审查和更新。
+
+例如：
+
+```tsx
+import { cookies, headers } from 'next/headers'
+const token = cookies().get('token')
+
+function useToken() {
+  const token = cookies().get('token')
+  return token
+}
+
+export default function Page() {
+  const name = cookies().get('name')
+}
+
+function getHeader() {
+  return headers().get('x-foo')
+}
+```
+
+转换为：
+
+```tsx
+import { use } from 'react'
+import {
+  cookies,
+  headers,
+  type UnsafeUnwrappedCookies,
+  type UnsafeUnwrappedHeaders,
+} from 'next/headers'
+const token = (cookies() as unknown as UnsafeUnwrappedCookies).get('token')
+
+function useToken() {
+  const token = use(cookies()).get('token')
+  return token
+}
+
+export default async function Page() {
+  const name = (await cookies()).get('name')
+}
+
+function getHeader() {
+  return (headers() as unknown as UnsafeUnwrappedHeaders).get('x-foo')
+}
+```
+
+当我们在页面/路由入口（`page.js`、`layout.js`、`route.js` 或 `default.js`）或 `generateMetadata` / `generateViewport` API 中检测到对 `params` 或 `searchParams` 属性的访问时，
+它会尝试将调用点从同步函数转换为异步函数，并等待属性访问。如果无法使其异步化（例如在客户端组件中），它将使用 `React.use` 来解包 Promise。
+
+例如：
+
+```tsx
+// page.tsx
+export default function Page({
+  params,
+  searchParams,
+}: {
+  params: { slug: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
+  const { value } = searchParams
+  if (value === 'foo') {
+    // ...
+  }
+}
+
+export function generateMetadata({ params }: { params: { slug: string } }) {
+  const { slug } = params
+  return {
+    title: `My Page - ${slug}`,
+  }
+}
+```
+
+转换为：
+
+```tsx
+// page.tsx
+export default async function Page(props: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const searchParams = await props.searchParams
+  const { value } = searchParams
+  if (value === 'foo') {
+    // ...
+  }
+}
+
+export async function generateMetadata(props: {
+  params: Promise<{ slug: string }>
+}) {
+  const params = await props.params
+  const { slug } = params
+  return {
+    title: `My Page - ${slug}`,
+  }
+}
+```
+
+> **请注意：** 当此代码修改工具识别到一个可能需要手动干预的位置，但我们无法确定确切的修复方法时，它会在代码中添加注释或类型转换，以通知用户需要手动更新。这些注释以 **@next/codemod** 为前缀，类型转换以 `UnsafeUnwrapped` 为前缀。
+> 您的构建将报错，直到这些注释被明确移除。[了解更多](/docs/messages/sync-dynamic-apis)。
+
+#### 替换 `NextRequest` 的 `geo` 和 `ip` 属性为 `@vercel/functions`
+
+##### `next-request-geo-ip`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-request-geo-ip .
+```
+
+此代码修改工具安装 `@vercel/functions` 并将 `NextRequest` 的 `geo` 和 `ip` 属性转换为对应的 `@vercel/functions` 功能。
+
+例如：
+
+```ts
+import type { NextRequest } from 'next/server'
+
+export function GET(req: NextRequest) {
+  const { geo, ip } = req
+}
+```
+
+转换为：
+
+```ts
+import type { NextRequest } from 'next/server'
+import { geolocation, ipAddress } from '@vercel/functions'
+
+export function GET(req: NextRequest) {
+  const geo = geolocation(req)
+  const ip = ipAddress(req)
+}
+```
+
+### 14.0
+
+#### 迁移 `ImageResponse` 导入项
+
+##### `next-og-import`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-og-import .
+```
+
+此代码修改工具将 `next/server` 的导入转换到 `next/og`，以用于 [动态 OG 图片生成](/docs/app/getting-started/metadata-and-og-images#generated-open-graph-images)。
+
+例如：
+
+```js
+import { ImageResponse } from 'next/server'
+```
+
+转换为：
+
+```js
+import { ImageResponse } from 'next/og'
+```
+
+#### 使用 `viewport` 导出
+
+##### `metadata-to-viewport-export`
+
+```bash filename="Terminal"
+npx @next/codemod@latest metadata-to-viewport-export .
+```
+
+此代码修改工具将某些视口元数据迁移到 `viewport` 导出。
+
+例如：
+
+```js
+export const metadata = {
+  title: 'My App',
+  themeColor: 'dark',
+  viewport: {
+    width: 1,
+  },
+}
+```
+
+转换为：
+
+```js
+export const metadata = {
+  title: 'My App',
+}
+
+export const viewport = {
+  width: 1,
+  themeColor: 'dark',
+}
+```
+
+### 13.2
+
+#### 使用内置字体
+
+##### `built-in-next-font`
+
+```bash filename="Terminal"
+npx @next/codemod@latest built-in-next-font .
+```
+
+此代码修改工具卸载 `@next/font` 包并将 `@next/font` 导入转换为内置的 `next/font`。
+
+例如：
+
+```js
+import { Inter } from '@next/font/google'
+```
+
+转换为：
+
+```js
+import { Inter } from 'next/font/google'
+```
+
+### 13.0
+
+#### 重命名 Next 图像导入项
+
+##### `next-image-to-legacy-image`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-image-to-legacy-image .
+```
+
+安全地将现有 Next.js 10、11 或 12 应用程序中的 `next/image` 导入重命名为 Next.js 13 中的 `next/legacy/image`。同时将 `next/future/image` 重命名为 `next/image`。
+
+例如：
+
+```jsx filename="pages/index.js"
+import Image1 from 'next/image'
+import Image2 from 'next/future/image'
+
+export default function Home() {
+  return (
+    <div>
+      <Image1 src="/test.jpg" width="200" height="300" />
+      <Image2 src="/test.png" width="500" height="400" />
+    </div>
+  )
+}
+```
+
+转换为：
+
+```jsx filename="pages/index.js"
+// 'next/image' becomes 'next/legacy/image'
+import Image1 from 'next/legacy/image'
+// 'next/future/image' becomes 'next/image'
+import Image2 from 'next/image'
+
+export default function Home() {
+  return (
+    <div>
+      <Image1 src="/test.jpg" width="200" height="300" />
+      <Image2 src="/test.png" width="500" height="400" />
+    </div>
+  )
+}
+```
+
+#### 迁移到新的图像组件
+
+##### `next-image-experimental`
+
+```bash filename="Terminal"
+npx @next/codemod@latest next-image-experimental .
+```
+
+通过添加内联样式和移除未使用的属性，从 `next/legacy/image` 迁移到新的 `next/image`（此操作有一定风险）。
+
+- 移除 `layout` 属性并添加 `style`。
+- 移除 `objectFit` 属性并添加 `style`。
+- 移除 `objectPosition` 属性并添加 `style`。
+- 移除 `lazyBoundary` 属性。
+- 移除 `lazyRoot` 属性。
+
+#### 从 Link 组件中移除 `<a>` 标签
+
+##### `new-link`
+
+```bash filename="Terminal"
+npx @next/codemod@latest new-link .
+```
+
+<AppOnly>
+
+移除 [Link 组件](/docs/app/api-reference/components/link) 内部的 `<a>` 标签，或者为无法自动修复的 Link 添加 `legacyBehavior` 属性。
+
+</AppOnly>
+
+<PagesOnly>
+
+移除 [Link 组件](/docs/pages/api-reference/components/link) 内部的 `<a>` 标签，或者为无法自动修复的 Link 添加 `legacyBehavior` 属性。
+
+</PagesOnly>
+
+例如：
+
+```jsx
+<Link href="/about">
+  <a>About</a>
+</Link>
+// transforms into
+<Link href="/about">
+  About
+</Link>
+
+<Link href="/about">
+  <a onClick={() => console.log('clicked')}>About</a>
+</Link>
+// transforms into
+<Link href="/about" onClick={() => console.log('clicked')}>
+  About
+</Link>
+```
+
+在无法应用自动修复的情况下，会添加 `legacyBehavior` 属性。这允许您的应用程序为该特定链接保留旧行为以继续运行。
+
+```jsx
+const Component = () => <a>About</a>
+
+<Link href="/about">
+  <Component />
+</Link>
+// becomes
+<Link href="/about" legacyBehavior>
+  <Component />
+</Link>
+```
+
+### 11
+
+#### 从 CRA 迁移
+
+##### `cra-to-next`
+
+```bash filename="Terminal"
+npx @next/codemod cra-to-next
+```
+
+将一个 Create React App 项目迁移到 Next.js；创建 Pages Router 和必要的配置以匹配行为。最初利用仅客户端渲染来防止由于 SSR 期间使用 `window` 导致的兼容性问题，并且可以无缝启用以逐步采用 Next.js 特定功能。
+
+请在此讨论中分享与此转换相关的任何反馈：[https://github.com/vercel/next.js/discussions/25858](https://github.com/vercel/next.js/discussions/25858)。
+
+### 10
+
+#### 添加 React 导入项
+
+##### `add-missing-react-import`
+
+```bash filename="Terminal"
+npx @next/codemod add-missing-react-import
+```
+
+转换未导入 `React` 的文件，以包含导入，以便新的 [React JSX 转换](https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html) 能够工作。
+
+例如：
+
+```jsx filename="my-component.js"
+export default class Home extends React.Component {
+  render() {
+    return <div>Hello World</div>
+  }
+}
+```
+
+转换为：
+
+```jsx filename="my-component.js"
+import React from 'react'
+export default class Home extends React.Component {
+  render() {
+    return <div>Hello World</div>
+  }
+}
+```
+
+### 9
+
+#### 将匿名组件转换为具名组件
+
+##### `name-default-component`
+
+```bash filename="Terminal"
+npx @next/codemod name-default-component
+```
+
+**适用于版本 9 及以上。**
+
+将匿名组件转换为具名组件，以确保它们与 [快速刷新](https://nextjs.org/blog/next-9-4#fast-refresh) 兼容。
+
+例如：
+
+```jsx filename="my-component.js"
+export default function () {
+  return <div>Hello World</div>
+}
+```
+
+转换为：
+
+```jsx filename="my-component.js"
+export default function MyComponent() {
+  return <div>Hello World</div>
+}
+```
+
+该组件将基于文件名采用驼峰式命名，并且也适用于箭头函数。
+
+### 8
+
+#### 转换 AMP HOC 为页面配置
+
+##### `withamp-to-config`
+
+```bash filename="Terminal"
+npx @next/codemod withamp-to-config
+```
+
+将 `withAmp` HOC 转换为 Next.js 9 页面配置。
+
+例如：
+
+```js
+// Before
+import { withAmp } from 'next/amp'
+
+function Home() {
+  return <h1>My AMP Page</h1>
+}
+
+export default withAmp(Home)
+```
+
+```js
+// After
+export default function Home() {
+  return <h1>My AMP Page</h1>
+}
+
+export const config = {
+  amp: true,
+}
+```
+
+### 6
+
+#### 使用 `withRouter`
+
+##### `url-to-withrouter`
+
+```bash filename="Terminal"
+npx @next/codemod url-to-withrouter
+```
+
+将顶层页面上已弃用的自动注入的 `url` 属性转换为使用 `withRouter` 及其注入的 `router` 属性。在此处了解更多信息：[https://nextjs.org/docs/messages/url-deprecated](/docs/messages/url-deprecated)
+
+例如：
+
+```js filename="From"
+import React from 'react'
+export default class extends React.Component {
+  render() {
+    const { pathname } = this.props.url
+    return <div>Current pathname: {pathname}</div>
+  }
+}
+```
+
+```js filename="To"
+import React from 'react'
+import { withRouter } from 'next/router'
+export default withRouter(
+  class extends React.Component {
+    render() {
+      const { pathname } = this.props.router
+      return <div>Current pathname: {pathname}</div>
+    }
+  }
+)
+```
+
+这是一个案例。所有已转换（并经过测试）的案例可以在 [`__testfixtures__` 目录](https://github.com/vercel/next.js/tree/canary/packages/next-codemod/transforms/__testfixtures__/url-to-withrouter) 中找到。
