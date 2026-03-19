@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
+import { annotate } from './annotate';
 import {
   assemble,
   NEEDS_TRANSLATION_END,
@@ -223,8 +224,9 @@ async function translateFile(
   if (assembleResult.allCached) {
     const finalPath = path.join(opts.outputDir, opts.lang, relPath);
     fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-    fs.writeFileSync(finalPath, assembleResult.content, 'utf8');
-    const mdxResult = validateMdx(assembleResult.content);
+    const annotated = annotate(assembleResult.content);
+    fs.writeFileSync(finalPath, annotated, 'utf8');
+    const mdxResult = validateMdx(annotated);
     return {
       status: 'cached',
       newTranslations: 0,
@@ -273,9 +275,10 @@ async function translateFile(
 
   const finalPath = path.join(opts.outputDir, opts.lang, relPath);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-  fs.writeFileSync(finalPath, finalContent, 'utf8');
+  const annotatedFinal = annotate(finalContent);
+  fs.writeFileSync(finalPath, annotatedFinal, 'utf8');
 
-  const mdxResult = validateMdx(finalContent);
+  const mdxResult = validateMdx(annotatedFinal);
 
   return {
     status: 'translated',
@@ -338,7 +341,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
         cachedFiles.push(relPath);
         const finalPath = path.join(opts.outputDir, lang, relPath);
         fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-        fs.writeFileSync(finalPath, assembleResult.content, 'utf8');
+        fs.writeFileSync(finalPath, annotate(assembleResult.content), 'utf8');
       } else {
         translateFiles.push(relPath);
         if (translateFiles.length >= opts.max) break;
