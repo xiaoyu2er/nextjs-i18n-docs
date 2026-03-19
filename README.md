@@ -33,7 +33,6 @@ nextjs-i18n-docs/
 ├── content-v13/       # v13 docs (all languages)
 ├── content-v14/       # v14 docs (all languages)
 ├── content-v15/       # v15 docs (all languages)
-├── content-astro/     # Astro-specific content overrides
 ├── scripts/           # Build & sync scripts
 └── .cache/            # Translation cache (JSONL, git-tracked)
 ```
@@ -189,7 +188,7 @@ Cloudflare Builds automatically runs `bun install` (which triggers `postinstall`
 
 | Build project | Build command | Deploy command | Watch paths ([docs](https://developers.cloudflare.com/pages/configuration/build-watch-paths/)) |
 |---------------|---------------|----------------|-------------|
-| `nextjs-docs-latest` | `bun run build:latest` | `cd apps/web && npx wrangler deploy` | `apps/web/*`, `packages/shared/*`, `packages/const/*`, `content/*`, `content-astro/*`, `scripts/prepare-content.ts` |
+| `nextjs-docs-latest` | `bun run build:latest` | `cd apps/web && npx wrangler deploy` | `apps/web/*`, `packages/shared/*`, `packages/const/*`, `content/*`, `scripts/prepare-content.ts` |
 | `nextjs-docs-v13` | `VERSION=13 bun run build:v` | `cd apps/web-v && npx wrangler deploy --name nextjs-docs-v13` | `apps/web-v/*`, `packages/shared/*`, `packages/const/*`, `content-v13/*`, `scripts/prepare-content.ts` |
 | `nextjs-docs-v14` | `VERSION=14 bun run build:v` | `cd apps/web-v && npx wrangler deploy --name nextjs-docs-v14` | `apps/web-v/*`, `packages/shared/*`, `packages/const/*`, `content-v14/*`, `scripts/prepare-content.ts` |
 | `nextjs-docs-v15` | `VERSION=15 bun run build:v` | `cd apps/web-v && npx wrangler deploy --name nextjs-docs-v15` | `apps/web-v/*`, `packages/shared/*`, `packages/const/*`, `content-v15/*`, `scripts/prepare-content.ts` |
