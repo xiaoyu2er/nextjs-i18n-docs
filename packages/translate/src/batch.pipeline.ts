@@ -87,7 +87,7 @@ function parseArgs(argv: string[]) {
 async function translateFile(
   sourcePath: string,
   relPath: string,
-  opts: ReturnType<typeof parseArgs>,
+  opts: ReturnType<typeof parseArgs> & { docsContext?: string },
   cache: TranslationCache,
 ): Promise<{
   status: 'cached' | 'translated' | 'skipped';

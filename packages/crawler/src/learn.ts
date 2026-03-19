@@ -49,7 +49,8 @@ export async function parseLearn(config: Config) {
 
   const crawler = new Crawler({
     ...crawlerOptions,
-    callback: async (error, res, done) => {
+    callback: async (error, res, done_) => {
+      const done = done_ as () => void;
       const req = res.requestUrl;
       const url = req.href;
 
