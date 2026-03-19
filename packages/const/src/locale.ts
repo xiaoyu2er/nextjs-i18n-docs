@@ -10,6 +10,9 @@ export type LocaleConfig = {
   description: string;
   color: string;
 };
+
+const BASE_URL = 'https://nextjs.im';
+
 export const LOCALES: LocaleConfig[] = [
   {
     color: 'from-blue-500 to-blue-600',
@@ -19,7 +22,7 @@ export const LOCALES: LocaleConfig[] = [
     locale: 'en',
     name: 'English',
     nativeName: 'English',
-    url: 'https://en.nextjs.im',
+    url: BASE_URL,
   },
   {
     color: 'from-red-500 to-red-600',
@@ -29,7 +32,7 @@ export const LOCALES: LocaleConfig[] = [
     locale: 'zh-hans',
     name: 'Simplified Chinese',
     nativeName: '简体中文',
-    url: 'https://zh-hans.nextjs.im',
+    url: `${BASE_URL}/zh-hans`,
   },
   {
     color: 'from-purple-500 to-purple-600',
@@ -39,9 +42,8 @@ export const LOCALES: LocaleConfig[] = [
     locale: 'zh-hant',
     name: 'Traditional Chinese',
     nativeName: '繁體中文',
-    url: 'https://zh-hant.nextjs.im',
+    url: `${BASE_URL}/zh-hant`,
   },
-
   {
     color: 'from-pink-500 to-pink-600',
     description: 'Next.js 日本語ドキュメント',
@@ -50,7 +52,7 @@ export const LOCALES: LocaleConfig[] = [
     locale: 'ja',
     name: 'Japanese',
     nativeName: '日本語',
-    url: 'https://ja.nextjs.im',
+    url: `${BASE_URL}/ja`,
   },
   {
     color: 'from-amber-500 to-amber-600',
@@ -60,7 +62,7 @@ export const LOCALES: LocaleConfig[] = [
     locale: 'es',
     name: 'Spanish',
     nativeName: 'Español',
-    url: 'https://es.nextjs.im',
+    url: `${BASE_URL}/es`,
   },
   {
     color: 'from-gray-500 to-gray-600',
@@ -70,7 +72,7 @@ export const LOCALES: LocaleConfig[] = [
     locale: 'de',
     name: 'German',
     nativeName: 'Deutsch',
-    url: 'https://de.nextjs.im',
+    url: `${BASE_URL}/de`,
   },
   {
     color: 'from-indigo-500 to-indigo-600',
@@ -80,7 +82,7 @@ export const LOCALES: LocaleConfig[] = [
     locale: 'fr',
     name: 'French',
     nativeName: 'Français',
-    url: 'https://fr.nextjs.im',
+    url: `${BASE_URL}/fr`,
   },
   {
     color: 'from-emerald-500 to-emerald-600',
@@ -88,9 +90,9 @@ export const LOCALES: LocaleConfig[] = [
     enabled: true,
     flag: '🇷🇺',
     locale: 'ru',
-    name: 'French',
+    name: 'Russian',
     nativeName: 'Русский',
-    url: 'https://ru.nextjs.im',
+    url: `${BASE_URL}/ru`,
   },
   {
     color: 'from-green-500 to-green-600',
@@ -100,7 +102,7 @@ export const LOCALES: LocaleConfig[] = [
     locale: 'ar',
     name: 'Arabic',
     nativeName: 'العربية',
-    url: 'https://ar.nextjs.im',
+    url: `${BASE_URL}/ar`,
   },
 ];
 
