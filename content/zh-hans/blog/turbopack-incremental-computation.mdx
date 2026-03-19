@@ -1,0 +1,115 @@
+---
+title: '深入 Turbopack：通过减少构建量实现更快速度'
+description: >-
+  了解我们如何利用增量计算构建 Turbopack，以扩展开发和构建规模至大型 Next.js 应用程序。
+author:
+  - name: Anthony Shew
+    image: /static/team/anthony-shew.jpg
+  - name: Benjamin Woodruff
+    image: /static/team/benjamin-woodruff.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2026-01-20T17:00:00.000Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/twitter-card.png
+---
+
+编辑。保存。刷新。等待…… 等待…… 等待……
+
+编译代码通常意味着等待，但 [Turbopack](/docs/app/api-reference/turbopack) 利用缓存和增量计算使迭代循环变快。并非所有现代打包器都采用增量方法，这也有充分理由。增量计算会引入显著复杂性和潜在的 bug 机会。缓存需要额外的跟踪和数据副本，增加了 CPU 和内存开销。应用不当的话，缓存实际上会使性能更差。
+
+尽管情况如此，我们还是接受了这些挑战，因为我们知道增量架构对于 Turbopack 的成功至关重要。Turbopack 是 Next.js 的新默认打包器，Next.js 框架被用于构建世界上 [一些最大的 Web 应用程序](https://nextjs.org/showcase)。我们需要实现即时构建和快速交互的 [React Fast Refresh](/docs/architecture/fast-refresh) 体验，即使对于最大和最具有挑战性的工作负载也是如此。我们的增量架构是实现这一目标的核心。
+
+![A formula with big O notation showing a change in time spent from “your entire application” to “your changes”.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/turbopack--light.png)![A formula with big O notation showing a change in time spent from “your entire application” to “your changes”.](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Fturbopack--dark.png&w=3840&q=75)
+
+无缓存的解决方案会随着应用程序体积的增大而变慢。增量计算可以扩展至大型应用程序，因为它仅取决于小型迭代更改的大小。
+
+Turbopack 的架构是从头开始设计的，充分考虑了缓存。其增量设计基于十多年的研究。我们从在 [webpack](https://webpack.js.org/) 中实现缓存的挑战中获得了第一手经验，并从 [Salsa](https://salsa-rs.netlify.app/overview)（驱动 [Rust-Analyzer](https://rust-analyzer.github.io/) 和 [Ruff](https://docs.astral.sh/ruff/)）、[Parcel](https://parceljs.org/)、[Rust 编译器的查询系统](https://rustc-dev-guide.rust-lang.org/query.html)、[Adapton](https://plum-umd.github.io/adapton/) 等众多项目中汲取了灵感。
+
+Turbopack 通过自动跟踪内部函数如何被调用以及它们依赖于哪些值来实现细粒度缓存。当某些内容发生变化时，我们知道如何以最小的工作量重新计算结果。
+
+背景：手动增量计算 ()(#background-manual-incremental-computation)
+----------------------------------------------------------------------------------------
+
+许多构建系统包含显式的依赖关系图，在评估构建规则时必须手动填充。显式声明依赖关系图理论上可以给出最优结果，但在实践中会给错误留下空间。
+
+指定显式依赖关系图的难度意味着通常缓存是在粗略的文件级粒度上完成的。这种粒度确实有一些好处：较少的增量结果意味着需要缓存的数据更少，如果您磁盘空间或内存有限，这可能是值得的。
+
+这种架构的一个例子是 [GNU Make](https://www.gnu.org/software/make/)，其中输出目标和依赖项是手动配置并以文件形式表示。像 GNU Make 这样的系统由于其粗略的粒度而错过了缓存机会：它们无法理解也不能缓存编译器内部的数据结构。
+
+函数级细粒度自动增量计算 ()(#function-level-fine-grained-automatic-incremental-computation)
+-------------------------------------------------------------------------------------------------------------------------------
+
+在 Turbopack 中，输入文件和生成的构建产物之间的关系并不直接。打包器为消除死代码（“摇树 (tree shaking)"）和模块图中常见依赖的聚类而采用全程序分析。因此，构建产物（在多个应用路由间共享的 JavaScript 文件）与输入文件形成复杂的多对多关系。
+
+Turbopack 使用非常细粒度的缓存架构。由于手动声明和添加依赖项到图中容易出错，Turbopack 需要一个可扩展的自动化解决方案。
+
+### 使用值单元格跟踪编译图 ()(#tracking-the-compilation-graph-with-value-cells)
+
+为了促进自动缓存和依赖关系跟踪，Turbopack 引入了“值单元格”的概念 ([`Vc<…>`](https://turbopack-rust-docs.vercel.sh/rustdoc/turbo_tasks/struct.Vc.html))。每个值单元格代表一个细粒度的执行，就像电子表格中的单元格一样。读取单元格时，它会记录当前执行的函数及其所有单元格依赖于该单元格。这与 [SolidJS](https://docs.solidjs.com/concepts/signals) 等框架中的信号工作方式类似。
+
+![Example Rust code annotated with a macro, along with arguments annotated as inputs. Those arguments are awaited in the function's body.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/turbopack_value-cells--light.png)![Example Rust code annotated with a macro, along with arguments annotated as inputs. Those arguments are awaited in the function's body.](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Fturbopack_value-cells--dark.png&w=3840&q=75)
+
+值单元格在被 await 时会被追踪。
+
+由于直到读取单元格时才将其标记为依赖项，Turbopack 实现的缓存粒度比 [传统的自上而下记忆化方法](https://en.wikipedia.org/wiki/Memoization) 更细。例如，参数可能是一个包含 *许多* 值单元格的对象或映射。我们不需要在对象或映射的*任何部分*更改时重新计算受跟踪的函数，而只需要在 *它实际读取的* 单元格更改时重新计算。
+
+值单元格代表了 Turbopack 内部的几乎所有内容，例如磁盘上的文件、抽象语法树 (AST)、模块导入和导出的元数据，或用于分块和打包聚类信息。
+
+![Illustrations of files, abstract syntax trees, module metadata, and clustering metadata.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/example_value_cells--light.png)![Illustrations of files, abstract syntax trees, module metadata, and clustering metadata.](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Fexample_value_cells--dark.png&w=3840&q=75)
+
+可能存储在值单元格内的数据类型示例。
+
+### 标记脏数据并传播更改 ()(#marking-dirty-and-propagating-changes)
+
+当 Turbopack 首次执行函数时，它会构建一个函数图以及它们创建或依赖的值单元格。图的根是请求的输出（打包的资源），叶子是源代码文件。中间有中间表示，例如 AST、元数据、部分转换的模块或分块信息。
+
+当我们的文件系统监视器发现源代码发生变化时，它会将读取该文件值单元格的所有函数标记为“脏”，并将其排列为重新计算队列。
+
+读取文件的已脏函数可能会解析或转换 JavaScript 模块，并生成新的中间表示。重新计算函数更新包含已更改中间表示的单元格，这可能会标记更多函数为脏。如果单元格内容相等，则跳过单元格更新。这种传播会向上传播直到所有受影响的函数都被重新计算。
+
+作为额外的优化，执行是“按需驱动”的，这意味着系统会推迟对脏函数的重新执行，直到它们成为“活动查询”的一部分。在开发中，活动查询可能是启用了热重载的当前打开网页。在构建中，这是针对完整生产应用的请求。
+
+![Three call trees representing an initial (cold) execution, the "mark dirty" operation when a file has been changed, and the propagation from the leaf up to the root.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/example_value_cell_operations--light.png)![Three call trees representing an initial (cold) execution, the "mark dirty" operation when a file has been changed, and the propagation from the leaf up to the root.](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Fexample_value_cell_operations--dark.png&w=3840&q=75)
+
+这些示例调用树表示初始（冷）执行、文件更改后的“标记脏”操作，以及从叶子到根的传播。
+
+### 聚合图 ()(#aggregation-graphs)
+
+虽然大多数操作（如脏传播算法）只需要有关图中相邻边和相邻节点的信息，但某些操作需要查询有关依赖图更大部分的信息：
+
+*   当子图成为新活动查询的一部分时，查找所有脏节点，以便我们调度重新计算。
+*   收集子图的错误、警告或 lint。
+*   等待子图计算完成。
+
+由于我们维护细粒度缓存，该图可能包含数十万甚至数百万个中间结果。访问该图的大量部分将是昂贵的。
+
+为了使这些查询高效，Turbopack 在依赖图之上使用了额外的数据结构，称为“聚合图”。
+
+当我们构建或更新依赖图时，我们在聚合图中维护并行节点，以总结依赖图的一部分。一些频繁访问的信息（如发出的错误或警告）附加到聚合节点上。
+
+这个聚合图具有多种分辨率层，较高的聚合层中每个节点引用更多的函数，降低分辨率，减少收集信息时必须遍历的节点数。
+
+每个潜在的活动查询（例如应用程序入口点或路由）代表聚合图中的根。在最终聚合层，每个根代表其自身及其在原始依赖图中所有子节点的信息。向依赖图添加根可能需要重新组织聚合图，但这是一种不频繁的操作。
+
+![Examples of the aggregation graph showing multiple layers.](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/aggregation_layers--light.png)![Examples of the aggregation graph showing multiple layers.](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Faggregation_layers--dark.png&w=3840&q=75)
+
+聚合层捕获的细节少于原始依赖图，但遍历速度更快。在最后一层，聚合根节点包含原始图中的所有子节点。
+
+文件系统缓存 ()(#file-system-caching)
+-------------------------------------------
+
+直到我们最近的 [Next.js 16.1](/blog/next-16-1) 发布，所有这些缓存都仅存储在内存中。
+
+在此新发布中，我们发布了 `next dev` 的文件系统缓存作为稳定版并默认开启。此缓存允许我们将依赖图、聚合图和存储在值单元格中的所有中间结果持久化到磁盘。重新启动 `next dev` 时，它可以快速地从这个热缓存中恢复。
+
+文件系统缓存伴随着其自身的挑战，我们花了超过一年的专门时间才能达到我们自己的高性能和质量标准。我们将在即将到来的工程博客文章中深入探讨这一点。
+
+反馈与社区[](#feedback-and-community)
+-------------------------------------------------
+
+分享您的反馈，帮助塑造 Next.js 的未来：
+
+*   [GitHub 讨论](https://github.com/vercel/next.js/discussions)
+*   [GitHub 问题](https://github.com/vercel/next.js/issues)
+*   [Discord 社区](https://nextjs.org/discord)

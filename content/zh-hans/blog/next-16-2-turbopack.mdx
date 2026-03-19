@@ -1,0 +1,186 @@
+---
+title: 'Turbopack: 关于 Next.js 16.2 的新功能'
+description: >-
+  Next.js 16.2 中的 Turbopack 带来了更快的构建、SRI 支持、
+  postcss.config.ts、动态导入的树摇分析、服务器快速刷新、
+  内联加载器配置，以及 200 多项错误修复。
+author:
+  - name: Andrew Imm
+    image: /static/team/imm.jpeg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2026-03-18T20:00:00.000Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-16-2-turbopack/twitter-card.png
+---
+
+两个版本后，Turbopack 已成为 Next.js 的默认打包器，我们现在专注于提高性能、修复错误和增加功能对等性。以下是作为 [Next.js 16.2](/blog/next-16-2) 一部分发布的最新功能。
+
+*   [**服务器快速刷新**](#server-fast-refresh)：细粒度的服务器端热重载
+*   [**Web Worker 来源**](#web-worker-origin)：增加 Worker 中对 WASM 库的支持
+*   [**子资源完整性支持**](#subresource-integrity-support)：JavaScript 文件的子资源完整性 (SRI)
+*   [**动态导入的树摇分析**](#tree-shaking-of-dynamic-imports)：从动态 `import()` 中移除未使用的导出
+*   [**内联加载器配置**](#inline-loader-configuration)：通过导入属性实现每个导入项的加载器配置
+*   [**Lightning CSS 配置**](#lightning-css-configuration)：实验性的 LightningCSS 配置选项
+*   [**日志过滤**](#log-filtering)：使用 `ignoreIssue` 抑制杂乱的日志和警告
+*   [**`postcss.config.ts` 支持**](#postcssconfigts-support)：TypeScript PostCSS 配置
+*   [**性能改进和错误修复**](#performance-improvements-and-bug-fixes)：200 多项更改和错误修复
+
+展望未来我们的下一个发布版本，我们将专注于加快编译性能并减少内存使用。
+
+Server Fast Refresh [](#server-fast-refresh)
+-------------------------------------------
+
+我们彻底重写了开发期间服务器端代码的重新加载机制。之前的系统会为更改的模块及其导入链中的所有其他模块清除 `require.cache`。这种方法往往会重新加载比必要更多的代码，包括未更改的 `node_modules`。
+
+新的系统将浏览器中使用的 Fast Refresh 机制引入了您的服务器代码。Turbopack 对模块图的掌握意味着只有实际更改的模块会被重新加载，其余部分保持不变。这使得服务器端热重载显著更高效。
+
+在实际的 Next.js 应用中，我们看到应用刷新速度提高了 67-100%，Next.js 内部的编译时间提高了 400-900%。这些结果从最小的 "hello world" 启动项目到 `vercel.com` 这样的大型站点都能适用。
+
+示例 Next.js 站点的服务器刷新时间
+
+快 375%
+
+之前
+
+40ms
+
+19ms
+
+59ms
+
+之后
+
+2.7ms
+
+9.7ms
+
+12.4ms
+
+Next.js (40ms → 2.7ms)
+
+应用 (19ms → 9.7ms)
+
+今天我们默认向所有开发者开放此功能。[代理](/docs/app/getting-started/proxy) 和 [路由处理程序](/docs/app/getting-started/route-handlers) 目前仍使用现有系统，但支持功能将在未来版本中推出。请在 [GitHub](https://github.com/vercel/next.js/issues) 上分享您对此新功能的反馈或问题。
+
+Web Worker Origin [](#web-worker-origin)
+---------------------------------------
+
+以前，Web Workers 通过 `blob://` URL 进行引导。这简化了 worker 的加载，但设置了空的 `location.origin` 值。尝试使用 `importScripts()` 或 `fetch()`（通常在第三方库中）的 Web Worker 代码在不做更改的情况下将无法解析请求。
+
+通过更新后的 Worker 引导代码，`origin` 正确指向您的域名，并且相对 fetch 请求成功。这应该能解决任何人在先前版本中在 Worker 内运行 WASM 代码时的障碍。
+
+Subresource Integrity Support [](#subresource-integrity-support)
+---------------------------------------------------------------
+
+Turbopack 现在支持 [子资源完整性 (SRI)](https://nextjs.org/docs/app/guides/content-security-policy#enabling-sri)。SRI 在构建时为 JavaScript 文件生成加密哈希，允许浏览器验证文件是否未被修改。
+
+浏览器提供了一种称为内容安全策略 (Content Security Policy) 的技术，允许站点限制可运行的 JavaScript，消除整个类别的安全问题。然而，实施此策略的典型 `nonce` 基于方法需要所有页面都动态渲染，从而影响性能。子资源完整性是一种替代方案，它预先计算每个脚本的哈希，并仅允许浏览器执行具有批准哈希的脚本。
+
+next.config.js
+
+```
+const nextConfig = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256',
+    },
+  },
+};
+ 
+module.exports = nextConfig;
+```
+
+Tree Shaking of Dynamic Imports [](#tree-shaking-of-dynamic-imports)
+-------------------------------------------------------------------
+
+Turbopack 现在对解构的动态导入进行树摇分析，方式与静态导入相同。未使用的导出将从捆绑包中移除：
+
+```
+const { cat } = await import('./lib');
+```
+
+对于树摇分析而言，这现在等同于静态导入——任何未被使用的 `./lib` 中的导出都将被树摇分析。
+
+Inline Loader Configuration [](#inline-loader-configuration)
+-----------------------------------------------------------
+
+Turbopack 现在支持通过 [导入属性](https://github.com/vercel/next.js/pull/89644) 实现每个导入项的加载器配置。不再通过 `turbopack.rules` 全局应用加载器，您可以使用 `with` 子句在单个导入上配置它们：
+
+```
+import rawText from './data.txt' with {
+  turbopackLoader: 'raw-loader',
+  turbopackAs: '*.js',
+};
+import value from './data.js' with {
+  turbopackLoader: 'string-replace-loader',
+  turbopackLoaderOptions: '{"search":"PLACEHOLDER","replace":"replaced value"}',
+};
+```
+
+这对于仅需要特殊处理的特定导入非常有用，避免了对相同文件类型的其他导入产生副作用。可用的属性包括 `turbopackLoader`、`turbopackLoaderOptions`、`turbopackAs` 和 `turbopackModuleType`。
+
+在可能的情况下，您仍应优先考虑在 `next.config.ts` 中配置您的加载器，因为使用内联加载器的代码可移植性较差。此选项对从插件或加载器生成的代码更有用。
+
+Lightning CSS Configuration [](#lightning-css-configuration)
+-----------------------------------------------------------
+
+Lightning CSS 是一种快速、基于 Rust 的 CSS 转换器，Turbopack 使用它对 CSS 进行压缩和前缀处理。它还可以像 Babel 或 SWC 为 JavaScript 所做的那样，在旧版浏览器上实现现代 CSS 功能。以前，切换这些设置的唯一方法是通过 Browserslist 配置。现在通过实验性 `lightningCssFeatures` 选项，您可以强制某些功能始终或永不转译。
+
+```
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  experimental: {
+    useLightningcss: true,
+    lightningCssFeatures: {
+      include: ['light-dark', 'oklab-colors'],
+      exclude: ['nesting'],
+    },
+  },
+};
+ 
+export default nextConfig;
+```
+
+Log Filtering [](#log-filtering)
+-------------------------------
+
+Turbopack 现在可以使用 `turbopack.ignoreIssue` 配置选项来抑制流式日志中杂乱或预期的警告。这对于抑制来自第三方代码、生成文件或可选依赖项的警告以及隐藏 Next.js 错误覆盖预期错误很有用。
+
+您可以匹配来自特定代码路径生成的日志，以及筛选特定的标题/描述字符串或模式。
+
+```
+import type { NextConfig } from 'next';
+ 
+const nextConfig: NextConfig = {
+  turbopack: {
+    ignoreIssue: [
+      { path: '**/vendor/**' },
+      { path: 'app/**', title: 'Module not found' },
+      { path: /generated\/.*\.ts/, description: /expected error/i },
+    ],
+  },
+};
+ 
+export default nextConfig;
+```
+
+`postcss.config.ts` Support [](#postcssconfigts-support)
+-------------------------------------------------------
+
+Turbopack 现在除了现有的 `.js` 和 `.cjs` 变体外，还支持 `postcss.config.ts`。
+
+Performance Improvements and Bug Fixes [](#performance-improvements-and-bug-fixes)
+---------------------------------------------------------------------------------
+
+我们继续致力于改进 Turbopack 内部机制。200 多项更改和错误修复提高了稳定性和在广泛项目中的兼容性。数据编码、内部表示格式和哈希算法的优化改善了内存使用和构建时间。我们使错误日志更清晰，并扩展了诊断信息，以帮助您更好地理解编译器错误。我们还使用 GitHub Issues 作为指南，以确定自 16.1 版本发布以来缺失了哪些功能。
+
+反馈与社区[](#feedback-and-community)
+-------------------------------------------------
+
+分享您的反馈，帮助塑造 Next.js 的未来：
+
+*   [GitHub 讨论](https://github.com/vercel/next.js/discussions)
+*   [GitHub 问题](https://github.com/vercel/next.js/issues)
+*   [Discord 社区](https://nextjs.org/discord)

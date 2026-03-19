@@ -85,3 +85,32 @@ export function assemble(
     parsedNodes: nodes,
   };
 }
+
+/**
+ * Extract uncached translatable nodes as a map of MD5 → source text.
+ * Used for JSON-based translation mode.
+ */
+export function extractUncached(
+  rawContent: string,
+  lang: string,
+  cache: TranslationCache,
+): { uncached: Record<string, string>; allCached: boolean; total: number } {
+  const nodes = parseMdx(rawContent);
+  const uncached: Record<string, string> = {};
+  let total = 0;
+
+  for (const node of nodes) {
+    if (node.needsTranslation && node.md5) {
+      total++;
+      if (!cache.get(lang, node.md5)) {
+        uncached[node.md5] = node.rawText;
+      }
+    }
+  }
+
+  return {
+    uncached,
+    allCached: Object.keys(uncached).length === 0,
+    total,
+  };
+}

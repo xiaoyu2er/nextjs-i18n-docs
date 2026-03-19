@@ -32,6 +32,7 @@ import { glob } from 'glob';
 import { annotate } from './annotate';
 import {
   assemble,
+  extractUncached,
   NEEDS_TRANSLATION_END,
   NEEDS_TRANSLATION_START,
 } from './assembler';
@@ -39,12 +40,7 @@ import { executeInBatches } from './batch';
 import { TranslationCache } from './cache';
 import { validateMdx } from './mdx-validator';
 import { parseMdx } from './parser';
-import {
-  needsTranslation,
-  type TranslateOptions,
-  translateAssembled,
-} from './translator';
-import { validate } from './validator';
+import { type TranslateOptions, translateJson } from './translator';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -241,13 +237,25 @@ async function translateFile(
     };
   }
 
-  if (opts.dryRun || !needsTranslation(assembleResult.content)) {
+  if (opts.dryRun) {
     return { status: 'skipped', newTranslations: 0, diffs: 0, mdxErrors: [] };
   }
 
-  // Translate via API
-  const translatedContent = await translateAssembled({
+  // Extract uncached nodes for JSON-based translation
+  const { uncached } = extractUncached(sourceContent, opts.lang, cache);
+  if (Object.keys(uncached).length === 0) {
+    // All cached after extractUncached (race condition or cache updated)
+    const final = assemble(sourceContent, opts.lang, cache, relPath);
+    const finalPath = path.join(opts.outputDir, opts.lang, relPath);
+    fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+    fs.writeFileSync(finalPath, final.content, 'utf8');
+    return { status: 'cached', newTranslations: 0, diffs: 0, mdxErrors: [] };
+  }
+
+  // Translate via JSON mode — LLM returns {md5: translation} pairs
+  const jsonResult = await translateJson({
     assembledContent: assembleResult.content,
+    uncached,
     langName: langConfig.name,
     guide: langConfig.guide,
     apiType: opts.apiType,
@@ -260,78 +268,34 @@ async function translateFile(
       'Next.js is a React framework for building full-stack web applications.',
   });
 
-  // Validate and update cache
-  const validateResult = validate(
-    sourceContent,
-    translatedContent,
-    opts.lang,
-    cache,
-    relPath,
-  );
+  // Update cache with translations
+  let newTranslations = 0;
+  for (const [md5, translation] of Object.entries(jsonResult.translations)) {
+    cache.set(opts.lang, md5, translation);
+    newTranslations++;
+  }
 
-  // Re-assemble from source structure + updated cache.
-  // This guarantees the output structure matches the English source exactly,
-  // regardless of how the LLM formatted its output.
+  // Log missing translations
+  if (jsonResult.missing.length > 0) {
+    console.warn(
+      `   ⚠️ ${jsonResult.missing.length} nodes missing from LLM response`,
+    );
+  }
+
+  // Re-assemble from source structure + updated cache
+  // Structure is ALWAYS correct since we control the assembly
   const reassembled = assemble(sourceContent, opts.lang, cache, relPath);
+  const finalContent = reassembled.allCached
+    ? reassembled.content
+    : // Strip NEEDS_TRANSLATION markers for any still-uncached nodes
+      reassembled.content
+        .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
+        .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
 
-  let finalContent: string;
-  if (reassembled.allCached) {
-    // All nodes cached — use clean re-assembled output (structure matches EN exactly)
-    finalContent = reassembled.content;
-  } else {
-    // Some nodes still uncached after translation.
-    // Backfill cache from LLM output (align by type), then re-assemble.
-    const llmContent = validateResult.correctedContent;
-    const llmNodes = parseMdx(llmContent).filter((n) => n.needsTranslation);
-    const srcNodes = parseMdx(sourceContent).filter((n) => n.needsTranslation);
-
-    // Type-based backfill: walk both lists, cache matching types
-    let si = 0;
-    let li = 0;
-    let backfilled = 0;
-    while (si < srcNodes.length && li < llmNodes.length) {
-      if (srcNodes[si].type === llmNodes[li].type) {
-        if (
-          srcNodes[si].md5 &&
-          !cache.get(opts.lang, srcNodes[si].md5 as string)
-        ) {
-          cache.set(
-            opts.lang,
-            srcNodes[si].md5 as string,
-            llmNodes[li].rawText,
-          );
-          backfilled++;
-        }
-        si++;
-        li++;
-      } else if (llmNodes.length > srcNodes.length) {
-        li++; // skip extra LLM node
-      } else {
-        si++; // skip missing source node
-      }
-    }
-
-    // Re-assemble again with backfilled cache
-    const reassembled2 = assemble(sourceContent, opts.lang, cache, relPath);
-    if (reassembled2.allCached) {
-      finalContent = reassembled2.content;
-      if (backfilled > 0) {
-        console.log(
-          `   ↳ Backfilled ${backfilled} nodes from LLM output → re-assembled clean.`,
-        );
-      }
-    } else {
-      // Still not fully cached — use LLM output as final fallback
-      finalContent = llmContent;
-      if (finalContent.includes(NEEDS_TRANSLATION_START)) {
-        finalContent = finalContent
-          .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
-          .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
-      }
-      console.warn(
-        `⚠️ ${relPath}: ${reassembled2.uncachedCount} nodes still uncached after backfill. Using LLM output.`,
-      );
-    }
+  if (!reassembled.allCached) {
+    console.warn(
+      `   ⚠️ ${reassembled.uncachedCount} nodes still uncached (English text in output)`,
+    );
   }
 
   const finalPath = path.join(opts.outputDir, opts.lang, relPath);
@@ -342,8 +306,8 @@ async function translateFile(
 
   return {
     status: 'translated',
-    newTranslations: validateResult.newTranslations,
-    diffs: validateResult.diffs.length,
+    newTranslations,
+    diffs: jsonResult.missing.length,
     mdxErrors: mdxResult.errors.map((e) => e.message),
   };
 }

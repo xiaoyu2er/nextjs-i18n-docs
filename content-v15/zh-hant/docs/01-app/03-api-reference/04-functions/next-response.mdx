@@ -1,0 +1,192 @@
+---
+title: NextResponse
+description: NextResponse 的 API 參考文檔。
+---
+
+{/* 此文件內容在應用程式路由器和頁面路由器之間共享。您可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於頁面路由器的內容。任何共享內容都不應包裹在元件中。 */}
+
+NextResponse 擴充了 [Web Response API](https://developer.mozilla.org/docs/Web/API/Response)，並提供更多方便的方法。
+
+## `cookies`
+
+讀取或修改回應的 [`Set-Cookie`](https://developer.mozilla.org/docs/Web/HTTP/Headers/Set-Cookie) 標頭。
+
+### `set(name, value)`
+
+指定一個名稱，在回應上設定具有該值的 Cookie。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// Set a cookie to hide the banner
+response.cookies.set('show-banner', 'false')
+// Response will have a `Set-Cookie:show-banner=false;path=/home` header
+return response
+```
+
+### `get(name)`
+
+提供 Cookie 名稱，返回該 Cookie 的值。如果未找到 Cookie，則返回 `undefined`。如果找到多個 Cookie，則返回第一個。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// { name: 'show-banner', value: 'false', Path: '/home' }
+response.cookies.get('show-banner')
+```
+
+### `getAll()`
+
+指定 Cookie 名稱，回傳該 Cookie 的值。若未指定名稱，則回傳回應上的所有 Cookie。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// [
+//   { name: 'experiments', value: 'new-pricing-page', Path: '/home' },
+//   { name: 'experiments', value: 'winter-launch', Path: '/home' },
+// ]
+response.cookies.getAll('experiments')
+// Alternatively, get all cookies for the response
+response.cookies.getAll()
+```
+
+### `delete(name)`
+
+指定 Cookie 名稱，從回應中刪除該 Cookie。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// Returns true for deleted, false is nothing is deleted
+response.cookies.delete('experiments')
+```
+
+## `json()`
+
+產生包含指定 JSON 內容的回應。
+
+```ts filename="app/api/route.ts" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request: Request) {
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+}
+```
+
+## `redirect()`
+
+產生一個將使用者重新導向至 [URL](https://developer.mozilla.org/docs/Web/API/URL) 的回應。
+
+```ts
+import { NextResponse } from 'next/server'
+
+return NextResponse.redirect(new URL('/new', request.url))
+```
+
+[URL](https://developer.mozilla.org/docs/Web/API/URL) 可以在用於 `NextResponse.redirect()` 方法之前建立和修改。例如，您可以使用 `request.nextUrl` 屬性取得目前 URL，然後修改它以重新導向到不同的 URL。
+
+```ts
+import { NextResponse } from 'next/server'
+
+// Given an incoming request...
+const loginUrl = new URL('/login', request.url)
+// Add ?from=/incoming-url to the /login URL
+loginUrl.searchParams.set('from', request.nextUrl.pathname)
+// And redirect to the new URL
+return NextResponse.redirect(loginUrl)
+```
+
+## `rewrite()`
+
+產生一個在保留原始 URL 的同時，重新寫入 (代理) 指定 [URL](https://developer.mozilla.org/docs/Web/API/URL) 的回應。
+
+```ts
+import { NextResponse } from 'next/server'
+
+// Incoming request: /about, browser shows /about
+// Rewritten request: /proxy, browser shows /about
+return NextResponse.rewrite(new URL('/proxy', request.url))
+```
+
+## `next()`
+
+`next()` 方法對中介軟體 (Middleware) 很有用，因為它允許您提前結束並繼續路由處理。
+
+```ts
+import { NextResponse } from 'next/server'
+
+return NextResponse.next()
+```
+
+在產生回應時，您也可以使用 `NextResponse.next({ request: { headers } })` 將 `headers` 向上游轉發：
+
+```ts
+import { NextResponse } from 'next/server'
+
+// Given an incoming request...
+const newHeaders = new Headers(request.headers)
+// Add a new header
+newHeaders.set('x-version', '123')
+// Forward the modified request headers upstream
+return NextResponse.next({
+  request: {
+    // New request headers
+    headers: newHeaders,
+  },
+})
+```
+
+這會將 `newHeaders` 向上游轉發至目標頁面、路由或伺服器動作，但不會對客戶端公開。雖然此模式對於向上游傳遞數據很有用，但應謹慎使用，因為包含此數據的標頭可能會轉發到外部服務。
+
+相比之下，`NextResponse.next({ headers })` 是從中介軟體將標頭發送給客戶端的簡寫。這**不是**良好的做法，應予以避免。除此之外，設定像 `Content-Type` 等回應標題，可能會覆蓋框架的預期（例如，伺服器動作使用的 `Content-Type`），導致提交失敗或串流回應中斷。
+
+```ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+async function middleware(request: NextRequest) {
+  const headers = await injectAuth(request.headers)
+  // DO NOT forward headers like this
+  return NextResponse.next({ headers })
+}
+```
+
+一般來說，避免複製所有傳入請求的標頭，因為這樣可能會洩漏敏感數據給客戶端或上游服務。
+
+傾向採用防禦性方法，透過白名單建立傳入請求標頭的子集。例如，您可以忽略自訂 `x-*` 標頭，僅轉發已知安全的標頭：
+
+```ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+function middleware(request: NextRequest) {
+  const incoming = new Headers(request.headers)
+  const forwarded = new Headers()
+
+  for (const [name, value] of incoming) {
+    const headerName = name.toLowerCase()
+    // Keep only known-safe headers, discard custom x-* and other sensitive ones
+    if (
+      !headerName.startsWith('x-') &&
+      headerName !== 'authorization' &&
+      headerName !== 'cookie'
+    ) {
+      // Preserve original header name casing
+      forwarded.set(name, value)
+    }
+  }
+
+  return NextResponse.next({
+    request: {
+      headers: forwarded,
+    },
+  })
+}
+```

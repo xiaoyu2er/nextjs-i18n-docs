@@ -228,7 +228,7 @@ async function translateWithRetry(
 }
 
 /**
- * Translate assembled content.
+ * Translate assembled content (legacy whole-file mode).
  * Supports: 'openrouter' (default), 'openai' (OpenAI-compatible), 'anthropic'.
  * Includes retry with exponential backoff and truncation detection.
  */
@@ -242,4 +242,204 @@ export async function translateAssembled(
   });
 
   return translateWithRetry(opts, systemPrompt);
+}
+
+// ── JSON-based translation ───────────────────────────────────────────
+
+/**
+ * Build prompt for JSON-based translation.
+ * The LLM receives the full file as context but only outputs
+ * translations as a JSON object keyed by MD5 hash.
+ */
+export function buildJsonPrompt(opts: {
+  langName: string;
+  guide?: string;
+  docsContext?: string;
+}): string {
+  let prompt = `You are a professional technical translator specializing in software documentation.
+
+TASK: Translate the marked sections to ${opts.langName} and return as JSON.
+
+The input file contains sections marked with <!-- NEEDS_TRANSLATION:md5hash -->. 
+Translate ONLY these marked sections. Return a JSON object where:
+- Each key is the md5 hash from the marker
+- Each value is the translated text (Markdown preserved)
+
+RULES:
+1. Return ONLY a valid JSON object. No other text, no markdown code fences.
+2. Preserve all Markdown formatting: heading levels (## ###), links, inline code, bold, italic
+3. Keep code blocks, file paths, URLs, variable names unchanged
+4. For frontmatter content (title, description), translate the values but keep YAML-safe formatting
+5. NEVER start a translated value with backticks, quotes, or special YAML characters
+6. Keep HTML/JSX tags balanced: <AppOnly></AppOnly>, <PagesOnly></PagesOnly>
+7. Each translated value must be the COMPLETE translation of the original section
+
+EXAMPLE INPUT:
+\`\`\`
+Some already translated text...
+
+<!-- NEEDS_TRANSLATION:abc123 -->
+## Getting Started
+
+<!-- NEEDS_TRANSLATION:def456 -->
+Next.js is a React framework for building web applications.
+
+More already translated text...
+\`\`\`
+
+EXAMPLE OUTPUT:
+{"abc123":"## 入门指南","def456":"Next.js 是一个用于构建 Web 应用程序的 React 框架。"}`;
+
+  if (opts.docsContext) {
+    prompt += `\n\nDOCUMENTATION CONTEXT:\n${opts.docsContext}`;
+  }
+
+  if (opts.guide) {
+    prompt += `\n\nTRANSLATION GUIDELINES:\n${opts.guide}`;
+  }
+
+  return prompt;
+}
+
+/**
+ * Build the user message for JSON-based translation.
+ * Inserts <!-- NEEDS_TRANSLATION:md5 --> markers before uncached nodes.
+ */
+export function buildJsonUserMessage(
+  assembledContent: string,
+  uncached: Record<string, string>,
+): string {
+  // Replace NEEDS_TRANSLATION markers with MD5-keyed markers
+  let content = assembledContent;
+  for (const [md5, sourceText] of Object.entries(uncached)) {
+    const marker = `<!-- NEEDS_TRANSLATION -->\n${sourceText}\n<!-- /NEEDS_TRANSLATION -->`;
+    const newMarker = `<!-- NEEDS_TRANSLATION:${md5} -->\n${sourceText}`;
+    content = content.replace(marker, newMarker);
+  }
+  return content;
+}
+
+export interface JsonTranslateResult {
+  /** Translations keyed by MD5 */
+  translations: Record<string, string>;
+  /** MD5s that were requested but not returned */
+  missing: string[];
+  /** MD5s returned that were not requested (hallucinated) */
+  extra: string[];
+}
+
+/**
+ * Translate using JSON mode — LLM returns {md5: translation} pairs.
+ * This eliminates structure mismatch since we assemble the file ourselves.
+ */
+export async function translateJson(
+  opts: TranslateOptions & {
+    uncached: Record<string, string>;
+  },
+): Promise<JsonTranslateResult> {
+  const systemPrompt = buildJsonPrompt({
+    langName: opts.langName,
+    guide: opts.guide,
+    docsContext: opts.docsContext,
+  });
+
+  const userMessage = buildJsonUserMessage(
+    opts.assembledContent,
+    opts.uncached,
+  );
+
+  const { baseURL, apiKey, model } = resolveApiConfig(opts);
+  const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+  const client = new OpenAI({ baseURL, apiKey });
+
+  let lastError: Error | undefined;
+  const requestedMd5s = Object.keys(opts.uncached);
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        max_tokens: maxTokens,
+      });
+
+      const choice = response.choices?.[0];
+      if (!choice?.message?.content) {
+        throw new Error('Empty response from API');
+      }
+
+      if (choice.finish_reason === 'length') {
+        throw new Error(
+          `Output truncated (finish_reason=length). Model hit max_tokens=${maxTokens}.`,
+        );
+      }
+
+      // Parse JSON from response
+      let raw = stripThinkingBlock(choice.message.content);
+      // Strip markdown code fences if present
+      raw = raw.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '');
+
+      let parsed: Record<string, string>;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          `Failed to parse JSON response: ${raw.substring(0, 200)}...`,
+        );
+      }
+
+      // Validate: check for missing and extra keys
+      const returnedMd5s = new Set(Object.keys(parsed));
+      const missing = requestedMd5s.filter((md5) => !returnedMd5s.has(md5));
+      const extra = [...returnedMd5s].filter(
+        (md5) => !requestedMd5s.includes(md5),
+      );
+
+      if (missing.length > 0) {
+        console.warn(
+          `⚠️ JSON translation missing ${missing.length}/${requestedMd5s.length} keys`,
+        );
+      }
+      if (extra.length > 0) {
+        console.warn(
+          `⚠️ JSON translation has ${extra.length} extra keys (ignored)`,
+        );
+      }
+
+      // Filter to only requested keys
+      const translations: Record<string, string> = {};
+      for (const md5 of requestedMd5s) {
+        if (parsed[md5]) {
+          translations[md5] = parsed[md5];
+        }
+      }
+
+      return { translations, missing, extra };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const isRetryable =
+        lastError.message.includes('429') ||
+        lastError.message.includes('503') ||
+        lastError.message.includes('405') ||
+        lastError.message.includes('timeout') ||
+        lastError.message.includes('ECONNRESET') ||
+        lastError.message.includes('truncated') ||
+        lastError.message.includes('Failed to parse JSON');
+
+      if (!isRetryable || attempt === MAX_RETRIES) {
+        throw lastError;
+      }
+
+      const backoff = INITIAL_BACKOFF_MS * 2 ** (attempt - 1);
+      console.warn(
+        `⚠️ Attempt ${attempt}/${MAX_RETRIES} failed: ${lastError.message}. Retrying in ${backoff / 1000}s...`,
+      );
+      await sleep(backoff);
+    }
+  }
+
+  throw lastError ?? new Error('Translation failed after retries');
 }
