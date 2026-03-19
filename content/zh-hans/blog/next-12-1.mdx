@@ -1,0 +1,221 @@
+---
+title: Next.js 12.1
+description: >-
+  Next.js 12.1 推出了按需 (On-demand) 增量静态再生 (ISR)、支持 styled-components 和 Relay、无需配置 (Zero-config) Jest 支持等！
+author:
+  - name: Balázs Orbán
+    image: /static/team/balazs.jpg
+  - name: DongYoon Kang
+    image: /static/team/kdy.jpg
+  - name: Gerald Monaco
+    image: /static/team/gerald.jpg
+  - name: Javi Velasco
+    image: /static/team/javi.jpg
+  - name: Jiachi Liu
+    image: /static/team/jiachi.png
+  - name: JJ Kasper
+    image: /static/team/jj.jpg
+  - name: Joe Haddad
+    image: /static/team/timer.jpg
+  - name: Kara Erickson
+    image: /static/team/kara.jpg
+  - name: Maia Teegarden
+    image: /static/team/maia.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Steven
+    image: /static/team/styfle.png
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2022-02-17T16:00:00.507Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-12-1/twitter-card.png
+---
+
+我们很高兴发布 Next.js 12.1 中我们最期待的功能之一：
+
+*   [**按需 ISR（Beta 版）：**](#on-demand-incremental-static-regeneration-beta) 使用 `getStaticProps` 立即重新验证页面。
+*   [**增强的 SWC 支持：**](#improved-swc-support) `styled-components`, Relay 等。
+*   [**`next/jest` 插件：**](#zero-configuration-jest-plugin) 使用 SWC 实现无需配置的 Jest 支持。
+*   [**使用 SWC 进行更快的压缩（RC）：**](#faster-minification-with-swc) 比 Terser 快 7 倍的压缩速度。
+*   [**自托管 Next.js 改进：**](#self-hosted-nextjs-improvements) Docker 镜像体积缩小约 80%。
+*   [**React 18 与 Server Components 和 SSR 流式传输（Alpha）：**](#react-18-server-components-and-ssr-streaming-alpha) 稳定性与支持的改进。
+*   [**开发者调查：**](#nextjs-developer-survey) 通过您的反馈帮助我们改进 Next.js。
+
+今天通过运行 `npm i next@latest` 进行更新。
+
+按需增量静态再生 (Beta 版)[](#on-demand-incremental-static-regeneration-beta)
+---------------------------------------------------------------------------------------------------
+
+Next.js 现在暴露了一个函数 `unstable_revalidate()`，允许您重新验证使用 `getStaticProps` 的独立页面。自我们在 Next.js 9.5 中引入 [增量静态再生 (ISR)](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) 以来，这是我们最期待的功能之一。
+
+自 ISR 发布以来，我们看到了 [Tripadvisor](https://vercel.com/customers/cruise-critic), [Parachute](https://vercel.com/customers/parachute), HashiCorp 等公司大幅缩短了构建时间，同时保持了极佳的性能。但是，我们也听到了关于基于时间间隔的重新验证的反馈，并期待提供更大的灵活性。
+
+目前，如果您设置 `revalidate` 时间为 `60`，所有访问者在整整一分钟内看到的都是您网站的同一个生成版本。缓存的唯一清除方式是让某人在一分钟后访问该页面。您现在可以按需手动清除特定页面的 Next.js 缓存。
+
+这在以下情况使更新网站变得更加容易：
+
+*   来自您无头 CMS (Headless CMS) 的内容创建或更新
+*   电子商务元数据更改（价格、描述、类别、评论等）
+
+pages/api/revalidate.js
+
+```
+export default async function handler(req, res) {
+  // Check for secret to confirm this is a valid request
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
+ 
+  try {
+    await res.unstable_revalidate('/path-to-revalidate');
+    return res.json({ revalidated: true });
+  } catch (err) {
+    // If there was an error, Next.js will continue
+    // to show the last successfully generated page
+    return res.status(500).send('Error revalidating');
+  }
+}
+```
+
+在 `getStaticProps` 内，您不需要指定 `revalidate` 即可使用按需重新验证。如果省略 `revalidate`，Next.js 将使用默认值 `false`（不重新验证），并且仅在调用 `unstable_revalidate()` 时按需重新验证页面。
+
+增量静态再生适用于支持 [Next.js 构建 API] (/docs/pages/building-your-application/deploying#nextjs-build-api) (`next build`) 的任何提供商。从今天开始，部署到 Vercel 时，将页面推送到边缘时，按需重新验证会在约 300ms 内全球传播。
+
+[查看我们的演示](https://on-demand-isr.vercel.app/) 以查看按需重新验证的演示并提供反馈。Svix（企业就绪的 Webhooks）和 Clerk（身份验证）也已 [创建了按需 ISR 演示示例](https://www.svix.com/blog/vercel-on-demand-isr-and-svix)。
+
+增强的 SWC 支持[](#improved-swc-support)
+---------------------------------------------
+
+我们希望让每个 Next.js 应用的生产构建更快，并在本地开发中获得即时反馈。[Next.js 12](https://nextjs.org/blog/next-12) 引入了一个新的 [基于 Rust 的编译器](/docs/architecture/nextjs-compiler)，利用原生编译。
+
+12.1 版本中，我们已为 Next.js 编译器添加了对以下内容的支持：
+
+*   [styled-components](/docs/architecture/nextjs-compiler#styled-components)
+*   [importSource](/docs/architecture/nextjs-compiler#importsource)
+*   [legacy-decorators](/docs/architecture/nextjs-compiler#legacy-decorators)
+*   [relay](/docs/architecture/nextjs-compiler#relay)
+*   [remove-react-properties](/docs/architecture/nextjs-compiler#remove-react-properties)
+*   [remove-console](/docs/architecture/nextjs-compiler#remove-console)
+
+通过添加上述六个转换，我们现在已使用新编译器将最常用的 Babel 插件移植到了 Rust。如果您希望看到其他插件，请 [在讨论中告知我们](https://github.com/vercel/next.js/discussions/30174)。此外，我们正在研究 [通过 SWC 启用的高性能 WebAssembly 插件](https://twitter.com/swc_rs/status/1492454606118752257) 系统。
+
+无需配置的 Jest 插件[](#zero-configuration-jest-plugin)
+-----------------------------------------------------------------
+
+Next.js 现在会自动为您配置 Jest (`next/jest`)，使用基于 Rust 的 Next.js 编译器转换文件，包括：
+
+*   自动模拟样式表 (`.css`, `.module.css` 及其 `.scss` 变体) 和图像导入
+*   将 `.env` (及所有变体) 加载到 `process.env` 中
+*   从测试解析和转换中忽略 `node_modules`
+*   忽略 `.next` 的解析
+*   加载 `next.config.js` 以启用 Next.js 编译器转换的标志
+
+[查看文档](/docs/pages/building-your-application/optimizing/testing#setting-up-jest-with-the-rust-compiler) 了解更多或 [从我们的 Jest 示例开始](https://github.com/vercel/next.js/tree/canary/examples/with-jest)。
+
+使用 SWC 进行更快的压缩[](#faster-minification-with-swc)
+-------------------------------------------------------------
+
+随着 [Next.js 12](https://nextjs.org/blog/next-12)，我们引入了作为 Next.js 编译器一部分的 SWC 压缩。早期结果显示它比 Terser 快 **7 倍**。使用 SWC 进行压缩现在是 12.1 版中的 Release Candidate (RC)，并将在 12.2 中成为默认设置。
+
+您可以在 `next.config.js` 中选择使用 SWC 进行压缩：
+
+next.config.js
+
+```
+module.exports = {
+  swcMinify: true,
+};
+```
+
+请就讨论 [讨论](https://github.com/vercel/next.js/discussions/30237) 中的反馈告知我们。
+
+更快的图像优化[](#faster-image-optimization)
+-------------------------------------------------------
+
+内置的图像优化 API 已更新以支持与 [ISR 页面](/docs/pages/building-your-application/data-fetching/incremental-static-regeneration) 相同的模式，其中图像以前端缓存且 _后台重新验证_ 的方式提供（也称为 `stale-while-revalidate`）。
+
+这是图像优化的重大性能提升。查看 [图像缓存行为](/docs/pages/api-reference/components/image#caching-behavior) 了解更多。
+
+自托管 Next.js 改进[](#self-hosted-nextjs-improvements)
+--------------------------------------------------------------------
+
+Next.js 现在可以自动创建一个 `standalone` 文件夹，该文件夹仅复制生产部署所需的文件。这导致自托管 Next.js 应用的 **Docker 镜像缩小了约 80%**。
+
+要利用此自动复制功能，您可以在 `next.config.js` 中启用它：
+
+next.config.js
+
+```
+module.exports = {
+  experimental: {
+    outputStandalone: true,
+  },
+};
+```
+
+这将在 `.next/standalone` 处创建一个文件夹，然后可以独立部署该文件夹，而无需安装 `node_modules`。
+
+[查看文档](/docs/pages/api-reference/next-config-js/output#automatically-copying-traced-files-experimental) 或从 [Docker 示例](https://github.com/vercel/next.js/tree/canary/examples/with-docker) 开始。我们现在还有一个 [多环境 Docker 示例](https://github.com/vercel/next.js/tree/canary/examples/with-docker-multi-env)，支持基于环境加载不同的 `.env` 文件。
+
+React 18、Server Components 和 SSR 流式传输（Alpha）[](#react-18-server-components-and-ssr-streaming-alpha)
+-------------------------------------------------------------------------------------------------------------
+
+正如 [Next.js Conf](https://www.youtube.com/watch?v=WlP2TB2ORL4) 所示，我们一直努力将 React 18、服务端 Suspense、流式传输 SSR 以及最终的 Server Components 引入 Next.js。
+
+Server Components 是 React 的一项新功能，它通过分离服务器和客户端代码来减少 JavaScript 包体积。Server Components 允许开发者构建跨越服务器和客户端的应用，结合客户端应用的丰富交互性和传统服务器渲染的更好性能。
+
+对于 [跟随](https://github.com/vercel/next.js/discussions/31263) Next.js 中从 Alpha 到 Beta 的 Server Components 路径的开发者，以下是最近的更新：
+
+*   [在 HTML 中内联 Server Component 响应以避免二次请求](https://github.com/vercel/next.js/issues/30994)
+*   [改进流式传输时的脚本加载，以支持 React 18 的部分水合 (Partial Hydration)](https://github.com/vercel/next.js/issues/31338)
+*   [支持 React 18 中的新 `useId` API](https://github.com/vercel/next.js/pull/31102)
+*   [支持将 `_app` 作为 Server Component](https://github.com/vercel/next.js/issues/30996)
+*   [改进 Server Components 的代码分割](https://github.com/vercel/next.js/pull/31968)
+*   [改进流式传输性能](https://github.com/vercel/next.js/pull/30585)
+*   [在 Node.js 和 Edge 之间更改默认运行时](https://github.com/vercel/next.js/pull/34068) ([RFC](https://github.com/vercel/next.js/discussions/34179))
+
+我们正在努力让您能够在边缘服务器端渲染整个 Next.js 应用。您可以选择哪些页面加入 Edge Runtime，以便您准备好时逐步将页面从 Node.js 迁移。
+
+我们将很快发布另一篇关于 Edge Runtime 更深入的帖子。我们的两个演示 ([next-server-components](https://github.com/vercel/next-server-components) 和 [next-rsc-demo](https://github.com/vercel/next-rsc-demo)) 均已更新至最新更改。
+
+其他错误修复和改进[](#other-bug-fixes-and-improvements)
+---------------------------------------------------------------------
+
+*   使用带有 `target="blank"` 的 `<a>` 不再警告使用 `next/link` 与 ESLint。
+*   `.d.ts` 文件不再被视为 Pages。
+*   `document.title` 现在在向屏幕阅读器宣布页面更改时优先级高于 `h1`。
+*   创建 `pages/index/[...dynamic].js` 现在可行，之前由于 `index` 是保留关键字而不可能。
+*   当使用 `dynamic(() => import('./some-component'), { ssr: false })` 时，导入将被自动从服务器代码中摇树优化 (Treeshaken)。
+*   为了创建更小的安装体积并提高安全性，我们正在努力预编译更多依赖项。最新的添加是 `node-fetch`。
+*   使用 [Middleware](/docs/pages/building-your-application/routing/middleware) 时的 Fast Refresh 改进。
+*   与我们的 [内置 ESLint 集成](/docs/pages/building-your-application/configuring/eslint) 支持 ESLint 8。
+*   `styled-jsx` 已升级到 5.0，包括所有 `styled-jsx` 编译错误的新的帮助性错误链接。
+*   Edge Runtime:`AbortController` 和 `AbortSignal` 支持
+*   Edge Runtime:`CryptoKey` 和 `globalThis.CryptoKey` 已添加。
+*   大型 Next.js 应用看到 Fast Refresh 时间约 60% 的改进（超过 1,000 模块被重新加载）。
+*   如果 Fast Refresh 失败并导致完整页面重新加载，现在会显示通知。
+*   宣布的路由现在在使用 React 18 严格模式时正确跳过宣布初始页面加载。
+*   与 2021 年 12 月相比，我们已将 Next.js 仓库中的开放问题 [减少近 300 个](https://nextjs-issue-tracker.vercel.app/)（解决了近 1000 个问题）。
+
+Next.js 开发者调查[](#nextjs-developer-survey)
+----------------------------------------------------
+
+分享您的反馈并帮助我们通过我们的 [首个开发者调查](https://vercel.link/nextjs-survey) 改进 Next.js。
+
+这项调查有两部分：一个八道问题的快速调查和一个深入了解各个功能反馈的扩展调查。如果您有时间，我们很希望您填写这两个部分，但不是的话，请自由在第一部分后提交您的答案。
+
+您的回答将完全匿名，尽管您选择是否与我们联系分享您的应用 URL。
+
+感谢您帮助我们改进 Next.js！
+
+感谢您，贡献者 (Thank you, contributors)[](#thank-you-contributors)
+--------------------------------------------------
+
+Next.js 是 **2,000 多名个人开发者**，像 Google 和 Facebook 这样的行业合作伙伴以及我们核心团队的共同努力成果。
+
+为了使贡献更容易，我们已迁移 Next.js 仓库以使用 [Turborepo](https://turborepo.com) 以提高构建性能。我们还添加了测试和错误链接的脚手架，以便更容易开始编写测试。最后，我们录制了 [40 分钟的操作视频](https://www.youtube.com/watch?v=cuoNzXFLitc) 展示如何为 Next.js 做贡献。
+
+本次发布由以下贡献者带来：@MaedahBatool, @mutebg, @sokra, @huozhi, @hanford, @shuding, @sean6bucks, @jameshfisher, @devknoll, @yuta-ike, @zh-lx, @amandeepmittal, @alunyov, @stefanprobst, @leerob, @balazsorban44, @kdy1, @brittanyrw, @jord1e, @kara, @vvo, @ismaelrumzan, @dlindenkreuz, @MohammadxAli, @nguyenyou, @thibautsabot, @hanneslund, @vertti, @KateKate, @stefee, @mikinovation, @Leticijak, @mohsen1, @ncphillips, @ehowey, @lancechentw, @krychaxp, @fmacherey, @pklawansky, @RyanClementsHax, @lakbychance, @sannajammeh, @oliviertassinari, @alexander-akait, @u-yas, @Cheprer, @msp5382, @chrispat, @getspooky, @Ryz0nd, @klaasman, @midgleyc, @kumard3, @jesstelford, @neeraj3029, @glenngijsberts, @pie6k, @wouterraateland, @timneutkens, @11koukou, @thesyedbasim, @aeneasr, @ijjk, @lfades, @JuniorTour, @xavhan, @mattyocode, @padmaia, @Skn0tt, @gwer, @Nutlope, @styfle, @stipsan, @xhoantran, @eolme, @sespinosa, @zenorocha, @hjaber, @benmvp, @T-O-R-U-S, @dburrows, @atcastle, @kiriny, @molebox, @Vienio99, @kyliau, @PepijnSenders, @krystofex, @PizzaPete, @souljuse, @Schniz, @Nelsonfrank, @Mhmdrza, @hideokamoto-stripe, @Emrin, @gr-qft, @delbaoliveira, @redbar0n, @lxy-yz, @Divlo, @kachkaev, @teleaziz, @OgbeniHMMD, @goncy, @bennettdams, @hsynlms, @callumgare, @jonrosner, @karaggeorge, @rpie3, @MartijnHols, @bashunaimiroy, @NOCELL, @rishabhpoddar, @omariosouto, @theMosaad, @javivelasco, @pierrenel, @lobsterkatie, @tharakabimal, @saevarb, @nbouvrette, @paulnbrd, @ecklf, @renbaoshuo, @chozzz, @tbezman, @karlhorky, @j-mendez, @ffan0811, @arthurfiorette, @chimit, @joperron, @moh12594, @rasmusjp, @bryanrsmith, @TrySound, @josharsh, @thecrypticace, @arturparkhisenko, @segheysens, @thevinter, @AryanBeezadhur, @xiaohp, @tknickman, @oriolcp, @smakosh, @jorrit, @mix3d, @Clecio013, @michielvangendt, @intergalacticspacehighway, @jbraithwaite, @marcelocarmona, @benmerckx, @haykerman, @steven-tey, @jaredpalmer, @pi-guy-in-the-sky, @JuanM04, @apollisa, @D-Pagey, @Kikobeats, @ramosbugs, @dan-weaver, @chris-stytch, @MikevPeeren, @janpio, @emw3, @nubpro, @cmdcolin, @joostdecock, @sgallese, @housseindjirdeh, @minervabot, @cjboco, @Ryuurock, @dm430, @mkarkachov, @nvh95, @gfortaine, @zifeo, @vicente-s, @Rohithgilla12, @brookton, @skirsten, @davidfateh, @DavidBabel, @mannybecerra, @pveyes, @kaykdm, @xhiroga, @mzaien, @losfair, @ykzts, @knezevicdev, @yang-feng-yfeng, @xuchaobei, @elkevinwolf, @fabienheureux, @nilskaspersson, @Andarist, @mathcrln, @dferber90, @FranciscoMoretti, @benschwarz, @wendellhu95, @gazdagergo, @imabp, @ljosberinn, @samuliasmala, @ka2jun8, @monsonjeremy, @pqt, @leoortizz, @michel-kraemer, @ntkoopman, @iicdii, @chentsulin, @ericmatthys, @lennym, @balogunkeji, @wnr, @chemicalkosek, @KittyGiraudel, @OKinane, @KonstHardy, @BrandonRomano, @furcan, @dusanralic, @elliottsj, @hi-ogawa, @panva, @genetschneider, @thundermiracle, @stefano-rainieri, @ericbiewener, @vordgi, @stevejarvis, @ihmpavel, @matamatanot, @dyarfaradj, @iheyunfei, @ascorbic, @fytriht, @emzoumpo, @onurtemiz, @a-ursino, @mxschmitt, @bywo, @OArnarsson, @TurekBot, @gish, @vadymshymko, @kamsar, @skhaz, @Prashoon123, @IrisvanOllefen, @evan-bradley, @ntltd, @EzequielDM, @oBusk, @martpie, @BruceRodrigues, @luke-h1, @lucasvazq, @velocity23, @AkiraTsuboi, @mitheelgajare, @JamiesWhiteShirt, @leroydev, @JulienZD, @leotaku, @mattfwood, and @kripod.
