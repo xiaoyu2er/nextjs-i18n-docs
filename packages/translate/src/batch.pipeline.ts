@@ -226,7 +226,12 @@ async function translateFile(
   if (assembleResult.allCached) {
     const finalPath = path.join(opts.outputDir, opts.lang, relPath);
     fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-    const annotated = annotate(assembleResult.content, sourceContent);
+    const annotated = annotate(
+      assembleResult.content,
+      sourceContent,
+      cache,
+      opts.lang,
+    );
     fs.writeFileSync(finalPath, annotated, 'utf8');
     const mdxResult = validateMdx(annotated);
     return {
@@ -277,7 +282,12 @@ async function translateFile(
 
   const finalPath = path.join(opts.outputDir, opts.lang, relPath);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-  const annotatedFinal = annotate(finalContent, sourceContent);
+  const annotatedFinal = annotate(
+    finalContent,
+    sourceContent,
+    cache,
+    opts.lang,
+  );
   fs.writeFileSync(finalPath, annotatedFinal, 'utf8');
 
   const mdxResult = validateMdx(annotatedFinal);
@@ -345,7 +355,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
         fs.mkdirSync(path.dirname(finalPath), { recursive: true });
         fs.writeFileSync(
           finalPath,
-          annotate(assembleResult.content, sourceContent),
+          annotate(assembleResult.content, sourceContent, cache, opts.lang),
           'utf8',
         );
       } else {
@@ -490,8 +500,21 @@ async function runAnnotate(opts: CliOptions): Promise<void> {
     files = await glob(target);
   }
 
+  // Load all language caches for anchor-based alignment
+  const { langs: langConfigs } = await loadLangConfigs(opts.configPath);
+  const caches = new Map<string, TranslationCache>();
+  for (const lang of Object.keys(langConfigs)) {
+    const c = new TranslationCache(opts.cacheDir);
+    try {
+      c.load(lang);
+      caches.set(lang, c);
+    } catch {
+      // no cache for this language
+    }
+  }
+
   console.log(`📝 Annotating ${files.length} file(s)`);
-  console.log(`   English source: ${opts.docsRoot}\n`);
+  console.log(`   Caches loaded: ${[...caches.keys()].join(', ') || 'none'}\n`);
 
   let annotatedCount = 0;
   let skippedCount = 0;
@@ -529,7 +552,32 @@ async function runAnnotate(opts: CliOptions): Promise<void> {
       sourceText = fs.readFileSync(enSourcePath, 'utf8');
     }
 
-    const result = annotate(content, sourceText);
+    // Detect language from path for cache lookup
+    let detectedLang = '';
+    const knownLangs = [
+      'zh-hans',
+      'zh-hant',
+      'ja',
+      'es',
+      'de',
+      'fr',
+      'ru',
+      'ar',
+    ];
+    for (const lang of knownLangs) {
+      if (fullPath.includes(`/${lang}/`)) {
+        detectedLang = lang;
+        break;
+      }
+    }
+    const langCache = detectedLang ? caches.get(detectedLang) : undefined;
+
+    const result = annotate(
+      content,
+      sourceText,
+      langCache,
+      detectedLang || undefined,
+    );
     fs.writeFileSync(filePath, result, 'utf8');
     annotatedCount++;
     if (!sourceText) noSourceCount++;
