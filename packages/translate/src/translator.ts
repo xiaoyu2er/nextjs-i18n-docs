@@ -311,12 +311,17 @@ export async function translateAssembled(
   return translateWithRetry(opts, systemPrompt);
 }
 
-// ── JSON-based translation ───────────────────────────────────────────
+// ── Structured JSON translation ──────────────────────────────────────
+
+interface TranslationNode {
+  key: string;
+  type: string;
+  text: string;
+}
 
 /**
- * Build prompt for JSON-based translation.
- * The LLM receives the full file as context but only outputs
- * translations as a JSON object keyed by MD5 hash.
+ * Build prompt for structured JSON translation.
+ * Input: JSON with typed nodes. Output: JSON {key: translation}.
  */
 export function buildJsonPrompt(opts: {
   langName: string;
@@ -325,66 +330,65 @@ export function buildJsonPrompt(opts: {
 }): string {
   let prompt = `You are a professional technical translator specializing in software documentation.
 
-TASK: Translate the marked sections to ${opts.langName} and return as JSON.
+TASK: Translate the provided nodes to ${opts.langName} and return as JSON.
 
-The input file contains sections marked with <!-- NEEDS_TRANSLATION:md5hash -->. 
-Translate ONLY these marked sections. Return a JSON object where:
-- Each key is the md5 hash from the marker
-- Each value is the translated text (Markdown preserved)
+INPUT: A JSON object with a "nodes" array. Each node has:
+- "key": unique identifier (use as key in your response)
+- "type": one of frontmatter, heading, paragraph, list, blockquote, html
+- "text": the content to translate
+
+OUTPUT: A single valid JSON object mapping each key to its translation. No other text.
 
 RULES:
-1. Return ONLY a valid JSON object. No other text, no markdown code fences.
-2. All newlines INSIDE translated text MUST be escaped as \\n in the JSON string. The JSON must be a SINGLE LINE per key-value pair. Example: {"key":"line1\\nline2\\n## Heading"}
-3. Preserve all Markdown formatting: heading levels (## ###), links, inline code, bold, italic
-3. Keep code blocks, file paths, URLs, variable names unchanged
-4. For frontmatter content (title, description), translate the values but keep YAML-safe formatting
-5. NEVER start a translated value with backticks, quotes, or special YAML characters
-6. Keep HTML/JSX tags balanced: <AppOnly></AppOnly>, <PagesOnly></PagesOnly>
-7. Each translated value must be the COMPLETE translation of the original section
+1. Return ONLY valid JSON. No markdown fences, no explanation.
+2. Escape newlines as \\n in JSON strings. Output must be parseable JSON.
+3. Translate EVERY node. Do not skip any key.
+4. Preserve Markdown: heading levels (##), links [text](url), inline \`code\`, **bold**, *italic*.
+5. Keep code blocks, file paths, URLs, variable names, component names unchanged.
+6. Keep HTML/JSX tags balanced: <AppOnly></AppOnly>, <PagesOnly></PagesOnly>.
 
-EXAMPLE INPUT:
-\`\`\`
-Some already translated text...
+TYPE-SPECIFIC RULES:
+- "frontmatter": YAML metadata. Translate values only, keep keys unchanged.
+  CRITICAL: Never start a value with \` ' " or use : in values. Must be valid YAML.
+- "heading": Keep ## or ### prefix exactly as original.
+- "list": Keep - or 1. markers and indentation.
+- "blockquote": Keep > prefix.
+- "html": Translate human text only. Keep all tags/attributes unchanged.
 
-<!-- NEEDS_TRANSLATION:abc123 -->
-## Getting Started
-
-<!-- NEEDS_TRANSLATION:def456 -->
-Next.js is a React framework for building web applications.
-
-More already translated text...
-\`\`\`
-
-EXAMPLE OUTPUT:
-{"abc123":"## 入门指南","def456":"Next.js 是一个用于构建 Web 应用程序的 React 框架。"}`;
+EXAMPLE:
+Input: {"nodes":[{"key":"a1","type":"frontmatter","text":"title: Getting Started\\ndescription: Learn Next.js\\n---"},{"key":"b2","type":"heading","text":"## Installation"},{"key":"c3","type":"paragraph","text":"Run the following command:"}]}
+Output: {"a1":"title: 入门指南\\ndescription: 学习 Next.js\\n---","b2":"## 安装","c3":"运行以下命令："}`;
 
   if (opts.docsContext) {
-    prompt += `\n\nDOCUMENTATION CONTEXT:\n${opts.docsContext}`;
+    prompt += `\n\nCONTEXT:\n${opts.docsContext}`;
   }
 
   if (opts.guide) {
-    prompt += `\n\nTRANSLATION GUIDELINES:\n${opts.guide}`;
+    prompt += `\n\nGUIDELINES:\n${opts.guide}`;
   }
 
   return prompt;
 }
 
 /**
- * Build the user message for JSON-based translation.
- * Inserts <!-- NEEDS_TRANSLATION:md5 --> markers before uncached nodes.
+ * Build structured JSON user message from uncached nodes.
+ * Each node gets a type based on its AST classification.
  */
 export function buildJsonUserMessage(
-  assembledContent: string,
   uncached: Record<string, string>,
+  nodeTypes: Record<string, string>,
 ): string {
-  // Replace NEEDS_TRANSLATION markers with MD5-keyed markers
-  let content = assembledContent;
-  for (const [md5, sourceText] of Object.entries(uncached)) {
-    const marker = `<!-- NEEDS_TRANSLATION -->\n${sourceText}\n<!-- /NEEDS_TRANSLATION -->`;
-    const newMarker = `<!-- NEEDS_TRANSLATION:${md5} -->\n${sourceText}`;
-    content = content.replace(marker, newMarker);
+  const nodes: TranslationNode[] = [];
+  for (const [md5, text] of Object.entries(uncached)) {
+    const type = nodeTypes[md5] ?? 'paragraph';
+    // Map parser types to simpler categories
+    let simpleType = type;
+    if (text.includes('title:') && text.includes('---')) {
+      simpleType = 'frontmatter';
+    }
+    nodes.push({ key: md5, type: simpleType, text });
   }
-  return content;
+  return JSON.stringify({ nodes });
 }
 
 export interface JsonTranslateResult {
@@ -392,17 +396,19 @@ export interface JsonTranslateResult {
   translations: Record<string, string>;
   /** MD5s that were requested but not returned */
   missing: string[];
-  /** MD5s returned that were not requested (hallucinated) */
+  /** MD5s returned that were not requested */
   extra: string[];
 }
 
 /**
- * Translate using JSON mode — LLM returns {md5: translation} pairs.
- * This eliminates structure mismatch since we assemble the file ourselves.
+ * Translate using structured JSON mode.
+ * Input: typed nodes as JSON. Output: {md5: translation} JSON.
+ * Zero structure mismatch — we control both input and output format.
  */
 export async function translateJson(
   opts: TranslateOptions & {
     uncached: Record<string, string>;
+    nodeTypes: Record<string, string>;
   },
 ): Promise<JsonTranslateResult> {
   const systemPrompt = buildJsonPrompt({
@@ -411,10 +417,7 @@ export async function translateJson(
     docsContext: opts.docsContext,
   });
 
-  const userMessage = buildJsonUserMessage(
-    opts.assembledContent,
-    opts.uncached,
-  );
+  const userMessage = buildJsonUserMessage(opts.uncached, opts.nodeTypes);
 
   const { baseURL, apiKey, model } = resolveApiConfig(opts);
   const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
@@ -454,10 +457,8 @@ export async function translateJson(
       try {
         parsed = JSON.parse(raw);
       } catch {
-        // Try to repair: fix unescaped newlines inside JSON string values
         try {
-          const repaired = repairJson(raw);
-          parsed = JSON.parse(repaired);
+          parsed = JSON.parse(repairJson(raw));
         } catch {
           throw new Error(
             `Failed to parse JSON response: ${raw.substring(0, 200)}...`,

@@ -42,6 +42,8 @@ import { validateMdx } from './mdx-validator';
 import { parseMdx } from './parser';
 import { type TranslateOptions, translateJson } from './translator';
 
+// Note: translateAssembled (legacy whole-file mode) still exported for backward compatibility
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 const __filename = fileURLToPath(import.meta.url);
@@ -241,8 +243,12 @@ async function translateFile(
     return { status: 'skipped', newTranslations: 0, diffs: 0, mdxErrors: [] };
   }
 
-  // Extract uncached nodes for JSON-based translation
-  const { uncached } = extractUncached(sourceContent, opts.lang, cache);
+  // Extract uncached nodes for structured JSON translation
+  const { uncached, nodeTypes } = extractUncached(
+    sourceContent,
+    opts.lang,
+    cache,
+  );
   if (Object.keys(uncached).length === 0) {
     // All cached after extractUncached (race condition or cache updated)
     const final = assemble(sourceContent, opts.lang, cache, relPath);
@@ -252,10 +258,11 @@ async function translateFile(
     return { status: 'cached', newTranslations: 0, diffs: 0, mdxErrors: [] };
   }
 
-  // Translate via JSON mode — LLM returns {md5: translation} pairs
+  // Translate via structured JSON — send typed nodes, receive {md5: translation}
   const jsonResult = await translateJson({
     assembledContent: assembleResult.content,
     uncached,
+    nodeTypes,
     langName: langConfig.name,
     guide: langConfig.guide,
     apiType: opts.apiType,
@@ -609,7 +616,7 @@ async function runAnnotate(opts: CliOptions): Promise<void> {
   const target = opts.annotateFiles;
 
   // Resolve glob or file path
-  const stat = fs.existsSync(target) && fs.statSync(target);
+  const stat = fs.existsSync(target) ? fs.statSync(target) : null;
   let files: string[];
   let baseDir: string;
 
