@@ -1,0 +1,224 @@
+---
+title: instrumentation-client.js
+description: 了解如何添加客户端插桩以追踪和监控 Next.js 应用的前端性能。
+---
+
+`instrumentation-client.js|ts` 文件允许你添加监控、分析代码以及其他在你的应用变得可交互之前运行的副作用代码。这对于设置性能跟踪、错误监控、垫片 (polyfill) 或任何其他客户端可观测性工具非常有用。
+
+要使用它，请将文件放在你应用的**根目录**下或 `src` 文件夹内。
+
+## 使用方法
+
+与[服务端插桩](/docs/app/guides/instrumentation)不同，你不需要导出任何特定函数。你可以直接在文件中编写监控代码：
+
+```ts filename="instrumentation-client.ts" switcher
+// Set up performance monitoring
+performance.mark('app-init')
+
+// Initialize analytics
+console.log('Analytics initialized')
+
+// Set up error tracking
+window.addEventListener('error', (event) => {
+  // Send to your error tracking service
+  reportError(event.error)
+})
+```
+
+```js filename="instrumentation-client.js" switcher
+// Set up performance monitoring
+performance.mark('app-init')
+
+// Initialize analytics
+console.log('Analytics initialized')
+
+// Set up error tracking
+window.addEventListener('error', (event) => {
+  // Send to your error tracking service
+  reportError(event.error)
+})
+```
+
+**错误处理：** 在你的插桩代码周围实现 try-catch 块以确保监控的健壮性。这可以防止单个跟踪失败影响其他插桩功能。
+
+## 路由导航跟踪
+
+你可以导出一个 `onRouterTransitionStart` 函数来在导航开始时接收通知：
+
+```ts filename="instrumentation-client.ts" switcher
+performance.mark('app-init')
+
+export function onRouterTransitionStart(
+  url: string,
+  navigationType: 'push' | 'replace' | 'traverse'
+) {
+  console.log(`Navigation started: ${navigationType} to ${url}`)
+  performance.mark(`nav-start-${Date.now()}`)
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+performance.mark('app-init')
+
+export function onRouterTransitionStart(url, navigationType) {
+  console.log(`Navigation started: ${navigationType} to ${url}`)
+  performance.mark(`nav-start-${Date.now()}`)
+}
+```
+
+`onRouterTransitionStart` 函数接收两个参数：
+
+- `url: string` - 要导航到的 URL
+- `navigationType: 'push' | 'replace' | 'traverse'` - 导航的类型
+
+## 性能考量
+
+保持插桩代码轻量级。
+
+Next.js 在开发环境中会监控初始化时间，如果耗时超过 16 毫秒（这可能会影响流畅的页面加载），将会记录警告。
+
+## 执行时机
+
+`instrumentation-client.js` 文件在应用程序生命周期中的特定时刻执行：
+
+1. 在 HTML 文档加载**之后**
+2. 在 React 注水 (hydration) 开始**之前**
+3. 在用户交互可能进行**之前**
+
+这种时机使其非常适合设置需要捕获早期应用生命周期事件的错误跟踪、分析和性能监控。
+
+## 示例
+
+### 错误跟踪
+
+在 React 启动之前初始化错误跟踪，并添加导航面包屑 (breadcrumb) 以提供更好的调试上下文。
+
+```ts filename="instrumentation-client.ts" switcher
+import Monitor from './lib/monitoring'
+
+Monitor.initialize()
+
+export function onRouterTransitionStart(url: string) {
+  Monitor.pushEvent({
+    message: `Navigation to ${url}`,
+    category: 'navigation',
+  })
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+import Monitor from './lib/monitoring'
+
+Monitor.initialize()
+
+export function onRouterTransitionStart(url) {
+  Monitor.pushEvent({
+    message: `Navigation to ${url}`,
+    category: 'navigation',
+  })
+}
+```
+
+### 分析跟踪
+
+初始化分析工具，并通过详细的元数据跟踪导航事件，用于用户行为分析。
+
+```ts filename="instrumentation-client.ts" switcher
+import { analytics } from './lib/analytics'
+
+analytics.init()
+
+export function onRouterTransitionStart(url: string, navigationType: string) {
+  analytics.track('page_navigation', {
+    url,
+    type: navigationType,
+    timestamp: Date.now(),
+  })
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+import { analytics } from './lib/analytics'
+
+analytics.init()
+
+export function onRouterTransitionStart(url, navigationType) {
+  analytics.track('page_navigation', {
+    url,
+    type: navigationType,
+    timestamp: Date.now(),
+  })
+}
+```
+
+### 性能监控
+
+使用 Performance Observer API 和性能标记 (performance marks) 跟踪可交互时间 (Time to Interactive) 和导航性能。
+
+```ts filename="instrumentation-client.ts" switcher
+const startTime = performance.now()
+
+const observer = new PerformanceObserver(
+  (list: PerformanceObserverEntryList) => {
+    for (const entry of list.getEntries()) {
+      if (entry instanceof PerformanceNavigationTiming) {
+        console.log('Time to Interactive:', entry.loadEventEnd - startTime)
+      }
+    }
+  }
+)
+
+observer.observe({ entryTypes: ['navigation'] })
+
+export function onRouterTransitionStart(url: string) {
+  performance.mark(`nav-start-${url}`)
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+const startTime = performance.now()
+
+const observer = new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    if (entry instanceof PerformanceNavigationTiming) {
+      console.log('Time to Interactive:', entry.loadEventEnd - startTime)
+    }
+  }
+})
+
+observer.observe({ entryTypes: ['navigation'] })
+
+export function onRouterTransitionStart(url) {
+  performance.mark(`nav-start-${url}`)
+}
+```
+
+### 垫片
+
+在应用代码运行之前加载垫片。对于立即加载使用静态导入，对于基于特性检测的条件加载使用动态导入。
+
+```ts filename="instrumentation-client.ts" switcher
+import './lib/polyfills'
+
+if (!window.ResizeObserver) {
+  import('./lib/polyfills/resize-observer').then((mod) => {
+    window.ResizeObserver = mod.default
+  })
+}
+```
+
+```js filename="instrumentation-client.js" switcher
+import './lib/polyfills'
+
+if (!window.ResizeObserver) {
+  import('./lib/polyfills/resize-observer').then((mod) => {
+    window.ResizeObserver = mod.default
+  })
+}
+```
+
+## 版本历史
+
+| 版本    | 变更                             |
+| ------- | -------------------------------- |
+| `v15.3` | 引入了 `instrumentation-client` |

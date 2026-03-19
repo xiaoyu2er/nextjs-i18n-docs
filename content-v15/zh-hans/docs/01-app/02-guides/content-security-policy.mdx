@@ -1,0 +1,723 @@
+---
+title: 如何为你的 Next.js 应用设置内容安全策略 (CSP)
+nav_title: 内容安全策略
+description: 了解如何为你的 Next.js 应用设置内容安全策略 (CSP)。
+related:
+  links:
+    - app/api-reference/file-conventions/middleware
+    - app/api-reference/functions/headers
+---
+
+{/* 本文档的内容在应用路由和页面路由之间共享。您可以使用 `<PagesOnly>Content</PagesOnly>` 组件来添加仅适用于页面路由的内容。任何共享内容不应包裹在组件中。 */}
+
+[内容安全策略 (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP) 对于保护你的 Next.js 应用免受跨站脚本 (XSS)、点击劫持和其他代码注入攻击等各种安全威胁至关重要。
+
+通过使用 CSP，开发者可以指定哪些来源对于内容源、脚本、样式表、图片、字体、对象、媒体（音频、视频）、iframe 等是允许的。
+
+<details>
+
+  <summary>示例</summary>
+
+- [严格 CSP](https://github.com/vercel/next.js/tree/canary/examples/with-strict-csp)
+
+</details>
+
+## 随机数
+
+[随机数 (nonce)](https://developer.mozilla.org/docs/Web/HTML/Global_attributes/nonce) 是一个为单次使用而创建的唯一、随机字符串。它与 CSP 结合使用，以选择性地允许某些内联脚本或样式执行，从而绕过严格的 CSP 指令。
+
+### 为什么要使用随机数？
+
+CSP 可以阻止内联和外部脚本，以防止攻击。随机数允许您安全地允许特定的脚本运行——前提是该脚本包含匹配的随机数值。
+
+如果攻击者试图在你的页面中加载脚本，他们需要猜测随机数值。这就是为什么随机数对于每个请求都必须是不可预测且唯一的。
+
+### 使用中间件添加随机数
+
+[中间件](/docs/app/api-reference/file-conventions/middleware) 允许你在页面渲染之前添加头信息并生成随机数。
+
+每次查看页面时，都应生成一个新的随机数。这意味着你**必须使用 [动态渲染](/docs/app/getting-started/partial-prerendering#dynamic-rendering) 来添加随机数**。
+
+例如：
+
+```ts filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // Replace newline characters and spaces
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // Replace newline characters and spaces
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+默认情况下，中间件在所有请求上运行。你可以使用 [`matcher`](/docs/app/api-reference/file-conventions/middleware#matcher) 过滤中间件以在特定路径上运行。
+
+我们建议忽略匹配预取请求（来自 `next/link`）和不需要 CSP 头的静态资源。
+
+```ts filename="middleware.ts" switcher
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+```js filename="middleware.js" switcher
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+### 随机数在 Next.js 中如何工作
+
+要使用随机数，你的页面必须是**动态渲染**的。这是因为 Next.js 在**服务器端渲染**期间应用随机数，基于请求中存在的 CSP 头。静态页面是在构建时生成的，当时不存在请求或响应头——因此无法注入随机数。
+
+以下是动态渲染页面中随机数支持的工作原理：
+
+1. **中间件生成随机数**：你的中间件为请求创建唯一的随机数，将其添加到你的 `Content-Security-Policy` 头中，并将其设置在自定义的 `x-nonce` 头中。
+2. **Next.js 提取随机数**：在渲染期间，Next.js 解析 `Content-Security-Policy` 头并使用 `'nonce-{value}'` 模式提取随机数。
+3. **随机数自动应用**：Next.js 将随机数附加到：
+   - 框架脚本（React、Next.js 运行时）
+   - 页面特定的 JavaScript 包
+   - Next.js 生成的内联样式和脚本
+   - 使用 `nonce` prop 的任何 `<Script>` 组件
+
+由于这种自动行为，你不需要手动为每个标签添加随机数。
+
+### 强制动态渲染
+
+如果你使用随机数，你可能需要显式将页面置于动态渲染模式：
+
+```tsx filename="app/page.tsx" switcher
+import { connection } from 'next/server'
+
+export default async function Page() {
+  // wait for an incoming request to render this page
+  await connection()
+  // Your page content
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { connection } from 'next/server'
+
+export default async function Page() {
+  // wait for an incoming request to render this page
+  await connection()
+  // Your page content
+}
+```
+
+### 读取随机数
+
+<PagesOnly>
+
+  你可以使用 [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) 将随机数 (nonce) 传递给你的页面：
+
+```tsx filename="pages/index.tsx" switcher
+import Script from 'next/script'
+
+import type { GetServerSideProps } from 'next'
+
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+import Script from 'next/script'
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export async function getServerSideProps({ req }) {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+You can also access the nonce in `_document.tsx` for Pages Router applications:
+
+```tsx filename="pages/_document.tsx" switcher
+import Document, {
+  Html,
+  Head,
+  Main,
+  NextScript,
+  DocumentContext,
+  DocumentInitialProps,
+} from 'next/document'
+
+interface ExtendedDocumentProps extends DocumentInitialProps {
+  nonce?: string
+}
+
+class MyDocument extends Document<ExtendedDocumentProps> {
+  static async getInitialProps(
+    ctx: DocumentContext
+  ): Promise<ExtendedDocumentProps> {
+    const initialProps = await Document.getInitialProps(ctx)
+    const nonce = ctx.req?.headers?.['x-nonce'] as string | undefined
+
+    return {
+      ...initialProps,
+      nonce,
+    }
+  }
+
+  render() {
+    const { nonce } = this.props
+
+    return (
+      <Html lang="en">
+        <Head nonce={nonce} />
+        <body>
+          <Main />
+          <NextScript nonce={nonce} />
+        </body>
+      </Html>
+    )
+  }
+}
+
+export default MyDocument
+```
+
+```jsx filename="pages/_document.jsx" switcher
+import Document, { Html, Head, Main, NextScript } from 'next/document'
+
+class MyDocument extends Document {
+  static async getInitialProps(ctx) {
+    const initialProps = await Document.getInitialProps(ctx)
+    const nonce = ctx.req?.headers?.['x-nonce']
+
+    return {
+      ...initialProps,
+      nonce,
+    }
+  }
+
+  render() {
+    const { nonce } = this.props
+
+    return (
+      <Html lang="en">
+        <Head nonce={nonce} />
+        <body>
+          <Main />
+          <NextScript nonce={nonce} />
+        </body>
+      </Html>
+    )
+  }
+}
+
+export default MyDocument
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+你可以使用 [`headers`](/docs/app/api-reference/functions/headers) 从[服务端组件 (Server Component)](/docs/app/getting-started/server-and-client-components) 读取随机数 (nonce)：
+
+```tsx filename="app/page.tsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+</AppOnly>
+
+## Static vs Dynamic Rendering with CSP
+
+Using nonces has important implications for how your Next.js application renders:
+
+### Dynamic Rendering Requirement
+
+When you use nonces in your CSP, **all pages must be dynamically rendered**. This means:
+
+- Pages will build successfully but may encounter runtime errors if not properly configured for dynamic rendering
+- Each request generates a fresh page with a new nonce
+- Static optimization and Incremental Static Regeneration (ISR) are disabled
+- Pages cannot be cached by CDNs without additional configuration
+- **Partial Prerendering (PPR) is incompatible** with nonce-based CSP since static shell scripts won't have access to the nonce
+
+### Performance Implications
+
+The shift from static to dynamic rendering affects performance:
+
+- **Slower initial page loads**: Pages must be generated on each request
+- **Increased server load**: Every request requires server-side rendering
+- **No CDN caching**: Dynamic pages cannot be cached at the edge by default
+- **Higher hosting costs**: More server resources needed for dynamic rendering
+
+### When to use nonces
+
+Consider nonces when:
+
+- You have strict security requirements that prohibit `'unsafe-inline'`
+- Your application handles sensitive data
+- You need to allow specific inline scripts while blocking others
+- Compliance requirements mandate strict CSP
+
+## Without Nonces
+
+对于不需要随机数 (nonce) 的应用，你可以直接在 [`next.config.js`](/docs/app/api-reference/config/next-config-js) 文件中设置 CSP 头：
+
+```js filename="next.config.js"
+const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-eval' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+<AppOnly>
+
+## Subresource Integrity (Experimental)
+
+As an alternative to nonces, Next.js offers experimental support for hash-based CSP using Subresource Integrity (SRI). This approach allows you to maintain static generation while still having a strict CSP.
+
+> **Good to know**: This feature is experimental and only available with webpack bundler in App Router applications.
+
+### How SRI works
+
+Instead of using nonces, SRI generates cryptographic hashes of your JavaScript files at build time. These hashes are added as `integrity` attributes to script tags, allowing browsers to verify that files haven't been modified during transit.
+
+### Enabling SRI
+
+Add the experimental SRI configuration to your `next.config.js`:
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256', // or 'sha384' or 'sha512'
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+### CSP configuration with SRI
+
+When SRI is enabled, you can continue using your existing CSP policies. SRI works independently by adding `integrity` attributes to your assets:
+
+> **Good to know**: For dynamic rendering scenarios, you can still generate nonces with middleware if needed, combining both SRI integrity attributes and nonce-based CSP approaches.
+
+```js filename="next.config.js"
+const cspHeader = `
+    default-src 'self';
+    script-src 'self';
+    style-src 'self';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256',
+    },
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### Benefits of SRI over nonces
+
+- **Static generation**: Pages can be statically generated and cached
+- **CDN compatibility**: Static pages work with CDN caching
+- **Better performance**: No server-side rendering required for each request
+- **Build-time security**: Hashes are generated at build time, ensuring integrity
+
+### Limitations of SRI
+
+- **Experimental**: Feature may change or be removed
+- **Webpack only**: Not available with Turbopack
+- **App Router only**: Not supported in Pages Router
+- **Build-time only**: Cannot handle dynamically generated scripts
+
+</AppOnly>
+
+## Development vs Production Considerations
+
+CSP implementation differs between development and production environments:
+
+### Development Environment
+
+In development, you will need to enable `'unsafe-eval'` to support APIs that provide additional debugging information:
+
+```ts filename="middleware.ts" switcher
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+  // Rest of middleware implementation
+}
+```
+
+```js filename="middleware.js" switcher
+export function middleware(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+  // Rest of middleware implementation
+}
+```
+
+### Production Deployment
+
+Common issues in production:
+
+- **Nonce not applied**: Ensure your middleware runs on all necessary routes
+- **Static assets blocked**: Verify your CSP allows Next.js static assets
+- **Third-party scripts**: Add necessary domains to your CSP policy
+
+## 故障排除
+
+### Third-party Scripts
+
+<AppOnly>
+
+When using third-party scripts with CSP:
+
+```tsx filename="app/layout.tsx" switcher
+import { GoogleTagManager } from '@next/third-parties/google'
+import { headers } from 'next/headers'
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <GoogleTagManager gtmId="GTM-XYZ" nonce={nonce} />
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.jsx" switcher
+import { GoogleTagManager } from '@next/third-parties/google'
+import { headers } from 'next/headers'
+
+export default async function RootLayout({ children }) {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <GoogleTagManager gtmId="GTM-XYZ" nonce={nonce} />
+      </body>
+    </html>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+When using third-party scripts with CSP, ensure you add the necessary domains and pass the nonce:
+
+```tsx filename="pages/_app.tsx" switcher
+import type { AppProps } from 'next/app'
+import Script from 'next/script'
+
+export default function App({ Component, pageProps }: AppProps) {
+  const nonce = pageProps.nonce
+
+  return (
+    <>
+      <Component {...pageProps} />
+      <Script
+        src="https://www.googletagmanager.com/gtag/js"
+        strategy="afterInteractive"
+        nonce={nonce}
+      />
+    </>
+  )
+}
+```
+
+```jsx filename="pages/_app.jsx" switcher
+import Script from 'next/script'
+
+export default function App({ Component, pageProps }) {
+  const nonce = pageProps.nonce
+
+  return (
+    <>
+      <Component {...pageProps} />
+      <Script
+        src="https://www.googletagmanager.com/gtag/js"
+        strategy="afterInteractive"
+        nonce={nonce}
+      />
+    </>
+  )
+}
+```
+
+</PagesOnly>
+
+Update your CSP to allow third-party domains:
+
+```ts filename="middleware.ts" switcher
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com;
+  connect-src 'self' https://www.google-analytics.com;
+  img-src 'self' data: https://www.google-analytics.com;
+`
+```
+
+```js filename="middleware.js" switcher
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com;
+  connect-src 'self' https://www.google-analytics.com;
+  img-src 'self' data: https://www.google-analytics.com;
+`
+```
+
+### Common CSP Violations
+
+1. **Inline styles**: Use CSS-in-JS libraries that support nonces or move styles to external files
+2. **Dynamic imports**: Ensure dynamic imports are allowed in your script-src policy
+3. **WebAssembly**: Add `'wasm-unsafe-eval'` if using WebAssembly
+4. **Service workers**: Add appropriate policies for service worker scripts
+
+## 版本历史
+
+| Version    | Changes                                                       |
+| ---------- | ------------------------------------------------------------- |
+| `v14.0.0`  | Experimental SRI support added for hash-based CSP             |
+| `v13.4.20` | Recommended for proper nonce handling and CSP header parsing. |

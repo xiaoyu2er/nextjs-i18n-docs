@@ -1,0 +1,604 @@
+---
+title: 如何实现增量静态再生 (Incremental Static Regeneration, ISR)
+nav_title: ISR
+description: 了解如何在运行时通过增量静态再生创建或更新静态页面。
+---
+
+<details>
+
+  <summary>示例</summary>
+
+- [Next.js Commerce](https://vercel.com/templates/next.js/nextjs-commerce)
+- [On-Demand ISR](https://on-demand-isr.vercel.app)
+- [Next.js Forms](https://github.com/vercel/next.js/tree/canary/examples/next-forms)
+
+</details>
+
+增量静态再生 (Incremental Static Regeneration, ISR) 使你能够：
+
+- 无需重建整个站点即可更新静态内容
+- 通过为大多数请求提供预渲染的静态页面来减少服务器负载
+- 确保自动为页面添加正确的 `cache-control` 头
+- 处理大量内容页面而无需过长的 `next build` 时间
+
+以下是一个最小示例：
+
+<AppOnly>
+
+```tsx filename="app/blog/[id]/page.tsx" switcher
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+// Next.js will invalidate the cache when a
+// request comes in, at most once every 60 seconds.
+export const revalidate = 60
+
+export async function generateStaticParams() {
+  const posts: Post[] = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+  return posts.map((post) => ({
+    id: String(post.id),
+  }))
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const post: Post = await fetch(`https://api.vercel.app/blog/${id}`).then(
+    (res) => res.json()
+  )
+  return (
+    <main>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/blog/[id]/page.jsx" switcher
+// Next.js will invalidate the cache when a
+// request comes in, at most once every 60 seconds.
+export const revalidate = 60
+
+export async function generateStaticParams() {
+  const posts = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+  return posts.map((post) => ({
+    id: String(post.id),
+  }))
+}
+
+export default async function Page({ params }) {
+  const { id } = await params
+  const post = await fetch(`https://api.vercel.app/blog/${id}`).then((res) =>
+    res.json()
+  )
+  return (
+    <main>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </main>
+  )
+}
+```
+
+这个示例的工作原理如下：
+
+1. 在 `next build` 期间，所有已知的博客文章都会被生成
+2. 对这些页面（例如 `/blog/1`）的所有请求都会被缓存并瞬时响应
+3. 60秒过后，下一个请求仍将返回已缓存（现在已过时）的页面
+4. 缓存被失效，新版本的页面开始在后台生成
+5. 成功后，下一个请求将返回更新后的页面并为后续请求缓存它
+6. 如果请求 `/blog/26` 且该文章存在，页面将按需生成。可以通过使用不同的 [dynamicParams](/docs/app/api-reference/file-conventions/route-segment-config#dynamicparams) 值来更改此行为。但是，如果文章不存在，则返回 404。
+
+</AppOnly>
+
+<PagesOnly>
+
+```tsx filename="pages/blog/[id].tsx" switcher
+import type { GetStaticPaths, GetStaticProps } from 'next'
+
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+interface Props {
+  post: Post
+}
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const posts = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+  const paths = posts.map((post: Post) => ({
+    params: { id: String(post.id) },
+  }))
+
+  return { paths, fallback: 'blocking' }
+}
+
+export const getStaticProps: GetStaticProps<Props> = async ({
+  params,
+}: {
+  params: { id: string }
+}) => {
+  const post = await fetch(`https://api.vercel.app/blog/${params.id}`).then(
+    (res) => res.json()
+  )
+
+  return {
+    props: { post },
+    // Next.js will invalidate the cache when a
+    // request comes in, at most once every 60 seconds.
+    revalidate: 60,
+  }
+}
+
+export default function Page({ post }: Props) {
+  return (
+    <main>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </main>
+  )
+}
+```
+
+```jsx filename="pages/blog/[id].jsx" switcher
+export async function getStaticPaths() {
+  const posts = await fetch('https://api.vercel.app/blog').then((res) =>
+    res.json()
+  )
+  const paths = posts.map((post) => ({
+    params: { id: post.id },
+  }))
+
+  return { paths, fallback: 'blocking' }
+}
+
+export async function getStaticProps({ params }) {
+  const post = await fetch(`https://api.vercel.app/blog/${params.id}`).then(
+    (res) => res.json()
+  )
+
+  return {
+    props: { post },
+    // Next.js will invalidate the cache when a
+    // request comes in, at most once every 60 seconds.
+    revalidate: 60,
+  }
+}
+
+export default function Page({ post }) {
+  return (
+    <main>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </main>
+  )
+}
+```
+
+这个示例的工作原理如下：
+
+1. 在 `next build` 期间，所有已知的博客文章都会被生成
+2. 对这些页面（例如 `/blog/1`）的所有请求都会被缓存并瞬时响应
+3. 60秒过后，下一个请求仍将返回已缓存（现在已过时）的页面
+4. 缓存被失效，新版本的页面开始在后台生成
+5. 成功后，下一个请求将返回更新后的页面并为后续请求缓存它
+6. 如果请求 `/blog/26` 且该文章存在，页面将按需生成。可以通过使用不同的 [fallback](/docs/pages/api-reference/functions/get-static-paths#fallback-false) 值来更改此行为。但是，如果文章不存在，则返回 404。
+
+</PagesOnly>
+
+## 参考
+
+<AppOnly>
+
+### 路由段配置
+
+- [`revalidate`](/docs/app/api-reference/file-conventions/route-segment-config#revalidate)
+- [`dynamicParams`](/docs/app/api-reference/file-conventions/route-segment-config#dynamicparams)
+
+### 函数
+
+- [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath)
+- [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)
+
+</AppOnly>
+
+<PagesOnly>
+
+### 函数
+
+- [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props)
+- [`res.revalidate`](/docs/pages/building-your-application/routing/api-routes#response-helpers)
+
+</PagesOnly>
+
+## 示例
+
+<AppOnly>
+
+### 基于时间的重新验证
+
+这段文字在 /blog 上获取并显示博客文章列表。一小时后，下一个访客仍将立即收到缓存（过时）版本的页面以实现快速响应。同时，Next.js 在后台触发新版本的重新生成。新版本成功生成后，将替换缓存版本，后续访客将收到更新的内容。
+
+```tsx filename="app/blog/page.tsx" switcher
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+export const revalidate = 3600 // invalidate every hour
+
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog')
+  const posts: Post[] = await data.json()
+  return (
+    <main>
+      <h1>Blog Posts</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+export const revalidate = 3600 // invalidate every hour
+
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog')
+  const posts = await data.json()
+  return (
+    <main>
+      <h1>Blog Posts</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>{post.title}</li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+```
+
+我们建议设置一个较长的重新验证时间。例如，1 小时而不是 1 秒。如果你需要更高的精确度，请考虑使用按需重新验证。如果你需要实时数据，请考虑切换到[动态渲染](/docs/app/getting-started/partial-prerendering#dynamic-rendering)。
+
+### 使用 `revalidatePath` 进行按需重新验证
+
+为了让重新验证更精确，可以使用 `revalidatePath` 函数按需使缓存页面失效。
+
+例如，添加新文章后会调用此服务器操作。无论你在服务器组件中使用 `fetch` 还是连接到数据库来检索数据，这都将使整个路径的缓存失效。对该路径的下一个请求将触发重新生成并提供新数据，然后将为后续请求缓存它。
+
+> **注意:** `revalidatePath` 会使缓存条目失效，但重新生成发生在下一个请求上。如果你想立即重新生成缓存条目而不是等待下一个请求，可以使用 Pages 路由器 [`res.revalidate`](docs/pages/guides/incremental-static-regeneration#on-demand-validation-with-resrevalidate) 方法。我们正在添加新方法来为 App Router 提供急切重新生成功能。
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost() {
+  // Invalidate the cache for the /posts route
+  revalidatePath('/posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost() {
+  // Invalidate the cache for the /posts route
+  revalidatePath('/posts')
+}
+```
+
+[查看演示](https://on-demand-isr.vercel.app) 和 [探索源代码](https://github.com/vercel/on-demand-isr)。
+
+### 使用 `revalidateTag` 进行按需重新验证
+
+对于大多数用例，建议重新验证整个路径。如果你需要更精细的控制，可以使用 `revalidateTag` 函数。例如，你可以为单独的 `fetch` 调用添加标签：
+
+```tsx filename="app/blog/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog', {
+    next: { tags: ['posts'] },
+  })
+  const posts = await data.json()
+  // ...
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog', {
+    next: { tags: ['posts'] },
+  })
+  const posts = await data.json()
+  // ...
+}
+```
+
+如果你正在使用 ORM 或连接到数据库，可以使用 `unstable_cache`：
+
+```tsx filename="app/blog/page.tsx" switcher
+import { unstable_cache } from 'next/cache'
+import { db, posts } from '@/lib/db'
+
+const getCachedPosts = unstable_cache(
+  async () => {
+    return await db.select().from(posts)
+  },
+  ['posts'],
+  { revalidate: 3600, tags: ['posts'] }
+)
+
+export default async function Page() {
+  const posts = getCachedPosts()
+  // ...
+}
+```
+
+```jsx filename="app/blog/page.js" switcher
+import { unstable_cache } from 'next/cache'
+import { db, posts } from '@/lib/db'
+
+const getCachedPosts = unstable_cache(
+  async () => {
+    return await db.select().from(posts)
+  },
+  ['posts'],
+  { revalidate: 3600, tags: ['posts'] }
+)
+
+export default async function Page() {
+  const posts = getCachedPosts()
+  // ...
+}
+```
+
+你可以在 [服务器操作](/docs/app/getting-started/updating-data) 或 [路由处理器](/docs/app/api-reference/file-conventions/route) 中使用 `revalidateTag`：
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function createPost() {
+  // Invalidate all data tagged with 'posts'
+  revalidateTag('posts')
+}
+```
+
+```js filename="app/actions.js" switcher
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function createPost() {
+  // Invalidate all data tagged with 'posts'
+  revalidateTag('posts')
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+### 使用 `res.revalidate()` 进行按需验证
+
+对于更精确的重新验证方法，可以使用 `res.revalidate` 从 API 路由按需生成新页面。
+
+例如，可以调用 `/api/revalidate?secret=<token>` 这个 API 路由来重新验证给定的博客文章。创建一个仅你的 Next.js 应用知道的密钥令牌。此密钥将用于防止未经授权访问重新验证 API 路由。
+
+```ts filename="pages/api/revalidate.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // Check for secret to confirm this is a valid request
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: 'Invalid token' })
+  }
+
+  try {
+    // This should be the actual path not a rewritten path
+    // e.g. for "/posts/[id]" this should be "/posts/1"
+    await res.revalidate('/posts/1')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // If there was an error, Next.js will continue
+    // to show the last successfully generated page
+    return res.status(500).send('Error revalidating')
+  }
+}
+```
+
+```js filename="pages/api/revalidate.js" switcher
+export default async function handler(req, res) {
+  // Check for secret to confirm this is a valid request
+  if (req.query.secret !== process.env.MY_SECRET_TOKEN) {
+    return res.status(401).json({ message: 'Invalid token' })
+  }
+
+  try {
+    // This should be the actual path not a rewritten path
+    // e.g. for "/posts/[id]" this should be "/posts/1"
+    await res.revalidate('/posts/1')
+    return res.json({ revalidated: true })
+  } catch (err) {
+    // If there was an error, Next.js will continue
+    // to show the last successfully generated page
+    return res.status(500).send('Error revalidating')
+  }
+}
+```
+
+如果你使用按需重新验证，则无需在 `getStaticProps` 内部指定 `revalidate` 时间。Next.js 将使用默认值 `false`（不重新验证），仅在调用 `res.revalidate()` 时按需重新验证页面。
+
+</PagesOnly>
+
+### 处理未捕获的异常
+
+<AppOnly>
+
+如果在尝试重新验证数据时抛出错误，将继续从缓存提供上次成功生成的数据。在下一个后续请求上，Next.js 将重试重新验证数据。[了解更多关于错误处理的信息](/docs/app/getting-started/error-handling)。
+
+</AppOnly>
+
+<PagesOnly>
+
+如果在处理后台重新生成时，`getStaticProps` 内部发生错误，或者你手动抛出错误，将继续显示上次成功生成的页面。在下一个后续请求上，Next.js 将重试调用 `getStaticProps`。
+
+```tsx filename="pages/blog/[id].tsx" switcher
+import type { GetStaticProps } from 'next'
+
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+interface Props {
+  post: Post
+}
+
+export const getStaticProps: GetStaticProps<Props> = async ({
+  params,
+}: {
+  params: { id: string }
+}) => {
+  // If this request throws an uncaught error, Next.js will
+  // not invalidate the currently shown page and
+  // retry getStaticProps on the next request.
+  const res = await fetch(`https://api.vercel.app/blog/${params.id}`)
+  const post: Post = await res.json()
+
+  if (!res.ok) {
+    // If there is a server error, you might want to
+    // throw an error instead of returning so that the cache is not updated
+    // until the next successful request.
+    throw new Error(`Failed to fetch posts, received status ${res.status}`)
+  }
+
+  return {
+    props: { post },
+    // Next.js will invalidate the cache when a
+    // request comes in, at most once every 60 seconds.
+    revalidate: 60,
+  }
+}
+```
+
+```jsx filename="pages/blog/[id].jsx" switcher
+export async function getStaticProps({ params }) {
+  // If this request throws an uncaught error, Next.js will
+  // not invalidate the currently shown page and
+  // retry getStaticProps on the next request.
+  const res = await fetch(`https://api.vercel.app/blog/${params.id}`)
+  const post = await res.json()
+
+  if (!res.ok) {
+    // If there is a server error, you might want to
+    // throw an error instead of returning so that the cache is not updated
+    // until the next successful request.
+    throw new Error(`Failed to fetch posts, received status ${res.status}`)
+  }
+
+  return {
+    props: { post },
+    // Next.js will invalidate the cache when a
+    // request comes in, at most once every 60 seconds.
+    revalidate: 60,
+  }
+}
+```
+
+</PagesOnly>
+
+### 自定义缓存位置
+
+如果你想将缓存的页面和数据持久化到持久存储，或者在多个容器或 Next.js 应用实例之间共享缓存，可以配置 Next.js 的缓存位置。[了解更多](/docs/app/guides/self-hosting#caching-and-isr)。
+
+## 故障排除
+
+### 调试本地开发中的缓存数据
+
+如果你正在使用 `fetch` API，可以添加额外的日志记录来了解哪些请求是缓存或未缓存的。[了解更多关于 `logging` 选项的信息](/docs/app/api-reference/config/next-config-js/logging)。
+
+```jsx filename="next.config.js"
+module.exports = {
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
+}
+```
+
+### 验证正确的生产行为
+
+为了验证你的页面在生产环境中被正确缓存和重新验证，你可以通过运行 `next build` 然后 `next start` 来本地运行生产环境的 Next.js 服务器进行测试。
+
+这将允许你测试 ISR 行为，就像它在生产环境中工作一样。为了进一步调试，请将以下环境变量添加到你的 `.env` 文件中：
+
+```bash filename=".env"
+NEXT_PRIVATE_DEBUG_CACHE=1
+```
+
+这将使 Next.js 服务器控制台记录 ISR 缓存命中和未命中。你可以检查输出以查看哪些页面是在 `next build` 期间生成的，以及页面在按需访问路径时是如何更新的。
+
+## 注意事项
+
+<AppOnly>
+
+- ISR 仅在使用 Node.js 运行时（默认）时受支持。
+- ISR 在创建[静态导出](/docs/app/guides/static-exports)时不支持。
+- 如果在静态渲染的路由中有多个 `fetch` 请求，且每个请求具有不同的 `revalidate` 频率，则最小时长将用于 ISR。但是，这些重新验证频率仍将由[数据缓存](/docs/app/guides/caching#data-cache)尊重。
+- 如果在路由上使用的任何 `fetch` 请求具有 `revalidate` 时间为 `0` 或显式的 `no-store`，则该路由将被[动态渲染](/docs/app/getting-started/partial-prerendering#dynamic-rendering)。
+- 中间件不会为按需 ISR 请求执行，这意味着中间件中的任何路径重写或逻辑都不会应用。请确保你重新验证的是确切的路径。例如，使用 `/post/1` 而不是重写后的 `/post-1`。
+
+</AppOnly>
+
+<PagesOnly>
+
+- ISR 仅在使用 Node.js 运行时（默认）时受支持。
+- 创建[静态导出](/docs/app/guides/static-exports)时不支持 ISR。
+- 中间件 (Middleware) 不会为按需 ISR 请求执行，这意味着中间件中的任何路径重写或逻辑都不会应用。请确保你重新验证的是确切的路径。例如，使用 `/post/1` 而不是重写后的 `/post-1`。
+
+</PagesOnly>
+
+## 平台支持
+
+请参阅[自托管指南](/docs/app/guides/self-hosting#streaming-and-suspense)获取详细的配置说明。
+
+了解如何在自托管 Next.js 时[配置 ISR](/docs/app/guides/self-hosting#caching-and-isr)。
+
+## 版本历史
+
+| Version   | Changes                                                                             |
+| --------- | ----------------------------------------------------------------------------------- |
+| `v14.1.0` | 自定义 `cacheHandler` 已稳定。                                                    |
+| `v13.0.0` | 引入了 App Router。                                                           |
+| `v12.2.0` | Pages Router: 按需 ISR 已稳定                                               |
+| `v12.0.0` | Pages Router: 添加了 [Bot-aware ISR 回退](/blog/next-12#bot-aware-isr-fallback)。 |
+| `v9.5.0`  | Pages Router: [引入了稳定的 ISR](/blog/next-9-5)。                              |

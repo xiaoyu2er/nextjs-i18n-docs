@@ -267,10 +267,13 @@ async function translateFile(
     relPath,
   );
 
-  // Write final output
-  let finalContent = validateResult.correctedContent;
+  // Re-assemble from source structure + updated cache.
+  // This guarantees the output structure matches the English source exactly,
+  // regardless of how the LLM formatted its output.
+  const reassembled = assemble(sourceContent, opts.lang, cache, relPath);
+  let finalContent = reassembled.content;
 
-  // Strip any leftover NEEDS_TRANSLATION markers
+  // Strip any leftover NEEDS_TRANSLATION markers (uncached nodes)
   if (finalContent.includes(NEEDS_TRANSLATION_START)) {
     finalContent = finalContent
       .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
