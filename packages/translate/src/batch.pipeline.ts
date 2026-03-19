@@ -80,6 +80,7 @@ interface CliOptions {
   concurrency: number;
   dryRun: boolean;
   status: boolean;
+  annotateFiles: string;
   lookup: string;
   configPath: string;
   docsContext?: string;
@@ -114,6 +115,7 @@ function parseArgs(argv: string[]): CliOptions {
     concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
     status: hasFlag('status'),
+    annotateFiles: getOpt('annotate', ''),
     lookup: getOpt('lookup', ''),
     configPath: getOpt('config', 'translation.config.example.mjs'),
   };
@@ -460,6 +462,55 @@ async function runTranslate(opts: CliOptions): Promise<void> {
 
 // ── Lookup Mode ──────────────────────────────────────────────────────
 
+// ── Annotate Mode ────────────────────────────────────────────────────
+
+async function runAnnotate(opts: CliOptions): Promise<void> {
+  const target = opts.annotateFiles;
+
+  // Resolve glob or file path
+  const stat = fs.existsSync(target) && fs.statSync(target);
+  let files: string[];
+  let baseDir: string;
+
+  if (stat?.isFile()) {
+    // Single file
+    baseDir = path.dirname(target);
+    files = [path.basename(target)];
+  } else if (stat?.isDirectory()) {
+    // Directory — find all .mdx
+    baseDir = target;
+    files = await glob('**/*.mdx', { cwd: target });
+  } else {
+    // Treat as glob pattern
+    baseDir = '.';
+    files = await glob(target);
+  }
+
+  console.log(`📝 Annotating ${files.length} file(s)\n`);
+
+  let annotated = 0;
+  for (const relPath of files) {
+    const filePath = path.join(baseDir, relPath);
+    const content = fs.readFileSync(filePath, 'utf8');
+
+    // Skip if already annotated
+    if (content.includes('<!-- md5:')) {
+      continue;
+    }
+
+    const result = annotate(content);
+    fs.writeFileSync(filePath, result, 'utf8');
+    annotated++;
+    console.log(`  ✅ ${filePath}`);
+  }
+
+  console.log(
+    `\n📝 Annotated ${annotated} file(s), ${files.length - annotated} already had annotations.`,
+  );
+}
+
+// ── Lookup Mode ──────────────────────────────────────────────────────
+
 async function runLookup(opts: CliOptions): Promise<void> {
   const md5 = opts.lookup;
   const files = await glob(opts.pattern, { cwd: opts.docsRoot });
@@ -516,7 +567,9 @@ async function runLookup(opts: CliOptions): Promise<void> {
 async function main() {
   const opts = parseArgs(process.argv);
 
-  if (opts.lookup) {
+  if (opts.annotateFiles) {
+    await runAnnotate(opts);
+  } else if (opts.lookup) {
     await runLookup(opts);
   } else if (opts.status) {
     await runStatus(opts);
