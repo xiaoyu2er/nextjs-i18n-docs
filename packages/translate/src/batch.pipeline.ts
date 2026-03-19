@@ -282,15 +282,65 @@ async function translateFile(
     newTranslations++;
   }
 
-  // Log missing translations with details
-  if (jsonResult.missing.length > 0) {
-    console.warn(
-      `   ⚠️ ${jsonResult.missing.length}/${Object.keys(uncached).length} nodes missing from LLM response:`,
-    );
+  // Retry missing keys (if any) with a second smaller request
+  if (jsonResult.missing.length > 0 && jsonResult.missing.length <= 10) {
+    const retryUncached: Record<string, string> = {};
+    const retryTypes: Record<string, string> = {};
     for (const md5 of jsonResult.missing) {
+      retryUncached[md5] = uncached[md5];
+      retryTypes[md5] = nodeTypes[md5];
+    }
+    try {
+      console.log(
+        `   ↳ Retrying ${jsonResult.missing.length} missing nodes...`,
+      );
+      const retryResult = await translateJson({
+        assembledContent: '',
+        uncached: retryUncached,
+        nodeTypes: retryTypes,
+        langName: langConfig.name,
+        guide: langConfig.guide,
+        apiType: opts.apiType,
+        apiBaseUrl: opts.apiBaseUrl || undefined,
+        apiKey: opts.apiKey || undefined,
+        model: opts.model || undefined,
+        maxTokens: opts.maxTokens,
+        docsContext:
+          opts.docsContext ||
+          'Next.js is a React framework for building full-stack web applications.',
+      });
+      for (const [md5, translation] of Object.entries(
+        retryResult.translations,
+      )) {
+        cache.set(opts.lang, md5, translation);
+        newTranslations++;
+      }
+      if (retryResult.missing.length > 0) {
+        console.warn(
+          `   ⚠️ ${retryResult.missing.length} nodes still missing after retry:`,
+        );
+        for (const md5 of retryResult.missing) {
+          const src = uncached[md5] ?? '';
+          const preview = src.split('\n')[0].substring(0, 80);
+          console.warn(`      ${md5.substring(0, 12)}… ${preview}`);
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `   ⚠️ Retry failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  } else if (jsonResult.missing.length > 10) {
+    console.warn(
+      `   ⚠️ ${jsonResult.missing.length}/${Object.keys(uncached).length} nodes missing (too many to retry):`,
+    );
+    for (const md5 of jsonResult.missing.slice(0, 5)) {
       const src = uncached[md5] ?? '';
       const preview = src.split('\n')[0].substring(0, 80);
       console.warn(`      ${md5.substring(0, 12)}… ${preview}`);
+    }
+    if (jsonResult.missing.length > 5) {
+      console.warn(`      ... and ${jsonResult.missing.length - 5} more`);
     }
   }
 
