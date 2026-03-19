@@ -46,6 +46,50 @@ import { type TranslateOptions, translateJson } from './translator';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+/**
+ * Check if a node's source text looks like YAML frontmatter.
+ */
+function isFrontmatter(text: string): boolean {
+  const t = text.trim();
+  return (
+    (t.includes('title:') || t.includes('description:')) && t.endsWith('---')
+  );
+}
+
+/**
+ * Validate translated frontmatter is parseable YAML.
+ * Returns false if YAML is broken (truncated, bad indentation, etc.)
+ */
+function validateFrontmatter(translation: string): boolean {
+  try {
+    const t = translation.trim();
+    // Strip trailing ---
+    const yamlContent = t.endsWith('---') ? t.slice(0, -3).trim() : t;
+    if (!yamlContent) return false;
+
+    // Quick checks before full parse
+    if (yamlContent.includes('NEEDS_TRANSLATION')) return false;
+    if (yamlContent.endsWith('author:')) return false; // truncated author list
+
+    // Try YAML parse using simple validation
+    // Check: every line with "key:" must have proper indentation
+    const lines = yamlContent.split('\n');
+    for (const line of lines) {
+      // Detect backtick/quote at start of YAML value
+      const match = line.match(/^(\s*\w[\w-]*):\s*(.+)/);
+      if (match) {
+        const val = match[2];
+        if (val.startsWith('`') || val.startsWith("'") || val.startsWith('"')) {
+          return false;
+        }
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
@@ -275,9 +319,21 @@ async function translateFile(
       'Next.js is a React framework for building full-stack web applications.',
   });
 
-  // Update cache with translations
+  // Update cache with translations (validate frontmatter before caching)
   let newTranslations = 0;
+  let _badTranslations = 0;
   for (const [md5, translation] of Object.entries(jsonResult.translations)) {
+    const srcText = uncached[md5] ?? '';
+    // Validate frontmatter: if source looks like YAML frontmatter, check translation is valid
+    if (isFrontmatter(srcText)) {
+      if (!validateFrontmatter(translation)) {
+        _badTranslations++;
+        console.warn(
+          `   ⚠️ Bad YAML in translation for ${md5.substring(0, 12)}…, skipping cache`,
+        );
+        continue;
+      }
+    }
     cache.set(opts.lang, md5, translation);
     newTranslations++;
   }
@@ -312,6 +368,13 @@ async function translateFile(
       for (const [md5, translation] of Object.entries(
         retryResult.translations,
       )) {
+        const srcText = uncached[md5] ?? '';
+        if (isFrontmatter(srcText) && !validateFrontmatter(translation)) {
+          console.warn(
+            `   ⚠️ Bad YAML in retry for ${md5.substring(0, 12)}…, skipping`,
+          );
+          continue;
+        }
         cache.set(opts.lang, md5, translation);
         newTranslations++;
       }
