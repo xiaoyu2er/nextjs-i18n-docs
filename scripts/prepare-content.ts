@@ -51,7 +51,9 @@ const { target, version } = parseArgs();
 
 const ROOT_LOCALE = 'en';
 const LOCALES = ['en', 'zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
-const CONTENT_SRC = resolve(import.meta.dirname!, '../content');
+const CONTENT_SRC = version
+  ? resolve(import.meta.dirname!, `../content-v${version}`)
+  : resolve(import.meta.dirname!, '../content');
 const CONTENT_DST = resolve(import.meta.dirname!, '..', target, 'src/content/docs');
 const VERSIONED_DIRS = ['13', '14', '15'];
 
@@ -127,11 +129,7 @@ function parseFrontmatter(content: string): {
 
 function resolveSourceFile(locale: string, sourceRef: string): string | null {
   const parts = sourceRef.split('/');
-  if (version) {
-    const versionDir = join(CONTENT_SRC, locale, 'docs', version);
-    const result = resolveSourceInDir(versionDir, parts);
-    if (result) return result;
-  }
+  // For versioned builds, CONTENT_SRC already points to content-v{N}/
   return resolveSourceInDir(join(CONTENT_SRC, locale, 'docs'), parts);
 }
 
@@ -201,7 +199,9 @@ function ensureDir(path: string) {
 }
 
 function shouldIncludeDocsDir(dirName: string): boolean {
-  if (version) return dirName === version;
+  // Versioned content is in separate top-level dirs (content-v13/, etc.)
+  // so no version subdirs exist within the content source
+  if (version) return true;
   return !VERSIONED_DIRS.includes(dirName);
 }
 
