@@ -71,14 +71,21 @@ RULES:
    - Keep the --- delimiters exactly as-is
 7. NEVER start a frontmatter value with backticks, quotes, or special characters
 
+CRITICAL STRUCTURE RULES:
+8. PRESERVE BLANK LINES EXACTLY. Every blank line in the input MUST appear in the output at the same position. Blank lines separate paragraphs, code blocks, headings, and lists — removing them merges content and BREAKS the document structure.
+9. NEVER remove a blank line between a paragraph and a code block (triple backticks).
+10. NEVER remove a blank line between a heading (## ...) and the next paragraph.
+11. NEVER merge two paragraphs into one by removing the blank line between them.
+12. Count paragraphs: the number of text paragraphs in your output MUST equal the number in the input.
+
 CRITICAL TAG RULES:
-8. All HTML/JSX tags MUST remain balanced. For every opening tag there must be a matching closing tag:
+13. All HTML/JSX tags MUST remain balanced. For every opening tag there must be a matching closing tag:
    - <AppOnly> must have </AppOnly>
    - <PagesOnly> must have </PagesOnly>
    - <details> must have </details>
    - <div ...> must have </div>
-9. Do NOT add or remove any HTML/JSX tags. Keep the exact same number of opening and closing tags as the input.
-10. Before outputting, verify: count every <AppOnly> and </AppOnly>, <PagesOnly> and </PagesOnly>, <details> and </details> — they MUST match.
+14. Do NOT add or remove any HTML/JSX tags. Keep the exact same number of opening and closing tags as the input.
+15. Before outputting, verify: count every <AppOnly> and </AppOnly>, <PagesOnly> and </PagesOnly>, <details> and </details> — they MUST match.
 
 OUTPUT: Return the complete file with translations applied and markers removed. Nothing else.`;
 

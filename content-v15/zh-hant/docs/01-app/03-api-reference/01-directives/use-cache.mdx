@@ -1,0 +1,375 @@
+---
+title: 使用快取 (use cache)
+description: 學習如何在 Next.js 應用程式中使用 use cache 指示詞來快取資料。
+version: canary
+related:
+  title: 相關內容
+  description: 檢視相關的 API 引用文件。
+  links:
+    - app/api-reference/config/next-config-js/useCache
+    - app/api-reference/config/next-config-js/cacheComponents
+    - app/api-reference/config/next-config-js/cacheLife
+    - app/api-reference/functions/cacheTag
+    - app/api-reference/functions/cacheLife
+    - app/api-reference/functions/revalidateTag
+---
+
+`use cache` 指示詞允許您將路由、React 元件或函式標記為可快取。它可以用於檔案開頭，表示檔案中的所有匯出都應該被快取，或者內嵌在函式或元件頂部，以快取返回值。
+
+## 使用方法
+
+`use cache` 目前是一個實驗性功能。要啟用它，請在您的 `next.config.ts` 檔案中加入 [`useCache`](/docs/app/api-reference/config/next-config-js/useCache) 選項：
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    useCache: true,
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    useCache: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+> **了解更多：** `use cache` 也可以使用 [`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) 選項來啟用。
+
+接著，在檔案、元件或函式層級加入 `use cache`：
+
+```tsx
+// File level
+'use cache'
+
+export default async function Page() {
+  // ...
+}
+
+// Component level
+export async function MyComponent() {
+  'use cache'
+  return <></>
+}
+
+// Function level
+export async function getData() {
+  'use cache'
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+## 使用快取運作方式
+
+### 快取金鑰
+
+快取項目的金鑰是使用其輸入的序列化版本生成的，包括：
+
+- 建置 ID（每個建置時生成）
+- 函式 ID（該函式的唯一安全識別碼）
+- 可 [序列化](https://react.dev/reference/rsc/use-server#serializable-parameters-and-return-values) 的函式引數（或 props）。
+
+傳遞給快取函式的引數，以及它從父層範圍讀取的任何值，都會自動成為金鑰的一部分。這意味著，只要輸入相同，就會重用於相同的快取項目。
+
+## 非序列化引數
+
+任何非序列化引數、props，或閉包值都會在快取函式內部轉換為引用，並且只能通過而無法被檢視或修改。這些非序列化值會在請求時填入，不會成為快取金鑰的一部分。
+
+例如，快取函式可以接受 JSX 作為 `children` prop 並返回 `<div>{children}</div>`，但它無法檢查實際的 `children` 物件。這允許您在快取元件內巢狀未快取的內容。
+
+```tsx filename="app/ui/cached-component.tsx" switcher
+function CachedComponent({ children }: { children: ReactNode }) {
+  'use cache'
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/ui/cached-component.js" switcher
+function CachedComponent({ children }) {
+  'use cache'
+  return <div>{children}</div>
+}
+```
+
+## 返回值
+
+可快取函式的返回值必須是可序列化的。這確保快取的資料可以正確儲存和檢索。
+
+## 建置時使用快取
+
+當在 [佈局](/docs/app/api-reference/file-conventions/layout) 或 [頁面](/docs/app/api-reference/file-conventions/page) 頂部使用時，路由區段將會被預先轉譯，允許它在之後被 [重新驗證](#during-revalidation)。
+
+這意味著 `use cache` 無法與 [請求時間的 API](/docs/app/getting-started/partial-prerendering#dynamic-rendering) 如 `cookies` 或 `headers` 一起使用。
+
+## 執行時使用快取
+
+在 **伺服器** 上，個別元件或函式的快取項目將在記憶體中快取。
+
+接著，在 **客戶端**，從伺服器快取回傳的任何內容都會在整個會話期間儲存於瀏覽器記憶體中，或直到 [重新驗證](#during-revalidation)。
+
+## 在重新驗證期間
+
+預設情況下，`use cache` 的伺服器端重新驗證期間為 **15 分鐘**。雖然這個期間對於不需要頻繁更新的內容可能有用，但您可以使用 `cacheLife` 和 `cacheTag` API 來配置個別快取項目應該何時重新驗證。
+
+- [`cacheLife`](/docs/app/api-reference/functions/cacheLife): 配置快取項目的生命週期。
+- [`cacheTag`](/docs/app/api-reference/functions/cacheTag): 建立用於按需重新驗證的標籤。
+
+這兩個 API 都會整合客戶端和伺服器快取層，這意味著您可以在一個地方配置您的快取語義，並讓它們在所有地方生效。
+
+有關更多資訊，請參閱 [`cacheLife`](/docs/app/api-reference/functions/cacheLife) 和 [`cacheTag`](/docs/app/api-reference/functions/cacheTag) API 文件。
+
+## 範例
+
+### 使用 use cache 快取整個路由
+
+要預先轉譯整個路由，請在 **兩者** 的 `layout` 和 `page` 檔案頂部加入 `use cache`。這些區段在應用程式中被視為獨立進入點，並將獨立快取。
+
+```tsx filename="app/layout.tsx" switcher
+'use cache'
+
+export default function Layout({ children }: { children: ReactNode }) {
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/page.tsx" switcher
+'use cache'
+
+export default function Layout({ children }) {
+  return <div>{children}</div>
+}
+```
+
+匯入並巢狀在 `page` 檔案中的任何元件都會繼承 `page` 的快取行為。
+
+```tsx filename="app/page.tsx" switcher
+'use cache'
+
+async function Users() {
+  const users = await fetch('/api/users')
+  // loop through users
+}
+
+export default function Page() {
+  return (
+    <main>
+      <Users />
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use cache'
+
+async function Users() {
+  const users = await fetch('/api/users')
+  // loop through users
+}
+
+export default function Page() {
+  return (
+    <main>
+      <Users />
+    </main>
+  )
+}
+```
+
+> **了解：**
+>
+> - 如果仅在 `layout` 或 `page` 中加入了 `use cache`，只有該路由區段以及匯入其中的任何元件將被快取。
+> - 如果路由中的任何巢狀子項目使用了 [動態 API](/docs/app/getting-started/partial-prerendering#dynamic-rendering)，那麼該路由將選擇退出預先轉譯。
+
+### 使用 use cache 快取元件的輸出
+
+您可以在元件層級使用 `use cache` 來快取該元件內執行的任何取得或計算。只要序列化的 props 在每個實例中產生相同的值，快取項目就會被重用。
+
+```tsx filename="app/components/bookings.tsx" highlight={2} switcher
+export async function Bookings({ type = 'haircut' }: BookingsProps) {
+  'use cache'
+  async function getBookingsData() {
+    const data = await fetch(`/api/bookings?type=${encodeURIComponent(type)}`)
+    return data
+  }
+  return //...
+}
+
+interface BookingsProps {
+  type: string
+}
+```
+
+```jsx filename="app/components/bookings.js" highlight={2} switcher
+export async function Bookings({ type = 'haircut' }) {
+  'use cache'
+  async function getBookingsData() {
+    const data = await fetch(`/api/bookings?type=${encodeURIComponent(type)}`)
+    return data
+  }
+  return //...
+}
+```
+
+### 使用 use cache 快取函式輸出
+
+由於您可以將 `use cache` 加入任何非同步函式，因此您不限於僅快取元件或路由。您可能想要快取網路請求、資料庫查詢或緩慢計算。
+
+```tsx filename="app/actions.ts" highlight={2} switcher
+export async function getData() {
+  'use cache'
+
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+```jsx filename="app/actions.js" highlight={2} switcher
+export async function getData() {
+  'use cache'
+
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+### 內容交錯
+
+如果您需要向可快取函式傳遞非序列化引數，您可以將它們作為 `children` 傳遞。這意味著 `children` 引用會发生变化而不影響快取項目。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const uncachedData = await getData()
+  return (
+    <CacheComponent>
+      <DynamicComponent data={uncachedData} />
+    </CacheComponent>
+  )
+}
+
+async function CacheComponent({ children }: { children: ReactNode }) {
+  'use cache'
+  const cachedData = await fetch('/api/cached-data')
+  return (
+    <div>
+      <PrerenderedComponent data={cachedData} />
+      {children}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const uncachedData = await getData()
+  return (
+    <CacheComponent>
+      <DynamicComponent data={uncachedData} />
+    </CacheComponent>
+  )
+}
+
+async function CacheComponent({ children }) {
+  'use cache'
+  const cachedData = await fetch('/api/cached-data')
+  return (
+    <div>
+      <PrerenderedComponent data={cachedData} />
+      {children}
+    </div>
+  )
+}
+```
+
+您也可以透過快取元件向客戶端元件傳遞伺服器動作，而無需可快取函式內呼叫它們。
+
+```tsx filename="app/page.tsx" switcher
+import ClientComponent from './ClientComponent'
+
+export default async function Page() {
+  const performUpdate = async () => {
+    'use server'
+    // Perform some server-side update
+    await db.update(...)
+  }
+
+  return <CacheComponent performUpdate={performUpdate} />
+}
+
+async function CachedComponent({
+  performUpdate,
+}: {
+  performUpdate: () => Promise<void>
+}) {
+  'use cache'
+  // Do not call performUpdate here
+  return <ClientComponent action={performUpdate} />
+}
+```
+
+```jsx filename="app/page.js" switcher
+import ClientComponent from './ClientComponent'
+
+export default async function Page() {
+  const performUpdate = async () => {
+    'use server'
+    // Perform some server-side update
+    await db.update(...)
+  }
+
+  return <CacheComponent performUpdate={performUpdate} />
+}
+
+async function CachedComponent({ performUpdate }) {
+  'use cache'
+  // Do not call performUpdate here
+  return <ClientComponent action={performUpdate} />
+}
+```
+
+```tsx filename="app/ClientComponent.tsx" switcher
+'use client'
+
+export default function ClientComponent({
+  action,
+}: {
+  action: () => Promise<void>
+}) {
+  return <button onClick={action}>Update</button>
+}
+```
+
+```jsx filename="app/ClientComponent.js" switcher
+'use client'
+
+export default function ClientComponent({ action }) {
+  return <button onClick={action}>Update</button>
+}
+```
+
+## 平台支援
+
+| 部署選項                                                           | 支援狀態          |
+| ------------------------------------------------------------------- | ----------------- |
+| [Node.js 伺服器](/docs/app/getting-started/deploying#nodejs-server) | 是               |
+| [Docker 容器](/docs/app/getting-started/deploying#docker)      | 是               |
+| [靜態匯出](/docs/app/getting-started/deploying#static-export)  | 否                |
+| [配接器](/docs/app/getting-started/deploying#adapters)            | 依平台而定 |
+
+學習如何在使用 Next.js 自我託管時 [配置快取](/docs/app/guides/self-hosting#caching-and-isr)。
+
+## 版本歷史
+
+| 版本   | 變更                                                 |
+| --------- | ------------------------------------------------------- |
+| v15.0.0 | "use cache" 作為實驗性功能首次引入。 |

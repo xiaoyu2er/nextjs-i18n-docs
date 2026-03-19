@@ -1,0 +1,723 @@
+---
+title: 設定 Next.js 應用程式的內容安全政策 (CSP)
+nav_title: 內容安全政策
+description: 學習如何為您的 Next.js 應用程式設定內容安全政策 (CSP)。
+related:
+  links:
+    - app/api-reference/file-conventions/middleware
+    - app/api-reference/functions/headers
+---
+
+{/* 此文件內容在應用程式路由器和頁面路由器之間共享。您可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於頁面路由器的內容。任何共享內容都不應包裹在元件中。 */}
+
+[內容安全政策 (Content Security Policy, CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP) 對於保護您的 Next.js 應用程式免受各種安全威脅至關重要，例如跨站腳本攻擊 (XSS)、點擊劫持 (Clickjacking) 及其他代碼注入攻擊。
+
+使用 CSP，開發人員可以指定哪些來源是內容來源、腳本、樣表、圖片、字體、物件、媒體（音訊、視訊）、嵌入框架，以及更多內容的可許可來源。
+
+<details>
+
+  <summary>範例</summary>
+
+- [嚴格的 CSP (Strict CSP)](https://github.com/vercel/next.js/tree/canary/examples/with-strict-csp)
+
+</details>
+
+## 隨機數 (Nonces)
+
+一個 [隨機數 (nonce)](https://developer.mozilla.org/docs/Web/HTML/Global_attributes/nonce) 是為一次性使用而創建的唯一隨機字元串。它與 CSP 一起使用，以有選擇性地允許某些內嵌腳本或樣式執行，從而繞過嚴格的 CSP 指令。
+
+### 為什麼要使用隨機數？
+
+CSP 可以阻止內嵌和外部腳本以防止攻擊。隨機數讓您能夠安全地允許特定腳本執行——前提是它們包含匹配的隨機數值。
+
+如果攻擊者想要將腳本載入您的頁面，他們必須猜測隨機數的值。這就是為什麼隨機數必須對每個請求都是不可預測且唯一的。
+
+### 使用 Middleware 添加隨機數
+
+[Middleware](/docs/app/api-reference/file-conventions/middleware) 使您能夠在頁面渲染之前添加標頭並生成隨機數。
+
+每次查看頁面時，都應生成新的隨機數。這意味著您 **必須使用 [動態渲染](/docs/app/getting-started/partial-prerendering#dynamic-rendering) 來添加隨機數**。
+
+例如：
+
+```ts filename="middleware.ts" switcher
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // Replace newline characters and spaces
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+```js filename="middleware.js" switcher
+import { NextResponse } from 'next/server'
+
+export function middleware(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+  // Replace newline characters and spaces
+  const contentSecurityPolicyHeaderValue = cspHeader
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicyHeaderValue
+  )
+
+  return response
+}
+```
+
+預設情況下，Middleware 在所有請求上執行。您可以使用 [`matcher`](/docs/app/api-reference/file-conventions/middleware#matcher) 過濾 Middleware，使其僅在特定路徑上執行。
+
+我們建議忽略匹配的預取（來自 `next/link`）以及不需要 CSP 標頭的靜態資源。
+
+```ts filename="middleware.ts" switcher
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+```js filename="middleware.js" switcher
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+### 隨機數在 Next.js 中的運作方式
+
+要使用隨機數，您的頁面必須 **動態渲染**。這是因為 Next.js 會在 **伺服器端渲染** 期間，根據請求中存在的 CSP 標頭應用隨機數。靜態頁面在建構時生成，當時不存在請求或回應標頭——因此無法注入隨機數。
+
+以下是動態渲染頁面中隨機數支援的運作方式：
+
+1.  **Middleware 生成隨機數**：您的 Middleware 為請求創建唯一的隨機數，將其添加到您的 `Content-Security-Policy` 標頭，並在自訂 `x-nonce` 標頭中設置。
+2.  **Next.js 提取隨機數**：在渲染期間，Next.js 解析 `Content-Security-Policy` 標頭，並使用 `'nonce-{value}'` 模式提取隨機數。
+3.  **隨機數自動應用**：Next.js 將隨機數附加到：
+    - 框架腳本 (React, Next.js 執行階段)
+    - 頁面專屬的 JavaScript 套件
+    - Next.js 產生的內嵌樣式和腳本
+    - 使用 `nonce` prop 的任何 `<Script>` 元件
+
+由於這種自動行為，您不需要手動將隨機數添加到每個標籤。
+
+### 強制動態渲染
+
+如果您正在使用隨機數，可能需要明確啟用頁面的動態渲染：
+
+```tsx filename="app/page.tsx" switcher
+import { connection } from 'next/server'
+
+export default async function Page() {
+  // wait for an incoming request to render this page
+  await connection()
+  // Your page content
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { connection } from 'next/server'
+
+export default async function Page() {
+  // wait for an incoming request to render this page
+  await connection()
+  // Your page content
+}
+```
+
+### 讀取隨機數
+
+<PagesOnly>
+
+  您可以使用 [`getServerSideProps`](/docs/pages/building-your-application/data-fetching/get-server-side-props) 將隨機數提供給您的頁面：
+
+```tsx filename="pages/index.tsx" switcher
+import Script from 'next/script'
+
+import type { GetServerSideProps } from 'next'
+
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+```jsx filename="pages/index.jsx" switcher
+import Script from 'next/script'
+export default function Page({ nonce }) {
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+
+export async function getServerSideProps({ req }) {
+  const nonce = req.headers['x-nonce']
+  return { props: { nonce } }
+}
+```
+
+您也可以在 Pages Router 應用程序中在 `_document.tsx` 中訪問隨機數：
+
+```tsx filename="pages/_document.tsx" switcher
+import Document, {
+  Html,
+  Head,
+  Main,
+  NextScript,
+  DocumentContext,
+  DocumentInitialProps,
+} from 'next/document'
+
+interface ExtendedDocumentProps extends DocumentInitialProps {
+  nonce?: string
+}
+
+class MyDocument extends Document<ExtendedDocumentProps> {
+  static async getInitialProps(
+    ctx: DocumentContext
+  ): Promise<ExtendedDocumentProps> {
+    const initialProps = await Document.getInitialProps(ctx)
+    const nonce = ctx.req?.headers?.['x-nonce'] as string | undefined
+
+    return {
+      ...initialProps,
+      nonce,
+    }
+  }
+
+  render() {
+    const { nonce } = this.props
+
+    return (
+      <Html lang="en">
+        <Head nonce={nonce} />
+        <body>
+          <Main />
+          <NextScript nonce={nonce} />
+        </body>
+      </Html>
+    )
+  }
+}
+
+export default MyDocument
+```
+
+```jsx filename="pages/_document.jsx" switcher
+import Document, { Html, Head, Main, NextScript } from 'next/document'
+
+class MyDocument extends Document {
+  static async getInitialProps(ctx) {
+    const initialProps = await Document.getInitialProps(ctx)
+    const nonce = ctx.req?.headers?.['x-nonce']
+
+    return {
+      ...initialProps,
+      nonce,
+    }
+  }
+
+  render() {
+    const { nonce } = this.props
+
+    return (
+      <Html lang="en">
+        <Head nonce={nonce} />
+        <body>
+          <Main />
+          <NextScript nonce={nonce} />
+        </body>
+      </Html>
+    )
+  }
+}
+
+export default MyDocument
+```
+
+</PagesOnly>
+
+<AppOnly>
+
+您可以使用 [`headers`](/docs/app/api-reference/functions/headers) 從 [Server Component](/docs/app/getting-started/server-and-client-components) 讀取隨機數：
+
+```tsx filename="app/page.tsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+</AppOnly>
+
+## 使用 CSP 時的靜態與動態渲染
+
+使用隨機數對您的 Next.js 應用程式的渲染方式有重要影響：
+
+### 動態渲染需求
+
+當您在 CSP 中使用隨機數時，**所有頁面都必須動態渲染**。這意味著：
+
+- 頁面將成功建構，但如果未正確配置動態渲染，可能會遇到執行階段錯誤
+- 每個請求會生成一個帶有新隨機數的全新頁面
+- 靜態最佳化和遞進式靜態還原 (ISR) 被禁用
+- 除非有額外的配置，否則頁面無法由 CDN 快取
+- **遞進式靜態還原 (PPR)** 與基於隨機數的 CSP **不相容**，因為靜態外殼腳本無法訪問隨機數
+
+### 效能影響
+
+從靜態轉向動態渲染會影響效能：
+
+- **初始頁面載入速度較慢**：頁面必須在每個請求上生成
+- **伺服器負載增加**：每個請求都需要伺服器端渲染
+- **無 CDN 快取**：預設情況下，動態頁面無法在邊緣快取
+- **更高的主機托管成本**：動態渲染需要更多的伺服器資源
+
+### 何時使用隨機數
+
+考慮以下情況時使用隨機數：
+
+- 您有禁止 `'unsafe-inline'` 的嚴格安全需求
+- 您的應用程式處理敏感數據
+- 您需要允許特定的內嵌腳本同時阻止其他腳本
+- 合規要求規定嚴格的 CSP
+
+## 不使用隨機數
+
+對於不需要隨機數的應用程式，您可以在 [`next.config.js`](/docs/app/api-reference/config/next-config-js) 文件中直接設置 CSP 標頭：
+
+```js filename="next.config.js"
+const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-eval' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+<AppOnly>
+
+## 子資源完整性 (實驗性)
+
+作為隨機數的替代方案，Next.js 提供使用子資源完整性 (SRI) 的基於雜湊的 CSP 的實驗性功能支援。此方法允許您保持靜態產生，同時仍擁有嚴格的 CSP。
+
+> **值得了解**：此功能為實驗性，僅在 App Router 應用程序的 webpack 打包器中可用。
+
+### SRI 如何運作
+
+SRI 不使用隨機數，而是在建構時生成 JavaScript 檔案的加密雜湊。這些雜湊作為 `integrity` 屬性添加到標籤中，允許瀏覽器驗證檔案在傳輸過程中未被修改。
+
+### 啟用 SRI
+
+將實驗性的 SRI 配置添加到您的 `next.config.js`：
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256', // or 'sha384' or 'sha512'
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+### 配合 SRI 的 CSP 配置
+
+當啟用 SRI 時，您可以繼續使用現有的 CSP 政策。SRI 通過向資產添加 `integrity` 屬性獨立運作：
+
+> **值得了解**：對於動態渲染情境，如果需要，您仍然可以使用 middleware 生成隨機數，結合 SRI 完整性屬性和基於隨機數的 CSP 方法。
+
+```js filename="next.config.js"
+const cspHeader = `
+    default-src 'self';
+    script-src 'self';
+    style-src 'self';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256',
+    },
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### 與隨機數相比 SRI 的好處
+
+- **靜態產生**：_PAGE_面可以靜態產生並快取
+- **CDN 相容性**：靜態頁面可與 CDN 快取協作
+- **更好的效能**：每個請求不需要伺服器端渲染
+- **建構時安全性**：雜湊在建構時生成，確保完整性
+
+### SRI 的限制
+
+- **實驗性**：功能可能會變更或被移除
+- **僅 webpack**：不支持 Turbopack
+- **僅 App Router**：未在 Pages Router 中支持
+- **僅建構時**：無法處理動態產生的腳本
+
+</AppOnly>
+
+## 開發與生產環境考量
+
+CSP 實現因開發和生產環境而異：
+
+### 開發環境
+
+在開發環境中，您需要啟用 `'unsafe-eval'` 以支持提供額外偵錯資訊的 API：
+
+```ts filename="middleware.ts" switcher
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+  // Rest of middleware implementation
+}
+```
+
+```js filename="middleware.js" switcher
+export function middleware(request) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+  // Rest of middleware implementation
+}
+```
+
+### 生產部署
+
+生產環境中的常見問題：
+
+- **隨機數未套用**：確保您的 middleware 在所有必要的路由上執行
+- **靜態資源被封鎖**：驗證您的 CSP 是否允許 Next.js 靜態資源
+- **第三方腳本**：將必要網域添加到您的 CSP 政策
+
+## 疑難排解
+
+### 第三方腳本
+
+<AppOnly>
+
+當使用具有 CSP 的第三方腳本時：
+
+```tsx filename="app/layout.tsx" switcher
+import { GoogleTagManager } from '@next/third-parties/google'
+import { headers } from 'next/headers'
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <GoogleTagManager gtmId="GTM-XYZ" nonce={nonce} />
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx filename="app/layout.jsx" switcher
+import { GoogleTagManager } from '@next/third-parties/google'
+import { headers } from 'next/headers'
+
+export default async function RootLayout({ children }) {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <GoogleTagManager gtmId="GTM-XYZ" nonce={nonce} />
+      </body>
+    </html>
+  )
+}
+```
+
+</AppOnly>
+
+<PagesOnly>
+
+當使用具有 CSP 的第三方腳本時，請確保添加必要的網域並傳遞隨機數：
+
+```tsx filename="pages/_app.tsx" switcher
+import type { AppProps } from 'next/app'
+import Script from 'next/script'
+
+export default function App({ Component, pageProps }: AppProps) {
+  const nonce = pageProps.nonce
+
+  return (
+    <>
+      <Component {...pageProps} />
+      <Script
+        src="https://www.googletagmanager.com/gtag/js"
+        strategy="afterInteractive"
+        nonce={nonce}
+      />
+    </>
+  )
+}
+```
+
+```jsx filename="pages/_app.jsx" switcher
+import Script from 'next/script'
+
+export default function App({ Component, pageProps }) {
+  const nonce = pageProps.nonce
+
+  return (
+    <>
+      <Component {...pageProps} />
+      <Script
+        src="https://www.googletagmanager.com/gtag/js"
+        strategy="afterInteractive"
+        nonce={nonce}
+      />
+    </>
+  )
+}
+```
+
+</PagesOnly>
+
+更新您的 CSP 以允許第三方網域：
+
+```ts filename="middleware.ts" switcher
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com;
+  connect-src 'self' https://www.google-analytics.com;
+  img-src 'self' data: https://www.google-analytics.com;
+`
+```
+
+```js filename="middleware.js" switcher
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com;
+  connect-src 'self' https://www.google-analytics.com;
+  img-src 'self' data: https://www.google-analytics.com;
+`
+```
+
+### 常見的 CSP 違規行為
+
+1. **內嵌樣式**：使用支援隨機數的 CSS-in-JS 函式庫，或將樣式移至外部檔案
+2. **動態導入**：確保您的 script-src 政策允許動態導入
+3. **WebAssembly**：使用 WebAssembly 時添加 `'wasm-unsafe-eval'`
+4. **Service Workers**：為 Service Worker 腳本添加適當的政策
+
+## 版本歷史
+
+| 版本 | 變更 |
+| ---------- | ------------------------------------------------------------- |
+| `v14.0.0`  | 新增基於雜湊的 CSP 之 SRI 實驗性功能支援 |
+| `v13.4.20` | 建議用於正確的隨機數處理和 CSP 標頭解析。 |
