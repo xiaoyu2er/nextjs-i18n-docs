@@ -1,0 +1,365 @@
+---
+title: Next.js 8
+description: >-
+  Next.js 8 引入了 Serverless 模式、更小的包体积和性能
+  提升，以及更多。
+author:
+  - name: Connor Davis
+    image: /static/team/connor.jpg
+  - name: Shu Ding
+    image: /static/team/shu.jpg
+  - name: Tim Neutkens
+    image: /static/team/tim.jpg
+date: 2019-02-11T08:00:35.009Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/twitter-card.png
+---
+
+我们很自豪地介绍生产级别的 Next.js 8，它包含：
+
+*   [Serverless 模式 (Serverless Next.js)](#serverless-nextjs)
+*   [构建时内存占用大幅降低](#massive-build-time-memory-usage-reduction)
+*   [构建时环境变量配置](#build-time-environment-configuration)
+*   [预取性能提升](#prefetch-performance-improvements)
+*   [初始 HTML 体积更小](#smaller-initial-html-size)
+*   [改进的按需模块加载](#improved-on-demand-entries)
+*   [开发时端口监听更快](#faster-port-listening-in-development)
+*   [静态导出更快](#faster-static-export)
+*   [Head 元素去重](#head-element-deduplication)
+*   [新的 crossOrigin 配置选项](#new-crossorigin-config-option)
+*   [移除内联 JavaScript](#removed-inline-javascript)
+*   [API 认证示例](#example-of-api-authentication)
+
+一如既往，我们致力于确保所有这些功能都**完全向后兼容**。对于大多数 Next.js 应用程序，您只需要运行：
+
+终端
+
+```
+npm i next@latest react@latest react-dom@latest
+```
+
+我们要感谢我们的社区以及所有信任我们的人。自从上一篇文章发布以来，我们看到像 [AT&T](https://att.com)、[Starbucks](https://www.starbucksreserve.com/en-us) 和 [Twitch](https://m.twitch.tv/) 这样的公司利用 Next.js 重新发布了它们面向公众的网站和应用程序。
+
+Serverless Next.js 模式 [](#serverless-nextjs)
+----------------------------------------
+
+Next.js 的 serverless 目标会从 pages 中输出 Serverless 函数。
+
+Serverless 部署通过将应用程序拆分为更小的部分（也称为 **lambdas**）极大地提高了可靠性和可扩展性。对于 Next.js 来说，`pages` 目录中的每个页面都会变成一个 Serverless Lambda。
+
+Serverless 有许多 [优势](https://vercel.com/docs/serverless-functions/conceptual-model)。参考链接在 Express 的上下文中讨论了其中一些，但这些原则是通用的：Serverless 允许分散故障点、无限扩展，并且采用“按使用付费”的模式，成本极低。
+
+要在 Next.js 中启用 **Serverless 模式**，请添加 `serverless` 构建 `target` 到 `next.config.js` 中：
+
+next.config.js
+
+```
+module.exports = {
+  target: 'serverless',
+};
+```
+
+`serverless` target 将每个页面输出一个 lambda。此文件完全独立，不需要任何依赖即可运行：
+
+*   `pages/index.js` => `.next/serverless/pages/index.js`
+*   `pages/about.js` => `.next/serverless/pages/about.js`
+
+Next.js Serverless 函数的签名类似于 Node.js HTTP 服务器回调：
+
+```
+type Function = (req: http.IncomingMessage, res: http.ServerResponse) => void;
+```
+
+*   [http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage)
+*   [http.ServerResponse](https://nodejs.org/api/http.html#http_class_http_serverresponse)
+*   `void` 指函数没有返回值，等同于 JavaScript 的 `undefined`。调用函数将结束请求。
+
+Next.js 为 Serverless 部署提供了低级 API，因为托管平台具有不同的函数签名。通常情况下，您需要使用兼容层来包装 Next.js Serverless 构建的输出。
+
+例如，如果平台支持 Node.js [http.Server](https://nodejs.org/api/http.html#http_class_http_server) 类：
+
+server.js
+
+```
+const http = require('http');
+const page = require('./.next/serverless/about.js');
+const server = new http.Server((req, res) => page.render(req, res));
+server.listen(3000, () => console.log('Listening on http://localhost:3000'));
+```
+
+### **总结**[](#summary)
+
+*   用于实现 Serverless 部署的低级 API
+*   `pages` 目录中的每个页面都会变成一个 Serverless 函数（lambda）
+*   创建尽可能小的 Serverless 函数（**50 KB** 基础 zip 大小）
+*   优化了函数的快速 [冷启动](https://vercel.com/docs/serverless-functions/conceptual-model)
+*   Serverless 函数有 0 个依赖项（它们包含在函数包中）
+*   使用来自 Node.js 的 [http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage) 和 [http.ServerResponse](https://nodejs.org/api/http.html#http_class_http_serverresponse)
+*   在 `next.config.js` 中使用 `target: 'serverless'` 开启
+*   `server` target 仍然得到完全支持和维护
+*   `serverless` 模式不支持 `publicRuntimeConfig` 和 `serverRuntimeConfig`。请使用构建时配置。
+
+构建时内存占用大幅降低 [](#massive-build-time-memory-usage-reduction)
+---------------------------------------------------------------------------------------
+
+我们已向 webpack 做出贡献，以改进 Next.js 的（以及整个 webpack 生态系统的！）构建性能和资源利用率。
+
+这一努力带来的结果是 **内存使用最多改善 16 倍，且性能没有下降**。
+
+内存释放得更快，且在大量压力（多个页面）下进程不再崩溃。
+
+我们将很快详细介绍如何实现这一优化。请留意 [Next.js 博客](/blog)。
+
+构建时环境变量配置 [](#build-time-environment-configuration)
+-----------------------------------------------------------------------------
+
+在审查 Next.js 应用程序时，我们经常观察到一个模式，那就是添加 `babel-plugin-transform-define` 或 `webpack.DefinePlugin` 向应用程序提供配置值。
+
+在 Next.js 8 中，我们正在 `next.config.js` 中引入一个新的名为 `env` 的键，以便以向后兼容的方式提供相同的功能：
+
+next.config.js
+
+```
+module.exports = {
+  env: {
+    customKey: 'MyValue',
+  },
+};
+```
+
+这将允许你在代码中使用 `process.env.customKey`。例如：
+
+取而代之的是，Next.js 会自动注入 CSS 文件。在生产环境中，Next.js 还自动在 CSS URL 中添加内容哈希，因此如果有更改，可确保您的最终用户永远不会获得文件的过时版本，并且具有引入不可变永久缓存的能力。
+
+```
+export default function IndexPage() {
+  return <h1>The value of customKey is: {process.env.customKey}</h1>;
+}
+```
+
+ `process.env.customKey` 将在构建时替换为 `'MyValue'` 。
+
+预取性能提升 [](#prefetch-performance-improvements)
+-----------------------------------------------------------------------
+
+Next.js 路由器允许你预取页面，以实现更快的导航：
+
+取而代之的是，Next.js 会自动注入 CSS 文件。在生产环境中，Next.js 还自动在 CSS URL 中添加内容哈希，因此如果有更改，可确保您的最终用户永远不会获得文件的过时版本，并且具有引入不可变永久缓存的能力。
+
+```
+import Link from 'next/link';
+ 
+export default function IndexPage() {
+  return (
+    <>
+      <Link href="/about" prefetch>
+        <a>To About Page</a>
+      </Link>
+    </>
+  );
+}
+```
+
+它的工作原理是预取所有具有 `prefetch` 属性的链接的 JavaScript 包。
+
+在 Next.js 8 之前的版本中，这意味着将 `<script>` 标签注入到文档的 `<body>` 中。
+
+然而，这引入了页面打开时的开销，最明显的是，即使页面已经可以交互，浏览器的“加载”指示也会比预期显示更久。
+
+在 Next.js 8 中，`prefetch` 使用 `<link rel="preload">` 而不是 `<script>` 标签。它还仅在 `onload` 后开始预取，以允许浏览器管理资源。
+
+此外，Next.js 现在检测到 2G 网络和 `navigator.connection.saveData` 模式，以在较慢的网络连接上禁用预取。
+
+初始 HTML 体积更小 [](#smaller-initial-html-size)
+-------------------------------------------------------
+
+由于 Next.js 预渲染 HTML，它将页面包装为包含 `<html>`、`<head>`、`<body>` 以及渲染页面所需的 JavaScript 文件的默认结构。
+
+使用 [Next.js 7 我们将初始负载优化到了 1.50KB](https://nextjs.org/blog/next-7/#smaller-initial-html-payload)，这比上一个版本减少了 7.4%。
+
+我们能够将初始负载大小进一步减少到 1.16KB，进一步减少了 23%：
+
+|  | 7.0 | 8.0 | delta |
+| --- | --- | --- | --- |
+| 文档大小（服务器渲染） | 1.50KB | 1.16KB | **23%** _更小_ |
+
+减少大小的主要方式如下：
+
+*   已移除页面初始化内联脚本
+*   `/_error` 页面不再包含在每次页面加载上
+
+### 按需加载 /_error [](#on-demand-loading-of-_error)
+
+每当生产环境发生错误时，都会渲染 `/_error` 页面以显示发生了错误。
+
+自 Next.js 首次发布以来，`/_error` 页面的脚本标签一直是初始 HTML 的一部分，这意味着即使没有运行时错误，它也会被加载。
+
+从 Next.js 8 开始，`/_error` 页面在发生错误时按需加载。
+
+这意味着默认情况下需要加载、解析和执行的代码更少。
+
+开发者体验 (DX) 改进[](#dx-improvements)
+-----------------------------------
+
+Next.js 的主要目标之一是提供最佳的生产性能，并拥有 **尽可能好的开发者体验**。此更新包含了许多基于用户反馈的细微改进。
+
+### 改进的按需模块加载 [](#improved-on-demand-entries)
+
+开箱即用，Next.js 只会自动编译 _活跃_ 开发的页面。每次运行 `next dev` 时，Next.js 不会编译 `pages` 目录中的所有页面。相反，它是按需编译你访问的页面。
+
+例如，当访问 `http://localhost:3000/my-page` 时，`pages/my-page.js` 文件会按需编译，然后渲染页面。
+
+这确保开发者在启动开发服务器时不必等待所有页面编译完成，这在大型应用中可能需要相当长的时间。它保持了较低的内存使用量和快速的编译速度，因为编译器在捆绑时不必考虑所有页面。
+
+![按需模块加载的流程](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/next-8/flow.jpg)
+
+按需模块加载的流程
+
+如果页面在 25 秒内未被访问，它将被从编译器的构建缓存中清理，以保持编译器快速并减少内存使用。
+
+Next.js 跟踪页面访问的方式是使用轮询机制。每 5 秒，会发送一个 "on-demand-entries-ping"，以告知 Next.js 开发服务器正在访问某个页面。
+
+自该功能首次发布以来，ping 是通过 `window.fetch` 调用完成的，这意味着每次触发 ping 时，都会出现在浏览器开发工具的 `console` 和 `network` 标签中。
+
+最请求的功能之一就是能够从浏览器开发工具中隐藏这些请求，因为这些请求会增加不必要的噪音。
+
+我们很兴奋地宣布，在 Next.js 8 中，基于 `fetch` 的 ping 已被基于 WebSockets 的方法所取代，这意味着 ping 仍然会发生，但仅在检查 WebSocket 连接时可见。
+
+特别感谢 [JJ Kasper](https://github.com/ijjk) 合作将代码转换为 WebSockets。
+
+### 开发时端口监听更快 [](#faster-port-listening-in-development)
+
+启动 Next.js 开发服务器时，它必须运行一些初始编译才能提供服务。默认情况下，Next.js 会在启动 HTTP 服务器之前等待此编译步骤完成，这意味着如果你运行 `next dev` 然后打开浏览器，有时会收到 "This site can't be reached" 的提示，因为 HTTP 服务器尚未监听连接。
+
+在 Next.js 8 中，HTTP 将在编译开始之前监听连接，这意味着如果你在编译完成之前访问 `http://localhost:3000/`，请求将等待初始编译完成后再提供服务，而无需刷新页面直到它变得可用。
+
+特别感谢 [Brian Beck](https://github.com/exogen) 实现了此功能。
+
+静态导出更快 [](#faster-static-export)
+---------------------------------------------
+
+Next.js 专注于 **预渲染 (Pre-rendering)** 的理念，作为实现高性能的一种手段。预渲染有两种形式：
+
+*   **服务器渲染**，每个请求都会触发渲染。因此，最终用户不需要等待任何 JS 下载即可开始消费数据
+*   **静态渲染**，我们输出可以直接服务的静态文件，而无需在服务器上执行任何代码
+
+从 Next.js 8 开始，如果机器有多个 CPU，通过 `next export` 进行静态渲染将有速度提升。
+
+在 4 核 MacBook 上的测试结果表明，利用所有核心预渲染页面，导出速度从每秒约 25 页提高到 75 页。
+
+Next.js 将自动检测 CPU 核心数量并相应地分配页面，无需任何代码更改。
+
+特别感谢 [Benjamin Kniffler](https://github.com/bkniffler) 实现了此功能。
+
+`<Head>` 元素去重 [](#head-element-deduplication)
+---------------------------------------------------------
+
+构建应用程序时的一个常见需求是更新页面的 `<head>` 元素。例如设置 `<title>` 或 `<meta name="viewport">` 用于响应式设计。
+
+Next.js 暴露了一个内置组件，用于引入对 `<head>` 的更改：
+
+取而代之的是，Next.js 会自动注入 CSS 文件。在生产环境中，Next.js 还自动在 CSS URL 中添加内容哈希，因此如果有更改，可确保您的最终用户永远不会获得文件的过时版本，并且具有引入不可变永久缓存的能力。
+
+```
+import Head from 'next/head';
+ 
+export default function IndexPage() {
+  return (
+    <>
+      <Head>
+        <title>My page title</title>
+      </Head>
+    </>
+  );
+}
+```
+
+`<Head>` 组件甚至可以在不同的组件中多次使用，例如你的布局组件可以设置一些默认的头标签。
+
+但是，你可能想用不同的值覆盖默认的头标签，在旧版本的 Next.js 中，这会导致标签在输出中重复，因为没有方法来去重标签。
+
+因此，现在可以向 `<Head>` 组件内的每个元素提供 `key` 属性，这将自动去重具有相同 `key` 值的标签。
+
+当给两个标签设置 `key="viewport"` 时，只渲染最后一个。
+
+取而代之的是，Next.js 会自动注入 CSS 文件。在生产环境中，Next.js 还自动在 CSS URL 中添加内容哈希，因此如果有更改，可确保您的最终用户永远不会获得文件的过时版本，并且具有引入不可变永久缓存的能力。
+
+```
+import Head from 'next/head';
+export default function IndexPage() {
+  return (
+    <>
+      <Head>
+        <title>My page title</title>
+        <meta
+          name="viewport"
+          content="initial-scale=1.0, width=device-width"
+          key="viewport"
+        />
+      </Head>
+      <Head>
+        <meta
+          name="viewport"
+          content="initial-scale=1.2, width=device-width"
+          key="viewport"
+        />
+      </Head>
+    </>
+  );
+}
+```
+
+安全改进 [](#security-improvements)
+-----------------------------------------------
+
+### 新的 `crossOrigin` 配置选项 [](#new-crossorigin-config-option)
+
+在 Next.js 6 中，我们引入了为 `pages/_document.js` 中的 `<Head>` 和 `<NextScript>` 添加 `crossOrigin` 属性的选项，但这并未涵盖设置 `cross-origin` 的所有用例。
+
+Next.js 有一个客户端路由器，它动态注入 `<script>` 标签，这些标签在注入时缺少 `cross-origin` 属性。
+
+为了确保所有 `<script>` 标签都设置了 `cross-origin`，我们在 `next.config.js` 中引入了一个新的配置选项
+
+next.config.js
+
+```
+module.exports = {
+  crossOrigin: 'anonymous',
+};
+```
+
+引入此选项的另一个好处是，不再需要自定义 `pages/_document.js` 来为你的应用程序设置 `cross-origin`。
+
+之前的行为仍然支持，但会在开发中发出警告，以帮助开发者迁移到新引入的选项。
+
+### 移除内联 JavaScript [](#removed-inline-javascript)
+
+使用 Next.js 7 及以下版本时，要启用 [内容安全策略 (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP)，用户必须在策略中包含 `script-src 'unsafe-inline'`，因为 Next.js 会创建一个内联 `<script>` 标签来传递数据，例如将 `getInitialProps` 的结果传递给客户端端。
+
+在 Next.js 8 中，我们已将此内联脚本标签 (inline script tag) 更改为 JSON 标签 (JSON tag)，以便安全地传输到客户端 (client)。这意味着 Next.js 不再包含任何内联脚本 (inline scripts)。
+
+经过仔细考虑，现在可以使用 `script-src 'self'`。
+
+### API 认证示例 [](#example-of-api-authentication)
+
+其中一个 [至今最请求的示例](https://github.com/vercel/next.js/issues/153) 是如何在 Next.js 中针对外部 API（任何 API）、在任何编程语言中进行认证。
+
+随着 Next.js 8 的推出，我们也推出了一个新建示例：[with-cookie-auth](https://github.com/vercel/next.js/tree/canary/examples/with-cookie-auth)
+
+此示例展示了如何针对外部 Node.js API 进行认证，但应用的概念适用于任何无状态 API。
+
+该示例使用 cookie 在服务器端和客户端渲染之间共享令牌。
+
+这样，如果应用是在服务器上渲染的，它仍然可以代表用户获取已认证的数据。
+
+特别感谢贡献此示例的 [Juan Olvera](https://github.com/j0lv3r4)。
+
+### 社区[](#community)
+
+自首次发布以来，Next.js 已被用于从财富 500 强公司到个人博客的一切事物。我们很高兴看到 Next.js 采用率的持续增长。
+
+*   我们已有超过 **600 名贡献者** 至少提交了 1 次提交。
+*   在 GitHub 上，该项目已被星标 **34,400+ 次**。
+*   自首次发布以来，已提交超过 **2600 个拉取请求**。
+
+Next.js 社区拥有超过 **4,570 名成员**。[加入我们！](https://github.com/vercel/next.js/discussions)

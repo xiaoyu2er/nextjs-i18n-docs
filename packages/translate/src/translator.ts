@@ -108,6 +108,24 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Extract JSON object from LLM response.
+ * Strips: <think> blocks, markdown fences, any text before { or after }.
+ */
+function extractJson(response: string): string {
+  // Strip thinking blocks
+  let raw = stripThinkingBlock(response);
+  // Strip markdown code fences
+  raw = raw.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '');
+  // Extract from first { to last }
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) {
+    return raw.trim(); // fallback — let JSON.parse give a clear error
+  }
+  return raw.substring(start, end + 1);
+}
+
+/**
  * Attempt to repair broken JSON from LLM output.
  * Common issues: unescaped newlines inside string values,
  * trailing commas, missing closing brace.
@@ -449,9 +467,7 @@ export async function translateJson(
       }
 
       // Parse JSON from response
-      let raw = stripThinkingBlock(choice.message.content);
-      // Strip markdown code fences if present
-      raw = raw.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '');
+      const raw = extractJson(choice.message.content);
 
       let parsed: Record<string, string>;
       try {
@@ -460,9 +476,7 @@ export async function translateJson(
         try {
           parsed = JSON.parse(repairJson(raw));
         } catch {
-          throw new Error(
-            `Failed to parse JSON response: ${raw.substring(0, 200)}...`,
-          );
+          throw new Error(`Failed to parse JSON: ${raw.substring(0, 200)}...`);
         }
       }
 
