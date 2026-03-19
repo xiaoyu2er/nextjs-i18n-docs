@@ -379,25 +379,143 @@ function processFile(
   }
 }
 
-// ── Copy Astro-only content (e.g., splash index pages) ──
+// ── Generate splash index pages (blog & learn) ──
 
-// Copy Astro-only splash pages (blog/learn index) — only for latest worker, not versioned
-const CONTENT_ASTRO = resolve(import.meta.dirname!, '../content-astro');
-if (!version && existsSync(CONTENT_ASTRO)) {
-  const astroFiles = walkMdx(CONTENT_ASTRO);
-  for (const srcPath of astroFiles) {
-    const relPath = relative(CONTENT_ASTRO, srcPath);
-    // Map locale to Starlight structure (en goes to root)
-    const parts = relPath.split('/');
-    const locale = parts[0];
-    const rest = parts.slice(1).join('/');
-    const dstRel = locale === ROOT_LOCALE ? rest : relPath;
-    const dstPath = join(CONTENT_DST, dstRel);
-    ensureDir(dstPath);
-    writeFileSync(dstPath, readFileSync(srcPath, 'utf-8'));
-    totalFiles++;
+if (!version) {
+  const CONTENT_ROOT = resolve(import.meta.dirname!, '../content');
+
+  // Generate blog index from actual blog posts
+  generateBlogIndex(CONTENT_ROOT);
+
+  // Generate learn index from actual learn directories
+  generateLearnIndex(CONTENT_ROOT);
+
+  console.log('Generated blog & learn index pages');
+}
+
+/** Generate blog/index.mdx with cards grouped by year */
+function generateBlogIndex(contentRoot: string) {
+  const blogDir = join(contentRoot, 'en', 'blog');
+  if (!existsSync(blogDir)) return;
+
+  interface BlogPost { slug: string; title: string; date: Date; dateStr: string }
+  const posts: BlogPost[] = [];
+
+  for (const file of readdirSync(blogDir)) {
+    if (!file.endsWith('.mdx') || file === 'index.mdx') continue;
+    const content = readFileSync(join(blogDir, file), 'utf-8');
+    const { frontmatter } = parseFrontmatter(content);
+    if (!frontmatter.title || !frontmatter.date) continue;
+    const date = new Date(frontmatter.date.trim());
+    posts.push({
+      slug: file.replace(/\.mdx$/, ''),
+      title: frontmatter.title
+        .replace(/^['"]|['"]$/g, '')  // strip wrapping quotes
+        .replace(/&apos;/g, "'")      // decode HTML entities
+        .replace(/"/g, '&quot;'),     // escape for MDX attribute
+      date,
+      dateStr: date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+    });
   }
-  console.log(`Astro-only content copied from ${CONTENT_ASTRO}`);
+
+  posts.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  // Group by year
+  const byYear = new Map<number, BlogPost[]>();
+  for (const post of posts) {
+    const year = post.date.getFullYear();
+    if (!byYear.has(year)) byYear.set(year, []);
+    byYear.get(year)!.push(post);
+  }
+
+  let mdx = `---
+title: Blog
+description: News and updates from the Next.js team.
+template: splash
+hero:
+  title: Blog
+  tagline: News and updates from the Next.js team.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+`;
+
+  const years = [...byYear.keys()].sort((a, b) => b - a);
+  for (const year of years) {
+    mdx += `## ${year}\n\n<CardGrid>\n`;
+    for (const post of byYear.get(year)!) {
+      mdx += `  <LinkCard title="${post.title}" href="/blog/${post.slug}/" description="${post.dateStr}" />\n`;
+    }
+    mdx += `</CardGrid>\n\n`;
+  }
+
+  const dstPath = join(CONTENT_DST, 'blog', 'index.mdx');
+  ensureDir(dstPath);
+  writeFileSync(dstPath, mdx);
+  totalFiles++;
+}
+
+/** Generate learn/index.mdx with cards for each course */
+function generateLearnIndex(contentRoot: string) {
+  const learnDir = join(contentRoot, 'en', 'learn');
+  if (!existsSync(learnDir)) return;
+
+  const icons: Record<string, string> = {
+    'react-foundations': 'rocket',
+    'dashboard-app': 'laptop',
+    'pages-router': 'document',
+    'seo': 'magnifier',
+  };
+
+  interface Course { name: string; slug: string; chapters: number; icon: string }
+  const courses: Course[] = [];
+
+  const titleOverrides: Record<string, string> = { seo: 'SEO' };
+
+  const entries = readdirSync(learnDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const entry of entries) {
+    const slug = stripNumericPrefix(entry.name);
+    const chapters = readdirSync(join(learnDir, entry.name))
+      .filter((f) => f.endsWith('.mdx')).length;
+    const name = titleOverrides[slug]
+      || slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    courses.push({ name, slug, chapters, icon: icons[slug] || 'open-book' });
+  }
+
+  let mdx = `---
+title: Learn Next.js
+description: Free interactive courses to help you get started with Next.js and build full-stack web applications.
+template: splash
+hero:
+  title: Learn Next.js
+  tagline: Free interactive courses with quizzes, from React basics to building a full-stack app.
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+`;
+
+  for (const course of courses) {
+    mdx += `  <Card title="${course.name}" icon="${course.icon}">
+    **${course.chapters} Chapters**
+
+    [Start Learning →](/learn/${course.slug}/)
+  </Card>
+
+`;
+  }
+
+  mdx += `</CardGrid>\n`;
+
+  const dstPath = join(CONTENT_DST, 'learn', 'index.mdx');
+  ensureDir(dstPath);
+  writeFileSync(dstPath, mdx);
+  totalFiles++;
 }
 
 console.log(`\nTotal: ${totalFiles} files`);
