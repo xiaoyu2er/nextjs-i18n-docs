@@ -16,6 +16,7 @@ export default defineConfig({
       pagefind: false,
       components: {
         Header: './src/overrides/Header.astro',
+        PageFrame: './src/overrides/PageFrame.astro',
         Sidebar: './src/overrides/Sidebar.astro',
         MarkdownContent: './src/overrides/MarkdownContent.astro',
       },
