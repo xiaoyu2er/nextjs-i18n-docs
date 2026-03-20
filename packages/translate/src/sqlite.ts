@@ -1,25 +1,9 @@
 /**
  * SQLite compatibility layer.
  *
- * Uses bun:sqlite when running under Bun, better-sqlite3 when under Node.js (Vitest).
- * Both have nearly identical APIs: Database, prepare(), run(), get(), all(), exec().
+ * Uses bun:sqlite when running under Bun, better-sqlite3 under Node.js (Vitest).
  */
-
-// biome-ignore lint/suspicious/noExplicitAny: dynamic runtime detection
-let DatabaseConstructor: any;
-
-const isBun =
-  typeof process !== 'undefined' &&
-  // biome-ignore lint/suspicious/noExplicitAny: runtime detection
-  typeof (globalThis as any).Bun !== 'undefined';
-
-if (isBun) {
-  // Use Bun's built-in SQLite
-  DatabaseConstructor = require('bun:sqlite').Database;
-} else {
-  // Fallback to better-sqlite3 for Node.js / Vitest
-  DatabaseConstructor = require('better-sqlite3');
-}
+import { createRequire } from 'node:module';
 
 export interface SqliteStatement {
   run(...params: unknown[]): { changes: number; lastInsertRowid: number };
@@ -35,26 +19,39 @@ export interface SqliteDatabase {
   close(): void;
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: runtime detection
+const isBun = typeof (globalThis as any).Bun !== 'undefined';
+
 /**
- * Open a SQLite database with the appropriate backend.
+ * Open a SQLite database synchronously.
+ * Uses bun:sqlite under Bun, better-sqlite3 under Node.
  */
 export function openDatabase(filepath: string): SqliteDatabase {
-  const db = new DatabaseConstructor(filepath);
-
   if (isBun) {
-    // bun:sqlite uses db.run() for raw SQL, wrap to match better-sqlite3's exec()
-    const bunDb = db as SqliteDatabase & {
-      run(sql: string): void;
-    };
+    // Use createRequire to get a CJS require that can load bun:sqlite
+    const req = createRequire(import.meta.url);
+    const mod = req('bun:sqlite');
+    const Database = mod.Database ?? mod.default ?? mod;
+    const raw = new Database(filepath);
+
     return {
-      prepare: (sql: string) => bunDb.prepare(sql) as SqliteStatement,
-      exec: (sql: string) => bunDb.run(sql),
-      pragma: (p: string) => bunDb.run(`PRAGMA ${p}`),
-      transaction: <T>(fn: () => T) => bunDb.transaction(fn),
-      close: () => bunDb.close(),
+      prepare: (sql: string) => {
+        const stmt = raw.query(sql);
+        return {
+          run: (...params: unknown[]) => stmt.run(...params),
+          get: (...params: unknown[]) => stmt.get(...params),
+          all: (...params: unknown[]) => stmt.all(...params),
+        } as SqliteStatement;
+      },
+      exec: (sql: string) => raw.run(sql),
+      pragma: (p: string) => raw.run(`PRAGMA ${p}`),
+      transaction: <T>(fn: () => T) => raw.transaction(fn),
+      close: () => raw.close(),
     };
   }
 
-  // better-sqlite3 — already has the right API shape
-  return db as SqliteDatabase;
+  // Node.js / Vitest — use better-sqlite3
+  const req = createRequire(import.meta.url);
+  const Database = req('better-sqlite3');
+  return new Database(filepath) as SqliteDatabase;
 }

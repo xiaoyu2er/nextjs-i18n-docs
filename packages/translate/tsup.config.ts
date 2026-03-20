@@ -10,6 +10,7 @@ export default defineConfig({
   external: [
     'openai',
     'better-sqlite3',
+    'bun:sqlite',
     'node:fs',
     'node:fs/promises',
     'node:path',
