@@ -141,6 +141,7 @@ interface CliOptions {
   apiKey: string;
   model: string;
   modelRotate: string[];
+  modelMaxTokens: Map<string, number>;
   maxTokens: number;
   concurrency: number;
   dryRun: boolean;
@@ -157,6 +158,41 @@ interface LangConfig {
   locale: string;
   name: string;
   guide?: string;
+}
+
+/**
+ * Parse --model-rotate value. Supports:
+ *   "model1,model2"              — plain model IDs
+ *   "model1:16384,model2:8192"   — model IDs with max output tokens
+ */
+function parseModelRotate(raw: string): {
+  modelRotate: string[];
+  modelMaxTokens: Map<string, number>;
+} {
+  const modelRotate: string[] = [];
+  const modelMaxTokens = new Map<string, number>();
+
+  for (const part of raw.split(',')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const colonIdx = trimmed.lastIndexOf(':');
+    // Check if after last colon is a number (not part of ":free" suffix)
+    if (colonIdx > 0) {
+      const maybeTokens = trimmed.substring(colonIdx + 1);
+      const num = Number.parseInt(maybeTokens, 10);
+      if (!Number.isNaN(num) && num > 100) {
+        // It's model:maxTokens
+        const modelId = trimmed.substring(0, colonIdx);
+        modelRotate.push(modelId);
+        modelMaxTokens.set(modelId, num);
+        continue;
+      }
+    }
+    // Plain model ID (may contain :free suffix)
+    modelRotate.push(trimmed);
+  }
+
+  return { modelRotate, modelMaxTokens };
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -178,10 +214,7 @@ function parseArgs(argv: string[]): CliOptions {
     apiBaseUrl: getOpt('api-base-url', ''),
     apiKey: getOpt('api-key', ''),
     model: getOpt('model', ''),
-    modelRotate: getOpt('model-rotate', '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
+    ...parseModelRotate(getOpt('model-rotate', '')),
     maxTokens: Number.parseInt(getOpt('max-tokens', '16384'), 10),
     concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
@@ -346,6 +379,8 @@ async function translateFile(
     apiKey: opts.apiKey || undefined,
     model: opts.model || undefined,
     modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
+    modelMaxTokens:
+      opts.modelMaxTokens.size > 0 ? opts.modelMaxTokens : undefined,
     maxTokens: opts.maxTokens,
     filePath: relPath,
     logger,
@@ -411,6 +446,8 @@ async function translateFile(
         apiKey: opts.apiKey || undefined,
         model: opts.model || undefined,
         modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
+        modelMaxTokens:
+          opts.modelMaxTokens.size > 0 ? opts.modelMaxTokens : undefined,
         maxTokens: opts.maxTokens,
         filePath: relPath,
         logger,
@@ -1152,6 +1189,8 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
         apiKey: opts.apiKey || undefined,
         model: opts.model || undefined,
         modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
+        modelMaxTokens:
+          opts.modelMaxTokens.size > 0 ? opts.modelMaxTokens : undefined,
         maxTokens: opts.maxTokens,
         filePath: `_md5-chunk-${i + 1}`,
         logger: flog,

@@ -22,6 +22,8 @@ export interface TranslateOptions {
   model?: string;
   /** List of models to rotate through (overrides model) */
   modelRotate?: string[];
+  /** Per-model max output tokens (model id → tokens) */
+  modelMaxTokens?: Map<string, number>;
   /** Max output tokens (default: 16384) */
   maxTokens?: number;
   /** File path for logging */
@@ -691,8 +693,11 @@ async function translateJsonChunk(
     const { baseURL, apiKey, model } = resolveApiConfig(opts);
     const client = new OpenAI({ baseURL, apiKey });
 
+    // Per-model max_tokens (from model-rotate info), fallback to global
+    const effectiveMaxTokens = opts.modelMaxTokens?.get(model) ?? maxTokens;
+
     log(
-      `🔧 attempt=${attempt}/${maxAttempts} model=${model} keys=${requestedMd5s.length}`,
+      `🔧 attempt=${attempt}/${maxAttempts} model=${model} keys=${requestedMd5s.length} max_tokens=${effectiveMaxTokens}`,
     );
 
     try {
@@ -703,7 +708,7 @@ async function translateJsonChunk(
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        max_tokens: maxTokens,
+        max_tokens: effectiveMaxTokens,
         response_format: {
           type: 'json_schema',
           json_schema: {

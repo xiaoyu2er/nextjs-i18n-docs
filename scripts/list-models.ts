@@ -99,8 +99,10 @@ if (jsonOut) {
 }
 
 if (rotateCmd) {
-  const ids = models.map((m) => m.id).join(',');
-  console.log(`--model-rotate ${ids}`);
+  const entries = models.map(
+    (m) => `${m.id}:${m.maxOutput || m.contextLength}`,
+  );
+  console.log(`--model-rotate ${entries.join(',')}`);
   process.exit(0);
 }
 
