@@ -14,8 +14,8 @@ interface Props {
 
 function formatPrice(price: number) {
   if (price === 0) return 'Free';
-  if (price < 0.01) return `$${price.toFixed(4)}/M`;
-  return `$${price.toFixed(2)}/M`;
+  if (price < 0.01) return `$${price.toFixed(4)}`;
+  return `$${price.toFixed(2)}`;
 }
 
 function ctxLabel(n: number) {
@@ -23,8 +23,9 @@ function ctxLabel(n: number) {
   return `${(n / 1000).toFixed(0)}k`;
 }
 
-type PriceFilter = 'all' | 'free' | 'cheap' | 'mid';
-type CtxFilter = 'all' | '32k' | '64k' | '128k';
+type SortKey = 'price-asc' | 'price-desc' | 'context-desc' | 'name';
+
+const CTX_STEPS = [0, 8, 16, 32, 64, 128, 200, 512, 1024, 2048];
 
 export function JobDialog({
   langs,
@@ -43,10 +44,12 @@ export function JobDialog({
   const [error, setError] = useState<string | null>(null);
 
   // Filters
-  const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
-  const [ctxFilter, setCtxFilter] = useState<CtxFilter>('all');
+  const [sort, setSort] = useState<SortKey>('price-asc');
+  const [ctxSlider, setCtxSlider] = useState(0); // index into CTX_STEPS
+  const [freeOnly, setFreeOnly] = useState(false);
   const [jsonOnly, setJsonOnly] = useState(false);
-  const [providerFilter, setProviderFilter] = useState('all');
+
+  const minCtx = CTX_STEPS[ctxSlider] * 1000;
 
   const { data: models, isLoading: modelsLoading } = useQuery({
     queryKey: ['models'],
@@ -54,17 +57,9 @@ export function JobDialog({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Unique providers
-  const providers = useMemo(() => {
-    if (!models) return [];
-    const set = new Set(models.map((m) => m.provider));
-    return [...set].sort();
-  }, [models]);
-
   const filtered = useMemo(() => {
     if (!models) return [];
-    return models.filter((m) => {
-      // Search
+    let result = models.filter((m) => {
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -73,22 +68,31 @@ export function JobDialog({
         )
           return false;
       }
-      // Price
-      if (priceFilter === 'free' && !m.isFree) return false;
-      if (priceFilter === 'cheap' && m.promptPrice > 0.5) return false;
-      if (priceFilter === 'mid' && m.promptPrice > 5) return false;
-      // Context
-      if (ctxFilter === '32k' && m.contextLength < 32_000) return false;
-      if (ctxFilter === '64k' && m.contextLength < 64_000) return false;
-      if (ctxFilter === '128k' && m.contextLength < 128_000) return false;
-      // JSON support
+      if (freeOnly && !m.isFree) return false;
+      if (minCtx > 0 && m.contextLength < minCtx) return false;
       if (jsonOnly && !m.supportsJson) return false;
-      // Provider
-      if (providerFilter !== 'all' && m.provider !== providerFilter)
-        return false;
       return true;
     });
-  }, [models, search, priceFilter, ctxFilter, jsonOnly, providerFilter]);
+
+    // Sort
+    result = [...result];
+    switch (sort) {
+      case 'price-asc':
+        result.sort((a, b) => a.promptPrice - b.promptPrice);
+        break;
+      case 'price-desc':
+        result.sort((a, b) => b.promptPrice - a.promptPrice);
+        break;
+      case 'context-desc':
+        result.sort((a, b) => b.contextLength - a.contextLength);
+        break;
+      case 'name':
+        result.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+    }
+
+    return result;
+  }, [models, search, freeOnly, minCtx, jsonOnly, sort]);
 
   const qc = useQueryClient();
   const create = useMutation({
@@ -169,52 +173,58 @@ export function JobDialog({
         {/* Model section */}
         <label>Model</label>
 
-        {/* Filters row */}
+        {/* Filters */}
         <div className="model-filters">
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search models..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="model-search-input"
           />
           <select
-            value={priceFilter}
-            onChange={(e) => setPriceFilter(e.target.value as PriceFilter)}
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
           >
-            <option value="all">Any price</option>
-            <option value="free">🆓 Free only</option>
-            <option value="cheap">≤$0.50/M</option>
-            <option value="mid">≤$5/M</option>
-          </select>
-          <select
-            value={ctxFilter}
-            onChange={(e) => setCtxFilter(e.target.value as CtxFilter)}
-          >
-            <option value="all">Any context</option>
-            <option value="32k">≥32k</option>
-            <option value="64k">≥64k</option>
-            <option value="128k">≥128k</option>
-          </select>
-          <select
-            value={providerFilter}
-            onChange={(e) => setProviderFilter(e.target.value)}
-          >
-            <option value="all">All providers</option>
-            {providers.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
+            <option value="price-asc">Price ↑</option>
+            <option value="price-desc">Price ↓</option>
+            <option value="context-desc">Context ↓</option>
+            <option value="name">Name A-Z</option>
           </select>
           <label className="model-filter-check">
+            <input
+              type="checkbox"
+              checked={freeOnly}
+              onChange={(e) => setFreeOnly(e.target.checked)}
+            />
+            Free
+          </label>
+          <label
+            className="model-filter-check"
+            title="Structured JSON output — required for best translation quality"
+          >
             <input
               type="checkbox"
               checked={jsonOnly}
               onChange={(e) => setJsonOnly(e.target.checked)}
             />
-            JSON
+            Structured output
           </label>
+        </div>
+
+        {/* Context slider */}
+        <div className="model-slider-row">
+          <span className="model-slider-label">
+            Context ≥ {minCtx === 0 ? 'any' : ctxLabel(minCtx)}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={CTX_STEPS.length - 1}
+            value={ctxSlider}
+            onChange={(e) => setCtxSlider(Number(e.target.value))}
+            className="model-slider"
+          />
         </div>
 
         {/* Model list */}
@@ -250,10 +260,12 @@ export function JobDialog({
           <div className="model-info">
             <strong>{selected.name}</strong>
             {selected.isFree && <span className="badge-free">FREE</span>}
-            {selected.supportsJson && <span className="badge-json">JSON</span>}
+            {selected.supportsJson && (
+              <span className="badge-json">Structured</span>
+            )}
             <br />
-            In: {formatPrice(selected.promptPrice)} · Out:{' '}
-            {formatPrice(selected.completionPrice)} · Ctx:{' '}
+            In: {formatPrice(selected.promptPrice)}/M · Out:{' '}
+            {formatPrice(selected.completionPrice)}/M · Ctx:{' '}
             {ctxLabel(selected.contextLength)}
             {selected.maxOutput > 0 &&
               ` · Max out: ${ctxLabel(selected.maxOutput)}`}
@@ -303,11 +315,11 @@ function ModelRow({
         {m.name}
       </span>
       <span className="model-meta">
-        {m.supportsJson && '📋 '}
+        {m.supportsJson ? '✓ ' : ''}
         {ctxLabel(m.contextLength)} ·{' '}
         {m.isFree
           ? 'Free'
-          : `$${m.promptPrice.toFixed(2)}/$${m.completionPrice.toFixed(2)}`}
+          : `${formatPrice(m.promptPrice)}/${formatPrice(m.completionPrice)}`}
       </span>
     </div>
   );
