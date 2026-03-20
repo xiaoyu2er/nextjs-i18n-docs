@@ -115,7 +115,16 @@ export function App() {
                 {showFiles ? '◀ Hide files' : '▶ Show files'}
               </button>
               {previewFile && (
-                <span className="file-panel-current">{previewFile}</span>
+                <>
+                  <span className="file-panel-current">{previewFile}</span>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => setPreviewFile(null)}
+                  >
+                    ✕ Close
+                  </button>
+                </>
               )}
             </div>
             <div
