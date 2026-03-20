@@ -542,6 +542,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
       translateFiles,
     });
 
+    fileLogger.log('_run', `Command: ${process.argv.join(' ')}`);
     fileLogger.log('_run', `Source: ${opts.docsRoot}`);
     fileLogger.log(
       '_run',

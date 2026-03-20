@@ -1,0 +1,917 @@
+---
+title: 适配器路径
+description: 为 Next.js 配置自定义适配器以钩入构建流程。
+---
+
+Next.js 提供内置的适配器 API。它允许部署平台或构建系统接入 Next.js 构建流程。
+
+对于完整的参考实现，请参阅 [`nextjs/adapter-vercel`](https://github.com/nextjs/adapter-vercel) 适配器。
+
+## 配置
+
+要使用适配器，请在 `adapterPath` 中指定适配器模块的路径。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  adapterPath: require.resolve('./my-adapter.js'),
+}
+
+module.exports = nextConfig
+```
+
+或者可以设置 `NEXT_ADAPTER_PATH` 以在部署平台中启用零配置使用。
+
+## 创建适配器
+
+适配器是一个导出实现 `NextAdapter` 接口的对象的模块。
+
+该接口可以从 `next` 包中导入：
+
+```typescript
+import type { NextAdapter } from 'next'
+```
+
+接口定义如下：
+
+```typescript
+type Route = {
+  source?: string
+  sourceRegex: string
+  destination?: string
+  headers?: Record<string, string>
+  has?: RouteHas[]
+  missing?: RouteHas[]
+  status?: number
+  priority?: boolean
+}
+
+export interface AdapterOutputs {
+  pages: Array<AdapterOutput['PAGES']>
+  middleware?: AdapterOutput['MIDDLEWARE']
+  appPages: Array<AdapterOutput['APP_PAGE']>
+  pagesApi: Array<AdapterOutput['PAGES_API']>
+  appRoutes: Array<AdapterOutput['APP_ROUTE']>
+  prerenders: Array<AdapterOutput['PRERENDER']>
+  staticFiles: Array<AdapterOutput['STATIC_FILE']>
+}
+
+export interface NextAdapter {
+  name: string
+  modifyConfig?: (
+    config: NextConfigComplete,
+    ctx: {
+      phase: PHASE_TYPE
+      nextVersion: string
+    }
+  ) => Promise<NextConfigComplete> | NextConfigComplete
+  onBuildComplete?: (ctx: {
+    routing: {
+      beforeMiddleware: Array<Route>
+      beforeFiles: Array<Route>
+      afterFiles: Array<Route>
+      dynamicRoutes: Array<Route>
+      onMatch: Array<Route>
+      fallback: Array<Route>
+      shouldNormalizeNextData: boolean
+      rsc: RoutesManifest['rsc']
+    }
+    outputs: AdapterOutputs
+    projectDir: string
+    repoRoot: string
+    distDir: string
+    config: NextConfigComplete
+    nextVersion: string
+    buildId: string
+  }) => Promise<void> | void
+}
+```
+
+### 基础适配器结构
+
+这里是一个最小适配器示例：
+
+```js filename="my-adapter.js"
+/** @type {import('next').NextAdapter} */
+const adapter = {
+  name: 'my-custom-adapter',
+
+  async modifyConfig(config, { phase }) {
+    // Modify the Next.js config based on the build phase
+    if (phase === 'phase-production-build') {
+      return {
+        ...config,
+        // Add your modifications
+      }
+    }
+    return config
+  },
+
+  async onBuildComplete({
+    routing,
+    outputs,
+    projectDir,
+    repoRoot,
+    distDir,
+    config,
+    nextVersion,
+    buildId,
+  }) {
+    // Process the build output
+    console.log('Build completed with', outputs.pages.length, 'pages')
+    console.log('Build ID:', buildId)
+    console.log('Dynamic routes:', routing.dynamicRoutes.length)
+
+    // Access emitted output entries
+    for (const page of outputs.pages) {
+      console.log('Page:', page.pathname, 'at', page.filePath)
+    }
+
+    for (const apiRoute of outputs.pagesApi) {
+      console.log('API Route:', apiRoute.pathname, 'at', apiRoute.filePath)
+    }
+
+    for (const appPage of outputs.appPages) {
+      console.log('App Page:', appPage.pathname, 'at', appPage.filePath)
+    }
+
+    for (const prerender of outputs.prerenders) {
+      console.log('Prerendered:', prerender.pathname)
+    }
+  },
+}
+
+module.exports = adapter
+```
+
+## API 参考
+
+### `async modifyConfig(config, context)` 
+
+当任何 CLI 命令加载 `next.config.js` 文件时被调用，以允许修改配置。
+
+**参数：**
+
+- `config`: 完整的 Next.js 配置对象
+- `context.phase`: 当前构建阶段 (参见 [构建阶段](/docs/app/api-reference/config/next-config-js#phase))
+- `context.nextVersion`: 所使用的 Next.js 版本
+
+**返回值：** 修改后的配置对象 (可为异步函数)
+
+### `async onBuildComplete(context)` 
+
+构建进程完成后调用，并带有路由和输出的详细信息。
+
+**参数：**
+
+- `context.routing`: 包含 Next.js 路由阶段和元数据的对象
+  - `routing.beforeMiddleware`: 在中间件执行前应用的路由 (包括响应头和处理重定向)
+  - `routing.beforeFiles`: 在文件系统路由匹配前检查的重写路由
+  - `routing.afterFiles`: 在文件系统路由匹配后检查的重写路由
+  - `routing.dynamicRoutes`: 动态路由匹配表
+  - `routing.onMatch`: 在匹配成功后应用的路由 (例如不可变静态资源缓存头)
+  - `routing.fallback`: 最终重写回退路由
+  - `routing.shouldNormalizeNextData`: `/_next/data/<buildId>/...`  URL 在匹配期间是否应被规范化
+  - `routing.rsc`: 用于 React 服务器组件路由行为的路由元数据
+- `context.outputs`: 按类型组织的所有构建输出的详细信息
+- `context.projectDir`: Next.js 项目目录的绝对路径
+- `context.repoRoot`: 检测到的仓库根的绝对路径
+- `context.distDir`: 构建输出目录的绝对路径
+- `context.config`: 最终的 Next.js 配置 (已应用 `modifyConfig`)
+- `context.nextVersion`: 所使用的 Next.js 版本
+- `context.buildId`: 当前构建的唯一标识符
+
+## 测试适配器
+
+Next.js 提供用于验证适配器的测试工具。运行部署的端到端测试。
+
+GitHub Actions 工作流示例：
+
+```yaml filename=".github/workflows/test-e2e-deploy.yml"
+name: test-e2e-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      nextjsRef:
+        description: 'Next.js repo ref (branch/tag/SHA)'
+        default: 'canary'
+        type: string
+  # schedule:
+  #   - cron: '0 2 * * *'
+
+jobs:
+  build:
+    name: Build Next.js + adapter
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: adapter
+
+      - uses: actions/checkout@v4
+        with:
+          repository: vercel/next.js
+          ref: ${{ inputs.nextjsRef || 'canary' }}
+          path: nextjs
+          fetch-depth: 25
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Setup pnpm
+        run: npm i -g corepack@0.31 && corepack enable
+
+      - name: Install & build Next.js
+        working-directory: nextjs
+        run: pnpm install && pnpm build && pnpm install
+
+      - name: Install Playwright
+        working-directory: nextjs
+        run: pnpm playwright install --with-deps chromium
+
+      - name: Build adapter
+        working-directory: adapter
+        run: pnpm install && pnpm build
+
+      - uses: actions/cache/save@v4
+        with:
+          path: |
+            nextjs
+            adapter
+            ~/.cache/ms-playwright
+          key: build-${{ github.sha }}-${{ github.run_id }}
+
+  test:
+    name: Tests (${{ matrix.group }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          [
+            1/16,
+            2/16,
+            3/16,
+            4/16,
+            5/16,
+            6/16,
+            7/16,
+            8/16,
+            9/16,
+            10/16,
+            11/16,
+            12/16,
+            13/16,
+            14/16,
+            15/16,
+            16/16,
+          ]
+    steps:
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            nextjs
+            adapter
+            ~/.cache/ms-playwright
+          key: build-${{ github.sha }}-${{ github.run_id }}
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Setup pnpm
+        run: npm i -g corepack@0.31 && corepack enable
+
+      - name: Ensure Playwright browser
+        working-directory: nextjs
+        run: pnpm playwright install chromium
+
+      - name: Make scripts executable
+        run: chmod +x adapter/scripts/e2e-deploy.sh
+          adapter/scripts/e2e-logs.sh
+          adapter/scripts/e2e-cleanup.sh
+
+      - name: Run deploy tests
+        working-directory: nextjs
+        env:
+          NEXT_TEST_MODE: deploy
+          NEXT_E2E_TEST_TIMEOUT: 240000
+          NEXT_EXTERNAL_TESTS_FILTERS: test/deploy-tests-manifest.json
+          ADAPTER_DIR: ${{ github.workspace }}/adapter
+          IS_TURBOPACK_TEST: 1
+          NEXT_TEST_JOB: 1
+          NEXT_TELEMETRY_DISABLED: 1
+
+          # Change these to your adapter's scripts
+          # Keep as-is if the scripts are in the adapter repository `scripts` directory
+          NEXT_TEST_DEPLOY_SCRIPT_PATH: ${{ github.workspace }}/adapter/scripts/e2e-deploy.sh
+          NEXT_TEST_DEPLOY_LOGS_SCRIPT_PATH: ${{ github.workspace }}/adapter/scripts/e2e-logs.sh
+          NEXT_TEST_CLEANUP_SCRIPT_PATH: ${{ github.workspace }}/adapter/scripts/e2e-cleanup.sh
+        run: node run-tests.js --timings -g ${{ matrix.group }} -c 2 --type e2e
+```
+
+测试工具查找以下环境变量：
+
+- `NEXT_TEST_DEPLOY_SCRIPT_PATH`: 构建并部署隔离测试应用程序的可执行文件路径
+- `NEXT_TEST_DEPLOY_LOGS_SCRIPT_PATH`: 返回该部署的构建和运行时日志的可执行文件路径
+- `NEXT_TEST_CLEANUP_SCRIPT_PATH`: 测试运行后销毁部署的可选可执行文件路径
+
+### 自定义部署脚本契约
+
+部署脚本 `NEXT_TEST_DEPLOY_SCRIPT_PATH` 在 `cwd` 设置为 Next.js 测试工具创建的隔离临时应用时执行。
+
+部署脚本必须遵循此契约：
+
+- 失败时以非零代码退出。
+- 将部署 URL 打印到 `stdout`。这将用于验证部署。避免向 `stdout` 写入其他内容。
+- 将诊断输出写入 `stderr` 或工作目录内的文件。
+
+由于部署脚本和日志脚本作为独立进程运行，任何您稍后想使用的数据，例如构建 ID 或服务器日志，都应持久化到工作目录内的文件中。
+
+部署脚本示例：
+
+```bash filename="scripts/e2e-deploy.sh"
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Install the adapter, build the app, and deploy or start it.
+node -e "
+const pkg=JSON.parse(require('fs').readFileSync('package.json','utf8'));
+pkg.dependencies=pkg.dependencies||{};
+pkg.dependencies['adapter']='file:${ADAPTER_DIR}';
+require('fs').writeFileSync('package.json',JSON.stringify(pkg,null,2));
+" >&2
+
+# Set the adapter path so that the app uses it.
+export NEXT_ADAPTER_PATH="${ADAPTER_DIR}/dist/index.js"
+
+# Write any metadata needed later to files in the working directory.
+BUILD_ID="$(cat .next/BUILD_ID)"
+DEPLOYMENT_ID="my-adapter-local"
+# If your adapter generates an immutable asset token, set it here.
+# Otherwise use "undefined" to indicate there is none.
+IMMUTABLE_ASSET_TOKEN="undefined"
+
+{
+  echo "BUILD_ID: $BUILD_ID"
+  echo "DEPLOYMENT_ID: $DEPLOYMENT_ID"
+  echo "IMMUTABLE_ASSET_TOKEN: $IMMUTABLE_ASSET_TOKEN"
+} >> .adapter-build.log
+
+# Build the app
+pnpm build
+
+# Start or deploy the app. Capture the URL at this point or make the script output the URL to stdout.
+provider-cli-to-deploy
+
+# Example URL output:
+# echo "http://127.0.0.1:3000"
+```
+
+### 自定义日志脚本契约
+
+日志脚本 `NEXT_TEST_DEPLOY_LOGS_SCRIPT_PATH` 在 `cwd` 设置为 Next.js 测试工具创建的隔离临时应用时执行。
+
+此外，它接收 `NEXT_TEST_DIR` 和 `NEXT_TEST_DEPLOY_URL` 作为环境变量。
+
+其输出必须包括以以下内容开头的行：
+
+- `BUILD_ID:`
+- `DEPLOYMENT_ID:`
+- `IMMUTABLE_ASSET_TOKEN:` (如果您的适配器未生成该值，请使用 `undefined`)
+
+在这些标记之后，日志脚本可以打印任何其他有助于调试失败的构建或服务器日志。
+
+```bash filename="scripts/e2e-logs.sh"
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f ".adapter-build.log" ]; then
+  cat ".adapter-build.log"
+fi
+
+if [ -f ".adapter-server.log" ]; then
+  echo "=== .adapter-server.log ==="
+  cat ".adapter-server.log"
+fi
+```
+
+一种模式是部署脚本写入 `.adapter-build.log` 和 `.adapter-server.log`，然后日志脚本重放这些文件，以便工具提取所需的标记。这是一种选项，每个平台都有不同的方式获取日志。
+
+### 自定义清理脚本契约
+
+清理脚本 `NEXT_TEST_CLEANUP_SCRIPT_PATH` 在 `cwd` 设置为 Next.js 测试工具创建的隔离临时应用时执行。
+
+此外，它接收 `NEXT_TEST_DIR` 和 `NEXT_TEST_DEPLOY_URL` 作为环境变量。
+
+清理脚本可用于清理部署脚本创建的任何资源。它在测试完成后运行。
+
+## 使用 `@next/routing` 进行路由
+
+您可以使用 [`@next/routing`](https://www.npmjs.com/package/@next/routing) 利用 `onBuildComplete` 的数据来重现 Next.js 路由匹配行为。
+
+> [!NOTE]
+> `@next/routing` 仍处于实验阶段，将随着适配器 API 的逐步完善而稳定。
+
+```typescript
+import { resolveRoutes } from '@next/routing'
+
+const pathnames = [
+  ...outputs.pages,
+  ...outputs.pagesApi,
+  ...outputs.appPages,
+  ...outputs.appRoutes,
+  ...outputs.staticFiles,
+].map((output) => output.pathname)
+
+const result = await resolveRoutes({
+  url: requestUrl,
+  buildId,
+  basePath: config.basePath || '',
+  i18n: config.i18n,
+  headers: requestHeaders,
+  requestBody,
+  pathnames,
+  routes: routing,
+  invokeMiddleware: async (ctx) => {
+    // platform-specific middleware invocation
+    return {}
+  },
+})
+
+if (result.resolvedPathname) {
+  console.log('Resolved pathname:', result.resolvedPathname)
+  console.log('Resolved query:', result.resolvedQuery)
+  console.log('Invocation target:', result.invocationTarget)
+}
+```
+
+`resolveRoutes()` 返回：
+
+- `resolvedPathname`: Next.js 路由选择的路线路径名。对于动态路由，这是匹配的路由模板，例如 `/blog/[slug]`。
+- `resolvedQuery`: 重写或中间件添加或替换搜索参数后的最终查询参数。
+- `invocationTarget`: 为匹配的路由调用的具体路径名和查询参数。
+
+例如，如果 `/blog/post-1?draft=1` 匹配 `/blog/[slug]?slug=post-1`，`resolvedPathname` 是 `/blog/[slug]`，而 `invocationTarget.pathname` 是 `/blog/post-1`。
+
+## 在适配器中实现 PPR
+
+对于部分预渲染应用路由，`onBuildComplete` 提供了用于提供种子数据和恢复 PPR 所需的数据：
+
+- `outputs.prerenders[].fallback.filePath`: 生成的回退外壳的路径 (例如 HTML)
+- `outputs.prerenders[].fallback.postponedState`: 用于恢复渲染的序列化延迟状态
+
+### 1. 在构建时初始化外壳 + 延迟状态
+
+```ts filename="my-adapter.ts"
+import { readFile } from 'node:fs/promises'
+
+async function seedPprEntries(outputs: AdapterOutputs) {
+  for (const prerender of outputs.prerenders) {
+    const fallback = prerender.fallback
+    if (!fallback?.filePath || !fallback.postponedState) continue
+
+    const shell = await readFile(fallback.filePath, 'utf8')
+    await platformCache.set(prerender.pathname, {
+      shell,
+      postponedState: fallback.postponedState,
+      initialHeaders: fallback.initialHeaders,
+      initialStatus: fallback.initialStatus,
+      initialRevalidate: fallback.initialRevalidate,
+      initialExpiration: fallback.initialExpiration,
+    })
+  }
+}
+```
+
+### 2. 运行时流程：提供缓存外壳并在后台恢复
+
+在请求时，您可以流式传递一个组合为以下内容的响应：
+
+1. 缓存的 HTML 外壳流
+2. 恢复的渲染流 (在调用 `handler` 并提供延迟状态后生成)
+
+```text
+Client
+  | GET /ppr-route
+  v
+Adapter Router
+  |
+  |-- read cached shell + postponedState ---> Platform Cache
+  |<------------- cache hit -----------------|
+  |
+  |-- create responseStream = concat(shellStream, resumedStream)
+  |
+  |-- start piping shellStream ------------> Client (first bytes)
+  |
+  |-- invoke handler(req, res, { requestMeta: { postponed } })
+  |   -------------------------------------> Entrypoint (handler)
+  |   <------------------------------------- resumed chunks/cache entry
+  |
+  |-- append resumed chunks to resumedStream
+  |
+  '-- client receives one HTTP response:
+      [shell bytes........][resumed bytes........]
+```
+
+### 3. 使用 `requestMeta.onCacheEntryV2` 更新缓存
+
+当查找或生成响应缓存条目时，会调用 `requestMeta.onCacheEntryV2`。使用它来持久化更新的外壳/延迟数据。
+
+> [!NOTE]
+>
+> - `requestMeta.onCacheEntry` 仍然有效，但已弃用。
+> - 建议使用 `requestMeta.onCacheEntryV2`。
+> - 如果您的适配器使用内部 `onCacheCallback` 抽象，请将其连接到 `requestMeta.onCacheEntryV2`。
+
+```ts filename="my-adapter.ts"
+await handler(req, res, {
+  waitUntil,
+  requestMeta: {
+    postponed: cachedPprEntry?.postponedState,
+    onCacheEntryV2: async (cacheEntry, meta) => {
+      if (cacheEntry.value?.kind === 'APP_PAGE') {
+        const html =
+          cacheEntry.value.html &&
+          typeof cacheEntry.value.html.toUnchunkedString === 'function'
+            ? cacheEntry.value.html.toUnchunkedString()
+            : null
+
+        await platformCache.set(meta.url || req.url || '/', {
+          shell: html,
+          postponedState: cacheEntry.value.postponed,
+          headers: cacheEntry.value.headers,
+          status: cacheEntry.value.status,
+          cacheControl: cacheEntry.cacheControl,
+        })
+      }
+
+      // Return true only if your adapter already wrote the response itself.
+      return false
+    },
+  },
+})
+```
+
+```text
+Entrypoint (handler)
+  | onCacheEntryV2(cacheEntry, { url })
+  v
+requestMeta.onCacheEntryV2 callback
+  |
+  |-- if APP_PAGE ---> persist html + postponedState + headers ---> Platform Cache
+  |
+  '-- return false: continue normal Next.js response flow
+      return true:  adapter already handled response (short-circuit)
+```
+
+## 调用入口点
+
+构建输出入口点使用 `handler(..., ctx)` 接口，具有特定于运行时请求/响应的类型。
+
+### Node.js 运行时 (`runtime: 'nodejs'`)
+
+Node.js 入口点使用以下接口：
+
+```typescript
+handler(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: {
+    waitUntil?: (promise: Promise<void>) => void
+    requestMeta?: RequestMeta
+  }
+): Promise<void>
+```
+
+当直接调用 Node.js 入口点时，适配器可以直接在 `requestMeta` 上传递辅助函数，而不是依赖内部机制。一些支持的字段包括 `hostname`,
+`revalidate` 和 `render404`：
+
+```ts
+await handler(req, res, {
+  requestMeta: {
+    // Relative path from process.cwd() to the Next.js project directory.
+    relativeProjectDir: '.',
+    // Optional hostname used by route handlers when constructing absolute URLs.
+    hostname: '127.0.0.1',
+    // Optional internal revalidate function to avoid revalidating over the network
+    revalidate: async ({ urlPath, headers, opts }) => {
+      // platform-specific revalidate implementation
+    },
+    // Optional function to render the 404 page for pages router `notFound: true`
+    render404: async (req, res, parsedUrl, setHeaders) => {
+      // platform-specific 404 rendering implementation
+    },
+  },
+})
+```
+
+Next.js 核心中的相关文件：
+
+- [`packages/next/src/build/templates/app-page.ts`](https://github.com/vercel/next.js/blob/canary/packages/next/src/build/templates/app-page.ts)
+- [`packages/next/src/build/templates/app-route.ts`](https://github.com/vercel/next.js/blob/canary/packages/next/src/build/templates/app-route.ts)
+- 以及 [`packages/next/src/build/templates/pages-api.ts`](https://github.com/vercel/next.js/blob/canary/packages/next/src/build/templates/pages-api.ts)
+
+### Edge 运行时 (`runtime: 'edge'`)
+
+Edge 入口点使用以下接口：
+
+```typescript
+handler(
+  request: Request,
+  ctx: {
+    waitUntil?: (prom: Promise<void>) => void
+    signal?: AbortSignal
+    requestMeta?: RequestMeta
+  }
+): Promise<Response>
+```
+
+结构围绕 `handler(..., ctx)` 对齐，但 Node.js 和 Edge 运行时使用不同的请求/响应原语。
+
+对于带有 `runtime: 'edge'` 的输出，Next.js 还提供了 `output.edgeRuntime`，其中包含调用入口点所需的规范元数据：
+
+```typescript
+{
+  modulePath: string // Absolute path to the module registered in the edge runtime
+  entryKey: string // Canonical key used by the edge entry registry
+  handlerExport: string // Export name to invoke, currently 'handler'
+}
+```
+
+您的 Edge 运行时加载并评估 `modulePath` 的代码块后，请 使用 `entryKey` 从全局 Edge 入口注册表 (`globalThis._ENTRIES`) 读取注册的入口，然后从该入口调用 `handlerExport`：
+
+```ts
+const entry = await globalThis._ENTRIES[output.edgeRuntime.entryKey]
+const handler = entry[output.edgeRuntime.handlerExport]
+await handler(request, ctx)
+```
+
+使用 `edgeRuntime`，而不是从文件名派生注册表键或处理程序名称。
+
+Next.js 核心中的相关文件：
+
+- [`packages/next/src/build/templates/edge-ssr.ts`](https://github.com/vercel/next.js/blob/canary/packages/next/src/build/templates/edge-ssr.ts)
+- [`packages/next/src/build/templates/edge-app-route.ts`](https://github.com/vercel/next.js/blob/canary/packages/next/src/build/templates/edge-app-route.ts)
+- [`packages/next/src/build/templates/pages-edge-api.ts`](https://github.com/vercel/next.js/blob/canary/packages/next/src/build/templates/pages-edge-api.ts)
+- 以及 [`packages/next/src/build/templates/middleware.ts`](https://github.com/vercel/next.js/blob/canary/packages/next/src/build/templates/middleware.ts)
+
+## 输出类型
+
+ `outputs` 对象包含构建输出类型的数组：
+
+- `outputs.pages`: 来自 `pages/` 目录的 React 页面
+- `outputs.pagesApi`: 来自 `pages/api/` 的 API 路由
+- `outputs.appPages`: 来自 `app/` 目录的 React 页面
+- `outputs.appRoutes`: 来自 `app/` 的 API 和元数据路由
+- `outputs.prerenders`: 启用 ISR 的路由和静态预渲染
+- `outputs.staticFiles`: 静态资源和自动静态优化页面
+- `outputs.middleware`: 中间件函数 (如果存在)
+
+> **注意：** 当 `config.output` 设置为 `'export'` 时，仅 `outputs.staticFiles` 被填充。所有其他数组 (`pages`, `appPages`, `pagesApi`, `appRoutes`, `prerenders`) 将为空，因为整个应用程序将作为静态文件导出。
+
+对于任何带有 `runtime: 'edge'` 的路由输出，`edgeRuntime` 都包含在内，其中包含在您 Edge 运行时调用该输出的规范入口元数据。
+
+### 页面 (`outputs.pages`)
+
+来自 `pages/` 目录的 React 页面：
+
+```typescript
+{
+  type: 'PAGES'
+  id: string           // Route identifier
+  filePath: string     // Path to the built file
+  pathname: string     // URL pathname
+  sourcePage: string   // Original source file path in pages/ directory
+  runtime: 'nodejs' | 'edge'
+  assets: Record<string, string>  // Traced dependencies (key: relative path from repo root, value: absolute path)
+  wasmAssets?: Record<string, string>  // Bundled wasm files (key: name, value: absolute path)
+  edgeRuntime?: {
+    modulePath: string    // Absolute path to the module registered in the edge runtime
+    entryKey: string      // Canonical key used by the edge entry registry
+    handlerExport: string // Export name to invoke, currently 'handler'
+  }
+  config: {
+    maxDuration?: number  // Maximum duration of the route in seconds
+    preferredRegion?: string | string[]  // Preferred deployment region
+    env?: Record<string, string>  // Environment variables (edge runtime only)
+  }
+}
+```
+
+### API 路由 (`outputs.pagesApi`)
+
+来自 `pages/api/` 的 API 路由：
+
+```typescript
+{
+  type: 'PAGES_API'
+  id: string           // Route identifier
+  filePath: string     // Path to the built file
+  pathname: string     // URL pathname
+  sourcePage: string   // Original relative source file path
+  runtime: 'nodejs' | 'edge'
+  assets: Record<string, string>  // Traced dependencies (key: relative path from repo root, value: absolute path)
+  wasmAssets?: Record<string, string>  // Bundled wasm files (key: name, value: absolute path)
+  edgeRuntime?: {
+    modulePath: string    // Absolute path to the module registered in the edge runtime
+    entryKey: string      // Canonical key used by the edge entry registry
+    handlerExport: string // Export name to invoke, currently 'handler'
+  }
+  config: {
+    maxDuration?: number  // Maximum duration of the route in seconds
+    preferredRegion?: string | string[]  // Preferred deployment region
+    env?: Record<string, string>  // Environment variables (edge runtime only)
+  }
+}
+```
+
+### App 页面 (`outputs.appPages`)
+
+来自 `app/` 目录的 React 页面：
+
+```typescript
+{
+  type: 'APP_PAGE'
+  id: string           // Route identifier
+  filePath: string     // Path to the built file
+  pathname: string     // URL pathname.Includes .rsc suffix for RSC routes
+  sourcePage: string   // Original relative source file path
+  runtime: 'nodejs' | 'edge' // Runtime the route is built for
+  assets: Record<string, string>  // Traced dependencies (key: relative path from repo root, value: absolute path)
+  wasmAssets?: Record<string, string>  // Bundled wasm files (key: name, value: absolute path)
+  edgeRuntime?: {
+    modulePath: string    // Absolute path to the module registered in the edge runtime
+    entryKey: string      // Canonical key used by the edge entry registry
+    handlerExport: string // Export name to invoke, currently 'handler'
+  }
+  config: {
+    maxDuration?: number  // Maximum duration of the route in seconds
+    preferredRegion?: string | string[]  // Preferred deployment region
+    env?: Record<string, string>  // Environment variables (edge runtime only)
+  }
+}
+```
+
+### App 路由 (`outputs.appRoutes`)
+
+来自 `app/` 目录的 API 和元数据路由：
+
+```typescript
+{
+  type: 'APP_ROUTE'
+  id: string           // Route identifier
+  filePath: string     // Path to the built file
+  pathname: string     // URL pathname
+  sourcePage: string   // Original relative source file path
+  runtime: 'nodejs' | 'edge' // Runtime the route is built for
+  assets: Record<string, string>  // Traced dependencies (key: relative path from repo root, value: absolute path)
+  wasmAssets?: Record<string, string>  // Bundled wasm files (key: name, value: absolute path)
+  edgeRuntime?: {
+    modulePath: string    // Absolute path to the module registered in the edge runtime
+    entryKey: string      // Canonical key used by the edge entry registry
+    handlerExport: string // Export name to invoke, currently 'handler'
+  }
+  config: {
+    maxDuration?: number  // Maximum duration of the route in seconds
+    preferredRegion?: string | string[]  // Preferred deployment region
+    env?: Record<string, string>  // Environment variables (edge runtime only)
+  }
+}
+```
+
+### 预渲染 (`outputs.prerenders`)
+
+启用 ISR 的路由和静态预渲染：
+
+```typescript
+{
+  type: 'PRERENDER'
+  id: string           // Route identifier
+  pathname: string     // URL pathname
+  parentOutputId: string  // ID of the source page/route
+  groupId: number        // Revalidation group identifier (prerenders with same groupId revalidate together)
+  pprChain?: {
+    headers: Record<string, string>  // PPR chain headers (e.g., 'x-nextjs-resume': '1')
+  }
+  parentFallbackMode?: false | null | string  // false: no additional paths (fallback: false), null: blocking render, string: path to HTML fallback
+  fallback?: {
+    filePath: string | undefined  // Path to the fallback file (HTML, JSON, or RSC)
+    initialStatus?: number  // Initial status code
+    initialHeaders?: Record<string, string | string[]>  // Initial headers
+    initialExpiration?: number  // Initial expiration time in seconds
+    initialRevalidate?: number | false  // Initial revalidate time in seconds, or false for fully static
+    postponedState: string | undefined  // Serialized PPR state used for resuming rendering
+  }
+  config: {
+    allowQuery?: string[]     // Allowed query parameters considered for the cache key
+    allowHeader?: string[]    // Allowed headers for ISR
+    bypassFor?: RouteHas[]    // Cache bypass conditions
+    renderingMode?: 'STATIC' | 'PARTIALLY_STATIC'  // STATIC: fully static, PARTIALLY_STATIC: PPR-enabled
+    partialFallback?: boolean  // Serves a partial fallback shell that should be upgraded to a full route in the background
+    bypassToken?: string      // Generated token that signals the prerender cache should be bypassed
+  }
+}
+```
+
+### 静态文件 (`outputs.staticFiles`)
+
+静态资源和自动静态优化页面：
+
+```typescript
+{
+  type: 'STATIC_FILE'
+  id: string // Route identifier
+  filePath: string // Path to the built file
+  pathname: string // URL pathname
+  immutableHash: string | undefined // Content hash when the filename contains a hash, indicating the file is immutable
+}
+```
+
+### 中间件 (`outputs.middleware`)
+
+`middleware.ts` (`.js`/`.ts`) 或 `proxy.ts` (`.js`/`.ts`) 函数 (如果存在)：
+
+```typescript
+{
+  type: 'MIDDLEWARE'
+  id: string           // Route identifier
+  filePath: string     // Path to the built file
+  pathname: string      // Always '/_middleware'
+  sourcePage: string    // Always 'middleware'
+  runtime: 'nodejs' | 'edge' // Runtime the route is built for
+  assets: Record<string, string>  // Traced dependencies (key: relative path from repo root, value: absolute path)
+  wasmAssets?: Record<string, string>  // Bundled wasm files (key: name, value: absolute path)
+  edgeRuntime?: {
+    modulePath: string    // Absolute path to the module registered in the edge runtime
+    entryKey: string      // Canonical key used by the edge entry registry
+    handlerExport: string // Export name to invoke, currently 'handler'
+  }
+  config: {
+    maxDuration?: number  // Maximum duration of the route in seconds
+    preferredRegion?: string | string[]  // Preferred deployment region
+    env?: Record<string, string>  // Environment variables (edge runtime only)
+    matchers?: Array<{
+      source: string  // Source pattern
+      sourceRegex: string  // Compiled regex for matching requests
+      has: RouteHas[] | undefined  // Positive matching conditions
+      missing: RouteHas[] | undefined  // Negative matching conditions
+    }>
+  }
+}
+```
+
+## 路由信息
+
+ `onBuildComplete` 中的 `routing` 对象提供完整的路由信息，包含可用于部署的处理模式：
+
+### `routing.beforeMiddleware` 
+
+在中间件执行前应用的路由。这包括生成的响应头和重定向行为。
+
+### `routing.beforeFiles` 
+
+在文件系统路由匹配前检查的重写路由。
+
+### `routing.afterFiles` 
+
+在文件系统路由匹配后检查的重写路由。
+
+### `routing.dynamicRoutes` 
+
+从 [slug] 等路由段和通配符路由生成的动态匹配器。
+
+### `routing.onMatch` 
+
+在成功匹配后应用的路由，例如哈希静态资源的不可变缓存头。
+
+### `routing.fallback` 
+
+当早期阶段未产生匹配时检查的最终重写路由。
+
+### 通用路由字段
+
+每个路由条目可以包括：
+
+- `source`: 原始路由模式 (内部生成的规则为可选)
+- `sourceRegex`: 用于匹配请求的编译正则表达式
+- `destination`: 内部目的地或重定向目的地
+- `headers`: 要应用的响应头
+- `has`: 正向匹配条件
+- `missing`: 负向匹配条件
+- `status`: 重定向状态码
+- `priority`: 内部路由优先级标志
+
+## 使用示例
+
+适配器的常见使用示例包括：
+
+- **部署平台集成**：自动为特定托管平台配置构建输出
+- **资源处理**：转换或优化构建输出
+- **监控集成**：收集构建指标和路由信息
+- **自定义打包**：以平台特定格式打包输出
+- **构建验证**：确保输出符合特定要求
+- **路由生成**：使用处理后的路由信息生成特定于平台的路由配置
