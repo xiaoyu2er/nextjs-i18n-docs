@@ -53,6 +53,36 @@ bun run typecheck        # tsc for all non-Astro apps & packages
 bun run test             # Run all tests
 ```
 
+### Translation
+
+```bash
+# Translate latest docs
+bun packages/translate/src/batch.pipeline.ts --lang zh-hans
+
+# Translate versioned docs with a specific model
+bun packages/translate/src/batch.pipeline.ts \
+  --lang zh-hans --docs-root content-v14/en --output-dir content-v14 \
+  --model "qwen/qwen3.5-flash-02-23" --max 20
+
+# Rotate free models to avoid rate limits
+bun packages/translate/src/batch.pipeline.ts \
+  --lang zh-hans --docs-root content-v14/en --output-dir content-v14 \
+  $(bun scripts/list-models.ts --free --min-ctx 32 --rotate-cmd) \
+  --max 20 --concurrency 3
+
+# List available models
+bun scripts/list-models.ts --free           # Free models
+bun scripts/list-models.ts --max-price 0.5  # Cheap models
+bun scripts/list-models.ts --free --rotate-cmd  # Generate rotate flag
+
+# Translation status
+bun scripts/translation-status.ts
+bun scripts/translation-status.ts --lang zh-hans --untranslated
+
+# Admin dashboard (http://localhost:3456)
+bun run dev:admin
+```
+
 ## Important Rules
 
 ### Do NOT modify `content/` or `content-v*/` directly

@@ -1,83 +1,181 @@
 # @next-i18n/translate
 
-A utility for translating Nextjs documentation into multiple languages.
+Incremental AST-based translation pipeline for Next.js documentation. Translates MDX files into 8 languages using OpenRouter (or OpenAI/Anthropic) APIs with structured JSON output, caching, and validation.
 
-## Configuration
+## Architecture
 
-Create a `translate.config.mjs` file in your project root with the following structure:
-
-```js
-// Single configuration
-export default {
-  langs: {
-    // Language configurations
-    // Example: 'zh', 'es', 'fr', etc.
-    [languageCode]: {
-      name: String,         // Language name
-      guide: String,        // Translation guidelines
-      terms: {              // Dictionary of common terms
-        // 'term': 'translation'
-      },
-    },
-  },
-  docsRoot: String | String[],  // Root directory or array of root directories
-  docsContext: String,          // Context information for the translator
-  pattern: String,              // Optional: File pattern to match (same as --pattern)
-}
-
-// OR multiple configurations as an array
-export default [
-  {
-    langs: { /* ... */ },
-    docsRoot: String | String[],
-    docsContext: String,
-    pattern: String,        // Optional
-  },
-  // ...more configurations
-]
+```
+EN source MDX → parse (remark AST) → extract nodes → MD5 hash
+  → check cache (SQLite) → uncached nodes → chunk by tokens
+  → translate via LLM (JSON mode) → validate → cache → assemble output
 ```
 
-A sample configuration file (`translation.config.example.mjs`) is included in the repository that demonstrates how to set up translations for multiple languages including Simplified Chinese, Traditional Chinese, Japanese, Spanish, German, French, Russian, and Arabic. You can use this as a starting point for your own translations.
+- **Cache**: SQLite (`.cache/translations.db`) with WAL mode for concurrent access
+- **Translation format**: Structured JSON — `{md5: translation}` per chunk
+- **Validation**: YAML frontmatter, MDX syntax, empty/truncated checks
 
-## Usage
-
-Run the translation tool with:
+## Quick Start
 
 ```bash
-OPENAI_API_KEY=your-openai-api-key npx translate-docs
+# Translate latest docs to zh-hans (uses model from .env)
+bun packages/translate/src/batch.pipeline.ts \
+  --lang zh-hans
+
+# Translate versioned docs
+bun packages/translate/src/batch.pipeline.ts \
+  --lang zh-hans \
+  --docs-root content-v14/en \
+  --output-dir content-v14
+
+# Dry run (show what would be translated)
+bun packages/translate/src/batch.pipeline.ts \
+  --lang zh-hans --dry-run
 ```
 
-### Command Line Options
-
-The tool supports the following command line options:
+## CLI Options
 
 ```
-Options:
-  -c, --config <path>      Path to configuration file
-  --verbose            Enable verbose logging
-  -p, --pattern <pattern>  File pattern to match for updating (e.g., "*.mdx" or "**/*.tsx")
-  -d, --docs-path <pattern> File pattern for docs to translate (e.g., "**/*.mdx")
-  -l, --list-only          Only list file status without updating docs
-  -t, --target-language <language> Specify target language code for translation
-  -h, --help               Display help for command
-  -v, --version            Show version number
+Translation:
+  --lang <code>           Target language (default: zh-hans)
+  --docs-root <path>      EN source directory (default: content/en)
+  --output-dir <path>     Output root directory (default: content)
+  --pattern <glob>        File pattern (default: **/*.mdx)
+  --max <n>               Max files to process
+  --concurrency <n>       Parallel API calls (default: 3)
+
+Model:
+  --model <name>          Override model from .env
+  --model-rotate <list>   Comma-separated models to rotate through
+  --api-type <type>       API type: openrouter, openai, anthropic (default: openrouter)
+  --api-key <key>         API key override
+  --max-tokens <n>        Max output tokens (default: 16384)
+
+Utilities:
+  --dry-run               Show plan without translating
+  --status                Show translation status
+  --repair                Repair broken cache entries
+  --annotate <path>       Annotate a file with translation markers
+  --lookup <md5>          Look up a cache entry by MD5
 ```
 
-Examples:
+## Model Selection
+
+### Using a specific model
 
 ```bash
-# Use a specific configuration file
-npx translate-docs --config ./custom-config.mjs
+bun packages/translate/src/batch.pipeline.ts \
+  --lang zh-hans \
+  --model "qwen/qwen3.5-flash-02-23"
+```
 
-# Only process markdown files
-npx translate-docs --pattern "**/*.mdx"
+### Free model rotation
 
-# Just check which files would be processed without making changes
-npx translate-docs --list-only
+Rotate through multiple free models to distribute rate limits:
 
-# Enable verbose logging for troubleshooting
-npx translate-docs --verbose
+```bash
+# List available free models
+bun scripts/list-models.ts --free
 
-# Translate only to a specific language
-npx translate-docs --target-language "zh-CN"
+# List free models with context ≥ 32k
+bun scripts/list-models.ts --free --min-ctx 32
+
+# Generate --model-rotate flag automatically
+bun scripts/list-models.ts --free --min-ctx 32 --rotate-cmd
+
+# One-liner: translate with all free models rotating
+bun packages/translate/src/batch.pipeline.ts \
+  --lang zh-hans \
+  --docs-root content-v14/en \
+  --output-dir content-v14 \
+  $(bun scripts/list-models.ts --free --min-ctx 32 --rotate-cmd) \
+  --max 20 \
+  --concurrency 3
+```
+
+Each translation chunk uses the next model in the list (round-robin), distributing requests across models to avoid per-model rate limits.
+
+### Browse models
+
+```bash
+# All models supporting structured JSON output
+bun scripts/list-models.ts
+
+# Filter by price (input ≤ $0.50/M tokens)
+bun scripts/list-models.ts --max-price 0.5
+
+# Filter by context length (≥ 128k)
+bun scripts/list-models.ts --min-ctx 128
+
+# JSON output for scripting
+bun scripts/list-models.ts --free --json
+```
+
+## Environment Variables
+
+```bash
+# Required
+OPENROUTER_API_KEY=sk-or-v1-...
+
+# Optional
+OPENROUTER_MODEL=qwen/qwen3.5-flash-02-23  # Default model
+```
+
+## Rate Limits (OpenRouter)
+
+- **Free models**: ~20 requests/min, daily limit depends on credits purchased
+- **Paid models**: Effectively unlimited (credit-based)
+- **Rate limit handling**: Auto-retry with exponential backoff (2s → 4s → 8s, max 3 attempts)
+- **Mitigation**: Use `--model-rotate` with multiple free models to multiply throughput
+
+## Logs
+
+Detailed per-file logs are written to `.logs/` with timestamps. Each log includes:
+- Full system prompt and user message
+- Full response body (raw JSON from model)
+- Token usage (prompt/completion/total)
+- Response time and finish reason
+- Retry attempts and errors
+
+## Admin Dashboard
+
+Local web UI for managing translations:
+
+```bash
+bun run dev:admin
+# → http://localhost:3456
+```
+
+Features:
+- Translation progress per version/language/file
+- Side-by-side EN + translation preview with synced scrolling
+- Start translation jobs with model selection
+- Live job monitoring with log viewer
+
+## Translation Status
+
+```bash
+# Quick status overview
+bun scripts/translation-status.ts
+
+# Per-language detail
+bun scripts/translation-status.ts --lang zh-hans
+
+# Show untranslated files
+bun scripts/translation-status.ts --untranslated
+
+# Force rescan source files
+bun scripts/translation-status.ts --scan
+```
+
+## Cache Management
+
+```bash
+# Migrate JSONL → SQLite
+bun scripts/migrate-cache.ts
+
+# Verify migration
+bun scripts/migrate-cache.ts --verify
+
+# Export SQLite → JSONL (for git tracking)
+bun scripts/migrate-cache.ts --export
 ```
