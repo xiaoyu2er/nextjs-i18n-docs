@@ -10,6 +10,9 @@ app.route('/api/status', statusRoutes);
 app.route('/api/jobs', jobRoutes);
 app.get('/api/health', (c) => c.json({ ok: true }));
 
+// Redirect to Vite dev server
+app.get('/', (c) => c.redirect('http://localhost:3457'));
+
 const port = Number(process.env.PORT) || 3456;
 export default { port, fetch: app.fetch };
 console.log(`🌐 Translation Admin API → http://localhost:${port}`);
