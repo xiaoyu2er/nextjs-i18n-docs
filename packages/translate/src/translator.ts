@@ -201,16 +201,35 @@ function repairJson(raw: string): string {
 /** Round-robin counter for model rotation */
 let rotateIndex = 0;
 
+/** Models that returned 400/404 — skip them for the rest of the run */
+const deadModels = new Set<string>();
+
 /**
  * Pick the next model from the rotation list, or fall back to single model.
+ * Skips models marked as dead (400/404 errors).
  */
 function pickModel(opts: TranslateOptions): string | undefined {
   if (opts.modelRotate && opts.modelRotate.length > 0) {
-    const model = opts.modelRotate[rotateIndex % opts.modelRotate.length];
-    rotateIndex++;
-    return model;
+    const alive = opts.modelRotate.filter((m) => !deadModels.has(m));
+    if (alive.length === 0) {
+      // All dead — reset and try again
+      deadModels.clear();
+      return opts.modelRotate[rotateIndex++ % opts.modelRotate.length];
+    }
+    return alive[rotateIndex++ % alive.length];
   }
   return opts.model;
+}
+
+/**
+ * Check if an error is a model-level failure (bad model, not rate limit).
+ */
+function isModelError(msg: string): boolean {
+  return (
+    (msg.includes('400') && msg.includes('not a valid')) ||
+    msg.includes('404') ||
+    msg.includes('No endpoints found')
+  );
 }
 
 /**
@@ -641,16 +660,12 @@ async function translateJsonChunk(
 
   const userMessage = buildJsonUserMessage(opts.uncached, opts.nodeTypes);
 
-  const { baseURL, apiKey, model } = resolveApiConfig(opts);
   const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
-  const client = new OpenAI({ baseURL, apiKey });
   const log = opts.logger ?? console.warn;
 
   let lastError: Error | undefined;
   const requestedMd5s = Object.keys(opts.uncached);
 
-  // Log request details
-  log(`🔧 model=${model} keys=${requestedMd5s.length} max_tokens=${maxTokens}`);
   log(
     `📤 SYSTEM PROMPT (${systemPrompt.length} chars):\n${systemPrompt}\n--- END SYSTEM PROMPT ---`,
   );
@@ -658,7 +673,21 @@ async function translateJsonChunk(
     `📤 USER MESSAGE (${userMessage.length} chars):\n${userMessage}\n--- END USER MESSAGE ---`,
   );
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  // Extra attempts when rotating models (bad models get skipped)
+  const maxAttempts =
+    opts.modelRotate && opts.modelRotate.length > 0
+      ? MAX_RETRIES + opts.modelRotate.length
+      : MAX_RETRIES;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Resolve model per attempt (rotation picks next model each time)
+    const { baseURL, apiKey, model } = resolveApiConfig(opts);
+    const client = new OpenAI({ baseURL, apiKey });
+
+    log(
+      `🔧 attempt=${attempt}/${maxAttempts} model=${model} keys=${requestedMd5s.length}`,
+    );
+
     try {
       const t0 = Date.now();
       const response = await client.chat.completions.create({
@@ -794,23 +823,31 @@ async function translateJsonChunk(
       return { translations, missing, extra };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      const isRetryable =
-        lastError.message.includes('429') ||
-        lastError.message.includes('503') ||
-        lastError.message.includes('405') ||
-        lastError.message.includes('timeout') ||
-        lastError.message.includes('ECONNRESET') ||
-        lastError.message.includes('truncated') ||
-        lastError.message.includes('Failed to parse JSON');
+      const msg = lastError.message;
 
-      if (!isRetryable || attempt === MAX_RETRIES) {
+      // Model-level error (400/404): mark model as dead, try next immediately
+      if (isModelError(msg) && opts.modelRotate?.length) {
+        deadModels.add(model);
+        log(`💀 Model ${model} is dead (${msg.substring(0, 80)}), skipping`);
+        continue; // No backoff, try next model immediately
+      }
+
+      const isRetryable =
+        msg.includes('429') ||
+        msg.includes('503') ||
+        msg.includes('405') ||
+        msg.includes('timeout') ||
+        msg.includes('ECONNRESET') ||
+        msg.includes('truncated') ||
+        msg.includes('Failed to parse JSON');
+
+      if (!isRetryable || attempt === maxAttempts) {
         throw lastError;
       }
 
       const backoff = INITIAL_BACKOFF_MS * 2 ** (attempt - 1);
-      const retryLog = opts.logger ?? console.warn;
-      retryLog(
-        `⚠️ Attempt ${attempt}/${MAX_RETRIES} failed: ${lastError.message}. Retrying in ${backoff / 1000}s...`,
+      log(
+        `⚠️ Attempt ${attempt}/${maxAttempts} failed: ${msg}. Retrying in ${backoff / 1000}s...`,
       );
       await sleep(backoff);
     }
