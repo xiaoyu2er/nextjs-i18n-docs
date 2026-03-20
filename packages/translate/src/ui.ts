@@ -303,7 +303,12 @@ export class TableUI {
     if (stats.failedFiles.length > 0) {
       console.log(`\n❌ Failed files (${stats.failedFiles.length}):`);
       for (const f of stats.failedFiles) {
+        const logFile = path.join(
+          stats.logDir,
+          `${f.replace(/\//g, '__')}.log`,
+        );
         console.log(`   - ${f}`);
+        console.log(`     Log: ${logFile}`);
       }
     }
   }
