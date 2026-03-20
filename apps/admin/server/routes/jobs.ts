@@ -21,6 +21,7 @@ app.post('/', async (c) => {
     version: string;
     max?: number;
     concurrency?: number;
+    files?: string[];
   }>();
 
   if (!body.lang || !body.version) {

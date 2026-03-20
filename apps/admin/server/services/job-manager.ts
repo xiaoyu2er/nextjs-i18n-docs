@@ -45,6 +45,7 @@ class JobManager {
     version: string;
     max?: number;
     concurrency?: number;
+    files?: string[];
   }): Job {
     // Prevent duplicate jobs for same lang
     for (const [, job] of this.jobs) {
@@ -80,6 +81,13 @@ class JobManager {
       '--concurrency',
       String(opts.concurrency ?? 3),
     ];
+
+    // Support specific file selection via glob brace expansion
+    if (opts.files && opts.files.length > 0) {
+      const pattern =
+        opts.files.length === 1 ? opts.files[0] : `{${opts.files.join(',')}}`;
+      args.push('--pattern', pattern);
+    }
 
     const proc = spawn('bun', args, {
       cwd: PROJECT_ROOT,
