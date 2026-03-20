@@ -687,6 +687,35 @@ async function translateJsonChunk(
         }
       }
 
+      // Try to recover extra keys → missing keys (LLM may have corrupted a key)
+      if (extra.length > 0 && missing.length > 0) {
+        for (const extraKey of extra) {
+          // Find closest missing key by character similarity
+          let bestMatch: string | null = null;
+          let bestDist = Number.POSITIVE_INFINITY;
+          for (const missKey of missing) {
+            // Simple: count matching characters at same position
+            let diff = Math.abs(extraKey.length - missKey.length);
+            const minLen = Math.min(extraKey.length, missKey.length);
+            for (let i = 0; i < minLen; i++) {
+              if (extraKey[i] !== missKey[i]) diff++;
+            }
+            if (diff < bestDist) {
+              bestDist = diff;
+              bestMatch = missKey;
+            }
+          }
+          // Accept if ≤3 chars different (typo-level corruption)
+          if (bestMatch && bestDist <= 3) {
+            console.warn(
+              `   🔧 Recovered key: ${extraKey.substring(0, 12)}… → ${bestMatch.substring(0, 12)}… (${bestDist} char diff)`,
+            );
+            parsed[bestMatch] = parsed[extraKey];
+            missing.splice(missing.indexOf(bestMatch), 1);
+          }
+        }
+      }
+
       // Filter to only requested keys
       const translations: Record<string, string> = {};
       for (const md5 of requestedMd5s) {
