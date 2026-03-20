@@ -7,26 +7,18 @@
  *   bun run scripts/translation-status.ts --json       # JSON output
  *   bun run scripts/translation-status.ts --lang zh-hans  # single language
  *   bun run scripts/translation-status.ts --version latest # single version
+ *   bun run scripts/translation-status.ts --untranslated   # show incomplete files
+ *   bun run scripts/translation-status.ts --scan          # rescan EN files into SQLite
  *
- * How it works:
- *   1. Parse every EN MDX file into translatable nodes (using the same parser as the pipeline)
- *   2. For each node, compute its MD5 hash
- *   3. Check each language's cache (.cache/{lang}.jsonl) for that MD5
- *   4. Report per-version, per-section, per-language coverage
+ * The first run (or --scan) parses EN files with remark and stores MD5 hashes
+ * in the SQLite database. Subsequent runs use cached data (~10ms vs ~11s).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { TranslationCache } from '../packages/translate/src/cache';
 import { parseMdx } from '../packages/translate/src/parser';
 
 // ── Types ──
-
-interface FileStatus {
-  relPath: string;
-  section: string;
-  totalNodes: number;
-  cachedNodes: number;
-  isFullyTranslated: boolean;
-}
 
 interface SectionStats {
   totalFiles: number;
@@ -50,14 +42,31 @@ interface VersionStats {
   langs: Record<string, LangStats>;
 }
 
+interface IncompleteFile {
+  relPath: string;
+  section: string;
+  reason: 'identical' | 'partial';
+  hasCacheCoverage: boolean;
+  cachePct: number;
+  cachedNodes: number;
+  totalNodes: number;
+  missingNodes: number;
+}
+
+interface UntranslatedResult {
+  version: string;
+  contentDir: string;
+  langs: Record<string, IncompleteFile[]>;
+}
+
 // ── CLI ──
 
 interface CliOptions {
   json: boolean;
   lang: string | null;
   version: string | null;
-  /** Show files that need (re-)translation: identical to EN or partially translated */
   untranslated: boolean;
+  scan: boolean;
 }
 
 function parseArgs(): CliOptions {
@@ -67,6 +76,7 @@ function parseArgs(): CliOptions {
     lang: null,
     version: null,
     untranslated: false,
+    scan: false,
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -82,6 +92,9 @@ function parseArgs(): CliOptions {
       case '--untranslated':
         opts.untranslated = true;
         break;
+      case '--scan':
+        opts.scan = true;
+        break;
     }
   }
   return opts;
@@ -89,7 +102,7 @@ function parseArgs(): CliOptions {
 
 // ── Helpers ──
 
-const ROOT = resolve(import.meta.dirname!, '..');
+const ROOT = resolve(import.meta.dirname ?? '.', '..');
 
 function walkMdx(dir: string): string[] {
   const results: string[] = [];
@@ -105,128 +118,144 @@ function walkMdx(dir: string): string[] {
   return results;
 }
 
-/** Load a language cache into a Set of MD5 keys for fast lookup */
-function loadCacheKeys(lang: string): Set<string> {
-  const filePath = join(ROOT, '.cache', `${lang}.jsonl`);
-  const keys = new Set<string>();
-  if (!existsSync(filePath)) return keys;
-  const lines = readFileSync(filePath, 'utf8').split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const entry = JSON.parse(trimmed);
-      keys.add(entry.k);
-    } catch {
-      // skip malformed lines
-    }
-  }
-  return keys;
-}
-
-/** Classify a file's section from its relative path */
 function getSection(relPath: string): string {
-  if (relPath.startsWith('docs/') || relPath.startsWith('docs\\'))
-    return 'docs';
-  if (relPath.startsWith('blog/') || relPath.startsWith('blog\\'))
-    return 'blog';
-  if (relPath.startsWith('learn/') || relPath.startsWith('learn\\'))
-    return 'learn';
+  if (relPath.startsWith('docs/')) return 'docs';
+  if (relPath.startsWith('blog/')) return 'blog';
+  if (relPath.startsWith('learn/')) return 'learn';
   return 'other';
 }
 
-/** Get file status: parse EN file, check each node against cache */
-function getFileStatus(
-  filePath: string,
+// ── Scan EN files into SQLite ──
+
+function scanVersion(
+  cache: TranslationCache,
+  version: string,
   enDir: string,
-  cacheKeys: Set<string>,
-): FileStatus {
-  const relPath = relative(enDir, filePath);
-  const section = getSection(relPath);
-  const content = readFileSync(filePath, 'utf8');
+): number {
+  const files = walkMdx(enDir);
+  cache.clearSources('', version);
 
-  const nodes = parseMdx(content);
-  const translatableNodes = nodes.filter((n) => n.needsTranslation && n.md5);
+  let totalNodes = 0;
+  for (const file of files) {
+    const relPath = relative(enDir, file);
+    const content = readFileSync(file, 'utf8');
+    const nodes = parseMdx(content);
 
-  let cachedNodes = 0;
-  for (const node of translatableNodes) {
-    if (cacheKeys.has(node.md5!)) {
-      cachedNodes++;
+    for (const node of nodes) {
+      if (node.needsTranslation && node.md5) {
+        const line = content.substring(0, node.startOffset).split('\n').length;
+        cache.setSource(node.md5, node.rawText, node.type);
+        cache.updateSource('', node.md5, relPath, line, version);
+        totalNodes++;
+      }
     }
   }
 
-  return {
-    relPath,
-    section,
-    totalNodes: translatableNodes.length,
-    cachedNodes,
-    isFullyTranslated: cachedNodes === translatableNodes.length,
-  };
+  return totalNodes;
+}
+
+function needsScan(cache: TranslationCache, version: string): boolean {
+  return cache.sourceCount(version) === 0;
 }
 
 // ── Main ──
 
+const VERSION_DEFS: { version: string; dir: string }[] = [
+  { version: 'latest', dir: 'content' },
+  { version: 'v15', dir: 'content-v15' },
+  { version: 'v14', dir: 'content-v14' },
+  { version: 'v13', dir: 'content-v13' },
+];
+
+const ALL_LANGS = ['zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
+
 function main() {
   const opts = parseArgs();
 
-  // Define versions to check
-  const versionDefs: { version: string; dir: string }[] = [
-    { version: 'latest', dir: 'content' },
-    { version: 'v15', dir: 'content-v15' },
-    { version: 'v14', dir: 'content-v14' },
-    { version: 'v13', dir: 'content-v13' },
-  ];
-
-  // Filter by version if specified
   const versions =
     opts.version !== null
-      ? versionDefs.filter((v) => v.version === opts.version)
-      : versionDefs;
+      ? VERSION_DEFS.filter((v) => v.version === opts.version)
+      : VERSION_DEFS;
+
+  const langs =
+    opts.lang !== null ? ALL_LANGS.filter((l) => l === opts.lang) : ALL_LANGS;
 
   if (versions.length === 0) {
     console.error(`Unknown version: ${opts.version}`);
     process.exit(1);
   }
-
-  // All possible languages (from cache files)
-  const ALL_LANGS = ['zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
-  const langs =
-    opts.lang !== null ? ALL_LANGS.filter((l) => l === opts.lang) : ALL_LANGS;
-
   if (langs.length === 0) {
     console.error(`Unknown language: ${opts.lang}`);
     process.exit(1);
   }
 
-  // Load all cache keys upfront
-  const cacheMap = new Map<string, Set<string>>();
-  for (const lang of langs) {
-    cacheMap.set(lang, loadCacheKeys(lang));
+  const cache = new TranslationCache(join(ROOT, '.cache'));
+
+  // Scan EN files if needed or requested
+  for (const { version, dir } of versions) {
+    const enDir = join(ROOT, dir, 'en');
+    if (!existsSync(enDir)) continue;
+
+    if (opts.scan || needsScan(cache, version)) {
+      const start = Date.now();
+      const count = scanVersion(cache, version, enDir);
+      if (!opts.json) {
+        console.error(
+          `  Scanned ${version}: ${count} nodes in ${Date.now() - start}ms`,
+        );
+      }
+    }
   }
 
-  const allVersionStats: VersionStats[] = [];
+  if (opts.scan && !opts.untranslated && !opts.json) {
+    console.log('✅ Scan complete.');
+    cache.close();
+    return;
+  }
+
+  // Build stats using SQLite queries
+  if (opts.untranslated) {
+    const result = findUntranslatedFiles(cache, versions, langs);
+    if (opts.json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      printUntranslatedReport(result);
+    }
+  } else {
+    const allStats = buildStats(cache, versions, langs);
+    if (opts.json) {
+      console.log(JSON.stringify(allStats, null, 2));
+    } else {
+      printReport(allStats);
+    }
+  }
+
+  cache.close();
+}
+
+// ── Build stats from SQLite ──
+
+function buildStats(
+  cache: TranslationCache,
+  versions: { version: string; dir: string }[],
+  langs: string[],
+): VersionStats[] {
+  const allStats: VersionStats[] = [];
 
   for (const { version, dir } of versions) {
-    const contentDir = join(ROOT, dir);
-    const enDir = join(contentDir, 'en');
+    const enDir = join(ROOT, dir, 'en');
+    if (!existsSync(enDir)) continue;
 
-    if (!existsSync(enDir)) {
-      if (!opts.json) console.log(`⚠ ${version}: EN directory not found`);
-      continue;
-    }
-
-    // Collect all EN files
-    const enFiles = walkMdx(enDir);
+    const enFileCount = walkMdx(enDir).length;
     const versionStat: VersionStats = {
       version,
       contentDir: dir,
-      enFileCount: enFiles.length,
+      enFileCount,
       langs: {},
     };
 
     for (const lang of langs) {
-      const cacheKeys = cacheMap.get(lang)!;
-
+      const sectionData = cache.sectionStats(version, lang);
       const langStat: LangStats = {
         sections: {},
         totalFiles: 0,
@@ -235,98 +264,41 @@ function main() {
         cachedNodes: 0,
       };
 
-      for (const file of enFiles) {
-        const status = getFileStatus(file, enDir, cacheKeys);
-
-        // Aggregate by section
-        if (!langStat.sections[status.section]) {
-          langStat.sections[status.section] = {
-            totalFiles: 0,
-            translatedFiles: 0,
-            totalNodes: 0,
-            cachedNodes: 0,
-          };
-        }
-
-        const sec = langStat.sections[status.section];
-        sec.totalFiles++;
-        sec.totalNodes += status.totalNodes;
-        sec.cachedNodes += status.cachedNodes;
-        if (status.isFullyTranslated) sec.translatedFiles++;
-
-        langStat.totalFiles++;
-        langStat.totalNodes += status.totalNodes;
-        langStat.cachedNodes += status.cachedNodes;
-        if (status.isFullyTranslated) langStat.translatedFiles++;
+      for (const s of sectionData) {
+        langStat.sections[s.section] = {
+          totalFiles: s.totalFiles,
+          translatedFiles: s.translatedFiles,
+          totalNodes: s.totalNodes,
+          cachedNodes: s.translatedNodes,
+        };
+        langStat.totalFiles += s.totalFiles;
+        langStat.translatedFiles += s.translatedFiles;
+        langStat.totalNodes += s.totalNodes;
+        langStat.cachedNodes += s.translatedNodes;
       }
 
       versionStat.langs[lang] = langStat;
     }
 
-    allVersionStats.push(versionStat);
+    allStats.push(versionStat);
   }
 
-  // Output
-  if (opts.untranslated) {
-    const result = findUntranslatedFiles(versions, langs);
-    if (opts.json) {
-      console.log(JSON.stringify(result, null, 2));
-    } else {
-      printUntranslatedReport(result);
-    }
-  } else if (opts.json) {
-    console.log(JSON.stringify(allVersionStats, null, 2));
-  } else {
-    printReport(allVersionStats);
-  }
+  return allStats;
 }
 
 // ── Untranslated file detection ──
 
-interface IncompleteFile {
-  relPath: string;
-  section: string;
-  /** 'identical' = file is byte-identical to EN; 'partial' = file differs but cache is incomplete */
-  reason: 'identical' | 'partial';
-  /** Whether cache has full coverage (file can be re-assembled without LLM) */
-  hasCacheCoverage: boolean;
-  /** cachedNodes / totalNodes */
-  cachePct: number;
-  /** Absolute counts for detail */
-  cachedNodes: number;
-  totalNodes: number;
-  /** Number of nodes missing from cache */
-  missingNodes: number;
-}
-
-interface UntranslatedResult {
-  version: string;
-  contentDir: string;
-  langs: Record<string, IncompleteFile[]>;
-}
-
-/**
- * Find files that need translation work:
- * 1. Files identical to EN (reset or never translated)
- * 2. Files that differ from EN but have incomplete cache coverage (partial translation)
- */
 function findUntranslatedFiles(
+  cache: TranslationCache,
   versions: { version: string; dir: string }[],
   langs: string[],
 ): UntranslatedResult[] {
-  const cacheMap = new Map<string, Set<string>>();
-  for (const lang of langs) {
-    cacheMap.set(lang, loadCacheKeys(lang));
-  }
-
   const results: UntranslatedResult[] = [];
 
   for (const { version, dir } of versions) {
     const contentDir = join(ROOT, dir);
     const enDir = join(contentDir, 'en');
     if (!existsSync(enDir)) continue;
-
-    const enFiles = walkMdx(enDir);
 
     const result: UntranslatedResult = {
       version,
@@ -335,64 +307,59 @@ function findUntranslatedFiles(
     };
 
     for (const lang of langs) {
-      const langDir = join(contentDir, lang);
-      if (!existsSync(langDir)) continue;
-
-      // biome-ignore lint/style/noNonNullAssertion: guaranteed by loop above
-      const cacheKeys = cacheMap.get(lang)!;
+      const coverage = cache.fileCoverage(version, lang);
       const incomplete: IncompleteFile[] = [];
 
-      for (const enFile of enFiles) {
-        const relPath = relative(enDir, enFile);
-        const langFile = join(langDir, relPath);
+      for (const fc of coverage) {
+        if (fc.translated === fc.total) continue; // fully translated
 
-        const enContent = readFileSync(enFile, 'utf8');
-        const nodes = parseMdx(enContent);
-        const translatable = nodes.filter((n) => n.needsTranslation && n.md5);
-        const totalNodes = translatable.length;
-        if (totalNodes === 0) continue;
-
-        // biome-ignore lint/style/noNonNullAssertion: filtered above
-        const cachedNodes = translatable.filter((n) =>
-          cacheKeys.has(n.md5!),
-        ).length;
-        const missingNodes = totalNodes - cachedNodes;
-
-        // Determine reason
+        const langFile = join(contentDir, lang, fc.file);
+        const enFile = join(enDir, fc.file);
         const isIdentical =
-          existsSync(langFile) && readFileSync(langFile, 'utf8') === enContent;
-        const hasFullCache = cachedNodes === totalNodes;
+          existsSync(langFile) &&
+          existsSync(enFile) &&
+          readFileSync(langFile, 'utf8') === readFileSync(enFile, 'utf8');
 
-        if (isIdentical) {
-          // File is identical to EN — always needs work
+        const missingNodes = fc.total - fc.translated;
+        const cachePct = fc.total > 0 ? (fc.translated / fc.total) * 100 : 0;
+
+        incomplete.push({
+          relPath: fc.file,
+          section: getSection(fc.file),
+          reason: isIdentical ? 'identical' : 'partial',
+          hasCacheCoverage: false,
+          cachePct,
+          cachedNodes: fc.translated,
+          totalNodes: fc.total,
+          missingNodes,
+        });
+      }
+
+      // Also find files identical to EN that have full cache coverage
+      // (they can be re-assembled without LLM)
+      for (const fc of coverage) {
+        if (fc.translated !== fc.total) continue;
+        const langFile = join(contentDir, lang, fc.file);
+        const enFile = join(enDir, fc.file);
+        if (
+          existsSync(langFile) &&
+          existsSync(enFile) &&
+          readFileSync(langFile, 'utf8') === readFileSync(enFile, 'utf8')
+        ) {
           incomplete.push({
-            relPath,
-            section: getSection(relPath),
+            relPath: fc.file,
+            section: getSection(fc.file),
             reason: 'identical',
-            hasCacheCoverage: hasFullCache,
-            cachePct: (cachedNodes / totalNodes) * 100,
-            cachedNodes,
-            totalNodes,
-            missingNodes,
-          });
-        } else if (!hasFullCache) {
-          // File differs from EN but cache is incomplete — partial translation
-          incomplete.push({
-            relPath,
-            section: getSection(relPath),
-            reason: 'partial',
-            hasCacheCoverage: false,
-            cachePct: (cachedNodes / totalNodes) * 100,
-            cachedNodes,
-            totalNodes,
-            missingNodes,
+            hasCacheCoverage: true,
+            cachePct: 100,
+            cachedNodes: fc.total,
+            totalNodes: fc.total,
+            missingNodes: 0,
           });
         }
-        // else: file differs from EN AND cache is complete — fully translated, skip
       }
 
       if (incomplete.length > 0) {
-        // Sort: identical first, then partial; within each group by cachePct desc
         incomplete.sort((a, b) => {
           if (a.reason !== b.reason) return a.reason === 'identical' ? -1 : 1;
           return b.cachePct - a.cachePct;
@@ -405,6 +372,117 @@ function findUntranslatedFiles(
   }
 
   return results;
+}
+
+// ── Pretty Print ──
+
+function pct(n: number, total: number): string {
+  if (total === 0) return '  -  ';
+  const p = (n / total) * 100;
+  return `${p.toFixed(1)}%`.padStart(6);
+}
+
+function bar(n: number, total: number, width = 20): string {
+  if (total === 0) return '░'.repeat(width);
+  const filled = Math.round((n / total) * width);
+  return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+function printReport(allStats: VersionStats[]) {
+  console.log('');
+  console.log(
+    '═══════════════════════════════════════════════════════════════════════════════════════════════',
+  );
+  console.log('  Translation Status Report');
+  console.log(
+    '═══════════════════════════════════════════════════════════════════════════════════════════════',
+  );
+
+  for (const vs of allStats) {
+    console.log('');
+    console.log(
+      `  📦 ${vs.version.toUpperCase()} (${vs.contentDir}) — ${vs.enFileCount} EN files`,
+    );
+    console.log(
+      '  ─────────────────────────────────────────────────────────────────────────────────────────',
+    );
+
+    const sections = new Set<string>();
+    for (const ls of Object.values(vs.langs)) {
+      for (const s of Object.keys(ls.sections)) sections.add(s);
+    }
+    const sectionList = ['docs', 'blog', 'learn'].filter((s) =>
+      sections.has(s),
+    );
+
+    const langCol = 'Lang'.padEnd(10);
+    const sectionCols = sectionList.map((s) => s.padStart(18)).join('');
+    const totalCol = 'Total'.padStart(18);
+    const nodesCol = 'Nodes'.padStart(18);
+    console.log(`  ${langCol}${sectionCols}${totalCol}${nodesCol}`);
+    console.log(
+      `  ${'─'.repeat(10)}${sectionList.map(() => '─'.repeat(18)).join('')}${'─'.repeat(18)}${'─'.repeat(18)}`,
+    );
+
+    const sortedLangs = Object.keys(vs.langs).sort((a, b) => {
+      const order = ALL_LANGS;
+      return order.indexOf(a) - order.indexOf(b);
+    });
+
+    for (const lang of sortedLangs) {
+      const ls = vs.langs[lang];
+      const cols: string[] = [];
+      cols.push(lang.padEnd(10));
+
+      for (const section of sectionList) {
+        const sec = ls.sections[section];
+        if (sec) {
+          const p = pct(sec.translatedFiles, sec.totalFiles);
+          cols.push(
+            `${sec.translatedFiles}/${sec.totalFiles} ${p}`.padStart(18),
+          );
+        } else {
+          cols.push('-'.padStart(18));
+        }
+      }
+
+      const totalP = pct(ls.translatedFiles, ls.totalFiles);
+      cols.push(
+        `${ls.translatedFiles}/${ls.totalFiles} ${totalP}`.padStart(18),
+      );
+
+      const nodeP = pct(ls.cachedNodes, ls.totalNodes);
+      cols.push(`${ls.cachedNodes}/${ls.totalNodes} ${nodeP}`.padStart(18));
+
+      console.log(`  ${cols.join('')}`);
+    }
+
+    console.log('');
+    for (const lang of sortedLangs) {
+      const ls = vs.langs[lang];
+      const nodeP =
+        ls.totalNodes > 0 ? (ls.cachedNodes / ls.totalNodes) * 100 : 0;
+      console.log(
+        `  ${lang.padEnd(10)} ${bar(ls.cachedNodes, ls.totalNodes, 30)} ${nodeP.toFixed(1)}%`,
+      );
+    }
+  }
+
+  console.log('');
+  console.log(
+    '═══════════════════════════════════════════════════════════════════════════════════════════════',
+  );
+  const stats = new TranslationCache(join(ROOT, '.cache')).allLangStats();
+  console.log('  Cache sizes:');
+  for (const s of stats) {
+    console.log(
+      `    ${(`${s.lang}.jsonl`).padEnd(20)} ${s.count.toLocaleString().padStart(8)} entries`,
+    );
+  }
+  console.log(
+    '═══════════════════════════════════════════════════════════════════════════════════════════════',
+  );
+  console.log('');
 }
 
 function printUntranslatedReport(results: UntranslatedResult[]) {
@@ -441,7 +519,6 @@ function printUntranslatedReport(results: UntranslatedResult[]) {
         '  ─────────────────────────────────────────────────────────────────────────────',
       );
 
-      // Show identical-to-EN files
       if (identical.length > 0) {
         console.log(
           `\n    📄 Identical to EN (${identical.length} files — reset or never translated):`,
@@ -461,7 +538,6 @@ function printUntranslatedReport(results: UntranslatedResult[]) {
         }
       }
 
-      // Show partially translated files
       if (partial.length > 0) {
         console.log(
           `\n    📝 Partially translated (${partial.length} files — some nodes missing from cache):`,
@@ -475,7 +551,6 @@ function printUntranslatedReport(results: UntranslatedResult[]) {
         }
       }
 
-      // Suggestions
       console.log('');
       if (assembleOnly.length > 0) {
         console.log(
@@ -497,132 +572,6 @@ function printUntranslatedReport(results: UntranslatedResult[]) {
   console.log('');
   console.log(
     '═══════════════════════════════════════════════════════════════════════════════════',
-  );
-  console.log('');
-}
-
-// ── Pretty Print ──
-
-function pct(n: number, total: number): string {
-  if (total === 0) return '  -  ';
-  const p = (n / total) * 100;
-  return `${p.toFixed(1)}%`.padStart(6);
-}
-
-function bar(n: number, total: number, width = 20): string {
-  if (total === 0) return '░'.repeat(width);
-  const filled = Math.round((n / total) * width);
-  return '█'.repeat(filled) + '░'.repeat(width - filled);
-}
-
-function printReport(allStats: VersionStats[]) {
-  console.log('');
-  console.log(
-    '═══════════════════════════════════════════════════════════════════════════════════════════════',
-  );
-  console.log('  Translation Status Report');
-  console.log(
-    '═══════════════════════════════════════════════════════════════════════════════════════════════',
-  );
-
-  for (const vs of allStats) {
-    console.log('');
-    console.log(
-      `  📦 ${vs.version.toUpperCase()} (${vs.contentDir}) — ${vs.enFileCount} EN files`,
-    );
-    console.log(
-      '  ─────────────────────────────────────────────────────────────────────────────────────────',
-    );
-
-    // Header
-    const sections = new Set<string>();
-    for (const ls of Object.values(vs.langs)) {
-      for (const s of Object.keys(ls.sections)) sections.add(s);
-    }
-    const sectionList = ['docs', 'blog', 'learn'].filter((s) =>
-      sections.has(s),
-    );
-
-    // Table header
-    const langCol = 'Lang'.padEnd(10);
-    const sectionCols = sectionList.map((s) => s.padStart(18)).join('');
-    const totalCol = 'Total'.padStart(18);
-    const nodesCol = 'Nodes'.padStart(18);
-    console.log(`  ${langCol}${sectionCols}${totalCol}${nodesCol}`);
-    console.log(
-      `  ${'─'.repeat(10)}${sectionList.map(() => '─'.repeat(18)).join('')}${'─'.repeat(18)}${'─'.repeat(18)}`,
-    );
-
-    // Sort langs: zh-hans, zh-hant first, then alphabetical
-    const sortedLangs = Object.keys(vs.langs).sort((a, b) => {
-      const order = ['zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
-      return order.indexOf(a) - order.indexOf(b);
-    });
-
-    for (const lang of sortedLangs) {
-      const ls = vs.langs[lang];
-      const cols: string[] = [];
-
-      cols.push(lang.padEnd(10));
-
-      for (const section of sectionList) {
-        const sec = ls.sections[section];
-        if (sec) {
-          const p = pct(sec.translatedFiles, sec.totalFiles);
-          cols.push(
-            `${sec.translatedFiles}/${sec.totalFiles} ${p}`.padStart(18),
-          );
-        } else {
-          cols.push('-'.padStart(18));
-        }
-      }
-
-      // Total files
-      const totalP = pct(ls.translatedFiles, ls.totalFiles);
-      cols.push(
-        `${ls.translatedFiles}/${ls.totalFiles} ${totalP}`.padStart(18),
-      );
-
-      // Node-level coverage
-      const nodeP = pct(ls.cachedNodes, ls.totalNodes);
-      cols.push(`${ls.cachedNodes}/${ls.totalNodes} ${nodeP}`.padStart(18));
-
-      console.log(`  ${cols.join('')}`);
-    }
-
-    // Progress bars
-    console.log('');
-    for (const lang of sortedLangs) {
-      const ls = vs.langs[lang];
-      const nodeP =
-        ls.totalNodes > 0 ? (ls.cachedNodes / ls.totalNodes) * 100 : 0;
-      console.log(
-        `  ${lang.padEnd(10)} ${bar(ls.cachedNodes, ls.totalNodes, 30)} ${nodeP.toFixed(1)}%`,
-      );
-    }
-  }
-
-  // Summary
-  console.log('');
-  console.log(
-    '═══════════════════════════════════════════════════════════════════════════════════════════════',
-  );
-  console.log('  Cache sizes:');
-  const cacheDir = join(ROOT, '.cache');
-  if (existsSync(cacheDir)) {
-    for (const f of readdirSync(cacheDir)
-      .filter((f) => f.endsWith('.jsonl'))
-      .sort()) {
-      const lines = readFileSync(join(cacheDir, f), 'utf8')
-        .split('\n')
-        .filter((l) => l.trim()).length;
-      console.log(
-        `    ${f.padEnd(20)} ${lines.toLocaleString().padStart(8)} entries`,
-      );
-    }
-  }
-  console.log(
-    '═══════════════════════════════════════════════════════════════════════════════════════════════',
   );
   console.log('');
 }
