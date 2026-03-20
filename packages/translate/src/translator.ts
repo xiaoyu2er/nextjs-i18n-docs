@@ -812,6 +812,29 @@ async function translateJsonChunk(
         }
       }
 
+      // Detect garbage: if most values are identical, model is broken
+      const values = Object.values(parsed);
+      if (values.length > 3) {
+        const freq = new Map<string, number>();
+        for (const v of values) freq.set(v, (freq.get(v) ?? 0) + 1);
+        const maxFreq = Math.max(...freq.values());
+        if (maxFreq > values.length * 0.5) {
+          const dupVal = [...freq.entries()].find(
+            ([, c]) => c === maxFreq,
+          )?.[0];
+          const msg = `Model returned identical value for ${maxFreq}/${values.length} keys: "${dupVal?.substring(0, 60)}..."`;
+          log(`🗑️ ${msg}`);
+
+          // Mark model as dead if rotating
+          if (opts.modelRotate?.length) {
+            deadModels.add(model);
+            log(`💀 Model ${model} produces garbage, skipping`);
+            continue;
+          }
+          throw new Error(msg);
+        }
+      }
+
       // Filter to only requested keys
       const translations: Record<string, string> = {};
       for (const md5 of requestedMd5s) {

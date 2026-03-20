@@ -82,7 +82,7 @@ if (jsonOut) {
 
 if (rotateCmd) {
   const ids = models.map((m) => m.id).join(',');
-  console.log(`--model-rotate "${ids}"`);
+  console.log(`--model-rotate ${ids}`);
   process.exit(0);
 }
 
