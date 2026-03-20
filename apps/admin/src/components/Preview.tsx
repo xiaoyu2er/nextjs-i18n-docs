@@ -24,7 +24,22 @@ function parseContent(content: string, prefix: string) {
   const headings: Heading[] = [];
   const rendered: ParsedLine[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
+  // Skip YAML frontmatter
+  let start = 0;
+  if (lines[0]?.trim() === '---') {
+    for (let j = 1; j < lines.length; j++) {
+      if (lines[j].trim() === '---') {
+        start = j + 1;
+        break;
+      }
+    }
+  }
+  // Add frontmatter lines as-is
+  for (let i = 0; i < start; i++) {
+    rendered.push({ html: escapeHtml(lines[i]), isHeading: false });
+  }
+
+  for (let i = start; i < lines.length; i++) {
     const line = lines[i];
     const nextLine = lines[i + 1];
 
