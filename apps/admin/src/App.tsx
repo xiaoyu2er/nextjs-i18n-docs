@@ -115,16 +115,7 @@ export function App() {
                 {showFiles ? '◀ Hide files' : '▶ Show files'}
               </button>
               {previewFile && (
-                <>
-                  <span className="file-panel-current">{previewFile}</span>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => setPreviewFile(null)}
-                  >
-                    ✕ Close
-                  </button>
-                </>
+                <span className="file-panel-current">{previewFile}</span>
               )}
             </div>
             <div
@@ -144,7 +135,12 @@ export function App() {
                 />
               )}
               {previewFile && (
-                <Preview version={version} lang={lang} file={previewFile} />
+                <Preview
+                  version={version}
+                  lang={lang}
+                  file={previewFile}
+                  onClose={() => setPreviewFile(null)}
+                />
               )}
             </div>
           </>

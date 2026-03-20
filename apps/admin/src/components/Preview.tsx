@@ -75,9 +75,10 @@ interface Props {
   version: string;
   lang: string;
   file: string;
+  onClose?: () => void;
 }
 
-export function Preview({ version, lang, file }: Props) {
+export function Preview({ version, lang, file, onClose }: Props) {
   const enRef = useRef<HTMLPreElement>(null);
   const transRef = useRef<HTMLPreElement>(null);
   const syncing = useRef(false);
@@ -167,6 +168,16 @@ export function Preview({ version, lang, file }: Props) {
       {/* Header */}
       <div className="preview-hdr">
         <span className="preview-filename">{file}</span>
+        {onClose && (
+          <button
+            type="button"
+            className="preview-close"
+            onClick={onClose}
+            title="Close preview"
+          >
+            ✕
+          </button>
+        )}
         {!isEn && (
           <div className="preview-toggle">
             <button
