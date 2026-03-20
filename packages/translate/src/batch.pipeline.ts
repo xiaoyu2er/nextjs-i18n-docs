@@ -38,7 +38,7 @@ import {
 } from './assembler';
 import { executeInBatches } from './batch';
 import { TranslationCache } from './cache';
-import { validateMdx } from './mdx-validator';
+import { validateMdx, validateMdxCompile } from './mdx-validator';
 import { parseMdx } from './parser';
 import {
   rebuildFrontmatter,
@@ -450,12 +450,21 @@ async function translateFile(
   fs.writeFileSync(finalPath, finalContent, 'utf8');
 
   const mdxResult = validateMdx(finalContent);
+  const mdxErrors = mdxResult.errors.map((e) => e.message);
+
+  // Deep MDX compile check — catches JSX errors Astro would report
+  const compileErrors = await validateMdxCompile(finalContent);
+  if (compileErrors && compileErrors.length > 0) {
+    for (const e of compileErrors) {
+      mdxErrors.push(`MDX: ${e.message}`);
+    }
+  }
 
   return {
     status: 'translated',
     newTranslations,
     diffs: jsonResult.missing.length,
-    mdxErrors: mdxResult.errors.map((e) => e.message),
+    mdxErrors,
   };
 }
 
