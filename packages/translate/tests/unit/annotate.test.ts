@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { annotate } from '../../src/annotate';
 import { TranslationCache } from '../../src/cache';
@@ -29,7 +32,9 @@ describe('annotate', () => {
     const translated = '## 标题\n\n额外段落。\n\n一个段落。';
 
     // Build cache so "## 标题" is a known translation of "## Heading"
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'annotate-test-')),
+    );
     const enNodes = parseMdx(source).filter((n) => n.needsTranslation);
     // biome-ignore lint/style/noNonNullAssertion: test code, md5 is guaranteed for heading
     const headingMd5 = enNodes[0].md5!;

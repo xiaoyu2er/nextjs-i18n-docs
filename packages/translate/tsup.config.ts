@@ -9,6 +9,7 @@ export default defineConfig({
   minify: false,
   external: [
     'openai',
+    'better-sqlite3',
     'node:fs',
     'node:fs/promises',
     'node:path',

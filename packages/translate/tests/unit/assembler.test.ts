@@ -1,10 +1,15 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { assemble } from '../../src/assembler';
 import { TranslationCache } from '../../src/cache';
 
 describe('assemble', () => {
   function makeCache(entries: Record<string, string>): TranslationCache {
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'assembler-test-')),
+    );
     for (const [md5, text] of Object.entries(entries)) {
       cache.set('zh-hans', md5, text);
     }

@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TranslationCache } from '../../src/cache';
 import { parseMdx } from '../../src/parser';
@@ -7,7 +10,9 @@ describe('validate', () => {
   it('should update cache with new translations', () => {
     const sourceContent = '## Heading\n\nA paragraph.';
     const llmOutput = '## 标题\n\n一个段落。';
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'validator-test-')),
+    );
 
     const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
     expect(result.newTranslations).toBe(2); // heading + paragraph
@@ -24,7 +29,9 @@ describe('validate', () => {
   it('should detect diffs when LLM modifies cached content', () => {
     const sourceContent = '## Heading\n\nA paragraph.';
     const llmOutput = '## 标题\n\n被修改的段落。';
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'validator-test-')),
+    );
 
     // Pre-populate cache for paragraph
     const sourceNodes = parseMdx(sourceContent);
@@ -40,7 +47,9 @@ describe('validate', () => {
   it('should return corrected content using cache for diffs', () => {
     const sourceContent = '## Heading\n\nA paragraph.';
     const llmOutput = '## 标题\n\n被修改的段落。';
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'validator-test-')),
+    );
 
     const sourceNodes = parseMdx(sourceContent);
     const paraNode = sourceNodes.find((n) => n.type === 'paragraph');
@@ -54,7 +63,9 @@ describe('validate', () => {
   it('should detect no diffs when LLM output matches cached content', () => {
     const sourceContent = '## Heading\n\nA paragraph.';
     const llmOutput = '## 标题\n\n一个段落。';
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'validator-test-')),
+    );
 
     // Pre-populate cache with exact LLM output
     const sourceNodes = parseMdx(sourceContent);
@@ -80,7 +91,9 @@ describe('validate', () => {
     const sourceContent = '## Heading\n\nParagraph one.\n\nParagraph two.';
     // LLM merged two paragraphs into one (2 translatable vs 3 source)
     const llmOutput = '## 标题\n\n段落一和段落二合并了。';
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'validator-test-')),
+    );
 
     // Pre-populate heading cache as anchor
     const sourceNodes = parseMdx(sourceContent);
@@ -102,7 +115,9 @@ describe('validate', () => {
     // (added an extra paragraph)
     const llmOutput =
       '## 第一\n\n段落一。\n\n额外段落。\n\n## 第二\n\n段落二。';
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'validator-test-')),
+    );
 
     const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
 
@@ -115,7 +130,9 @@ describe('validate', () => {
     // Source: 3 nodes. Output: 2 nodes (last one dropped)
     const sourceContent = '## Title\n\nParagraph.\n\nAnother paragraph.';
     const llmOutput = '## 标题\n\n段落。';
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'validator-test-')),
+    );
 
     const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
     // First two should still be cached
@@ -125,7 +142,9 @@ describe('validate', () => {
   it('should handle code blocks as pass-through', () => {
     const sourceContent = '```js\ncode\n```\n\n<AppOnly>\n\nText\n\n</AppOnly>';
     const llmOutput = '```js\ncode\n```\n\n<AppOnly>\n\n文本\n\n</AppOnly>';
-    const cache = new TranslationCache('/tmp/unused');
+    const cache = new TranslationCache(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'validator-test-')),
+    );
 
     const result = validate(sourceContent, llmOutput, 'zh-hans', cache);
     expect(result.correctedContent).toContain('```js\ncode\n```');
