@@ -534,6 +534,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
     // Initialize UI and file logger
     const logDir = path.join(opts.outputDir, '.logs');
     const fileLogger = new FileLogger(logDir, lang);
+    console.log(`   Logs: ${fileLogger.getLogDir()}\n`);
     const ui = new TableUI({
       lang,
       totalFiles: files.length,
