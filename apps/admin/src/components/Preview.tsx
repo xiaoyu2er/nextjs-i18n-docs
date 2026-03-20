@@ -26,11 +26,22 @@ function parseContent(content: string, prefix: string) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const nextLine = lines[i + 1];
+
+    // ATX heading: ## Text or ## Text[](#anchor)
     const m = line.match(/^(#{1,6})\s+(.+)/);
-    if (m) {
-      const level = m[1].length;
-      const text = m[2]
-        .replace(/\[.*?\]\(.*?\)/g, '')
+    // Setext heading: text followed by === or ---
+    const setext =
+      !m && nextLine && /^[=-]{2,}\s*$/.test(nextLine) && line.trim().length > 0
+        ? line
+        : null;
+
+    if (m || setext) {
+      const level = m ? m[1].length : nextLine.startsWith('=') ? 1 : 2;
+      const raw = m ? m[2] : setext!;
+      const text = raw
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // [text](url) → text
+        .replace(/\[]\(#[^)]*\)/g, '') // [](#anchor) → ''
         .replace(/[`*[\]]/g, '')
         .trim();
       const id = `${prefix}-h-${i}`;
