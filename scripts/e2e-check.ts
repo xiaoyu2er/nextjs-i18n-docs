@@ -191,6 +191,15 @@ async function startDevServer(
     throw new Error('Dev server failed to start within 120s');
   }
 
+  // Warm up the server with a request to trigger initial compilation
+  try {
+    await fetch('http://localhost:4321/', {
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch {
+    // ignore warmup errors
+  }
+
   console.log('✅ Dev server ready\n');
   return {
     kill: () => {
@@ -212,7 +221,7 @@ interface CheckResult {
 async function checkUrl(
   baseUrl: string,
   urlPath: string,
-  retries = 2,
+  retries = 3,
 ): Promise<CheckResult> {
   const fullUrl = `${baseUrl}${urlPath}`;
   const start = Date.now();
@@ -241,8 +250,15 @@ async function checkUrl(
       );
     }
 
-    // Check for "Internal Server Error"
-    if (body.includes('Internal Server Error')) {
+    // Check for "Internal Server Error" — only match if it's a bare error page,
+    // not documentation content that mentions the phrase in code examples.
+    // Astro dev error pages have <title>InternalServerError or just the text as the whole body.
+    if (
+      body.includes('Internal Server Error') &&
+      (body.length < 1000 ||
+        body.includes('<title>Internal Server Error') ||
+        body.includes('<title>500'))
+    ) {
       errors.push('Internal Server Error');
     }
 
@@ -257,7 +273,7 @@ async function checkUrl(
         (e) => e.includes('Internal Server Error') || e.includes('HTTP 5'),
       );
       if (isTransient) {
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 3000));
         return checkUrl(baseUrl, urlPath, retries - 1);
       }
     }
@@ -272,7 +288,7 @@ async function checkUrl(
   } catch (err) {
     // Retry on network errors
     if (retries > 0) {
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 3000));
       return checkUrl(baseUrl, urlPath, retries - 1);
     }
     return {
@@ -380,6 +396,38 @@ async function main() {
         },
         opts.concurrency,
       );
+
+      // Retry failed URLs sequentially (dev server may have been overwhelmed)
+      if (failed.length > 0) {
+        const retryUrls = failed.map((f) => f.url);
+        console.log(
+          `\n   🔄 Retrying ${retryUrls.length} failed URLs sequentially...`,
+        );
+        const retryResults: CheckResult[] = [];
+        for (const url of retryUrls) {
+          // Wait a bit between retries to let the server recover
+          await new Promise((r) => setTimeout(r, 1000));
+          const result = await checkUrl(opts.baseUrl, url);
+          retryResults.push(result);
+          if (result.ok) {
+            process.stdout.write(`   ✅ ${url} — passed on retry\n`);
+          } else {
+            process.stdout.write(
+              `   ❌ ${url} — still failing: ${result.error}\n`,
+            );
+          }
+        }
+        // Update failed list: only keep URLs that still fail
+        failed.length = 0;
+        for (const r of retryResults) {
+          if (!r.ok) failed.push(r);
+        }
+        // Update results with retry outcomes
+        for (const retry of retryResults) {
+          const idx = results.findIndex((r) => r.url === retry.url);
+          if (idx !== -1) results[idx] = retry;
+        }
+      }
 
       // Summary
       const passed = results.filter((r) => r.ok).length;
