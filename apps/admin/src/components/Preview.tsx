@@ -151,67 +151,96 @@ export function Preview({
   const showTrans = !isEn && (mode === 'split' || mode === 'lang');
   const isSingle = !showEn || !showTrans;
 
-  function scrollToBoth(enId: string, idx: number) {
-    if (showEn) {
-      const enEl = document.getElementById(enId);
-      if (enEl) enEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  function scrollToHeading(idx: number) {
+    if (showEn && en.headings[idx]) {
+      const el = document.getElementById(en.headings[idx].id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     if (showTrans && trans.headings[idx]) {
-      const trEl = document.getElementById(trans.headings[idx].id);
-      if (trEl) trEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const el = document.getElementById(trans.headings[idx].id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
-  const tocHeadings = showEn ? en.headings : trans.headings;
+  const tocHeadings = en.headings.length > 0 ? en.headings : trans.headings;
 
   return (
-    <div className="preview-wrap">
-      {/* Header */}
-      <div className="preview-hdr">
-        <span className="preview-filename">{file}</span>
-        {onClose && (
-          <button
-            type="button"
-            className="preview-close"
-            onClick={onClose}
-            title="Close preview"
-          >
-            ✕
-          </button>
-        )}
-        {!isEn && (
-          <div className="preview-toggle">
+    <div className="preview-outer">
+      <div className="preview-wrap">
+        {/* Header */}
+        <div className="preview-hdr">
+          <span className="preview-filename">{file}</span>
+          {onClose && (
             <button
               type="button"
-              className={mode === 'split' ? 'active' : ''}
-              onClick={() => onViewMode('split')}
-              title="Side by side"
+              className="preview-close"
+              onClick={onClose}
+              title="Close preview"
             >
-              ◫
+              ✕
             </button>
-            <button
-              type="button"
-              className={mode === 'en' ? 'active' : ''}
-              onClick={() => onViewMode('en')}
-              title="EN only"
-            >
-              {FLAGS.en}
-            </button>
-            <button
-              type="button"
-              className={mode === 'lang' ? 'active' : ''}
-              onClick={() => onViewMode('lang')}
-              title={`${lang} only`}
-            >
-              {FLAGS[lang]}
-            </button>
-          </div>
-        )}
+          )}
+          {!isEn && (
+            <div className="preview-toggle">
+              <button
+                type="button"
+                className={mode === 'split' ? 'active' : ''}
+                onClick={() => onViewMode('split')}
+                title="Side by side"
+              >
+                ◫
+              </button>
+              <button
+                type="button"
+                className={mode === 'en' ? 'active' : ''}
+                onClick={() => onViewMode('en')}
+                title="EN only"
+              >
+                {FLAGS.en}
+              </button>
+              <button
+                type="button"
+                className={mode === 'lang' ? 'active' : ''}
+                onClick={() => onViewMode('lang')}
+                title={`${lang} only`}
+              >
+                {FLAGS[lang]}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Content panels */}
+        <div className={`preview-split${isSingle ? ' single' : ''}`}>
+          {showEn && (
+            <div className="preview-pane">
+              <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
+              {enData ? (
+                <ContentBody rendered={en.rendered} bodyRef={enRef} />
+              ) : (
+                <div className="preview-body loading">Loading...</div>
+              )}
+            </div>
+          )}
+          {showTrans && (
+            <div className="preview-pane">
+              <div className="preview-pane-hdr">
+                {FLAGS[lang]} {lang}
+              </div>
+              {transData ? (
+                <ContentBody rendered={trans.rendered} bodyRef={transRef} />
+              ) : (
+                <div className="preview-body loading">Loading...</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* TOC */}
+      {/* TOC — absolute right */}
       {tocHeadings.length > 0 && (
         <div className="preview-toc">
+          <div className="preview-toc-title">On this page</div>
           {tocHeadings.map((h, idx) => (
             <a
               key={h.id}
@@ -219,40 +248,14 @@ export function Preview({
               className={`h${h.level}`}
               onClick={(e) => {
                 e.preventDefault();
-                scrollToBoth(h.id, idx);
+                scrollToHeading(idx);
               }}
             >
-              {'#'.repeat(h.level)} {h.text}
+              {h.text}
             </a>
           ))}
         </div>
       )}
-
-      {/* Content panels */}
-      <div className={`preview-split${isSingle ? ' single' : ''}`}>
-        {showEn && (
-          <div className="preview-pane">
-            <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
-            {enData ? (
-              <ContentBody rendered={en.rendered} bodyRef={enRef} />
-            ) : (
-              <div className="preview-body loading">Loading...</div>
-            )}
-          </div>
-        )}
-        {showTrans && (
-          <div className="preview-pane">
-            <div className="preview-pane-hdr">
-              {FLAGS[lang]} {lang}
-            </div>
-            {transData ? (
-              <ContentBody rendered={trans.rendered} bodyRef={transRef} />
-            ) : (
-              <div className="preview-body loading">Loading...</div>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
