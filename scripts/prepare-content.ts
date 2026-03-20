@@ -466,54 +466,62 @@ function processFile(
 
 // ── Generate splash index pages (blog & learn) ──
 
-if (!version) {
-  const CONTENT_ROOT = resolve(import.meta.dirname!, '../content');
+const escapeAttr = (s: string) =>
+  s
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/&apos;/g, "'")
+    .replace(/"/g, '&quot;');
 
-  // Generate blog index from actual blog posts
-  generateBlogIndex(CONTENT_ROOT);
+const cleanMultiline = (s: string) =>
+  s
+    .replace(/^>-?\s*\n\s*/, '')
+    .replace(/\n\s+/g, ' ')
+    .trim();
 
-  // Generate learn index from actual learn directories
-  generateLearnIndex(CONTENT_ROOT);
-
-  console.log('Generated blog & learn index pages');
+interface BlogPost {
+  slug: string;
+  title: string;
+  description: string;
+  date: Date;
+  dateStr: string;
 }
 
-/** Generate blog/index.mdx with cards grouped by year */
-function generateBlogIndex(contentRoot: string) {
-  const blogDir = join(contentRoot, 'en', 'blog');
-  if (!existsSync(blogDir)) return;
+/** Read blog posts from a directory, using fallback for missing fields */
+function readBlogPosts(
+  blogDir: string,
+  fallbackPosts?: Map<string, BlogPost>,
+): BlogPost[] {
+  if (!existsSync(blogDir))
+    return fallbackPosts ? [...fallbackPosts.values()] : [];
 
-  interface BlogPost {
-    slug: string;
-    title: string;
-    description: string;
-    date: Date;
-    dateStr: string;
-  }
   const posts: BlogPost[] = [];
+  const slugs = new Set<string>();
 
   for (const file of readdirSync(blogDir)) {
     if (!file.endsWith('.mdx') || file === 'index.mdx') continue;
+    const slug = file.replace(/\.mdx$/, '');
     const content = readFileSync(join(blogDir, file), 'utf-8');
     const { frontmatter } = parseFrontmatter(content);
-    if (!frontmatter.title || !frontmatter.date) continue;
-    const date = new Date(frontmatter.date.trim());
-    const escapeAttr = (s: string) =>
-      s
-        .replace(/^['"]|['"]$/g, '')
-        .replace(/&apos;/g, "'")
-        .replace(/"/g, '&quot;');
-    const cleanMultiline = (s: string) =>
-      s
-        .replace(/^>-?\s*\n\s*/, '') // strip >- prefix
-        .replace(/\n\s+/g, ' ') // join continuation lines
-        .trim();
+    const fallback = fallbackPosts?.get(slug);
+
+    // Need date from EN (always), title/description from locale or fallback
+    const date = frontmatter.date
+      ? new Date(frontmatter.date.trim())
+      : fallback?.date;
+    if (!date) continue;
+
+    const title = frontmatter.title
+      ? escapeAttr(frontmatter.title)
+      : (fallback?.title ?? slug);
+    const description = frontmatter.description
+      ? escapeAttr(cleanMultiline(frontmatter.description))
+      : (fallback?.description ?? '');
+
+    slugs.add(slug);
     posts.push({
-      slug: file.replace(/\.mdx$/, ''),
-      title: escapeAttr(frontmatter.title),
-      description: frontmatter.description
-        ? escapeAttr(cleanMultiline(frontmatter.description))
-        : '',
+      slug,
+      title,
+      description,
       date,
       dateStr: date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -523,9 +531,18 @@ function generateBlogIndex(contentRoot: string) {
     });
   }
 
-  posts.sort((a, b) => b.date.getTime() - a.date.getTime());
+  // Add any EN posts not present in locale dir
+  if (fallbackPosts) {
+    for (const [slug, post] of fallbackPosts) {
+      if (!slugs.has(slug)) posts.push(post);
+    }
+  }
 
-  // Group by year
+  posts.sort((a, b) => b.date.getTime() - a.date.getTime());
+  return posts;
+}
+
+function buildBlogIndexMdx(posts: BlogPost[]): string {
   const byYear = new Map<number, BlogPost[]>();
   for (const post of posts) {
     const year = post.date.getFullYear();
@@ -567,10 +584,38 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
     mdx += '</CardGrid>\n\n';
   }
 
-  const dstPath = join(CONTENT_DST, 'blog', 'index.mdx');
-  ensureDir(dstPath);
-  writeFileSync(dstPath, mdx);
+  return mdx;
+}
+
+/** Generate blog/index.mdx for EN and all locales */
+function generateBlogIndex(contentRoot: string) {
+  // 1. Read EN posts (canonical list with dates)
+  const enPosts = readBlogPosts(join(contentRoot, 'en', 'blog'));
+  const enPostMap = new Map(enPosts.map((p) => [p.slug, p]));
+
+  // 2. Generate EN blog index
+  const enMdx = buildBlogIndexMdx(enPosts);
+  const enDst = join(CONTENT_DST, 'blog', 'index.mdx');
+  ensureDir(enDst);
+  writeFileSync(enDst, enMdx);
   totalFiles++;
+
+  // 3. Generate locale-specific blog indexes
+  const locales = readdirSync(contentRoot).filter(
+    (d) => d !== 'en' && existsSync(join(contentRoot, d, 'blog')),
+  );
+
+  for (const locale of locales) {
+    const localePosts = readBlogPosts(
+      join(contentRoot, locale, 'blog'),
+      enPostMap,
+    );
+    const localeMdx = buildBlogIndexMdx(localePosts);
+    const localeDst = join(CONTENT_DST, locale, 'blog', 'index.mdx');
+    ensureDir(localeDst);
+    writeFileSync(localeDst, localeMdx);
+    totalFiles++;
+  }
 }
 
 /** Generate learn/index.mdx with cards for each course */
@@ -643,6 +688,18 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
   ensureDir(dstPath);
   writeFileSync(dstPath, mdx);
   totalFiles++;
+}
+
+if (!version) {
+  const CONTENT_ROOT = resolve(import.meta.dirname!, '../content');
+
+  // Generate blog index from actual blog posts
+  generateBlogIndex(CONTENT_ROOT);
+
+  // Generate learn index from actual learn directories
+  generateLearnIndex(CONTENT_ROOT);
+
+  console.log('Generated blog & learn index pages');
 }
 
 console.log(`\nTotal: ${totalFiles} files`);
