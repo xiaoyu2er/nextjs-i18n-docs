@@ -634,8 +634,12 @@ async function translateJsonChunk(
 
   // Log request details
   log(`🔧 model=${model} keys=${requestedMd5s.length} max_tokens=${maxTokens}`);
-  log(`📤 system prompt (${systemPrompt.length} chars)`);
-  log(`📤 user message (${userMessage.length} chars)`);
+  log(
+    `📤 SYSTEM PROMPT (${systemPrompt.length} chars):\n${systemPrompt}\n--- END SYSTEM PROMPT ---`,
+  );
+  log(
+    `📤 USER MESSAGE (${userMessage.length} chars):\n${userMessage}\n--- END USER MESSAGE ---`,
+  );
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -680,6 +684,11 @@ async function translateJsonChunk(
             ? ` | tokens: in=${usage.prompt_tokens} out=${usage.completion_tokens} total=${usage.total_tokens}`
             : ''),
       );
+      if (choice?.message?.content) {
+        log(
+          `📥 RESPONSE BODY:\n${choice.message.content}\n--- END RESPONSE BODY ---`,
+        );
+      }
 
       if (!choice?.message?.content) {
         throw new Error('Empty response from API');
