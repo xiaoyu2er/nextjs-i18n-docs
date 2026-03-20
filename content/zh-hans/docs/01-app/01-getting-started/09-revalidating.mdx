@@ -1,0 +1,194 @@
+---
+title: 重新验证 (Revalidating)
+description: 了解如何使用基于时间和按需策略重新验证缓存数据。
+related:
+  title: API 参考
+  description: 了解更多关于本页面提及的 API。
+  links:
+    - app/api-reference/functions/cacheLife
+    - app/api-reference/functions/cacheTag
+    - app/api-reference/functions/revalidateTag
+    - app/api-reference/functions/updateTag
+    - app/api-reference/functions/revalidatePath
+---
+
+> 本页面介绍使用 [缓存组件 (Cache Components)](/docs/app/api-reference/config/next-config-js/cacheComponents) 进行重新验证，这需要在 `next.config.ts` 文件中设置 [`cacheComponents: true`](/docs/app/api-reference/config/next-config-js/cacheComponents) 来启用。如果您不使用缓存组件，请参阅 [缓存与重新验证（旧版模型）](/docs/app/guides/caching-without-cache-components) 指南。
+
+重新验证 (Revalidation) 是更新缓存数据的过程。它允许您继续提供快速的缓存响应，同时确保内容保持新鲜。有两种策略：
+
+- **基于时间的重新验证**：使用 [`cacheLife`](#cachelife) 在设定的持续时间后自动刷新缓存数据。
+- **按需重新验证**：在数据变更后，使用 [`revalidateTag`](#revalidatetag)、[`updateTag`](#updatetag) 或 [`revalidatePath`](#revalidatepath) 手动使缓存数据失效。
+
+## `cacheLife`
+
+[`cacheLife`](/docs/app/api-reference/functions/cacheLife) 控制缓存数据保持有效的时长。在 [`use cache`](/docs/app/api-reference/directives/use-cache) 作用域内使用它来设置缓存的生命周期。
+
+```tsx filename="app/lib/data.ts" highlight={1,4,5}
+import { cacheLife } from 'next/cache'
+
+export async function getProducts() {
+  'use cache'
+  cacheLife('hours')
+  return db.query('SELECT * FROM products')
+}
+```
+
+`cacheLife` 接受一个预设名称或自定义配置对象：
+
+| 预设     | `stale` | `revalidate` | `expire`    |
+| -------- | ------- | ------------ | ----------- |
+| `seconds`| 0       | 1s           | 60s         |
+| `minutes`| 5m      | 1m           | 1h          |
+| `hours`  | 5m      | 1h           | 1d          |
+| `days`   | 5m      | 1d           | 1w          |
+| `weeks`  | 5m      | 1w           | 30d         |
+| `max`    | 5m      | 30d          | ~indefinite |
+
+如需更精细的控制，请传递一个对象：
+
+```tsx highlight={2-6}
+'use cache'
+cacheLife({
+  stale: 3600, // 1 hour until considered stale
+  revalidate: 7200, // 2 hours until revalidated
+  expire: 86400, // 1 day until expired
+})
+```
+
+> **请注意**：当缓存使用 `seconds` 预设、`revalidate: 0` 或 `expire` 少于 5 分钟时，它被认为是“短生命周期”的。短生命周期缓存会自动从预渲染 (prerender) 中排除，并变为动态部分 (dynamic holes)。详情请参阅 [预渲染行为](/docs/app/api-reference/functions/cacheLife#prerendering-behavior)。
+
+有关所有预设和自定义配置选项，请参阅 [`cacheLife` API 参考](/docs/app/api-reference/functions/cacheLife)。
+
+## `cacheTag`
+
+[`cacheTag`](/docs/app/api-reference/functions/cacheTag) 允许您给缓存数据添加标签，以便能够按需使其失效。在 [`use cache`](/docs/app/api-reference/directives/use-cache) 作用域内使用它：
+
+```tsx filename="app/lib/data.ts" switcher
+import { cacheTag } from 'next/cache'
+
+export async function getProducts() {
+  'use cache'
+  cacheTag('products')
+  return db.query('SELECT * FROM products')
+}
+```
+
+```jsx filename="app/lib/data.js" switcher
+import { cacheTag } from 'next/cache'
+
+export async function getProducts() {
+  'use cache'
+  cacheTag('products')
+  return db.query('SELECT * FROM products')
+}
+```
+
+一旦添加了标签，就可以使用 [`revalidateTag`](#revalidatetag) 或 [`updateTag`](#updatetag) 来使缓存失效。
+
+请参阅 [`cacheTag` API 参考](/docs/app/api-reference/functions/cacheTag) 了解更多。
+
+## `revalidateTag`
+
+`revalidateTag` 使用 stale-while-revalidate 语义按标签使缓存条目失效 —— 立即提供陈旧内容，同时在后台加载新鲜内容。这对于内容更新稍有延迟也可以接受的场景非常理想，例如博客文章或产品目录。
+
+```tsx filename="app/lib/actions.ts" highlight={1,5} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Mutate data
+  revalidateTag('user', 'max') // Recommended: stale-while-revalidate
+}
+```
+
+```jsx filename="app/lib/actions.js" highlight={1,5} switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id) {
+  // Mutate data
+  revalidateTag('user', 'max') // Recommended: stale-while-revalidate
+}
+```
+
+您可以在多个函数中重复使用相同的标签，以便一次性重新验证所有相关的缓存。在 [Server Action](/docs/app/getting-started/mutating-data) 或 [Route Handler](/docs/app/api-reference/file-conventions/route) 中调用 `revalidateTag`。
+
+> **请注意**：第二个参数设置的是在后台生成新鲜内容期间，可以提供陈旧内容的时间长度。一旦过期，后续请求将阻塞直到新鲜内容准备就绪。使用 `'max'` 可以提供最长的陈旧内容窗口期。
+
+查看 [`revalidateTag` API 参考](/docs/app/api-reference/functions/revalidateTag) 以了解更多信息。
+
+## `updateTag`
+
+`updateTag` 立即使用于“读己之写” (read-your-own-writes) 场景 —— 用户立即看到他们的更改，而不是陈旧内容。与 `revalidateTag` 不同，它只能在 [Server Actions](/docs/app/getting-started/mutating-data) 中使用。
+
+```tsx filename="app/lib/actions.ts" highlight={1,6} switcher
+import { updateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData: FormData) {
+  const post = await db.post.create({
+    data: {
+      title: formData.get('title'),
+      content: formData.get('content'),
+    },
+  })
+
+  updateTag('posts')
+  redirect(`/posts/${post.id}`)
+}
+```
+
+```jsx filename="app/lib/actions.js" highlight={1,6} switcher
+import { updateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData) {
+  const post = await db.post.create({
+    data: {
+      title: formData.get('title'),
+      content: formData.get('content'),
+    },
+  })
+
+  updateTag('posts')
+  redirect(`/posts/${post.id}`)
+}
+```
+
+|              | `updateTag`                                   | `revalidateTag`                      |
+| ------------ | --------------------------------------------- | ------------------------------------ |
+| **位置**     | 仅 Server Actions                             | Server Actions 和 Route Handlers     |
+| **行为**     | 立即使缓存过期                                | Stale-while-revalidate               |
+| **用例**     | 读己之写（用户立即看到自己的更改）            | 后台刷新（允许轻微延迟）             |
+
+请参阅 [`updateTag` API 参考](/docs/app/api-reference/functions/updateTag) 了解更多。
+
+## `revalidatePath`
+
+`revalidatePath` 使特定路由路径的所有缓存数据失效。当您想重新验证一个路由但不知道它关联了哪些标签时，请使用它。
+
+```tsx filename="app/lib/actions.ts" highlight={1,5} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Mutate data
+  revalidatePath('/profile')
+}
+```
+
+```jsx filename="app/lib/actions.js" highlight={1,5} switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id) {
+  // Mutate data
+  revalidatePath('/profile')
+}
+```
+
+> **请注意**：尽可能优先使用基于标签的重新验证 (`revalidateTag`/`updateTag`) 而不是基于路径的 —— 它更精确且能避免过度失效。
+
+查看 [`revalidatePath` API 参考](/docs/app/api-reference/functions/revalidatePath) 以了解更多信息。
+
+## 我应该缓存什么？
+
+缓存那些不依赖于[运行时数据](/docs/app/getting-started/caching#working-with-runtime-apis)并且您愿意在一段时间内从缓存提供的数据。使用 `use cache` 配合 `cacheLife` 来描述该行为。
+
+对于具有更新机制的内容管理系统，请使用具有较长缓存持续时间的标签，并依赖 `revalidateTag` 在内容实际更改时刷新它，而不是预先让缓存过期。

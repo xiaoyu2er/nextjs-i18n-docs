@@ -1,0 +1,202 @@
+---
+title: 路由处理程序 (Route Handlers)
+nav_title: 路由处理程序
+description: 了解如何使用路由处理程序
+related:
+  title: API 参考
+  description: 了解更多关于路由处理程序的信息
+  links:
+    - app/api-reference/file-conventions/route
+    - app/guides/backend-for-frontend
+---
+
+## 路由处理器
+
+路由处理程序允许你使用 Web [Request](https://developer.mozilla.org/docs/Web/API/Request) 和 [Response](https://developer.mozilla.org/docs/Web/API/Response) API 为给定路由创建自定义请求处理器。
+
+<Image
+  alt="Route.js 特殊文件"
+  srcLight="/docs/light/route-special-file.png"
+  srcDark="/docs/dark/route-special-file.png"
+  width="1600"
+  height="444"
+/>
+
+> **须知**：路由处理程序仅在 `app` 目录内可用。它们等同于 `pages` 目录中的 [API 路由](/docs/pages/building-your-application/routing/api-routes)，这意味着你 **不需要** 同时使用 API 路由和路由处理程序。
+
+### 约定
+
+路由处理程序在 `app` 目录中的 [`route.js|ts` 文件](/docs/app/api-reference/file-conventions/route)里定义：
+
+```ts filename="app/api/route.ts" switcher
+export async function GET(request: Request) {}
+```
+
+```js filename="app/api/route.js" switcher
+export async function GET(request) {}
+```
+
+路由处理程序可以嵌套在 `app` 目录内的任何位置，类似于 `page.js` 和 `layout.js`。但 **不能** 在与 `page.js` 相同的路由段层级存在 `route.js` 文件。
+
+### 支持的 HTTP 方法
+
+支持以下 [HTTP 方法](https://developer.mozilla.org/docs/Web/HTTP/Methods)：`GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`HEAD` 和 `OPTIONS`。如果调用了不支持的方法，Next.js 将返回 `405 Method Not Allowed` 响应。
+
+### 扩展的 NextRequest 和 NextResponse API
+
+除了支持原生的 [Request](https://developer.mozilla.org/docs/Web/API/Request) 和 [Response](https://developer.mozilla.org/docs/Web/API/Response) API 之外，Next.js 还通过 [`NextRequest`](/docs/app/api-reference/functions/next-request) 和 [`NextResponse`](/docs/app/api-reference/functions/next-response) 对它们进行了扩展，为高级用例提供便捷的辅助功能。
+
+### 缓存
+
+路由处理程序默认不会被缓存。但是，你可以选择为 `GET` 方法启用缓存。其他支持的 HTTP 方法 **不会** 被缓存。要缓存 `GET` 方法，可以在你的路由处理程序文件中使用 [路由配置选项](/docs/app/guides/caching-without-cache-components#dynamic)，例如 `export const dynamic = 'force-static'`。
+
+```ts filename="app/items/route.ts" switcher
+export const dynamic = 'force-static'
+
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+  })
+  const data = await res.json()
+
+  return Response.json({ data })
+}
+```
+
+```js filename="app/items/route.js" switcher
+export const dynamic = 'force-static'
+
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY,
+    },
+  })
+  const data = await res.json()
+
+  return Response.json({ data })
+}
+```
+
+> **须知**：即使其他支持的 HTTP 方法与缓存的 `GET` 方法放在同一个文件中，它们也 **不会** 被缓存。
+
+#### 使用 缓存 组件
+
+当启用 [缓存组件](/docs/app/getting-started/caching) 时，`GET` 路由处理程序遵循与应用程序中普通 UI 路由相同的模型。它们默认在请求时运行，可以在不访问未缓存或运行时数据的情况下进行预渲染，并且你可以使用 `use cache` 将未缓存的数据包含在静态响应中。
+
+**静态示例** - 不访问未缓存或运行时数据，因此将在构建时预渲染：
+
+```tsx filename="app/api/project-info/route.ts"
+export async function GET() {
+  return Response.json({
+    projectName: 'Next.js',
+  })
+}
+```
+
+**动态示例** - 访问非确定性操作。在构建过程中，当调用 `Math.random()` 时预渲染停止，延迟到请求时渲染：
+
+```tsx filename="app/api/random-number/route.ts"
+export async function GET() {
+  return Response.json({
+    randomNumber: Math.random(),
+  })
+}
+```
+
+**运行时数据示例** - 访问特定于请求的数据。当调用 `headers()` 等运行时 API 时，预渲染终止：
+
+```tsx filename="app/api/user-agent/route.ts"
+import { headers } from 'next/headers'
+
+export async function GET() {
+  const headersList = await headers()
+  const userAgent = headersList.get('user-agent')
+
+  return Response.json({ userAgent })
+}
+```
+
+> **须知**：如果 `GET` 处理程序访问网络请求、数据库查询、异步文件系统操作、请求对象属性（如 `req.url`、`request.headers`、`request.cookies`、`request.body`）、[`cookies()`](/docs/app/api-reference/functions/cookies)、[`headers()`](/docs/app/api-reference/functions/headers)、[`connection()`](/docs/app/api-reference/functions/connection) 等运行时 API，或非确定性操作，预渲染会停止。
+
+**缓存示例** - 访问未缓存的数据（数据库查询），但使用 `use cache` 对其进行缓存，使其可以包含在预渲染的响应中：
+
+```tsx filename="app/api/products/route.ts"
+import { cacheLife } from 'next/cache'
+
+export async function GET() {
+  const products = await getProducts()
+  return Response.json(products)
+}
+
+async function getProducts() {
+  'use cache'
+  cacheLife('hours')
+
+  return await db.query('SELECT * FROM products')
+}
+```
+
+> **须知**：`use cache` 不能直接在路由处理程序主体内使用；请将其提取到一个辅助函数中。缓存的响应会根据 `cacheLife` 在新请求到达时重新验证。
+
+### 特殊路由处理器
+
+像 [`sitemap.ts`](/docs/app/api-reference/file-conventions/metadata/sitemap)、[`opengraph-image.tsx`](/docs/app/api-reference/file-conventions/metadata/opengraph-image)、[`icon.tsx`](/docs/app/api-reference/file-conventions/metadata/app-icons) 以及其他 [元数据文件](/docs/app/api-reference/file-conventions/metadata) 这样的特殊路由处理程序，默认情况下是静态的，除非它们使用请求时 API 或动态配置选项。
+
+### 路由解析
+
+你可以将 `route` 视为最低级别的路由原语。
+
+- 它们 **不** 参与布局或客户端导航，不像 `page`。
+- 在与 `page.js` 相同的路由上 **不能** 存在 `route.js` 文件。
+
+| 页面                  | 路由               | 结果                       |
+| --------------------- | ------------------ | -------------------------- |
+| `app/page.js`         | `app/route.js`     | <Cross size={18} /> 冲突   |
+| `app/page.js`         | `app/api/route.js` | <Check size={18} /> 有效   |
+| `app/[user]/page.js`  | `app/api/route.js` | <Check size={18} /> 有效   |
+
+每个 `route.js` 或 `page.js` 文件会接管该路由的所有 HTTP 方法。
+
+```ts filename="app/page.ts" switcher
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+
+// Conflict
+// `app/route.ts`
+export async function POST(request: Request) {}
+```
+
+```js filename="app/page.js" switcher
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+
+// Conflict
+// `app/route.js`
+export async function POST(request) {}
+```
+
+阅读更多关于路由处理程序如何 [补充你的前端应用程序](/docs/app/guides/backend-for-frontend)，或探索路由处理程序的 [API 参考](/docs/app/api-reference/file-conventions/route)。
+
+### 路由上下文明助器
+
+在 TypeScript 中，你可以使用全局可用的 [`RouteContext`](/docs/app/api-reference/file-conventions/route#route-context-helper) 帮助器来为路由处理程序的 `context` 参数添加类型：
+
+```ts filename="app/users/[id]/route.ts" switcher
+import type { NextRequest } from 'next/server'
+
+export async function GET(_req: NextRequest, ctx: RouteContext<'/users/[id]'>) {
+  const { id } = await ctx.params
+  return Response.json({ id })
+}
+```
+
+> **须知**
+>
+> - 类型会在 `next dev`、`next build` 或 `next typegen` 期间生成。

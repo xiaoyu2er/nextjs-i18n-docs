@@ -324,6 +324,14 @@ async function translateFile(
   });
 
   // Update cache with translations (rebuild frontmatter, validate YAML)
+  const requested = Object.keys(uncached).length;
+  const returned = Object.keys(jsonResult.translations).length;
+  const missed = jsonResult.missing.length;
+  if (returned < requested) {
+    console.log(
+      `   📊 LLM returned ${returned}/${requested} keys${missed > 0 ? `, ${missed} missing` : ''}`,
+    );
+  }
   let newTranslations = 0;
   let _badTranslations = 0;
   for (const [md5, translation] of Object.entries(jsonResult.translations)) {
@@ -336,11 +344,18 @@ async function translateFile(
       finalTranslation = rebuildFrontmatter(srcText, translation);
       if (!validateFrontmatter(finalTranslation)) {
         _badTranslations++;
-        console.warn(
-          `   ⚠️ Bad YAML in translation for ${md5.substring(0, 12)}…, skipping cache`,
-        );
+        const preview = finalTranslation.substring(0, 80).replace(/\n/g, '↵');
+        console.warn(`   ⚠️ Bad YAML for ${md5.substring(0, 12)}…: ${preview}`);
         continue;
       }
+    }
+
+    // Sanity check: skip empty translations
+    if (!finalTranslation.trim()) {
+      console.warn(
+        `   ⚠️ Empty translation for ${md5.substring(0, 12)}…, skipping`,
+      );
+      continue;
     }
     cache.set(opts.lang, md5, finalTranslation);
     newTranslations++;

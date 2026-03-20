@@ -1,0 +1,115 @@
+---
+title: '深入 Turbopack: 透過減少構建來打造更快體驗'
+description: >-
+  了解我們如何運用增量計算構建 Turbopack，以擴展開發體驗，並支援龐大的 Next.js 應用程式構建。
+author:
+  - name: Anthony Shew
+    image: /static/team/anthony-shew.jpg
+  - name: Benjamin Woodruff
+    image: /static/team/benjamin-woodruff.jpg
+  - name: Tobias Koppers
+    image: /static/team/sokra.jpg
+date: 2026-01-20T17:00:00.000Z
+image: >-
+  https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/twitter-card.png
+---
+
+編輯。儲存。重新整理。等待… 等待… 等待…
+
+編譯程式碼通常意味著等待，但 [Turbopack](/docs/app/api-reference/turbopack) 利用緩存和增量計算讓迭代循環變快。並非所有現代打包器都採用增量方式，這是有其原因的。增量計算可能會引入顯著複雜度並增加引入錯誤的機會。緩存需要額外的追蹤和數據復製，增加了 CPU 和記憶體開銷。如果應用不當，緩存實際上可能會導致效能變差。
+
+儘管如此，我們仍接受了這些挑戰，因為我們知道增量架構對 Turbopack 的成功至關重要。Turbopack 是 Next.js 的新預設打包器，該框架用於構建 [全球最大的部分網頁應用程式](https://nextjs.org/showcase)。我們需要實現即時構建和快速的逐字互動式 [React Fast Refresh](/docs/architecture/fast-refresh) 體驗，即使對於規模最大且最具挑戰性的工作負載也是如此。此目標的達成，核心在於我們的增量架構。
+
+![顯示「整個應用程式」到「您的更改」所花費時間變更的公式（含 Big O 表示法）。](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/turbopack--light.png)![顯示「整個應用程式」到「您的更改」所花費時間變更的公式（含 Big O 表示法）。](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Fturbopack--dark.png&w=3840&q=75)
+
+沒有緩存的解決方案會隨著應用程式規模增大而變慢。增量計算可以擴展到大規模應用程式，因為它僅取決於小型迭代變更的大小。
+
+Turbopack 的架構是從頭開始構建，並考量了緩存。其增量設計基於超過十年的研究。我們基於在 [webpack](https://webpack.js.org/) 實施緩存時遇到的挑戰的第一手經驗，並從 [Salsa](https://salsa-rs.netlify.app/overview)（驅動 [Rust-Analyzer](https://rust-analyzer.github.io/) 和 [Ruff](https://docs.astral.sh/ruff/) 的技術）、[Parcel](https://parceljs.org/)、[Rust 編譯器的查詢系統](https://rustc-dev-guide.rust-lang.org/query.html)、[Adapton](https://plum-umd.github.io/adapton/) 等許多其他技術中汲取靈感。
+
+Turbopack 透過自動追蹤內部函式的呼叫方式及其所依賴的值，實現細粒度的緩存。當某個部分變更時，我們知道如何以最少的工作量重新計算結果。
+
+背景：手動增量計算 [](#background-manual-incremental-computation)
+----------------------------------------------------------------------------------------
+
+許多構建系統包含明確的依賴圖，這些依賴圖在評估構建規則時必須手動填補。明確宣告你的依賴圖在理論上可以產生最佳結果，但在實際上卻留有錯誤的空間。
+
+指定明確依賴圖的困難意味著通常緩存是以粗略的檔案層級粒度進行的。這種粒度確實有一些好處：較少的增量結果意味著需要緩存的資料較少，如果你磁碟空間或記憶體有限，這可能是值得的。
+
+這種架構的一個範例是 [GNU Make](https://www.gnu.org/software/make/)，其輸出目標和前置條件需手動設定並表示為檔案。像 GNU Make 這樣的系統因粒度粗糙而錯過了緩存機會：它們無法理解且不能緩存編譯器內部的資料結構。
+
+函式層級細粒度自動增量計算 [](#function-level-fine-grained-automatic-incremental-computation)
+-------------------------------------------------------------------------------------------------------------------------------
+
+在 Turbopack 中，輸入檔案與產生的構建產出之間的關係並非直觀。打包器採用全程式分析來消除死代碼（「tree shaking」）並聚集模組圖中的常見依賴。因此，構建產出（在多個應用路由間共享的 JavaScript 檔案）與輸入檔案形成複雜的多對多關係。
+
+Turbopack 使用非常細粒度的緩存架構。因為手動宣告和將依賴加入圖表中容易出錯，Turbopack 需要一個可擴展的自動化解決方案。
+
+### 使用值單元追蹤編譯圖 [](#tracking-the-compilation-graph-with-value-cells)
+
+為了促進自動緩存和依賴追蹤，Turbopack 引入了一個「值單元」的概念 ([`Vc<…>`](https://turbopack-rust-docs.vercel.sh/rustdoc/turbo_tasks/struct.Vc.html))。每個值單元代表一個細粒度的執行部分，就像試算表中的儲存格。讀取儲存格時，它會記錄當前執行的函式及其所有儲存格，視為該儲存格的依賴。這與 [SolidJS](https://docs.solidjs.com/concepts/signals) 等框架中信號的工作方式類似。
+
+![註記宏的範例 Rust 程式碼，以及標記為輸入的參數。這些參數在函式體內被等待。](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/turbopack_value-cells--light.png)![註記宏的範例 Rust 程式碼，以及標記為輸入的參數。這些參數在函式體內被等待。](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Fturbopack_value-cells--dark.png&w=3840&q=75)
+
+當被 await 時，值單元會被追蹤。
+
+Turbopack 只有在讀取儲存格時才將其標記為依賴，這實現了比 [傳統由上而下的記憶化方法](https://en.wikipedia.org/wiki/Memoization) 更細粒度的緩存。例如，參數可能是多個值單元的物件或映射。我們不需要在物件或映射的_任何部分_變更時重新計算追蹤的函式，只有當_它實際讀取的_儲存格發生變更時，才需要重新計算。
+
+值單元代表 Turbopack 內幾乎一切事物，例如磁碟上的檔案、抽象語法樹 (AST)、模組匯入和匯出的元數據，或是用於分塊和打包的聚类信息。
+
+![檔案、抽象語法樹、模組元數據和聚类元數據的插圖。](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/example_value_cells--light.png)![檔案、抽象語法樹、模組元數據和聚类元數據的插圖。](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Fexample_value_cells--dark.png&w=3840&q=75)
+
+可能是儲存在值單元內的資料類型範例。
+
+### 標記髒並傳播變更 [](#marking-dirty-and-propagating-changes)
+
+當 Turbopack 首次執行函式時，它會建立一個函式圖，以及它們建立或依賴的值單元。圖的根節點是請求的輸出（打包的資源），葉節點是原始程式碼檔案。中間有中間表示形式，例如 AST、元數據、部分轉化的模組或分塊資訊。
+
+當檔案系統監聽器發現變化的原始程式碼時，它會将所有讀取該檔案值單元的函式標記為「髒」，並將其排入重新計算佇列。
+
+讀取該檔案的髒函式可能會解析或轉化 JavaScript 模組，並產生新的中間表示形式。重新計算該函式會更新包含變更中間表示形式的儲存格，這可能會標記更多函式為髒。如果儲存格內容相等，則跳過儲存格更新。這種傳播會沿著圖向上冒泡，直到所有受影響的函式都已重新計算完畢。
+
+作為額外優化，執行是「按需驅動」的，意味著系統會延遲髒函式的重新執行，直到它們成為「活躍查詢」的一部分。在開發環境中，活躍查詢可以是啟用熱裝載的當前開啟網頁。在構建中，這是請求完整的生產應用程式。
+
+![三個呼叫樹代表原始（冷）執行，檔案變更時的「標記髒」操作，以及從葉節點向上傳播到根節點。](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/example_value_cell_operations--light.png)![三個呼叫樹代表原始（冷）執行，檔案變更時的「標記髒」操作，以及從葉節點向上傳播到根節點。](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Fexample_value_cell_operations--dark.png&w=3840&q=75)
+
+這些範例呼叫樹代表原始（冷）執行，檔案變更時的「標記髒」操作，以及從葉節點向上傳播到根節點。
+
+### 聚合圖 [](#aggregation-graphs)
+
+雖然大多數操作（如髒傳播演算法）僅需要圖中相鄰邊和相鄰節點的信息，但某些操作需要查詢依賴圖更大部分的資訊：
+
+*   當子圖成為新活躍查詢的一部分時，找到所有髒節點，以便我們可以安排重新計算。
+*   收集子圖的錯誤、警告或程式碼規範問題。
+*   等待子圖的計算完成。
+
+因為我們維持一個細粒度的緩存，圖可能包含數十萬甚至數百萬個中間結果。遍歷該圖的大部分將昂貴。
+
+為了使這些查詢更高效，Turbopack 在依賴圖之上使用額外的資料結構，稱為「聚合圖」。
+
+當我們建立或更新依賴圖時，我们在聚合圖中維護平行節點，這些節點總結了依賴圖的部分內容。一些頻繁訪問的資訊，如產生的錯誤或警告，會附加在聚合節點上。
+
+此聚合圖具有多層解析，較高層級的聚合節點引用更多函式，降低解析度，並減少收集資訊時必須遍歷的節點數量。
+
+每個潛在的活躍查詢（例如應用程式入口點或路由）代表聚合圖中的一個根節點。在最終的聚合圖層級中，每個根源代表其本身以及原始依賴圖中所有子節點的信息。向依賴圖添加根源可能需要重新組織聚合圖，但這是不常操作的。
+
+![聚合圖包含多層範例。](https://h8DxKfmAPhn8O0p3.public.blob.vercel-storage.com/static/blog/turbopack-incremental-computation/aggregation_layers--light.png)![聚合圖包含多層範例。](/_next/image?url=https%3A%2F%2Fh8DxKfmAPhn8O0p3.public.blob.vercel-storage.com%2Fstatic%2Fblog%2Fturbopack-incremental-computation%2Faggregation_layers--dark.png&w=3840&q=75)
+
+聚合層捕捉的細節比原始依賴圖少，但遍歷速度更快。在最終層級，聚合根源節點包含原始圖中的所有子節點。
+
+檔案系統緩存 [](#file-system-caching)
+-------------------------------------------
+
+直到我們最近的 [Next.js 16.1](/blog/next-16-1) 發布為止，所有這些緩存都僅儲存在記憶體中。
+
+在這次的更新發布中，我們將 `next dev` 的檔案系統緩存作為穩定版並預設開啟推出。此緩存允許我們將依賴圖、聚合圖以及儲存在值單元中的所有中間結果持久化到磁碟。當 `next dev` 重新啟動時，它可以快速從這個暖緩存恢復。
+
+檔案系統緩存帶來了本身的挑戰，我們花了超過一年的專職工作來達到我們自己的高效能和品質標準。我們將在即將發布的工程部落格貼文中詳細探討。
+
+反饋與社區
+-----------
+
+分享您的反饋並幫助塑造 Next.js 的未來：
+
+*   [GitHub 討論](https://github.com/vercel/next.js/discussions)
+*   [GitHub Issues](https://github.com/vercel/next.js/issues)
+*   [Discord 社區](https://nextjs.org/discord)
