@@ -87,7 +87,7 @@ export function App() {
 
   const setView = useCallback(
     (m: ViewMode) => {
-      setParams({ view: m === 'split' ? null : m });
+      setParams({ view: m === 'lang' ? null : m });
       bump();
     },
     [bump],
