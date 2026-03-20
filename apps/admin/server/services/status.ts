@@ -47,8 +47,6 @@ function walkMdx(dir: string): string[] {
 /** Ensure source_files are populated for a version */
 export function ensureScanned(version: string): void {
   const cache = getCache();
-  if (cache.sourceCount(version) > 0) return;
-
   const vDef = VERSIONS.find((v) => v.version === version);
   if (!vDef) return;
 
@@ -56,6 +54,13 @@ export function ensureScanned(version: string): void {
   if (!existsSync(enDir)) return;
 
   const files = walkMdx(enDir);
+
+  // Check if scan is needed: source_files count should roughly match EN file count
+  // (each file has multiple nodes, so sourceCount >> fileCount, but 0 or way too low means stale)
+  const currentCount = cache.sourceCount(version);
+  if (currentCount >= files.length) return; // already scanned
+
+  console.log(`  Scanning ${version}: ${files.length} EN files...`);
   cache.clearSources('', version);
 
   for (const file of files) {

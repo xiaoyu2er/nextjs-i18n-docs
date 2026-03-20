@@ -443,23 +443,8 @@ export class TranslationCache {
         const entry = JSON.parse(trimmed);
         this.stmts.setTranslation.run(lang, entry.k, entry.v);
         count++;
-
-        // Import source locations if available
-        const srcs: string[] = entry.src ?? [];
-        for (const src of srcs) {
-          const parts = src.split(':');
-          const lineNum = Number.parseInt(parts.pop() ?? '0', 10);
-          const file = parts.join(':');
-          if (file) {
-            // Store source text as empty placeholder (we don't have it in JSONL)
-            this.db
-              .prepare(
-                "INSERT OR IGNORE INTO sources (key, text, type) VALUES (?, '', 'unknown')",
-              )
-              .run(entry.k);
-            this.stmts.upsertSourceFile.run(entry.k, file, lineNum, 'latest');
-          }
-        }
+        // Note: JSONL `src` fields are NOT imported into source_files.
+        // source_files is populated by scanning EN files (ensureScanned/--scan).
       }
     })();
 

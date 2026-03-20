@@ -154,8 +154,15 @@ function scanVersion(
   return totalNodes;
 }
 
-function needsScan(cache: TranslationCache, version: string): boolean {
-  return cache.sourceCount(version) === 0;
+function needsScan(
+  cache: TranslationCache,
+  version: string,
+  enFileCount: number,
+): boolean {
+  const currentCount = cache.sourceCount(version);
+  // Each file has multiple nodes, so sourceCount >> fileCount.
+  // If sourceCount < fileCount, data is stale/partial.
+  return currentCount < enFileCount;
 }
 
 // ── Main ──
@@ -196,7 +203,8 @@ function main() {
     const enDir = join(ROOT, dir, 'en');
     if (!existsSync(enDir)) continue;
 
-    if (opts.scan || needsScan(cache, version)) {
+    const enFiles = walkMdx(enDir);
+    if (opts.scan || needsScan(cache, version, enFiles.length)) {
       const start = Date.now();
       const count = scanVersion(cache, version, enDir);
       if (!opts.json) {
