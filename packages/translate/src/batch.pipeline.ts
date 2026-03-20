@@ -75,12 +75,11 @@ function validateFrontmatter(translation: string): boolean {
     if (yamlContent.includes('NEEDS_TRANSLATION')) return false;
     if (yamlContent.endsWith('author:')) return false; // truncated author list
 
-    // Try YAML parse using simple validation
-    // Check: every line with "key:" must have proper indentation
+    // Only validate translated fields (title, description)
+    // Other fields (headline, author, date, image) are preserved from original
     const lines = yamlContent.split('\n');
     for (const line of lines) {
-      // Detect backtick/quote at start of YAML value
-      const match = line.match(/^(\s*\w[\w-]*):\s*(.+)/);
+      const match = line.match(/^(title|description):\s*(.+)/);
       if (match) {
         const val = match[2];
         if (val.startsWith('`') || val.startsWith("'") || val.startsWith('"')) {
