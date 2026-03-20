@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
  */
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { slug as githubSlug } from 'github-slugger';
 
 // ── CLI Args ──
 
@@ -85,11 +86,14 @@ function contentPathToUrl(
     rel = rel.replace(new RegExp(`^${locale}/`), '');
   }
 
-  // Convert file path to URL path
+  // Convert file path to URL path (Astro uses github-slugger to lowercase segments)
   let urlPath = rel
     .replace(/\.mdx$/, '')
     .replace(/\/index$/, '')
-    .replace(/\\/g, '/');
+    .replace(/\\/g, '/')
+    .split('/')
+    .map((segment) => githubSlug(segment))
+    .join('/');
 
   // Add locale prefix for non-EN
   if (locale !== 'en') {
