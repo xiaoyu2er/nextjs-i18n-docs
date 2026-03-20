@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { FLAGS } from '../lib/flags';
 
@@ -69,6 +69,8 @@ function ContentBody({
   );
 }
 
+type ViewMode = 'split' | 'en' | 'lang';
+
 interface Props {
   version: string;
   lang: string;
@@ -81,6 +83,14 @@ export function Preview({ version, lang, file }: Props) {
   const syncing = useRef(false);
 
   const isEn = lang === 'en';
+  const [mode, setMode] = useState<ViewMode>('split');
+
+  // Reset to split when switching language
+  const prevLangRef = useRef(lang);
+  if (prevLangRef.current !== lang) {
+    prevLangRef.current = lang;
+    setMode(isEn ? 'en' : 'split');
+  }
 
   const { data: enData } = useQuery({
     queryKey: ['content', version, 'en', file],
@@ -102,7 +112,7 @@ export function Preview({ version, lang, file }: Props) {
     [transData?.content],
   );
 
-  // Synced scrolling
+  // Synced scrolling (only in split mode)
   const syncScroll = useCallback(
     (source: HTMLElement | null, target: HTMLElement | null) => {
       if (!source || !target || syncing.current) return;
@@ -119,6 +129,7 @@ export function Preview({ version, lang, file }: Props) {
   );
 
   useEffect(() => {
+    if (mode !== 'split') return;
     const enEl = enRef.current;
     const trEl = transRef.current;
     if (!enEl || !trEl) return;
@@ -131,30 +142,65 @@ export function Preview({ version, lang, file }: Props) {
       enEl.removeEventListener('scroll', onEnScroll);
       trEl.removeEventListener('scroll', onTrScroll);
     };
-  }, [syncScroll]);
+  }, [syncScroll, mode]);
+
+  const showEn = mode === 'split' || mode === 'en';
+  const showTrans = !isEn && (mode === 'split' || mode === 'lang');
+  const isSingle = !showEn || !showTrans;
 
   function scrollToBoth(enId: string, idx: number) {
-    const enEl = document.getElementById(enId);
-    if (enEl) enEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    // Find matching heading in translated content by index
-    if (!isEn && trans.headings[idx]) {
+    if (showEn) {
+      const enEl = document.getElementById(enId);
+      if (enEl) enEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (showTrans && trans.headings[idx]) {
       const trEl = document.getElementById(trans.headings[idx].id);
       if (trEl) trEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
+
+  // Use EN headings for TOC (always available), fall back to trans for lang-only
+  const tocHeadings = showEn ? en.headings : trans.headings;
 
   return (
     <div className="preview-wrap">
       {/* Header */}
       <div className="preview-hdr">
         <span className="preview-filename">{file}</span>
+        {!isEn && (
+          <div className="preview-toggle">
+            <button
+              type="button"
+              className={mode === 'split' ? 'active' : ''}
+              onClick={() => setMode('split')}
+              title="Side by side"
+            >
+              ◫
+            </button>
+            <button
+              type="button"
+              className={mode === 'en' ? 'active' : ''}
+              onClick={() => setMode('en')}
+              title="EN only"
+            >
+              {FLAGS.en}
+            </button>
+            <button
+              type="button"
+              className={mode === 'lang' ? 'active' : ''}
+              onClick={() => setMode('lang')}
+              title={`${lang} only`}
+            >
+              {FLAGS[lang]}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* TOC */}
-      {en.headings.length > 0 && (
+      {tocHeadings.length > 0 && (
         <div className="preview-toc">
-          {en.headings.map((h, idx) => (
+          {tocHeadings.map((h, idx) => (
             <a
               key={h.id}
               href={`#${h.id}`}
@@ -170,17 +216,19 @@ export function Preview({ version, lang, file }: Props) {
         </div>
       )}
 
-      {/* Side-by-side panels */}
-      <div className={`preview-split${isEn ? ' single' : ''}`}>
-        <div className="preview-pane">
-          <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
-          {enData ? (
-            <ContentBody rendered={en.rendered} bodyRef={enRef} />
-          ) : (
-            <div className="preview-body loading">Loading...</div>
-          )}
-        </div>
-        {!isEn && (
+      {/* Content panels */}
+      <div className={`preview-split${isSingle ? ' single' : ''}`}>
+        {showEn && (
+          <div className="preview-pane">
+            <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
+            {enData ? (
+              <ContentBody rendered={en.rendered} bodyRef={enRef} />
+            ) : (
+              <div className="preview-body loading">Loading...</div>
+            )}
+          </div>
+        )}
+        {showTrans && (
           <div className="preview-pane">
             <div className="preview-pane-hdr">
               {FLAGS[lang]} {lang}
