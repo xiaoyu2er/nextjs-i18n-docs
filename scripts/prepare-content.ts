@@ -619,46 +619,9 @@ function generateBlogIndex(contentRoot: string) {
 }
 
 /** Generate learn/index.mdx with cards for each course */
-function generateLearnIndex(contentRoot: string) {
-  const learnDir = join(contentRoot, 'en', 'learn');
-  if (!existsSync(learnDir)) return;
-
-  const icons: Record<string, string> = {
-    'react-foundations': 'rocket',
-    'dashboard-app': 'laptop',
-    'pages-router': 'document',
-    seo: 'magnifier',
-  };
-
-  interface Course {
-    name: string;
-    slug: string;
-    chapters: number;
-    icon: string;
-  }
-  const courses: Course[] = [];
-
-  const titleOverrides: Record<string, string> = { seo: 'SEO' };
-
-  const entries = readdirSync(learnDir, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  for (const entry of entries) {
-    const slug = stripNumericPrefix(entry.name);
-    const chapters = readdirSync(join(learnDir, entry.name)).filter((f) =>
-      f.endsWith('.mdx'),
-    ).length;
-    const name =
-      titleOverrides[slug] ||
-      slug
-        .split('-')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-    courses.push({ name, slug, chapters, icon: icons[slug] || 'open-book' });
-  }
-
-  let mdx = `---
+/** Generate learn/index.mdx — splash page, Starlight auto-generates sub-page cards */
+function generateLearnIndex(_contentRoot: string) {
+  const mdx = `---
 title: Learn Next.js
 description: Free interactive courses to help you get started with Next.js and build full-stack web applications.
 template: splash
@@ -666,23 +629,7 @@ hero:
   title: Learn Next.js
   tagline: Free interactive courses with quizzes, from React basics to building a full-stack app.
 ---
-
-import { Card, CardGrid } from '@astrojs/starlight/components';
-
-<CardGrid>
 `;
-
-  for (const course of courses) {
-    mdx += `  <Card title="${course.name}" icon="${course.icon}">
-    **${course.chapters} Chapters**
-
-    [Start Learning →](/learn/${course.slug}/)
-  </Card>
-
-`;
-  }
-
-  mdx += '</CardGrid>\n';
 
   const dstPath = join(CONTENT_DST, 'learn', 'index.mdx');
   ensureDir(dstPath);
