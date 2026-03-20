@@ -307,7 +307,7 @@ export class TableUI {
           stats.logDir,
           `${f.replace(/\//g, '__')}.log`,
         );
-        console.log(`   - ${f}`);
+        console.log(`   - ${path.resolve(stats.outputDir, f)}`);
         console.log(`     Log: ${logFile}`);
       }
     }
