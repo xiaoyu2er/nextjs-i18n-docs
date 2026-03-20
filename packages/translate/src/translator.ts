@@ -590,7 +590,17 @@ async function translateJsonChunk(
           { role: 'user', content: userMessage },
         ],
         max_tokens: maxTokens,
-        response_format: { type: 'json_object' },
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'translation_result',
+            strict: false,
+            schema: {
+              type: 'object',
+              additionalProperties: { type: 'string' },
+            },
+          },
+        },
         // @ts-expect-error OpenRouter extra params
         provider: { require_parameters: true },
         reasoning: { exclude: true },
