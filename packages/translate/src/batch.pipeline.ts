@@ -532,7 +532,7 @@ async function runTranslate(opts: CliOptions): Promise<void> {
     console.log(`   Concurrency: ${opts.concurrency}\n`);
 
     // Initialize UI and file logger
-    const logDir = path.join(opts.outputDir, '.logs');
+    const logDir = path.resolve('.logs');
     const fileLogger = new FileLogger(logDir, lang);
     console.log(`   Logs: ${fileLogger.getLogDir()}\n`);
     const ui = new TableUI({
