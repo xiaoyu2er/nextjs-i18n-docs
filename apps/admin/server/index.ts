@@ -276,9 +276,9 @@ async function previewFile(file,e){
   await loadPreview(file,S.previewLang);
 }
 async function loadPreview(file,lang){
-  const tabs=lang==='en'?['en']:['en',lang];
+  const tabs=S.lang==='en'?['en']:['en',S.lang];
   document.getElementById('preview-tabs').innerHTML=tabs.map(t=>
-    '<button class="preview-tab'+(t===S.previewLang?' active':'')+'" onclick="switchPreviewTab(\\''+t+'\\')">'+FLAGS[t]+' '+t+'</button>'
+    '<button class="preview-tab'+(t===lang?' active':'')+'" onclick="switchPreviewTab(\\''+t+'\\')">'+FLAGS[t]+' '+t+'</button>'
   ).join('');
   document.getElementById('preview-title').textContent=file;
   document.getElementById('preview-body').textContent='Loading...';
