@@ -69,6 +69,15 @@ export interface Job {
 
 // ── API ──
 
+export interface Model {
+  id: string;
+  name: string;
+  promptPrice: number;
+  completionPrice: number;
+  contextLength: number;
+  isFree: boolean;
+}
+
 export const api = {
   status: () => request<StatusOverview>('/status'),
 
@@ -78,6 +87,8 @@ export const api = {
   fileContent: (version: string, lang: string, file: string) =>
     request<FileContent>(`/status/content/${version}/${lang}/${file}`),
 
+  models: () => request<Model[]>('/models'),
+
   jobs: () => request<Job[]>('/jobs'),
 
   createJob: (body: {
@@ -85,6 +96,7 @@ export const api = {
     version: string;
     max?: number;
     concurrency?: number;
+    model?: string;
     files?: string[];
   }) =>
     request<Job>('/jobs', {

@@ -3,11 +3,13 @@ import { resolve } from 'node:path';
 import { Hono } from 'hono';
 import { createServer as createViteServer } from 'vite';
 import jobRoutes from './routes/jobs';
+import modelRoutes from './routes/models';
 import statusRoutes from './routes/status';
 
 const app = new Hono();
 app.route('/api/status', statusRoutes);
 app.route('/api/jobs', jobRoutes);
+app.route('/api/models', modelRoutes);
 app.get('/api/health', (c) => c.json({ ok: true }));
 
 const adminRoot = resolve(import.meta.dirname, '..');

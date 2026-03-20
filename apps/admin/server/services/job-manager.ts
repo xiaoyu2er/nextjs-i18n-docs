@@ -45,6 +45,7 @@ class JobManager {
     version: string;
     max?: number;
     concurrency?: number;
+    model?: string;
     files?: string[];
   }): Job {
     // Prevent duplicate jobs for same lang
@@ -81,6 +82,10 @@ class JobManager {
       '--concurrency',
       String(opts.concurrency ?? 3),
     ];
+
+    if (opts.model) {
+      args.push('--model', opts.model);
+    }
 
     // Support specific file selection via glob brace expansion
     if (opts.files && opts.files.length > 0) {
