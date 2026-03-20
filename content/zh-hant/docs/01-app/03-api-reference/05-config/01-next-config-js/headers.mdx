@@ -1,0 +1,592 @@
+---
+title: 標頭
+description: 為您的 Next.js 應用程式新增自訂 HTTP 標頭。
+---
+
+{/* 此文件內容在應用程式路由器和頁面路由器之間共享。您可以使用 `<PagesOnly>內容</PagesOnly>` 元件來新增專屬於頁面路由器的內容。任何共享內容都不應包裹在元件中。 */}
+
+標頭允許您為特定路徑的傳入請求回應設定自訂 HTTP 標頭。
+
+要設定自訂 HTTP 標頭，您可以在 `next.config.js` 中使用 `headers` 鍵：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/about',
+        headers: [
+          {
+            key: 'x-custom-header',
+            value: 'my custom header value',
+          },
+          {
+            key: 'x-another-custom-header',
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+`headers` 是一個 async 函數，預期回傳一個陣列，其中包含具有 `source` 和 `headers` 屬性的物件：
+
+- `source` 是傳入請求的路徑模式。
+- `headers` 是響應標頭物件的陣列，具有 `key` 和 `value` 屬性。
+- `basePath`：`false` 或 `undefined` - 如果為 false，匹配時不會包含 basePath，僅可用於外部重寫。
+- `locale`：`false` 或 `undefined` - 指定匹配時是否不包含 locale。
+- `has` 是包含 `type`、`key` 和 `value` 屬性的 [has 物件](#header-cookie-and-query-matching) 陣列。
+- `missing` 是包含 `type`、`key` 和 `value` 屬性的 [missing 物件](#header-cookie-and-query-matching) 陣列。
+
+標頭會在檔案系統檢查之前進行檢查，檔案系統包含頁面和 `/public` 檔案。
+
+## 標頭覆寫行為
+
+如果兩個標頭匹配相同的路徑並設定相同的標頭鍵，最後設定的標頭值將覆寫第一個。使用下列標頭，路徑 `/hello` 會導致標頭 `x-hello` 的值為 `world`，因為最後設定的標頭值為 `world`。
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'there',
+          },
+        ],
+      },
+      {
+        source: '/hello',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## 路徑匹配
+
+允許路徑匹配，例如 `/blog/:slug` 會匹配 `/blog/first-post`（無巢狀路徑）：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug', // Matched parameters can be used in the value
+          },
+          {
+            key: 'x-slug-:slug', // Matched parameters can be used in the key
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+模式 `/blog/:slug` 會匹配 `/blog/first-post` 和 `/blog/post-1`，但不包含像 `/blog/a/b` 這樣的巢狀路徑。模式是從開頭錨定的，`/blog/:slug` 不會匹配 `/archive/blog/first-post`。
+
+您可以在參數上使用修飾符：`*`（零個或多個）, `+`（一個或多個）, `?`（零個或一個）。例如，`/blog/:slug*` 會匹配 `/blog`、`/blog/a` 和 `/blog/a/b/c`。
+
+在 [path-to-regexp](https://github.com/pillarjs/path-to-regexp) 文檔中查看更多詳情。
+
+### 萬用字元路徑匹配
+
+要匹配萬用字元路徑，您可以在參數後使用 `*`，例如 `/blog/:slug*` 將匹配 `/blog/a/b/c/d/hello-world`：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:slug*',
+        headers: [
+          {
+            key: 'x-slug',
+            value: ':slug*', // Matched parameters can be used in the value
+          },
+          {
+            key: 'x-slug-:slug*', // Matched parameters can be used in the key
+            value: 'my other custom header value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+### 正則表達式路徑匹配
+
+要匹配正規表達式路徑，您可以在參數後用括號將正規表達式括起來，例如 `/blog/:slug(\\d{1,})` 將匹配 `/blog/123` 但不匹配 `/blog/abc`：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/blog/:post(\\d{1,})',
+        headers: [
+          {
+            key: 'x-post',
+            value: ':post',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+以下字元 `(`, `)`, `{`, `}`, `:`, `*`, `+`, `?` 用於正則表達式路徑匹配，因此當它們在 `source` 中作為非特殊值使用時，必須在它們前面加 `\` 來轉義：
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        // this will match `/english(default)/something` being requested
+        source: '/english\\(default\\)/:slug',
+        headers: [
+          {
+            key: 'x-header',
+            value: 'value',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## 標頭、Cookie 和 查詢 匹配
+
+若要僅在標頭、cookie 或 query 值也匹配 `has` 欄位或不匹配 `missing` 欄位時才套用標頭，可使用此功能。必須匹配 `source` 和所有的 `has` 項目，並且所有的 `missing` 項目都必須不匹配，標頭才會被套用。
+
+`has` 和 `missing` 項目可以有下列欄位：
+
+- `type`: `String` - 必須為 `header`、`cookie`、`host` 或 `query` 之一。
+- `key`: `String` - 選定類型中要匹配的鍵。
+- `value`: `String` 或 `undefined` - 要檢查的值，若為 undefined 則任意值皆可匹配。可用類似正則的字串來抓取值中的特定部分，例如若 `first-(?<paramName>.*)` 用於 `first-second`，則 `second` 可在 destination 中搭配 `:paramName` 使用。
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      // if the header `x-add-header` is present,
+      // the `x-another-header` header will be applied
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-add-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // if the header `x-no-header` is not present,
+      // the `x-another-header` header will be applied
+      {
+        source: '/:path*',
+        missing: [
+          {
+            type: 'header',
+            key: 'x-no-header',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: 'hello',
+          },
+        ],
+      },
+      // if the source, query, and cookie are matched,
+      // the `x-authorized` header will be applied
+      {
+        source: '/specific/:path*',
+        has: [
+          {
+            type: 'query',
+            key: 'page',
+            // the page value will not be available in the
+            // header key/values since value is provided and
+            // doesn't use a named capture group e.g. (?<page>home)
+            value: 'home',
+          },
+          {
+            type: 'cookie',
+            key: 'authorized',
+            value: 'true',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-authorized',
+            value: ':authorized',
+          },
+        ],
+      },
+      // if the header `x-authorized` is present and
+      // contains a matching value, the `x-another-header` will be applied
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-authorized',
+            value: '(?<authorized>yes|true)',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+      // if the host is `example.com`,
+      // this header will be applied
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'example.com',
+          },
+        ],
+        headers: [
+          {
+            key: 'x-another-header',
+            value: ':authorized',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## 支援 basePath 的標頭
+
+當在使用 [`basePath` 支援](/docs/app/api-reference/config/next-config-js/basePath) 時搭配標頭，每個 `source` 都會自動加上 `basePath` 前綴，除非您將 `basePath: false` 新增至標頭：
+
+```js filename="next.config.js"
+module.exports = {
+  basePath: '/docs',
+
+  async headers() {
+    return [
+      {
+        source: '/with-basePath', // becomes /docs/with-basePath
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        source: '/without-basePath', // is not modified since basePath: false is set
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+        basePath: false,
+      },
+    ]
+  },
+}
+```
+
+## 支援 i18n 的標頭
+
+<AppOnly>
+
+當搭配 [`i18n` 支援](/docs/app/guides/internationalization) 與標頭功能使用時，每個 `source` 都會自動加上前綴以處理設定的 `locales`，除非您將 `locale: false` 新增至標頭。若使用 `locale: false`，您必須在 `source` 前加上 locale，才能正確匹配。
+
+</AppOnly>
+
+<PagesOnly>
+
+當搭配 [`i18n` 支援](/docs/pages/guides/internationalization) 與標頭功能使用時，每個 `source` 都會自動加上前綴以處理設定的 `locales`，除非您將 `locale: false` 新增至標頭。若使用 `locale: false`，您必須在 `source` 前加上 locale，才能正確匹配。
+
+</PagesOnly>
+
+```js filename="next.config.js"
+module.exports = {
+  i18n: {
+    locales: ['en', 'fr', 'de'],
+    defaultLocale: 'en',
+  },
+
+  async headers() {
+    return [
+      {
+        source: '/with-locale', // automatically handles all locales
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // does not handle locales automatically since locale: false is set
+        source: '/nl/with-locale-manual',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // this matches '/' since `en` is the defaultLocale
+        source: '/en',
+        locale: false,
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+      {
+        // this gets converted to /(en|fr|de)/(.*) so will not match the top-level
+        // `/` or `/fr` routes like /:path* would
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'x-hello',
+            value: 'world',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+## Cache-Control (快取控制)
+
+Next.js 為真正不變的資源設定 `Cache-Control` 標頭為 `public, max-age=31536000, immutable`。此標頭無法被覆寫。這些不變的檔案在檔名中包含 SHA 雜湊值，因此可以安全地無限期快取。例如，[靜態圖片導入](/docs/app/getting-started/images#local-images)。您無法在 `next.config.js` 中為這些資源設定 `Cache-Control` 標頭。
+
+然而，您可以為其他回應或資料設定 `Cache-Control` 標頭。
+
+<AppOnly>
+
+了解更多關於 App Router 的 [緩存](/docs/app/getting-started/caching)。
+
+</AppOnly>
+
+<PagesOnly>
+
+如果您需要重新驗證 [已靜態生成的](/docs/pages/building-your-application/rendering/static-site-generation) 頁面快取，您可以在頁面的 [`getStaticProps`](/docs/pages/building-your-application/data-fetching/get-static-props) 函數中設定 `revalidate` prop 來進行。
+
+要快取 [API 路由](/docs/pages/building-your-application/routing/api-routes) 的回應，您可以使用 `res.setHeader`：
+
+```ts filename="pages/api/hello.ts" switcher
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+type ResponseData = {
+  message: string
+}
+
+export default function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ResponseData>
+) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+```js filename="pages/api/hello.js" switcher
+export default function handler(req, res) {
+  res.setHeader('Cache-Control', 's-maxage=86400')
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+您也可以在使用 `getServerSideProps` 時使用快取標頭 (`Cache-Control`) 來快取動態回應。例如，使用 [`stale-while-revalidate`](https://web.dev/stale-while-revalidate/)。
+
+```ts filename="pages/index.tsx" switcher
+import { GetStaticProps, GetStaticPaths, GetServerSideProps } from 'next'
+
+// This value is considered fresh for ten seconds (s-maxage=10).
+// If a request is repeated within the next 10 seconds, the previously
+// cached value will still be fresh. If the request is repeated before 59 seconds,
+// the cached value will be stale but still render (stale-while-revalidate=59).
+//
+// In the background, a revalidation request will be made to populate the cache
+// with a fresh value. If you refresh the page, you will see the new value.
+export const getServerSideProps = (async (context) => {
+  context.res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}) satisfies GetServerSideProps
+```
+
+```js filename="pages/index.js" switcher
+// This value is considered fresh for ten seconds (s-maxage=10).
+// If a request is repeated within the next 10 seconds, the previously
+// cached value will still be fresh. If the request is repeated before 59 seconds,
+// the cached value will be stale but still render (stale-while-revalidate=59).
+//
+// In the background, a revalidation request will be made to populate the cache
+// with a fresh value. If you refresh the page, you will see the new value.
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+
+  return {
+    props: {},
+  }
+}
+```
+
+</PagesOnly>
+
+## 選項
+
+### CORS
+
+[跨來源資源共享 (CORS)](https://developer.mozilla.org/docs/Web/HTTP/CORS) 是一個安全功能，允許您控制哪些網站可以存取您的資源。您可以設定 `Access-Control-Allow-Origin` 標頭，允許特定來源存取您的 <PagesOnly>API 端點</PagesOnly><AppOnly>路由處理函數</AppOnly>。
+
+```js
+async headers() {
+    return [
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*", // Set your origin
+          },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET, POST, PUT, DELETE, OPTIONS",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value: "Content-Type, Authorization",
+          },
+        ],
+      },
+    ];
+  },
+```
+
+### X-DNS-Prefetch-Control
+
+[此標頭](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-DNS-Prefetch-Control) 控制 DNS 預讀取，允許瀏覽器主動對外部的連結、圖片、CSS、JavaScript 等進行域名解析。此預讀取在背景中執行，因此在需要引用的項目時，[DNS](https://developer.mozilla.org/docs/Glossary/DNS) 更有可能已被解析。這減少了使用者點擊連結時的延遲。
+
+```js
+{
+  key: 'X-DNS-Prefetch-Control',
+  value: 'on'
+}
+```
+
+### Strict-Transport-Security
+
+[此標頭](https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security) 告知瀏覽器應僅使用 HTTPS 而非 HTTP 進行存取。使用下方配置，所有目前和未來的子網域都將使用 HTTPS，`max-age` 為 2 年。這會阻止存取只能透過 HTTP 服務的頁面或子網域。
+
+```js
+{
+  key: 'Strict-Transport-Security',
+  value: 'max-age=63072000; includeSubDomains; preload'
+}
+```
+
+### X-Frame-Options
+
+[此標頭](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Frame-Options) 指示是否允許網站在 `iframe` 內顯示。這可以防止點擊劫持攻擊。
+
+**此標頭已由 CSP 的 `frame-ancestors` 選項取代**，現代瀏覽器對該選項有更佳支援（請參閱 [內容安全政策](/docs/app/guides/content-security-policy) 以了解配置詳情）。
+
+```js
+{
+  key: 'X-Frame-Options',
+  value: 'SAMEORIGIN'
+}
+```
+
+### Permissions-Policy (Permissions 策略)
+
+[此標頭](https://developer.mozilla.org/docs/Web/HTTP/Headers/Permissions-Policy) 允許您控制瀏覽器中可以使用哪些功能和 API。它之前名為 `Feature-Policy`。
+
+```js
+{
+  key: 'Permissions-Policy',
+  value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()'
+}
+```
+
+### X-Content-Type-Options
+
+[此標頭](https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Content-Type-Options) 防止瀏覽器嘗試猜測內容類型，如果未明確設定 `Content-Type` 標頭。這可以防止允許使用者上傳和分享檔案的網站上的 XSS 攻擊。
+
+例如，使用者嘗試下載圖片，但被當作不同的 `Content-Type` 如可執行程式，這可能是惡意的。此標頭也適用於下載瀏覽器擴充套件。此標頭唯一有效的值是 `nosniff`。
+
+```js
+{
+  key: 'X-Content-Type-Options',
+  value: 'nosniff'
+}
+```
+
+### Referrer-Policy
+
+[此標頭](https://developer.mozilla.org/docs/Web/HTTP/Headers/Referrer-Policy) 控制當從目前網站 (origin) 導航至其他網站時，瀏覽器包含多少資訊。
+
+```js
+{
+  key: 'Referrer-Policy',
+  value: 'origin-when-cross-origin'
+}
+```
+
+### Content-Security-Policy
+
+了解如何為您的應用程式新增 [內容安全政策](/docs/app/guides/content-security-policy)。
+
+## 版本歷史
+
+| 版本   | 變更             |
+|--------- | ---------------- |
+| `v13.3.0` | 新增 `missing`。 |
+| `v10.2.0` | 新增 `has`。     |
+| `v9.5.0`  | 新增標頭。       |

@@ -1,0 +1,587 @@
+---
+title: 快取與重新驗證（舊模型）
+nav_title: Caching (Previous Model)
+description: 學習如何快取與重新驗證資料，使用 fetch 選項、unstable_cache 和路由區段配置，適用於未使用 Cache Components 的專案。
+---
+
+> 本指南假設您 **沒有** 使用 [Cache Components](/docs/app/getting-started/caching)，該功能是在 version 16 透過 [
+`cacheComponents`
+ flag](/docs/app/api-reference/config/next-config-js/cacheComponents) 引入的。
+
+## 快取 `
+fetch`
+ 請求
+
+預設情況下，[`fetch`](/docs/app/api-reference/functions/fetch) 請求不會被快取。您可以將 `cache` 選項設為 `'force-cache'` 來快取個別請求。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+}
+```
+
+請參閱 [`fetch` API 參考](/docs/app/api-reference/functions/fetch) 以了解更多。
+
+### `
+unstable_cache`
+ 用於非 `
+fetch`
+ 函數
+
+`
+unstable_cache`
+ 允許您快取資料庫查詢結果和其他不使用 `
+fetch`
+ 的 async 函式。將 `
+unstable_cache`
+ 包裝在函式周圍：
+
+```ts filename="app/lib/data.ts" switcher
+import { unstable_cache } from 'next/cache'
+import { db } from '@/lib/db'
+
+export const getCachedUser = unstable_cache(
+  async (id: string) => {
+    return db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .then((res) => res[0])
+  },
+  ['user'], // cache key prefix
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+```js filename="app/lib/data.js" switcher
+import { unstable_cache } from 'next/cache'
+import { db } from '@/lib/db'
+
+export const getCachedUser = unstable_cache(
+  async (id) => {
+    return db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .then((res) => res[0])
+  },
+  ['user'], // cache key prefix
+  {
+    tags: ['user'],
+    revalidate: 3600,
+  }
+)
+```
+
+第三個參數接受：
+
+- `
+tags`
+: 用於使用 `
+revalidateTag`
+ 進行需求重新驗證的標籤陣列。
+- `
+revalidate`
+: 快取重新驗證前的秒數。
+
+請參閱 [`unstable_cache` API 參考](/docs/app/api-reference/functions/unstable_cache) 以了解更多。
+
+### 路由區段設定
+
+您可以從 [Page](/docs/app/api-reference/file-conventions/page)、[Layout](/docs/app/api-reference/file-conventions/layout) 或 [Route Handler](/docs/app/api-reference/file-conventions/route) 匯出配置選項，在路由層級設定快取行為。
+
+#### `
+dynamic`
+
+
+將佈局或頁面的動態行為更改為完全靜態或完全動態。
+
+```tsx filename="layout.tsx | page.tsx | route.ts" switcher
+export const dynamic = 'auto'
+// 'auto' | 'force-dynamic' | 'error' | 'force-static'
+```
+
+```jsx filename="layout.js | page.js | route.js" switcher
+export const dynamic = 'auto'
+// 'auto' | 'force-dynamic' | 'error' | 'force-static'
+```
+
+- **`
+'auto'
+`** (預設): 預設選項，在不阻止任何組件選擇動態行為的情況下，盡可能快取。
+- **`
+'force-dynamic'
+`**: 強制 [dynamic rendering](/docs/app/glossary#dynamic-rendering)，導致每個使用者在請求時都渲染路由。此選項等同於：
+  - 將 layout 或 page 中每個 `
+fetch()
+` 請求的選項設定為 {
+ `cache: 'no-store'`
+,
+ ` next: { revalidate: 0 }
+` }。
+  - 將區段配置設定為 `
+export const fetchCache = 'force-no-store'
+`
+- **`
+'error'
+`**: 強制預先渲染並快取 layout 或 page 的資料，如果任何組件使用 Request-time APIs 或未快取的資料則透過產生錯誤來強制。此選項等同於：
+  - `
+pages`
+ 目錄中的 `
+getStaticProps()
+`。
+  - 將 layout 或 page 中每個 `
+fetch()
+` 請求的選項設定為 {
+ ` cache: 'force-cache'
+` }。
+  - 將區段配置設定為 `
+fetchCache = 'only-cache'
+`。
+- **`
+'force-static'
+`**: 強制預先渲染並快取 layout 或 page 的資料，透過強制 [
+`cookies`
+](/docs/app/api-reference/functions/cookies)、[
+`headers()`
+](/docs/app/api-reference/functions/headers) 和 [
+`useSearchParams()`
+](/docs/app/api-reference/functions/use-search-params) 回傳空值。在渲染為 `
+force-static`
+ 的 pages 或 layouts 中，可以 [
+`revalidate`
+](#route-segment-config-revalidate)、[
+`revalidatePath`
+](/docs/app/api-reference/functions/revalidatePath) 或 [
+`revalidateTag`
+](/docs/app/api-reference/functions/revalidateTag)。
+
+#### `
+fetchCache`
+
+
+<details>
+
+  <summary>這是一個進階選項，僅在需要覆蓋默認行為時使用。</summary>
+
+預設情況下，Next.js **將快取** 任何在使用任何 Request-time APIs 之前可達成的 `
+fetch()
+` 請求，並且 **不會快取** 在使用 Request-time APIs 之後發現的 `
+fetch`
+ 請求。
+
+`fetchCache` 允許您覆蓋佈局或頁面中所有 `fetch` 請求的默認 `cache` 選項。
+
+```tsx filename="layout.tsx | page.tsx | route.ts" switcher
+export const fetchCache = 'auto'
+// 'auto' | 'default-cache' | 'only-cache'
+// 'force-cache' | 'force-no-store' | 'default-no-store' | 'only-no-store'
+```
+
+```jsx filename="layout.js | page.js | route.js" switcher
+export const fetchCache = 'auto'
+// 'auto' | 'default-cache' | 'only-cache'
+// 'force-cache' | 'force-no-store' | 'default-no-store' | 'only-no-store'
+```
+
+- **`
+'auto'
+`** (預設): 預設選項，在 Request-time APIs 之前快取 `
+fetch`
+ 請求（使用它們提供的 `
+cache`
+ 選項），並且不在 Request-time APIs 之後快取 `
+fetch`
+ 請求。
+- **`
+'default-cache'
+`**: 允許將任何 `
+cache`
+ 選項傳遞給 `
+fetch`
+，但若不提供選項則將 `
+cache`
+ 選項設定為 `
+'force-cache'
+`。這意味著即使是 Request-time APIs 之後的 `
+fetch`
+ 請求也被視為靜態。
+- **`
+'only-cache'
+`**: 確保所有 `
+fetch`
+ 請求都選擇快取，若無提供選項則將預設變更爲 `
+cache: 'force-cache'
+`，若任何 `
+fetch`
+ 請求使用 `
+cache: 'no-store'
+` 則產生錯誤。
+- **`
+'force-cache'
+`**: 確保所有 `
+fetch`
+ 請求都選擇快取，將所有 `
+fetch`
+ 請求的 `
+cache`
+ 選項設定為 `
+'force-cache'
+`。
+- **`
+'default-no-store'
+`**: 允許將任何 `
+cache`
+ 選項傳遞給 `
+fetch`
+，但若不提供選項則將 `
+cache`
+ 選項設定為 `
+'no-store'
+`。這意味著即使是 Request-time APIs 之前的 `
+fetch`
+ 請求也被視為動態。
+- **`
+'only-no-store'
+`**: 確保所有 `
+fetch`
+ 請求都不選擇快取，若無提供選項則將預設變更爲 `
+cache: 'no-store'
+`，若任何 `
+fetch`
+ 請求使用 `
+cache: 'force-cache'
+` 則產生錯誤
+- **`
+'force-no-store'
+`**: 確保所有 `
+fetch`
+ 請求都不選擇快取，將所有 `
+fetch`
+ 請求的 `
+cache`
+ 選項設定為 `
+'no-store'
+`。這會強制所有 `
+fetch`
+ 請求在每次請求時都重新獲取，即使它們提供了 `
+'force-cache'
+` 選項。
+
+##### 跨路由區段行為
+
+- 單一路由中每個佈局和頁面的每個設置選項需要相互兼容。
+  - 如果同時提供了 `'only-cache'` 和 `'force-cache'`，則 `'force-cache'` 生效。如果同時提供了 `'only-no-store'` 和 `'force-no-store'`，則 `'force-no-store'` 生效。強制選項更改了跨路由的行為，因此具有 `'force-*'` 的單一段落會防止由 `'only-*'` 引起的錯誤。
+  - `'only-*'` 和 `'force-*'` 選項的意圖是保證整個路由完全靜態或完全動態。這意味著：
+    - 單一路由中同時結合 `'only-cache'` 和 `'only-no-store'` 是不允許的。
+    - 單一路由中同時結合 `'force-cache'` 和 `'force-no-store'` 是不允許的。
+  - 如果子節點提供了 `'auto'` 或 `'*-cache'`，父節點不能提供 `'default-no-store'`，因為這可能導致相同的 `fetch` 具有不同的行為。
+- 通常建議將共享的父佈局保留為 `'auto'`，並在子段分叉處自訂選項。
+
+</details>
+
+## 基於時間的重新驗證
+
+在 `
+fetch`
+ 上使用 `
+next.revalidate`
+ 選項，在指定的秒數後重新驗證資料：
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+```jsx filename="app/page.jsx" switcher
+export default async function Page() {
+  const data = await fetch('https://...', { next: { revalidate: 3600 } })
+}
+```
+
+對於非 `
+fetch`
+ 函數，`
+unstable_cache`
+ 在其配置中接受 `
+revalidate`
+ 選項（參見 [上述範例](#unstable_cache-for-non-fetch-functions)）。
+
+### 路由區段配置 `
+revalidate`
+
+
+為佈局或頁面設置默認重新驗證時間。此選項不會覆蓋個別 `fetch` 請求設置的 `revalidate` 值。
+
+```tsx filename="layout.tsx | page.tsx | route.ts" switcher
+export const revalidate = false
+// false | 0 | number
+```
+
+```jsx filename="layout.js | page.js | route.js" switcher
+export const revalidate = false
+// false | 0 | number
+```
+
+- **`
+false`
+`** (預設): 預設規則，快取任何將其 `
+cache`
+ 選項設定為 `
+'force-cache'
+` 的 `
+fetch`
+ 請求，或在 Request-time API 出現之前發現的請求。語意上等同於 `
+revalidate: Infinity`
+，這意味著資源應被無限期快取。個別 `
+fetch`
+ 請求仍可使用 `
+cache: 'no-store'
+` 或 `
+revalidate: 0`
+ 以避免被快取並使路由動態渲染。或者將 `
+revalidate`
+ 設定為低於路由預設值的正數，以增加路由的重新驗證頻率。
+- **`
+0`
+`**: 確保 layout 或 page 始終為動態渲染，即使沒有發現 Request-time APIs 或未快取的資料 fetches。此選項將未設定 `
+cache`
+ 選項的 `
+fetch`
+ 請求預設值變更爲 `
+'no-store'
+`，但保留選擇 `
+'force-cache'
+` 或使用正數 `
+revalidate`
+ 的 `
+fetch`
+ 請求。
+- **`
+number`
+`**: （秒數）將 layout 或 page 的預設重新驗證頻率設定為 `
+n`
+ 秒。
+
+> **小貼士**:
+>
+> - 重新驗證值需要是靜態可分析的。例如 `revalidate = 600` 是有效的，但 `revalidate = 60 * 10` 不是。
+> - 在 `runtime = 'edge'` 時，重新驗證值不可用。
+> - 在開發模式下，頁面始終按需渲染且永不被緩存。這允許您立即看到更改，而無需等待重新驗證期。
+
+#### 重新驗證頻率
+
+- 單一路由中每個佈局和頁面的最低 `revalidate` 值將決定整個 _路由_ 的重新驗證頻率。這確保子頁面與父佈局的重新驗證頻率相同。
+- 個別 `fetch` 請求可以設置比路由默認 `revalidate` 更低的 `revalidate` 以增加整個路由的重新驗證頻率。這允許您根據某些條件動態選擇加入更頻繁地重新驗證某些路由。
+
+## 需求重新驗證
+
+要在事件後重新驗證快取的資料，請在 [Server Action](/docs/app/getting-started/mutating-data) 或 [Route Handler](/docs/app/api-reference/file-conventions/route) 中使用 [`
+revalidateTag`
+](/docs/app/api-reference/functions/revalidateTag) 或 [`
+revalidatePath`
+](/docs/app/api-reference/functions/revalidatePath)。
+
+### 標記快取資料
+
+使用 `
+next.tags`
+ 標記 `
+fetch`
+ 請求以啟用需求式快取無效化：
+
+```tsx filename="app/lib/data.ts" switcher
+export async function getUserById(id: string) {
+  const data = await fetch(`https://...`, {
+    next: { tags: ['user'] },
+  })
+}
+```
+
+```jsx filename="app/lib/data.js" switcher
+export async function getUserById(id) {
+  const data = await fetch(`https://...`, {
+    next: { tags: ['user'] },
+  })
+}
+```
+
+對於非 `
+fetch`
+ 函數，`
+unstable_cache`
+ 也接受 `
+tags`
+ 選項（參見 [上述範例](#unstable_cache-for-non-fetch-functions)）。
+
+### `
+revalidateTag`
+
+
+使用 [`
+revalidateTag`
+](/docs/app/api-reference/functions/revalidateTag) 依標籤無效化快取資料：
+
+```tsx filename="app/lib/actions.ts" switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Mutate data
+  revalidateTag('user')
+}
+```
+
+```jsx filename="app/lib/actions.js" switcher
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id) {
+  // Mutate data
+  revalidateTag('user')
+}
+```
+
+### `revalidatePath`
+
+使用 [`
+revalidatePath`
+](/docs/app/api-reference/functions/revalidatePath) 無效化特定路由路徑的所有快取資料：
+
+```tsx filename="app/lib/actions.ts" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Mutate data
+  revalidatePath('/profile')
+}
+```
+
+```jsx filename="app/lib/actions.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id) {
+  // Mutate data
+  revalidatePath('/profile')
+}
+```
+
+## 請求去重
+
+如果您不使用 `
+fetch`
+（它會 [自動記憶化](/docs/app/api-reference/functions/fetch#memoization))，而是直接使用 ORM 或資料庫，您可以將資料存取包裝在 [React `
+cache`
+](https://react.dev/reference/react/cache) 函式周圍，以在單一渲染行程中去重請求：
+
+```tsx filename="app/lib/data.ts" switcher
+import { cache } from 'react'
+import { db, posts, eq } from '@/lib/db'
+
+export const getPost = cache(async (id: string) => {
+  const post = await db.query.posts.findFirst({
+    where: eq(posts.id, parseInt(id)),
+  })
+})
+```
+
+```jsx filename="app/lib/data.js" switcher
+import { cache } from 'react'
+import { db, posts, eq } from '@/lib/db'
+
+export const getPost = cache(async (id) => {
+  const post = await db.query.posts.findFirst({
+    where: eq(posts.id, parseInt(id)),
+  })
+})
+```
+
+## 預載資料
+
+您可以透過建立工具函式來預載資料，並在阻擋請求之前急切呼叫。這讓您能早期啟動資料獲取，以至於在組件渲染時資料已經可用。
+
+將 [`
+server-only`
+ package](https://www.npmjs.com/package/server-only) 與 React 的 [`
+cache`
+](https://react.dev/reference/react/cache) 結合，建立可複用的預載工具：
+
+```ts filename="utils/get-item.ts" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const getItem = cache(async (id: string) => {
+  // ...
+})
+
+export const preload = (id: string) => {
+  void getItem(id)
+}
+```
+
+```js filename="utils/get-item.js" switcher
+import { cache } from 'react'
+import 'server-only'
+
+export const getItem = cache(async (id) => {
+  // ...
+})
+
+export const preload = (id) => {
+  void getItem(id)
+}
+```
+
+然後在進行任何阻擋工作之前，呼叫 `
+preload()
+`，讓資料立即開始載入：
+
+```tsx filename="app/item/[id]/page.tsx" switcher
+import { getItem, preload, checkIsAvailable } from '@/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  // Start loading item data
+  preload(id)
+  // Perform another asynchronous task
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+
+async function Item({ id }: { id: string }) {
+  const result = await getItem(id)
+  // ...
+}
+```
+
+```jsx filename="app/item/[id]/page.js" switcher
+import { getItem, preload, checkIsAvailable } from '@/lib/data'
+
+export default async function Page({ params }) {
+  const { id } = await params
+  // Start loading item data
+  preload(id)
+  // Perform another asynchronous task
+  const isAvailable = await checkIsAvailable()
+
+  return isAvailable ? <Item id={id} /> : null
+}
+
+async function Item({ id }) {
+  const result = await getItem(id)
+  // ...
+}
+```

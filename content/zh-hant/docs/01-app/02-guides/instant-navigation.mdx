@@ -1,0 +1,291 @@
+---
+title: 確保 即時 導航
+description: 學習 如何 結構化 您 的 應用程式 以 預取 和 預渲染 更多 內容，提供 即時 頁面 載入 和 客戶端 導航。
+nav_title: Instant navigation
+version: draft
+related:
+  title: Learn more
+  description: Explore the full instant API, caching, and revalidation.
+  links:
+    - app/api-reference/file-conventions/route-segment-config/instant
+    - app/getting-started/caching
+    - app/getting-started/revalidating
+    - app/guides/prefetching
+---
+
+當 [Cache Components](/docs/app/api-reference/config/next-config-js/cacheComponents) 啟用 時，將 未 緩存 的 數據 包裹 在 `` `<Suspense>` `` 邊界 中 會 產生 即時 導航 — 但 僅 當 這些 邊界 位於 正確 位置 時。錯誤 放置 的 邊界 可能 會 靜默 阻擋 客戶端 導航，特別 是 在 入口 點 因 共享 佈局 而 不同 的 地方。**應 始終 從 應該 即時 導航 的 路由 中 導出 `unstable_instant`** — 它 在 開發 和 構建 期間 驗證 緩存 結構，在 問題 到達 用戶 之前 將 其 捕捉。
+
+本 指南 以 一個 可 即時 導航 的 產品 頁面 開始，接著 展示 如何 捕捉 並 修復 Suspense 邊界 位置 不 當 的 頁面。
+
+## 可 即時 導航 的 頁面
+
+位於 `/store/[slug]` 的 產品 頁面 獲取 兩種 內容: 產品 詳情 (名稱、價格) 和 即時 庫存。產品 詳情 很少 變動，因此 使用 `` `use cache` `` 進行 緩存。庫存 必須 是 最新 的，並且 在 其 自己 的 `` `<Suspense>` `` 回退 內容 後 流式 傳入:
+
+```tsx filename="app/store/[slug]/page.tsx" highlight={1,12-19,25}
+export const unstable_instant = { prefetch: 'static' }
+
+import { Suspense } from 'react'
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  return (
+    <div>
+      <Suspense fallback={<p>Loading product...</p>}>
+        {params.then(({ slug }) => (
+          <ProductInfo slug={slug} />
+        ))}
+      </Suspense>
+      <Suspense fallback={<p>Checking availability...</p>}>
+        <Inventory params={params} />
+      </Suspense>
+    </div>
+  )
+}
+
+async function ProductInfo({ slug }: { slug: string }) {
+  'use cache'
+  const product = await fetchProduct(slug)
+  return (
+    <>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+    </>
+  )
+}
+
+async function Inventory({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const inventory = await fetchInventory(slug)
+  return <p>{inventory.count} in stock</p>
+}
+```
+
+沒有 `` `generateStaticParams` ``，因此 `[slug]` 是 動態 段，`slug` 只有 在 請求 時間 才 可 知曉。等待 `` `params` `` 會 導致 懸掛，因此 每個 讀取 它 的 組件 都 有 自己 的 `` `<Suspense>` `` 邊界。`` `params` `` Promise 通過 `` `.then()` `` 在 行內 解析，因此 緩存 的 `` `ProductInfo` `` 接收 純 的 `` `slug` `` 字串。
+
+第 1 行上的 [`unstable_instant`](/docs/app/api-reference/file-conventions/route-segment-config/instant) 導出會指示 Next.js 驗證此頁面在每個可能的入口點是否會生成即時的 [靜態外殼 (static shell)](/docs/app/glossary#static-shell)。
+驗證會在開發期間和構建時執行。
+如果某個組件會阻攔導航，錯誤覆蓋層會明確指出是哪一個，並建議修復方案。
+
+### 使用 Next.js DevTools 檢查
+
+在 您 的 Next.js 配置 中 啟用 即時 導航 DevTools 開關:
+
+```ts filename="next.config.ts" highlight={5-7}
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+  experimental: {
+    instantNavigationDevToolsToggle: true,
+  },
+}
+
+export default nextConfig
+```
+
+打開 Next.js DevTools 並 選擇 **Instant Navs**。您 將 看到 兩個 選項:
+
+- **頁面 載入**: 點擊 **重新載入** 以 刷新 頁面 並 將 其 凍結 在 為 此 路由 生成 的 初始 靜態 UI，在 任何 動態 數據 流式 傳入 之前。
+- **客戶端 導航**: 一旦 啟用，點擊 您 應用 中 的 任何 連結 將 顯示 該 頁面 的 預取 UI，而非 完整 結果。
+
+嘗試 **頁面 載入**。「正在 載入 產品..."」和「正在 檢查 可用性..."」出現 為 獨立 的 回退 內容。首次 訪問 時 緩存 未 命中，因此 兩個 回退 內容 均 可見。再次 導航 到 該 頁面，產品 名稱 立 即 從 緩存 中 出現。
+
+現在 嘗試 **客戶端 導航** (從 `/store/shoes` 點擊 連結 到 `/store/hats`)。產品 名稱 和 價格 立 即 出現 (已 緩存)。「正在 檢查 可用性..."」顯示 庫存 將 流式 傳入 的 位置。
+
+> **值得 注意**: 頁面 載入 和 客戶端 導航 可能 生成 不同 的 外殼。客户端 鉤子 如 `` `useSearchParams` `` 在 頁面 載入 時 懸掛 (搜索 參數 在 構建 時 未知)，但在 客戶端 導航 時 同步 解析 (路由 器 已經 擁有 參數)。
+
+<details>
+
+<summary>為何 頁面 載入 和 客戶端 導航 生成 不同 的 外殼</summary>
+
+在 頁面 載入 時，整個 頁面 從 文檔 根 節點 渲染。每个 組件 都 在 服務器 上 運行，任何 懸掛 的 內容 都 會 被 完整 樹 中 最近 的 Suspense 邊界 捕捉。
+
+在 客戶端 導航 (連結 點擊) 期間，Next.js 僅 重新渲染 源 路由 和 目標 路由 共享 的 佈局 以下 部分。該 共享 佈局 上方 的 組件 不會 重新渲染。這 意味著 根 佈局 中 的 Suspense 邊界 覆蓋 頁面 載入 時 的 一切，但 對於 `/store/shoes` 和 `/store/hats` 之間 的 客戶端 導航，共享 的 `/store` 佈局 是 入口 點。根 Suspense 位於 其 上方，因此 無 效果。
+
+這 也 是 為 何 客户端 鉤子 行為 不同 的 原因。`` `useSearchParams()` `` 在 服務器 渲染 期間 懸掛，因為 搜索 參數 在 構建 時 不 可用。但在 客戶端 導航 時，路由 器 已經 從 URL 中 擁有 參數，因此 鉤子 同步 解析。同一 個 組件 在 客戶端 導航 時 可 出現在 即時 外殼 中，但在 頁面 載入 時 則 位於 回退 內容 後 面。
+
+</details>
+
+### 使用 e2e 測試 防止 回歸
+
+驗證 在 開發 期間 和 構建 時 捕捉 結構性 問題。為了 防止 代碼庫 演變 時 的 回歸，`` `@next/playwright` `` 包 包含 一個 `instant()` 輔助 函數，用於 斷言 即時 外殼 中 顯示 的 內容:
+
+```typescript filename="e2e/navigation.test.ts"
+import { test, expect } from '@playwright/test'
+import { instant } from '@next/playwright'
+
+test('product title appears instantly', async ({ page }) => {
+  await page.goto('/store/shoes')
+
+  await instant(page, async () => {
+    await page.click('a[href="/store/hats"]')
+    await expect(page.locator('h1')).toContainText('Baseball Cap')
+  })
+
+  // After instant() exits, dynamic content streams in
+  await expect(page.locator('text=in stock')).toBeVisible()
+})
+```
+
+`` `instant()` `` 在 回調 函數 針對 靜態 外殼 運行 時 保留 動態 內容。解析 後，動態 內容 流式 傳入，您 就可以 對 完整 頁面 進行 斷言。
+
+並 非 必須 為 每個 導航 編寫 `instant()` 測試。構建 時 驗證 已經 提供 了 結構性 保障。僅 對 最重要 的 用戶 流程 使用 `instant()`。
+
+## 修復 阻塞 的 頁面
+
+現在 考慮 一個 不同 的 路由，`` `/shop/[slug]` ``，它 具有 相同 的 數據 需求，但 沒有 本地 Suspense 邊界 或 緩存:
+
+```tsx filename="app/shop/[slug]/page.tsx"
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = await fetchProduct(slug)
+  const inventory = await fetchInventory(slug)
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+      <p>{inventory.count} in stock</p>
+    </div>
+  )
+}
+```
+
+根 佈局 將 `` `{children}` `` 包裹 在 `` `<Suspense>` `` 中:
+
+```tsx filename="app/layout.tsx" highlight={9-11}
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <Suspense fallback={<p>Loading...</p>}>{children}</Suspense>
+      </body>
+    </html>
+  )
+}
+```
+
+在 初始 頁面 載入 時，根 Suspense 捕捉 異步 任務 並 在 回退 內容 後 流式 傳入 頁面。一切 似乎 都 正常 運作。但在 從 `/shop/shoes` 到 `/shop/hats` 的 客戶端 導航 時，共享 的 `/shop` 佈局 是 入口 點。根 `` `<Suspense>` `` 邊界 位於 該 佈局 上方，因此 對 此 導航 不可見。頁面 獲取 未 緩存 數據 且 沒有 本地 邊界，因此 舊 頁面 會 保持 可見，直到 服務器 完成 渲染，導致 導航 感覺 無 響應。
+
+### 步驟 1: 新增 即時 驗證
+
+新增 `` `unstable_instant` `` 導出 以 暴露 問題:
+
+```tsx filename="app/shop/[slug]/page.tsx" highlight={1}
+export const unstable_instant = { prefetch: 'static' }
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = await fetchProduct(slug)
+  const inventory = await fetchInventory(slug)
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+      <p>{inventory.count} in stock</p>
+    </div>
+  )
+}
+```
+
+Next.js 現在 在 路由 中 的 每個 共享 佈局 邊界 模擬 導航。等待 `` `params` `` 以及 兩 個 數據 獲取 操作 被 標記 為 違規，因為 它們 會 懸掛 或 在 Suspense 邊界 外 訪問 未 緩存 數據。每個 錯誤 都 識別 具體 的 組件 並 提供 修復 建議。
+
+### 步驟 2: 修復 錯誤
+
+檢視 數據。沒有 `` `generateStaticParams` ``，因此 `slug` 只在 請求 時間 可 知曉。等待 `` `params` `` 會 懸掛，因此 每個 讀取 它 的 組件 都 需要 自己 的 `` `<Suspense>` `` 邊界。
+
+決定 每個 獲取 操作 的 處理 方式:
+
+- **產品 詳情** (名稱、價格) 很少 變動。使用 `use cache` 將 它們 緩存 為 `slug` 的 函數。
+- **庫存** 必須 來自 上游 的 最新 數據。保持 未 緩存，讓 它 在 `` `<Suspense>` `` 回退 內容 後 流式 傳入。
+
+結果 與 第一 節 的 結構 相同:
+
+```tsx filename="app/shop/[slug]/page.tsx" highlight={1,12-19,25}
+export const unstable_instant = { prefetch: 'static' }
+
+import { Suspense } from 'react'
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  return (
+    <div>
+      <Suspense fallback={<p>Loading product...</p>}>
+        {params.then(({ slug }) => (
+          <ProductInfo slug={slug} />
+        ))}
+      </Suspense>
+      <Suspense fallback={<p>Checking availability...</p>}>
+        <Inventory params={params} />
+      </Suspense>
+    </div>
+  )
+}
+
+async function ProductInfo({ slug }: { slug: string }) {
+  'use cache'
+  const product = await fetchProduct(slug)
+  return (
+    <>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+    </>
+  )
+}
+
+async function Inventory({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const inventory = await fetchInventory(slug)
+  return <p>{inventory.count} in stock</p>
+}
+```
+
+驗證 通過。打開 DevTools 並 嘗試 客戶端 導航。產品 名稱 和 價格 立 即 出現，「正在 檢查 可用性..."」顯示 庫存 將 流式 傳入 的 位置。
+
+<details>
+
+<summary>驗證 如何 檢查 每個 入口 點</summary>
+
+當 您 向 路由 新增 `unstable_instant` 時，Next.js 不僅 檢查 初始 頁面 載入。它 模擬 路由 層次 結構 中 每個 可能 的 共享 佈局 邊界 的 導航。
+
+對於 類似 `/shop/[slug]` 的 路由，驗證 檢查:
+
+- 外部的 入口 (頁面 載入): 完整 樹 渲染，根 佈局 Suspense 捕捉 一切
+- `/shop` 下 的 相 兄弟 節點 的 入口 (從 `/shop/shoes` 到 `/shop/hats` 的 客戶端 導航): 僅 頁面 段 重新 渲染，`` `/shop` `` 佈局 是 入口 點
+
+每個 入口 點 獨立 驗證。覆蓋 一個 路徑 的 Suspense 邊界 可能 對 另一個 路徑 不可見。這 就是 為什麼 頁面 可能 通過 初始 載入 檢查，但 對 相 兄弟 導航 失敗 的 原因，也是 為什麼 隨著 路由 數量 增加，手動 捕捉 這些 問題 很 困難。
+
+</details>
+
+## 透過 `instant = false` 停用
+
+並 非 每個 佈局 都能 即時。讀取 Cookie 並 獲取 用戶 特定 數據 的 儀表板 佈局 對於 第一 個 入口 點 可能 太 動態。您 可以 在 該 佈局 上 設定 `instant = false` 以 豁免 它 的 驗證:
+
+```tsx filename="app/dashboard/layout.tsx"
+export const unstable_instant = false
+```
+
+這 告知 驗證：不 要求 進入 `/dashboard` 是 即時 的，但仍 允許 您 通過 在 內部 段 上 使用 `instant` 來 驗證 內部 的 相 兄弟 導航。從 `/dashboard/a` 導航 到 `/dashboard/b` 仍可 通過 在 `/dashboard` 下 的 頁面 段 上 新增 `instant` 進行 檢查。
+
+## 下一步
+
+- [`instant` API 參考](/docs/app/api-reference/file-conventions/route-segment-config/instant) 包含 所有 配置 選項，包括 執行 時 預取 和 使用 `instant = false` 的 漸進 採用
+- [緩存](/docs/app/getting-started/caching) 關於 `use cache`、Suspense 和 部分 預渲染 的 背景
+- [重新驗證](/docs/app/getting-started/revalidating) 關於 如何 使用 `cacheLife` 和 `updateTag` 過期 緩存 數據

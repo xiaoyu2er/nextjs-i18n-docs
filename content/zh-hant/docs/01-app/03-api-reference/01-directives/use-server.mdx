@@ -1,0 +1,194 @@
+---
+title: 使用伺服器 (use server)
+description: 學習如何使用 use server 指令在伺服器端執行程式碼。
+---
+
+`use server` 指令標示函式或檔案，使其在 **伺服器端** 執行。它可放在檔案最頂端，標示該檔案中所有函式皆為伺服器端，或直接在函式頂端內聯標示該函式為 [Server Function](https://19.react.dev/reference/rsc/server-functions)。這是 React 的功能。
+
+## 在檔案最頂端使用 `use server`
+
+以下範例顯示一個在頂部有 `use server` 指令的檔案。檔案中的所有函式皆在伺服器上執行。
+
+```tsx filename="app/actions.ts" highlight={1} switcher
+'use server'
+import { db } from '@/lib/db' // Your database client
+import { auth } from '@/lib/auth'
+
+export async function createUser(data: { name: string; email: string }) {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized')
+  }
+
+  const user = await db.user.create({ data })
+  return { id: user.id, name: user.name }
+}
+```
+
+```jsx filename="app/actions.js" highlight={1} switcher
+'use server'
+import { db } from '@/lib/db' // Your database client
+import { auth } from '@/lib/auth'
+
+export async function createUser(data) {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized')
+  }
+
+  const user = await db.user.create({ data })
+  return { id: user.id, name: user.name }
+}
+```
+
+### 在用戶端組件中使用伺服器函式 (Server Functions)
+
+要在用戶端組件 (Client Components) 中使用伺服器函式 (Server Functions)，您需要在獨立檔案中建立伺服器函式，並在檔案頂部使用 `use server` 指令。接著這些伺服器函式便可匯入至用戶端組件 (Client Components) 和伺服器組件 (Server Components) 並執行。
+
+假設您在 `actions.ts` 中擁有一個 `fetchUsers` 伺服器函式 (Server Function)：
+
+```tsx filename="app/actions.ts" highlight={1} switcher
+'use server'
+import { db } from '@/lib/db' // Your database client
+import { auth } from '@/lib/auth'
+
+export async function fetchUsers() {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized')
+  }
+
+  const users = await db.user.findMany({
+    select: { id: true, name: true, email: true },
+  })
+  return users
+}
+```
+
+```jsx filename="app/actions.js" highlight={1} switcher
+'use server'
+import { db } from '@/lib/db' // Your database client
+import { auth } from '@/lib/auth'
+
+export async function fetchUsers() {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized')
+  }
+
+  const users = await db.user.findMany({
+    select: { id: true, name: true, email: true },
+  })
+  return users
+}
+```
+
+接著您便可將 `fetchUsers` 伺服器函式 (Server Function) 匯入用戶端組件，並在用戶端執行。
+
+```tsx filename="app/components/my-button.tsx" highlight={1,2,5} switcher
+'use client'
+import { fetchUsers } from '../actions'
+
+export default function MyButton() {
+  return <button onClick={() => fetchUsers()}>Fetch Users</button>
+}
+```
+
+```jsx filename="app/components/my-button.js" highlight={1,2,5} switcher
+'use client'
+import { fetchUsers } from '../actions'
+
+export default function MyButton() {
+  return <button onClick={() => fetchUsers()}>Fetch Users</button>
+}
+```
+
+## 直接在函式中內聯使用 `use server`
+
+在以下範例中，`use server` 用於函式頂部，以內聯方式將其標記為 [Server Function](https://19.react.dev/reference/rsc/server-functions)：
+
+```tsx filename="app/posts/[id]/page.tsx" switcher highlight={8}
+import { EditPost } from './edit-post'
+import { revalidatePath } from 'next/cache'
+
+export default async function PostPage({ params }: { params: { id: string } }) {
+  const post = await getPost(params.id)
+
+  async function updatePost(formData: FormData) {
+    'use server'
+    // Verify auth before saving (e.g. inside savePost)
+    await savePost(params.id, formData)
+    revalidatePath(`/posts/${params.id}`)
+  }
+
+  return <EditPost updatePostAction={updatePost} post={post} />
+}
+```
+
+```jsx filename="app/posts/[id]/page.js" switcher highlight={8}
+import { EditPost } from './edit-post'
+import { revalidatePath } from 'next/cache'
+
+export default async function PostPage({ params }) {
+  const post = await getPost(params.id)
+
+  async function updatePost(formData) {
+    'use server'
+    // Verify auth before saving (e.g. inside savePost)
+    await savePost(params.id, formData)
+    revalidatePath(`/posts/${params.id}`)
+  }
+
+  return <EditPost updatePostAction={updatePost} post={post} />
+}
+```
+
+## 安全性考量
+
+將您的數據存取函式設計為安全原語：驗證輸入、檢查認證與授權，並將返回類型限制為呼叫者所需的內容。當伺服器函式 (Server Functions) 委託到 [數據存取層 (Data Access Layer)](/docs/app/guides/data-security#using-a-data-access-layer-for-mutations) 時，這些保證集中在一個地方並一致套用。
+
+{/* TODO: 展示輸入驗證 */}
+
+### 身份驗證與授權
+
+執行敏感伺服器端作業前，務必對用戶進行認證和授權。應從 cookies 或 headers 讀取認證資訊，而非接受 tokens 作為函式參數。
+
+```tsx filename="app/actions.ts" highlight={1,7,8,9,10} switcher
+'use server'
+
+import { db } from '@/lib/db' // Your database client
+import { auth } from '@/lib/auth' // Your authentication library
+
+export async function createUser(data: { name: string; email: string }) {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized')
+  }
+  const newUser = await db.user.create({ data })
+  return { id: newUser.id, name: newUser.name }
+}
+```
+
+```jsx filename="app/actions.js" highlight={1,7,8,9,10} switcher
+'use server'
+
+import { db } from '@/lib/db' // Your database client
+import { auth } from '@/lib/auth' // Your authentication library
+
+export async function createUser(data) {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized')
+  }
+  const newUser = await db.user.create({ data })
+  return { id: newUser.id, name: newUser.name }
+}
+```
+
+### 返回值
+
+伺服器函式 (Server Functions) 的返回值會被序列化並發送到客戶端。僅返回 UI 所需的資料，不要返回原始的數據庫記錄。詳細資訊請參閱 [數據安全指南 (Data Security Guide)](/docs/app/guides/data-security#controlling-return-values)。
+
+## 參考
+
+請參閱 [React 文件](https://react.dev/reference/rsc/use-server) 以獲取更多關於 `use server` 的資訊。

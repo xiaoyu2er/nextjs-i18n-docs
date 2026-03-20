@@ -497,6 +497,24 @@ async function runTranslate(opts: CliOptions): Promise<void> {
       console.log('📦 No existing cache');
     }
 
+    // Clean up orphan translated files (no corresponding EN source)
+    const enFiles = new Set(files);
+    const langDir = path.join(opts.outputDir, lang);
+    if (fs.existsSync(langDir)) {
+      const langFiles = await glob(opts.pattern, { cwd: langDir });
+      let orphanCount = 0;
+      for (const relPath of langFiles) {
+        if (!enFiles.has(relPath)) {
+          const orphanPath = path.join(langDir, relPath);
+          fs.unlinkSync(orphanPath);
+          orphanCount++;
+        }
+      }
+      if (orphanCount > 0) {
+        console.log(`🧹 Removed ${orphanCount} orphan files (no EN source)`);
+      }
+    }
+
     // Scan all files, separate cached vs needs-translation
     const cachedFiles: string[] = [];
     const translateFiles: string[] = [];

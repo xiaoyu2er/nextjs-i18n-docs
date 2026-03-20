@@ -1,0 +1,304 @@
+---
+title: 後置執行 (after)
+description: 執行後 (after) 函數的 API 參考。
+---
+
+`後置執行 (after)` 允許您排程工作，在回應（或預先渲染）完成後執行。這對於不應阻塞回應的任務和其他副作用很有用，例如記錄和分析。
+
+它可用於 [伺服器組件 (Server Components)](/docs/app/getting-started/server-and-client-components)（包括 [`generateMetadata`](/docs/app/api-reference/functions/generate-metadata)）、[伺服器函數 (Server Functions)](/docs/app/getting-started/mutating-data)、[路由處理器 (Route Handlers)](/docs/app/api-reference/file-conventions/route) 和 [代理 (Proxy)](/docs/app/api-reference/file-conventions/proxy)。
+
+此函數接受一個回調，該回調將在回應（或預先渲染）完成後執行：
+
+```tsx filename="app/layout.tsx" switcher
+import { after } from 'next/server'
+// Custom logging function
+import { log } from '@/app/utils'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  after(() => {
+    // Execute after the layout is rendered and sent to the user
+    log()
+  })
+  return <>{children}</>
+}
+```
+
+```jsx filename="app/layout.jsx" switcher
+import { after } from 'next/server'
+// Custom logging function
+import { log } from '@/app/utils'
+
+export default function Layout({ children }) {
+  after(() => {
+    // Execute after the layout is rendered and sent to the user
+    log()
+  })
+  return <>{children}</>
+}
+```
+
+> **小知識：** `after` 不是 [請求時間 API (Request-time API)](/docs/app/glossary#request-time-apis)，呼叫它不會導致路由變為動態。如果它用於靜態頁面中，回調函數會在構建時，或頁面重新驗證時執行。
+
+## 參考
+
+### 參數
+
+- 一個在回應（或預先渲染）完成後執行的回調函式。
+
+### 持續時間
+
+`after` 將根據平台的預設或配置的最大持續時間執行。如果您的平台支持，您可以使用 [`maxDuration`](/docs/app/api-reference/file-conventions/route-segment-config/maxDuration) 路由段配置來設置超時限制。
+
+## 小知識
+
+- 即使回應未成功完成，\`後置執行 (after)\` 也會執行。包括拋出錯誤或呼叫 `notFound` 或 `redirect` 時。
+- 您可以使用 React `cache` 來去重複 \`後置執行 (after)\` 內部呼叫的函式。
+- \`後置執行 (after)\` 可以嵌套在其他 \`後置執行 (after)\` 呼叫中，例如，您可以建立包裝 \`後置執行 (after)\` 呼叫的公用函式以新增額外功能。
+
+## 範例
+
+### 使用請求 API
+
+您是否可以在 `after` 內部使用 `cookies` 和 `headers` 等請求 API，取決於 `after` 在何處被呼叫。
+
+#### 在路由處理器 (Route Handlers) 和伺服器函數 (Server Functions) 中
+
+當用於 [路由處理器 (Route Handlers)](/docs/app/api-reference/file-conventions/route) 和 [伺服器函數 (Server Functions)](/docs/app/getting-started/mutating-data) 時，您可以在 `after` 回調內部直接呼叫 `cookies` 和 `headers`。這可用於在變異操作或 API 請求後記錄活動。例如：
+
+```ts filename="app/api/route.ts" highlight={2,10-16} switcher
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export async function POST(request: Request) {
+  // Perform mutation
+  // ...
+
+  // Log user activity for analytics
+  after(async () => {
+    const userAgent = (await headers()).get('user-agent') || 'unknown'
+    const sessionCookie =
+      (await cookies()).get('session-id')?.value || 'anonymous'
+
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return new Response(JSON.stringify({ status: 'success' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+```
+
+```js filename="app/api/route.js" highlight={2,10-16} switcher
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export async function POST(request) {
+  // Perform mutation
+  // ...
+
+  // Log user activity for analytics
+  after(async () => {
+    const userAgent = (await headers()).get('user-agent') || 'unknown'
+    const sessionCookie =
+      (await cookies()).get('session-id')?.value || 'anonymous'
+
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return new Response(JSON.stringify({ status: 'success' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+```
+
+#### 在服務器組件 (Server Components) 中（頁面和佈局）
+
+[伺服器組件 (Server Components)](/docs/app/getting-started/server-and-client-components)（包括頁面、佈局和 `generateMetadata`）**無法** 在 `after` 內部使用 `cookies`、`headers` 或其他請求時間 API (Request-time APIs)。這是因為 Next.js 需要知道組件樹的哪一部分訪問請求數據以支持 [部分預渲染 (Partial Prerendering)](/docs/app/glossary#partial-prerendering-ppr) 和 [緩存組件 (Cache Components)](/docs/app/getting-started/caching)，但 `after` 會在 React 的渲染生命週期之後執行。
+
+如果您需要在伺服器組件 (Server Component) 的 `after` 回調內部使用請求資料，請事先讀取並傳遞值：
+
+```tsx filename="app/page.tsx" highlight={8-10,12} switcher
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default async function Page() {
+  // Read request data before `after` — this is allowed
+  // These calls will be read during the component's rendering lifecycle
+  const userAgent = (await headers()).get('user-agent') || 'unknown'
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  after(() => {
+    // Use the values read above
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return <h1>My Page</h1>
+}
+```
+
+```jsx filename="app/page.jsx" highlight={8-10,12} switcher
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default async function Page() {
+  // Read request data before `after` — this is allowed
+  // These calls will be read during the component's rendering lifecycle
+  const userAgent = (await headers()).get('user-agent') || 'unknown'
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  after(() => {
+    // Use the values read above
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return <h1>My Page</h1>
+}
+```
+
+在伺服器組件 (Server Component) 的 `after` 回調內部呼叫 `cookies()` 或 `headers()` 會拋出運行時錯誤。
+
+#### 搭配快取元件 (Cache Components)
+
+當使用 [緩存組件 (Cache Components)](/docs/app/getting-started/caching) 時，訪問如 `cookies` 或 `headers` 等請求資料的組件必須包裹在 [`<Suspense>`](https://react.dev/reference/react/Suspense) 中，以便頁面其餘部分可以預渲染為靜態外殼。
+
+您可以通過在動態組件中讀取請求資料並將其傳遞給 `after`，將此模式與 `after` 結合：
+
+```tsx filename="app/page.tsx" highlight={18-19,22-24} switcher
+import { Suspense } from 'react'
+import { after } from 'next/server'
+import { cookies } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default function Page() {
+  return (
+    <>
+      <h1>Part of the static shell</h1>
+      <Suspense fallback={<p>Loading...</p>}>
+        <DynamicContent />
+      </Suspense>
+    </>
+  )
+}
+
+async function DynamicContent() {
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  // Schedule work after the response is sent
+  after(() => {
+    logUserAction({ sessionCookie })
+  })
+
+  return <p>Your session: {sessionCookie}</p>
+}
+```
+
+```jsx filename="app/page.jsx" highlight={18-19,22-24} switcher
+import { Suspense } from 'react'
+import { after } from 'next/server'
+import { cookies } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default function Page() {
+  return (
+    <>
+      <h1>Part of the static shell</h1>
+      <Suspense fallback={<p>Loading...</p>}>
+        <DynamicContent />
+      </Suspense>
+    </>
+  )
+}
+
+async function DynamicContent() {
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  // Schedule work after the response is sent
+  after(() => {
+    logUserAction({ sessionCookie })
+  })
+
+  return <p>Your session: {sessionCookie}</p>
+}
+```
+
+在此範例中，`<h1>` 和 `<Suspense>` 備援包含在靜態外殼中。`DynamicContent` 在渲染期間讀取 Cookie 並通過閉包將其傳遞給 `after`。由於 `cookies()` 是在 `after` 回調_外面_（在組件的渲染期間）調用的，因此這可以正確工作。
+
+## 平台支援
+
+| 部署選項                                                           | 支援狀態          |
+| ------------------------------------------------------------------- | ----------------- |
+| [Node.js 伺服器](/docs/app/getting-started/deploying#nodejs-server) | 是               |
+| [Docker 容器](/docs/app/getting-started/deploying#docker)      | 是               |
+| [靜態匯出](/docs/app/getting-started/deploying#static-export)  | 否                |
+| [配接器](/docs/app/getting-started/deploying#adapters)            | 依平台而定 |
+
+請參閱 [設定 \`後置執行 (after)\`](/docs/app/guides/self-hosting#after) 以了解如何在自我託管 Next.js 時進行設定。
+
+<details id="after-serverless">
+
+  <summary>參考：支援 serverless 平台的 \`後置執行 (after)\``</summary>
+
+在 Serverless 環境中使用 \`後置執行 (after)\` 需要在回應已送出後等待非同步任务完成。在 Next.js 和 Vercel 中，這使用名為 \`waitUntil(promise)\` 的原語達成，它延伸 Serverless 呼叫的生命週期，直到所有傳給 [`waitUntil`](https://vercel.com/docs/functions/functions-api-reference#waituntil) 的 Promise 都解決。
+
+如果您的使用者需要能執行 \`後置執行 (after)\`，您必須提供您的 \`waitUntil\` 實作，行為需類似。
+
+當呼叫 \`後置執行 (after)\` 時，Next.js 會這樣存取 \`waitUntil\``
+
+```jsx
+const RequestContext = globalThis[Symbol.for('@next/request-context')]
+const contextValue = RequestContext?.get()
+const waitUntil = contextValue?.waitUntil
+```
+
+這意味著 \`globalThis[Symbol.for('@next/request-context')]\` 預期包含類似這個的物件：
+
+```tsx
+type NextRequestContext = {
+  get(): NextRequestContextValue | undefined
+}
+
+type NextRequestContextValue = {
+  waitUntil?: (promise: Promise<any>) => void
+}
+```
+
+這是實作的範例。
+
+```tsx
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+const RequestContextStorage = new AsyncLocalStorage<NextRequestContextValue>()
+
+// Define and inject the accessor that next.js will use
+const RequestContext: NextRequestContext = {
+  get() {
+    return RequestContextStorage.getStore()
+  },
+}
+globalThis[Symbol.for('@next/request-context')] = RequestContext
+
+const handler = (req, res) => {
+  const contextValue = { waitUntil: YOUR_WAITUNTIL }
+  // Provide the value
+  return RequestContextStorage.run(contextValue, () => nextJsHandler(req, res))
+}
+```
+
+</details>
+
+## 版本歷史
+
+| 版本      | 變更                      |
+| ------------ | ---------------------------- |
+| `v15.1.0`    | `after` 變得穩定。       |
+| `v15.0.0-rc` | `unstable_after` 引入。 |

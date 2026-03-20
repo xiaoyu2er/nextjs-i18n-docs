@@ -1,0 +1,663 @@
+---
+title: 使用緩存 (use cache)
+description: 學習如何使用「use cache」指令在 Next.js 應用程式中儲存資料。
+related:
+  title: Related
+  description: View related API references.
+  links:
+    - app/api-reference/directives/use-cache-private
+    - app/api-reference/config/next-config-js/cacheComponents
+    - app/api-reference/config/next-config-js/cacheLife
+    - app/api-reference/config/next-config-js/cacheHandlers
+    - app/api-reference/functions/cacheTag
+    - app/api-reference/functions/cacheLife
+    - app/api-reference/functions/revalidateTag
+---
+
+`use cache` 指示詞允許您將路由、React 元件或函式標記為可快取。它可以用於檔案開頭，表示檔案中的所有匯出都應該被快取，或者內嵌在函式或元件頂部，以快取返回值。
+
+> **重要知識**:
+>
+> - 若要使用 cookies 或 headers，請在緩存範圍外讀取它們，並作為參數傳遞。這是推薦的模式。
+> - 如果記憶體緩存不適合執行時資料，[`'use cache: remote'`](/docs/app/api-reference/directives/use-cache-remote) 允許平台提供專用緩存處理程式，但這需要網絡往返來檢查緩存，通常會產生平台費用。
+> - 為了符合合規要求，或者當您無法重構程式碼以將執行時資料作為參數傳遞給 `use cache` 範圍時，請參閱 [`'use cache: private'`](/docs/app/api-reference/directives/use-cache-private)。
+
+## 使用方法
+
+`use cache` 是 Cache Components 功能。若要啟用它，請在您的 `next.config.ts` 檔案中新增 [`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) 選項：
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  cacheComponents: true,
+}
+
+module.exports = nextConfig
+```
+
+接著，在檔案、元件或函式層級加入 `use cache`：
+
+```tsx
+// File level
+'use cache'
+
+export default async function Page() {
+  // ...
+}
+
+// Component level
+export async function MyComponent() {
+  'use cache'
+  return <></>
+}
+
+// Function level
+export async function getData() {
+  'use cache'
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+> **重要知識**：當在檔案層級使用時，所有函數匯出必須是異步函數。
+
+## 使用快取運作方式
+
+### 快取金鑰
+
+快取項目的金鑰是使用其輸入的序列化版本生成的，包括：
+
+1. **建構 ID** - 每個建構唯一，變更此項會使所有緩存條目失效
+2. **函數 ID** - 程式碼庫中函數位置與簽名的安全雜湊值
+3. **可序列化參數** - Props（用於元件）或函數參數
+4. **HMR 重新整理雜湊**（僅開發環境） - 在熱模組替換時無效化緩存
+
+當已緩存的函數參考來自外部作用域的變數時，這些變數會自動被捕捉並綁定為參數，使它們成為緩存鍵的一部分。
+
+```tsx filename="lib/data.ts"
+async function Component({ userId }: { userId: string }) {
+  const getData = async (filter: string) => {
+    'use cache'
+    // Cache key includes both userId (from closure) and filter (argument)
+    return fetch(`/api/users/${userId}/data?filter=${filter}`)
+  }
+
+  return getData('active')
+}
+```
+
+在上述程式碼片段中，`userId` 從外部作用域被捕捉，而 `filter` 作為參數傳遞，因此兩者都成為 `getData` 函數的緩存鍵。這意味著不同的用戶和過濾器組合將擁有分開的緩存條目。
+
+## 序列化
+
+已緩存函數的參數及其返回值必須可以序列化。
+
+完整參考請查看：
+
+- [`可序列化參數`](https://react.dev/reference/rsc/use-server#serializable-parameters-and-return-values) - 使用 **React Server Components** 序列化
+- [`可序列化返回值類型`](https://react.dev/reference/rsc/use-client#serializable-types) - 使用 **React Client Components** 序列化
+
+> **重要知識：**參數和返回值使用不同的序列化系統。伺服器元件序列化（用於參數）比客戶端元件序列化（用於返回值）更嚴格。這意味著您可以返回 JSX 元素，但除非使用穿透模式，否則不能將其作為參數接受。
+
+### 支援的類型
+
+**參數：**
+
+- 基本類型：`string`, `number`, `boolean`, `null`, `undefined`
+- 普通物件：`{ key: value }`
+- 陣列：`[1, 2, 3]`
+- 日期、Map、Set、TypedArray、ArrayBuffer
+- React 元素（僅作為穿透）
+
+**返回值：**
+
+- 與參數相同，外加 JSX 元素
+
+### 不支援的類型
+
+- 類別實例
+- 函數（除了作為穿透）
+- Symbols, WeakMaps, WeakSets
+- URL 實例
+
+```tsx filename="app/components/user-card.tsx"
+// Valid - primitives and plain objects
+async function UserCard({
+  id,
+  config,
+}: {
+  id: string
+  config: { theme: string }
+}) {
+  'use cache'
+  return <div>{id}</div>
+}
+
+// Invalid - class instance
+async function UserProfile({ user }: { user: UserClass }) {
+  'use cache'
+  // Error: Cannot serialize class instance
+  return <div>{user.name}</div>
+}
+```
+
+### 穿透（不可序列化參數）
+
+您可以接受不可序列化的值，**前提是不要對它們進行剖析**。這允許使用 `children` 和 Server Actions 的組合模式：
+
+```tsx filename="app/components/cached-wrapper.tsx"
+async function CachedWrapper({ children }: { children: ReactNode }) {
+  'use cache'
+  // Don't read or modify children - just pass it through
+  return (
+    <div className="wrapper">
+      <header>Cached Header</header>
+      {children}
+    </div>
+  )
+}
+
+// Usage: children can be dynamic
+export default function Page() {
+  return (
+    <CachedWrapper>
+      <DynamicComponent /> {/* Not cached, passed through */}
+    </CachedWrapper>
+  )
+}
+```
+
+您還可以透過已緩存的元件傳遞 Server Actions：
+
+```tsx filename="app/components/cached-form.tsx"
+async function CachedForm({ action }: { action: () => Promise<void> }) {
+  'use cache'
+  // Don't call action here - just pass it through
+  return <form action={action}>{/* ... */}</form>
+}
+```
+
+## 限制
+
+已緩存的函數在獨立環境中執行。以下限制確保緩存行為保持可預測且安全。
+
+### 請求時 APIs
+
+已緩存的函數和元件 **無法** 直接存取執行時 APIs，例如 `cookies()`、`headers()` 或 `searchParams`。相反，請在緩存範圍外讀取這些值，並將它們作為參數傳遞。
+
+### 執行時緩存注意事項
+
+雖然 `use cache` 主要是為了將未緩存的資料包含在靜態外殼中，但它也可以在執行時使用記憶體 LRU（最近最少使用）儲存來緩存資料。
+
+執行時緩存行為取決於您的託管環境：
+
+| 環境 | 執行時緩存行為 |
+| --------------- | -------------------------------------------------------------------------------------------- |
+| **Serverless** | 緩存條目通常不會在請求之間持久化（每個請求可能是不同的實例）。建構時緩存正常運作。 |
+| **自我託管** | 緩存條目會在請求之間持久化。使用 [`cacheMaxMemorySize`](/docs/app/api-reference/config/next-config-js/incrementalCacheHandlerPath) 控制緩存大小。 |
+
+如果預設記憶體緩存不夠，請考慮 **[use cache: remote](/docs/app/api-reference/directives/use-cache-remote)**，它允許平台提供專用緩存處理程式（例如 Redis 或 KV 資料庫）。這有助於减少对未針對總流量擴展的資料來源的存取次數，但會產生成本（儲存空間、網路延遲、平台費用）。
+
+在極罕見的情況下，為了符合合規要求，或者當您無法重構程式碼以將執行時資料作為參數傳遞給 `use cache` 範圍時，您可能需要 [use cache: private](/docs/app/api-reference/directives/use-cache-private)。
+
+### React.cache 隔離
+
+[React.cache](https://react.dev/reference/react/cache) 在 `use cache` 邊界內的獨立作用域中運行。在 `use cache` 函數外透過 `React.cache` 儲存的值在內部不可見。
+
+這意味著您無法使用 `React.cache` 將資料傳遞到 `use cache` 範圍：
+
+```tsx
+import { cache } from 'react'
+
+const store = cache(() => ({ current: null as string | null }))
+
+function Parent() {
+  const shared = store()
+  shared.current = 'value from parent'
+  return <Child />
+}
+
+async function Child() {
+  'use cache'
+  const shared = store()
+  // shared.current is null, not 'value from parent'
+  // use cache has its own isolated React.cache scope
+  return <div>{shared.current}</div>
+}
+```
+
+這種隔離確保已緩存的函數具有可預測、自包含的行為。要將資料傳遞到 `use cache` 範圍，請改用函數參數。
+
+## 執行時使用快取
+
+在 **伺服器** 上，緩存條目儲存在記憶體中，並尊重您的 `cacheLife` 設定中的 `revalidate` 和 `expire` 時間。您可以在 `next.config.js` 檔案中配置 [`cacheHandlers`](/docs/app/api-reference/config/next-config-js/cacheHandlers) 自定義緩存儲存。
+
+在 **客戶端**，來自伺服器緩存的內容會儲存在瀏覽器記憶體中，持續時間由 `stale` 時間定義。客戶端路由器強制實施 **至少 30 秒的過期時間**，不受配置影響。
+
+`x-nextjs-stale-time` 響應標頭從伺服器向客戶端傳達緩存生存期，確保協同行為。
+
+## 重新驗證 (Revalidation)
+
+預設情況下，`use cache` 使用 `default` 設定檔，設定如下：
+
+- **stale**：5 分鐘（客戶端）
+- **revalidate**：15 分鐘（伺服器端）
+- **expire**：永不按時間自動過期
+
+```tsx filename="lib/data.ts"
+async function getData() {
+  'use cache'
+  // Implicitly uses default profile
+  return fetch('/api/data')
+}
+```
+
+### 自定義緩存生存期
+
+使用 [`cacheLife`](/docs/app/api-reference/functions/cacheLife) 函數自定義緩存持續時間：
+
+```tsx filename="lib/data.ts"
+import { cacheLife } from 'next/cache'
+
+async function getData() {
+  'use cache'
+  cacheLife('hours') // Use built-in 'hours' profile
+  return fetch('/api/data')
+}
+```
+
+### 按需重新驗證
+
+對於按需緩存的無效化，使用 [`cacheTag`](/docs/app/api-reference/functions/cacheTag)、[`updateTag`](/docs/app/api-reference/functions/updateTag) 或 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag)：
+
+```tsx filename="lib/data.ts"
+import { cacheTag } from 'next/cache'
+
+async function getProducts() {
+  'use cache'
+  cacheTag('products')
+  return fetch('/api/products')
+}
+```
+
+```tsx filename="app/actions.ts"
+'use server'
+
+import { updateTag } from 'next/cache'
+
+export async function updateProduct() {
+  await db.products.update(...)
+  updateTag('products') // Invalidates all 'products' caches
+}
+```
+
+`cacheLife` 和 `cacheTag` 跨客戶端和伺服器緩存層整合，這意味著您在一個地方配置緩存語義，它們就會應用於所有地方。
+
+## 範例
+
+### 使用 use cache 快取整個路由
+
+要預先轉譯整個路由，請在 **兩者** 的 `layout` 和 `page` 檔案頂部加入 `use cache`。這些區段在應用程式中被視為獨立進入點，並將獨立快取。
+
+```tsx filename="app/layout.tsx" switcher
+'use cache'
+
+export default async function Layout({ children }: { children: ReactNode }) {
+  return <div>{children}</div>
+}
+```
+
+```jsx filename="app/layout.js" switcher
+'use cache'
+
+export default async function Layout({ children }) {
+  return <div>{children}</div>
+}
+```
+
+任何匯入並嵌套在 `page` 檔案中的元件都是與 `page` 相關的緩存輸出的一部分。
+
+```tsx filename="app/page.tsx" switcher
+'use cache'
+
+async function Users() {
+  const users = await fetch('/api/users')
+  // loop through users
+}
+
+export default async function Page() {
+  return (
+    <main>
+      <Users />
+    </main>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+'use cache'
+
+async function Users() {
+  const users = await fetch('/api/users')
+  // loop through users
+}
+
+export default async function Page() {
+  return (
+    <main>
+      <Users />
+    </main>
+  )
+}
+```
+
+> **重要知識**：
+>
+> - 如果 `use cache` 僅添加到 `layout` 或 `page`，則僅該路由部分及其匯入的任何元件將被緩存。
+
+### 使用 use cache 快取元件的輸出
+
+您可以在元件層級使用 `use cache` 來快取該元件內執行的任何取得或計算。只要序列化的 props 在每個實例中產生相同的值，快取項目就會被重用。
+
+```tsx filename="app/components/bookings.tsx" highlight={2} switcher
+export async function Bookings({ type = 'haircut' }: BookingsProps) {
+  'use cache'
+  async function getBookingsData() {
+    const data = await fetch(`/api/bookings?type=${encodeURIComponent(type)}`)
+    return data
+  }
+  return //...
+}
+
+interface BookingsProps {
+  type: string
+}
+```
+
+```jsx filename="app/components/bookings.js" highlight={2} switcher
+export async function Bookings({ type = 'haircut' }) {
+  'use cache'
+  async function getBookingsData() {
+    const data = await fetch(`/api/bookings?type=${encodeURIComponent(type)}`)
+    return data
+  }
+  return //...
+}
+```
+
+### 使用 use cache 快取函式輸出
+
+由於您可以將 `use cache` 加入任何非同步函式，因此您不限於僅快取元件或路由。您可能想要快取網路請求、資料庫查詢或緩慢計算。
+
+```tsx filename="app/actions.ts" highlight={2} switcher
+export async function getData() {
+  'use cache'
+
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+```jsx filename="app/actions.js" highlight={2} switcher
+export async function getData() {
+  'use cache'
+
+  const data = await fetch('/api/data')
+  return data
+}
+```
+
+### 內容交錯
+
+在 React 中，使用 `children` 或插槽進行組合是構建靈活元件的熟知模式。使用 `use cache` 時，您可以繼續以這種方式組合您的 UI。任何作為 `children` 或其他組合插槽包含在返回的 JSX 中的內容，都會透過已緩存的元件傳遞，而不影響其緩存條目。
+
+只要您不在可緩存函數本身的主體中直接參照任何 JSX 插槽，它們在返回輸出中的存在就不會影響緩存條目。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  const uncachedData = await getData()
+  return (
+    // Pass compositional slots as props, e.g. header and children
+    <CacheComponent header={<h1>Home</h1>}>
+      {/* DynamicComponent is provided as the children slot */}
+      <DynamicComponent data={uncachedData} />
+    </CacheComponent>
+  )
+}
+
+async function CacheComponent({
+  header, // header: a compositional slot, injected as a prop
+  children, // children: another slot for nested composition
+}: {
+  header: ReactNode
+  children: ReactNode
+}) {
+  'use cache'
+  const cachedData = await fetch('/api/cached-data')
+  return (
+    <div>
+      {header}
+      <PrerenderedComponent data={cachedData} />
+      {children}
+    </div>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  const uncachedData = await getData()
+  return (
+    // Pass compositional slots as props, e.g. header and children
+    <CacheComponent header={<h1>Home</h1>}>
+      {/* DynamicComponent is provided as the children slot */}
+      <DynamicComponent data={uncachedData} />
+    </CacheComponent>
+  )
+}
+
+async function CacheComponent({
+  header, // header: a compositional slot, injected as a prop
+  children, // children: another slot for nested composition
+}) {
+  'use cache'
+  const cachedData = await fetch('/api/cached-data')
+  return (
+    <div>
+      {header}
+      <PrerenderedComponent data={cachedData} />
+      {children}
+    </div>
+  )
+}
+```
+
+您也可以透過快取元件向客戶端元件傳遞伺服器動作，而無需可快取函式內呼叫它們。
+
+```tsx filename="app/page.tsx" switcher
+import ClientComponent from './ClientComponent'
+
+export default async function Page() {
+  const performUpdate = async () => {
+    'use server'
+    // Perform some server-side update
+    await db.update(...)
+  }
+
+  return <CachedComponent performUpdate={performUpdate} />
+}
+
+async function CachedComponent({
+  performUpdate,
+}: {
+  performUpdate: () => Promise<void>
+}) {
+  'use cache'
+  // Do not call performUpdate here
+  return <ClientComponent action={performUpdate} />
+}
+```
+
+```jsx filename="app/page.js" switcher
+import ClientComponent from './ClientComponent'
+
+export default async function Page() {
+  const performUpdate = async () => {
+    'use server'
+    // Perform some server-side update
+    await db.update(...)
+  }
+
+  return <CachedComponent performUpdate={performUpdate} />
+}
+
+async function CachedComponent({ performUpdate }) {
+  'use cache'
+  // Do not call performUpdate here
+  return <ClientComponent action={performUpdate} />
+}
+```
+
+```tsx filename="app/ClientComponent.tsx" switcher
+'use client'
+
+export default function ClientComponent({
+  action,
+}: {
+  action: () => Promise<void>
+}) {
+  return <button onClick={action}>Update</button>
+}
+```
+
+```jsx filename="app/ClientComponent.js" switcher
+'use client'
+
+export default function ClientComponent({ action }) {
+  return <button onClick={action}>Update</button>
+}
+```
+
+## 疑難排解
+
+### 除錯緩存行為
+
+#### 詳細記錄
+
+設定 `NEXT_PRIVATE_DEBUG_CACHE=1` 以啟用詳細的緩存記錄：
+
+```bash
+NEXT_PRIVATE_DEBUG_CACHE=1 npm run dev
+# or for production
+NEXT_PRIVATE_DEBUG_CACHE=1 npm run start
+```
+
+> **重要知識：**此環境變數也會記錄 ISR 和其他緩存機制。請參閱 [驗證正確的生產行為](/docs/app/guides/incremental-static-regeneration#verifying-correct-production-behavior) 以獲取更多詳細資訊。
+
+#### 主控台記錄重播
+
+在開發環境中，來自已緩存函數的控制台記錄會出現 `Cache` 前綴。
+
+### 建構掛起（緩存超時）
+
+如果您的建構掛起，您正在存取解析為未緩存或執行時資料的 Promises，這些資料是在 `use cache` 邊界之外建立的。已緩存的函數等待在建構期間無法解析的資料，導致 50 秒超時。
+
+當建構超時時，您會看到以下錯誤訊息：
+
+> 錯誤：在靜態預生成期間填充緩存超時，可能是因為在 "use cache" 內部使用了特定請求參數，如 params、searchParams、cookies() 或未緩存的資料。
+
+常見情況：將這些 Promises 作為 props 傳遞，透過閉包存取它們，或從共享儲存（Maps）中檢索它們。
+
+> **重要知識：**在 `use cache` 內部直接呼叫 `cookies()` 或 `headers()` 會立即失敗，顯示 [不同的錯誤](/docs/messages/next-request-in-use-cache)，而非超時。
+
+**將執行時資料 Promises 作為 props 傳遞：**
+
+```tsx filename="app/page.tsx"
+import { cookies } from 'next/headers'
+import { Suspense } from 'react'
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Dynamic />
+    </Suspense>
+  )
+}
+
+async function Dynamic() {
+  const cookieStore = cookies()
+  return <Cached promise={cookieStore} /> // Build hangs
+}
+
+async function Cached({ promise }: { promise: Promise<unknown> }) {
+  'use cache'
+  const data = await promise // Waits for runtime data during build
+  return <p>..</p>
+}
+```
+
+在 `Dynamic` 元件中等待 `cookies` 儲存，並將 cookie 值傳遞給 `Cached` 元件。
+
+**共享去重儲存：**
+
+```tsx filename="app/page.tsx"
+// Problem: Map stores dynamic Promises, accessed by cached code
+import { Suspense } from 'react'
+
+const cache = new Map<string, Promise<string>>()
+
+export default function Page() {
+  return (
+    <>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Dynamic id="data" />
+      </Suspense>
+      <Cached id="data" />
+    </>
+  )
+}
+
+async function Dynamic({ id }: { id: string }) {
+  // Stores dynamic Promise in shared Map
+  cache.set(
+    id,
+    fetch(`https://api.example.com/${id}`).then((r) => r.text())
+  )
+  return <p>Dynamic</p>
+}
+
+async function Cached({ id }: { id: string }) {
+  'use cache'
+  return <p>{await cache.get(id)}</p> // Build hangs - retrieves dynamic Promise
+}
+```
+
+使用 Next.js 內建的 `fetch()` 去重，或為緩存和未緩存情境使用分開的 Maps。
+
+## 平台支援
+
+| 部署選項                                                           | 支援狀態          |
+| ------------------------------------------------------------------- | ----------------- |
+| [Node.js 伺服器](/docs/app/getting-started/deploying#nodejs-server) | 是               |
+| [Docker 容器](/docs/app/getting-started/deploying#docker)      | 是               |
+| [靜態匯出](/docs/app/getting-started/deploying#static-export)  | 否                |
+| [配接器](/docs/app/getting-started/deploying#adapters)            | 依平台而定 |
+
+學習如何在使用 Next.js 自我託管時 [配置快取](/docs/app/guides/self-hosting#caching-and-isr)。
+
+## 版本歷史
+
+| 版本 | 變更 |
+| --------- | ----------------------------------------------------------- |
+| `v16.0.0` | 隨 Cache Components 功能啟用 "use cache"。 |
+| `v15.0.0` | "use cache" 作為實驗性功能引入。 |

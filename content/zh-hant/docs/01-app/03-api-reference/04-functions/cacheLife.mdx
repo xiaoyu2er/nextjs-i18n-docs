@@ -1,0 +1,586 @@
+---
+title: cacheLife
+description: 學習如何使用 cacheLife 函式來設定快取函式或元件的快取過期時間。
+related:
+  title: Related
+  description: View related API references.
+  links:
+    - app/api-reference/config/next-config-js/cacheComponents
+    - app/api-reference/directives/use-cache
+    - app/api-reference/functions/revalidateTag
+    - app/api-reference/functions/cacheTag
+---
+
+cacheLife 函數用於設定函數或元件的快取生命週期。它應與 [`use cache`](/docs/app/api-reference/directives/use-cache) 指令搭配使用，且位於該函數或元件的範圍內。
+
+## 使用方法
+
+### 基本設定
+
+要使用 `cacheLife`，首先要在您的 `next.config.js` 檔案中啟用 [`cacheComponents` flag](/docs/app/api-reference/config/next-config-js/cacheComponents)：
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+const nextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+`cacheLife` 需要 `use cache` 指示詞，該指示詞必須位於檔案層級或 async function 或元件的頂部。
+
+>
+> - 如果使用了 `cacheLife`，它應該放置在要快取的函式產出所在的函式內部，即使 `use cache` 指示詞位於檔案層級
+> - 每個函式執行期間只應執行一次 `cacheLife` 呼叫。您可以在不同的控制流程分支中呼叫 `cacheLife`，但請確保每次執行只執行一次。請參閱 [條件式快取壽命](#conditional-cache-lifetimes) 範例
+
+### 使用預設配置檔
+
+Next.js 提供涵蓋常見快取需求的預設快取配置檔。每個配置檔平衡三個因素：
+
+- 使用者看到快取內容而無需檢查更新的時間長度（客戶端）
+- 伺服器上定期產生新內容的頻率
+- 舊內容完全過期的時間
+
+根據您的內容更改頻率來選擇配置檔：
+
+- **`seconds`** - 即時資料（股價、即時比分）
+- **`minutes`** - 經常更新（社群貼文、新聞）
+- **`hours`** - 每日多次更新（庫存、天氣）
+- **`days`** - 每日更新（部落格文章、文章）
+- **`weeks`** - 每週更新（Podcast、通訊）
+- **`max`** - 很少更改（法律頁面、封存內容）
+
+匯入 `cacheLife` 並傳入配置檔名稱：
+
+```tsx filename="app/blog/page.tsx" highlight={1,5}
+'use cache'
+import { cacheLife } from 'next/cache'
+
+export default async function BlogPage() {
+  cacheLife('days') // Blog content updated daily
+
+  const posts = await getBlogPosts()
+  return <div>{/* render posts */}</div>
+}
+```
+
+配置檔名稱告訴 Next.js 如何快取整個函式的輸出。如果您沒有呼叫 `cacheLife`，則使用 `default` 配置檔。請參閱 [預設快取配置檔](#preset-cache-profiles) 了解時序細節。
+
+## 參考
+
+### 快取配置檔屬性
+
+快取配置檔透過三個時序屬性來控制快取行為：
+
+- **[`stale`](#stale)**：客戶端可以使用快取資料而不檢查伺服器的時間
+- **[`revalidate`](#revalidate)**：此時間過後，下一個請求會觸發背景重新整理
+- **[`expire`](#expire)**：此時間後無請求，下一個請求會等待新內容
+
+#### stale
+
+**客戶端：** 客戶端可以使用快取資料而不檢查伺服器的時間長度。
+
+在此期間，用戶端路由器會立即顯示快取內容，無需任何網路請求。此期限過期後，路由器在下次導航或請求時必須檢查伺服器。這可提供即時的客戶端快取頁面載入，但資料可能已過時。
+
+- 如果省略，預設為 `default` 配置檔的 `stale` 值（5 分鐘，請參閱 [`staleTimes`](/docs/app/api-reference/config/next-config-js/staleTimes)）
+
+```tsx
+cacheLife({ stale: 300 }) // 5 minutes
+```
+
+#### revalidate
+
+伺服器在背景重新產生快取內容的頻率。
+
+- 當此期限過期後的請求到達時，伺服器：
+  1. 立即提供快取版本（如果有）
+  2. 在背景重新產生內容
+  3. 使用新內容更新快取
+- 類似於 [遞增式靜態再生 (ISR)](/docs/app/guides/incremental-static-regeneration)
+- 如果省略，預設為 `default` 配置檔的 `revalidate` 值（15 分鐘）
+
+```tsx
+cacheLife({ revalidate: 900 }) // 15 minutes
+```
+
+#### expire
+
+伺服器必須重新產生快取內容前的最大時間。
+
+- 當此期限過期且無流量時，伺服器會在下一個請求時同步重新產生內容
+- 當您同時設定 `revalidate` 和 `expire` 時，`expire` 必須比 `revalidate` 長。Next.js 會驗證此設定，並對無效配置拋出錯誤。
+- 如果省略，預設為 `default` 配置檔的 `expire` 值（永不過期）
+
+```tsx
+cacheLife({ expire: 3600 }) // 1 hour
+```
+
+### 預設快取配置檔
+
+如果您未指定配置檔，Next.js 將使用 `default` 配置檔。我們建議明確設定配置檔以確保快取行為清晰。
+
+| **配置文件** | **使用案例**                           | `stale`    | `revalidate` | `expire` |
+| ----------- | -------------------------------------- | ---------- | ------------ | -------- |
+| `default`   | 標準內容                               | 5 分鐘     | 15 分鐘    | 永不     |
+| `seconds`   | 即時資料                               | 30 秒      | 1 秒       | 1 分鐘   |
+| `minutes`   | 經常更新內容                           | 5 分鐘     | 1 分鐘     | 1 小時   |
+| `hours`     | 每日多次更新內容                       | 5 分鐘     | 1 小時     | 1 天     |
+| `days`      | 每日更新內容                           | 5 分鐘     | 1 天       | 1 週     |
+| `weeks`     | 每週更新內容                           | 5 分鐘     | 1 週       | 30 天    |
+| `max`       | 很少更改的穩定內容                     | 5 分鐘     | 30 天      | 1 年     |
+
+### 自訂快取設定檔
+
+在您的 `next.config.ts` 檔案中定義可重用的快取配置檔：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    biweekly: {
+      stale: 60 * 60 * 24 * 14, // 14 days
+      revalidate: 60 * 60 * 24, // 1 day
+      expire: 60 * 60 * 24 * 14, // 14 days
+    },
+  },
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+const nextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    biweekly: {
+      stale: 60 * 60 * 24 * 14, // 14 days
+      revalidate: 60 * 60 * 24, // 1 day
+      expire: 60 * 60 * 24 * 14, // 14 days
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+上述範例快取 14 天，每天檢查更新，並在 14 天后使快取過期。然後您可以在應用程式中透過其名稱引用此設定檔：
+
+>
+> - **小提示**：自訂配置檔中任何遺漏的屬性都會繼承 `default` 配置檔。這也適用於直接傳入 `cacheLife()` 的內嵌配置檔物件。
+
+```tsx filename="app/page.tsx" highlight={5}
+'use cache'
+import { cacheLife } from 'next/cache'
+
+export default async function Page() {
+  cacheLife('biweekly')
+  return <div>Page</div>
+}
+```
+
+### 覆寫預設快取設定檔
+
+雖然預設快取設定檔提供了一種思考快取輸出中任何特定部分的新舊程度的有用方式，您可能偏好不同的命名設定檔，以更好地符合您應用程式的快取策略。
+
+您可以建立與預設相同名稱的新設定，來覆寫預設命名快取設定檔。
+
+下列範例說明如何覆寫預設的 `"days"` 快取配置檔：
+
+```ts filename="next.config.ts"
+const nextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    // Override the 'days' profile
+    days: {
+      stale: 3600, // 1 hour
+      revalidate: 900, // 15 minutes
+      expire: 86400, // 1 day
+    },
+  },
+}
+
+export default nextConfig
+```
+
+### 內嵌快取配置檔
+
+針對一次性案例，直接將配置檔物件傳入 `cacheLife`：
+
+```tsx filename="app/page.tsx"
+'use cache'
+import { cacheLife } from 'next/cache'
+
+export default async function Page() {
+  cacheLife({
+    stale: 3600,
+    revalidate: 900,
+    expire: 86400,
+  })
+
+  return <div>Page</div>
+}
+```
+
+內嵌配置檔僅適用於特定的函式或元件。若要可重用的配置，請在 `next.config.ts` 中定義自訂配置檔。
+
+使用 `cacheLife({})` 並帶有空物件，將套用 `default` 配置檔值。
+
+### 客戶端快取行為
+
+`stale` 屬性控制 [客戶端快取](/docs/app/glossary#client-cache)，而非 `Cache-Control` 標頭：
+
+- 伺服器透過 `x-nextjs-stale-time` 回應標頭傳送過期時間
+- 用戶端路由器使用此值來判斷何時重新檢查
+- **強制執行至少 30 秒**，以確保預先讀取的連結保持可用
+
+此 30 秒最低限制可防止預先擷取的資料在用戶點按連結之前過期。它僅適用於基於時間的過期。
+
+當您從 Server Action ([`revalidateTag`](/docs/app/api-reference/functions/revalidateTag), [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath), [`updateTag`](/docs/app/api-reference/functions/updateTag), or [`refresh`](/docs/app/api-reference/functions/refresh)) 呼叫重新驗證函式時，整個用戶端快取會立即清除，跳過過期時間。
+
+>
+> - **小提示**： `cacheLife` 中的 `stale` 屬性與 [`staleTimes`](/docs/app/api-reference/config/next-config-js/staleTimes) 不同。雖然 `staleTimes` 是影響所有路徑的全域設定，但 `cacheLife` 允許針對函式或路徑進行配置。更新 `staleTimes.static` 也會更新 `default` 快取配置檔的 `stale` 值。
+
+### 預先轉譯行為
+
+壽命非常短的快取 — 零 `revalidate` 或 `expire` 低於 5 分鐘 — 將自動從預先轉譯中排除，並變成「動態空洞」。這包括 `seconds` 配置檔。
+
+此行為允許您在同一頁面中混合靜態和動態內容。靜態部分會預先轉譯，而短壽命快取會建立邊界，在請求時而非建置時取得資料。在使用動態快取時，請在 `<Suspense>` 邊界內包圍以在內容載入時提供後備選項。
+
+## 範例
+
+### 使用預設配置檔
+
+配置快取最簡單的方法是使用預設配置檔。選擇一個符合您的內容更新模式的配置檔：
+
+```tsx filename="app/blog/[slug]/page.tsx"
+import { cacheLife } from 'next/cache'
+
+export default async function BlogPost() {
+  'use cache'
+  cacheLife('days') // Blog posts updated daily
+
+  const post = await fetchBlogPost()
+  return <article>{post.content}</article>
+}
+```
+
+```tsx filename="app/products/[id]/page.tsx"
+import { cacheLife } from 'next/cache'
+
+export default async function ProductPage() {
+  'use cache'
+  cacheLife('hours') // Product data updated multiple times per day
+
+  const product = await fetchProduct()
+  return <div>{product.name}</div>
+}
+```
+
+### 針對特定需求的自訂配置檔
+
+當預設選項不符合您的需求時，定義自訂配置檔：
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+  cacheLife: {
+    editorial: {
+      stale: 600, // 10 minutes
+      revalidate: 3600, // 1 hour
+      expire: 86400, // 1 day
+    },
+    marketing: {
+      stale: 300, // 5 minutes
+      revalidate: 1800, // 30 minutes
+      expire: 43200, // 12 hours
+    },
+  },
+}
+
+export default nextConfig
+```
+
+然後在整個應用程式中使用這些配置檔：
+
+```tsx filename="app/editorial/page.tsx"
+import { cacheLife } from 'next/cache'
+
+export default async function EditorialPage() {
+  'use cache'
+  cacheLife('editorial')
+  // ...
+}
+```
+
+### 針對獨特案例的內嵌配置檔
+
+當特定函式需要一次性快取行為時，使用內嵌配置檔：
+
+```tsx filename="app/api/limited-offer/route.ts"
+import { cacheLife } from 'next/cache'
+import { getDb } from '@lib/db'
+
+async function getLimitedOffer() {
+  'use cache'
+
+  cacheLife({
+    stale: 60, // 1 minute
+    revalidate: 300, // 5 minutes
+    expire: 3600, // 1 hour
+  })
+
+  const offer = await getDb().offer.findFirst({
+    where: { type: 'limited' },
+    orderBy: { created_at: 'desc' },
+  })
+
+  return offer
+}
+
+export async function GET() {
+  const offer = await getLimitedOffer()
+
+  return Response.json(offer)
+}
+```
+
+### 快取個別函式
+
+將快取套用至工具函式以進行細粒度控制：
+
+```tsx filename="lib/api.ts"
+import { cacheLife } from 'next/cache'
+
+export async function getSettings() {
+  'use cache'
+  cacheLife('max') // Settings rarely change
+
+  return await fetchSettings()
+}
+```
+
+```tsx filename="lib/stats.ts"
+import { cacheLife } from 'next/cache'
+
+export async function getRealtimeStats() {
+  'use cache'
+  cacheLife('seconds') // Stats update constantly
+
+  return await fetchStats()
+}
+```
+
+### 巢狀快取行為
+
+當您巢狀化 `use cache` 指示詞（一個快取函式或元件使用另一個快取函式或元件）時，外層快取的行為取決於它是否有明確的 `cacheLife`。
+
+#### 具有明確外層 cacheLife
+
+外層快取使用其自己的壽命，無視內層快取的壽命。當外層快取命中時，它會傳回完整的輸出，包括所有巢狀資料。明確的 `cacheLife` 總是優先，無論它比內層壽命長還是短。
+
+```tsx filename="app/dashboard/page.tsx"
+import { cacheLife } from 'next/cache'
+import { Widget } from './widget'
+
+export default async function Dashboard() {
+  'use cache'
+  cacheLife('hours') // Outer scope sets its own lifetime
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <Widget /> {/* Inner scope has 'minutes' lifetime */}
+    </div>
+  )
+}
+```
+
+#### 沒有明確外層 cacheLife
+
+如果您在外層快取中沒有呼叫 `cacheLife`，它將使用 `default` 配置檔（15 分鐘重新驗證）。具有較短壽命的內層快取可以降低外層快取的 `default` 壽命。具有較長壽命的內層快取無法將其延伸至預設值之外。
+
+```tsx filename="app/dashboard/page.tsx"
+import { Widget } from './widget'
+
+export default async function Dashboard() {
+  'use cache'
+  // No cacheLife call - uses default (15 min)
+  // If Widget has 5 min → Dashboard becomes 5 min
+  // If Widget has 1 hour → Dashboard stays 15 min
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <Widget />
+    </div>
+  )
+}
+```
+
+**建議指定明確的 `cacheLife`。** 具有明確的壽命值，您可以檢視快取函式或元件並立即了解其行為，而無需追蹤巢狀快取。沒有明確的壽命值，行為將取決於內層快取壽命，使得推理更加困難。
+
+#### 巢狀短壽命快取
+
+如 [預先轉譯行為](#prerendering-behavior) 中所述，短壽命快取（零 `revalidate` 或 `expire` 低於 5 分鐘）會變成動態空洞，從預先轉譯中排除。
+
+當短壽命快取巢狀在另一個沒有明確 `cacheLife` 的 `use cache` 內部時，外層快取的壽命也會透過傳播而無聲變短。為了防止這種意外的錯誤配置，Next.js 會在預先轉譯期間拋出錯誤。
+
+請注意，巢狀快取可能不明顯 — 它可能在匯入的模組中，甚至是在第三方依賴中：
+
+```tsx filename="components/short-lived-widget.tsx" highlight={5}
+import { cacheLife } from 'next/cache'
+
+export async function ShortLivedWidget() {
+  'use cache'
+  cacheLife('seconds')
+  const data = await fetchRealtimeData()
+  return <div>{data}</div>
+}
+```
+
+從另一個沒有明確 `cacheLife` 的 `use cache` 使用此元件會在預先轉譯期間產生錯誤：
+
+```tsx filename="app/page.tsx"
+import { ShortLivedWidget } from '@/components/short-lived-widget'
+
+export default async function Page() {
+  'use cache'
+  // Error: no explicit cacheLife on outer cache
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Last updated: {new Date().toISOString()}</p>
+      <ShortLivedWidget />
+    </div>
+  )
+}
+```
+
+要修復此錯誤，請向外層的 `use cache` 新增明確的 `cacheLife()`：
+
+**如果您希望外層快取保持靜態（預先轉譯）**，請設定較長的快取壽命：
+
+```tsx filename="app/page.tsx" highlight={6}
+import { cacheLife } from 'next/cache'
+import { ShortLivedWidget } from '@/components/short-lived-widget'
+
+export default async function Page() {
+  'use cache'
+  cacheLife('default') // Explicit cacheLife prevents the error
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Last updated: {new Date().toISOString()}</p>
+      <ShortLivedWidget />
+    </div>
+  )
+}
+```
+
+**如果您希望外層快取也是短壽命的**，請明確設定短壽命以確認這是有意義的。在元件外加 `<Suspense>` 邊界以在內容載入時提供後備選項：
+
+```tsx filename="app/page.tsx" highlight={7,17-19}
+import { Suspense } from 'react'
+import { cacheLife } from 'next/cache'
+import { ShortLivedWidget } from '@/components/short-lived-widget'
+
+async function Content() {
+  'use cache: remote'
+  cacheLife('seconds') // Explicit cacheLife confirms this is intentionally short-lived
+  return (
+    <>
+      <p>Last updated: {new Date().toISOString()}</p>
+      <ShortLivedWidget />
+    </>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<p>Loading...</p>}>
+        <Content />
+      </Suspense>
+    </div>
+  )
+}
+```
+
+>
+> - **注意：** 此範例使用 `use cache: remote`，因為在無伺服器部署中的執行時期快取不會使用預設的記憶體快取跨請求持續存在。對於自我託管的環境， `use cache` 可能已足夠。請參閱 [執行時期快取考量](/docs/app/api-reference/directives/use-cache#runtime-caching-considerations) 以獲得更多詳細資訊。
+
+### 條件式快取壽命
+
+您可以在不同的程式碼路徑中條件式呼叫 `cacheLife`，以根據您的應用程式邏輯設定不同的快取持續時間：
+
+```tsx filename="lib/posts.ts" highlight={14,19}
+import { cacheLife, cacheTag } from 'next/cache'
+
+async function getPostContent(slug: string) {
+  'use cache'
+
+  const post = await fetchPost(slug)
+
+  // Tag the cache entry for targeted revalidation
+  cacheTag(`post-${slug}`)
+
+  if (!post) {
+    // Content may not be published yet or could be in draft
+    // Cache briefly to reduce database load
+    cacheLife('minutes')
+    return null
+  }
+
+  // Published content can be cached longer
+  cacheLife('days')
+
+  // Return only the necessary data to keep cache size minimal
+  return post.data
+}
+```
+
+此模式在需要不同快取持續時間的不同結果時很有用，例如，當項目遺失但稍後可能會取得時。
+
+#### 從資料使用動態快取壽命
+
+如果您想要執行時期計算快取壽命，例如從取得的資料中讀取它，請使用 [內嵌快取配置檔](#inline-cache-profiles) 物件：
+
+```tsx filename="lib/posts.ts" highlight={15,16,17,18}
+import { cacheLife, cacheTag } from 'next/cache'
+
+async function getPostContent(slug: string) {
+  'use cache'
+
+  const post = await fetchPost(slug)
+  cacheTag(`post-${slug}`)
+
+  if (!post) {
+    cacheLife('minutes')
+    return null
+  }
+
+  // Use cache timing from CMS data directly as an object
+  cacheLife({
+    // Ensure post.revalidateSeconds is a number in seconds
+    // stale and expire inherit from 'default' profile
+    revalidate: post.revalidateSeconds ?? 3600,
+  })
+
+  return post.data
+}
+```
