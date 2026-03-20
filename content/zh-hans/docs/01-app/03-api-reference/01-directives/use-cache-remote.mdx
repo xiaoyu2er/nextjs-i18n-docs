@@ -1,0 +1,610 @@
+---
+title: 'use cache: remote'
+description: 'Learn how to use the "use cache: remote" directive for persistent, shared caching using remote cache handlers.'
+related:
+  title: Related
+  description: View related API references.
+  links:
+    - app/api-reference/directives/use-cache
+    - app/api-reference/directives/use-cache-private
+    - app/api-reference/config/next-config-js/cacheComponents
+    - app/api-reference/config/next-config-js/cacheHandlers
+    - app/api-reference/functions/cacheLife
+    - app/api-reference/functions/cacheTag
+    - app/api-reference/functions/connection
+---
+
+虽然 `use cache` 指令通常已足够满足大多数应用需求，但您可能会发现缓存的操作比预期更频繁地重新运行，或者您的上游服务（CMS、数据库、外部 API）比预期的收到更多请求。这可能是因为 `use cache` 将条目存储在内存中，具有固有的限制：
+
+- 缓存条目因需要为新条目腾出空间而被淘汰
+- 部署环境的内存限制
+- 缓存不会在请求或服务器重启间持久化
+
+注意，`use cache` 提供的价值不局限于服务端缓存：它告知 Next.js 哪些内容可以预取，并定义客户端导航的过期时间。
+
+‘use cache: remote’指令允许您声明式地指定缓存输出应存储在远程缓存而非内存中，提供在所有服务器实例间共享的持久化缓存。这伴随着权衡：基础设施成本以及缓存查找期间的网络延迟。
+
+## 使用方法
+
+要使用‘use cache: remote’，在您的 `next.config.ts` 文件中启用 [`cacheComponents`](/docs/app/api-reference/config/next-config-js/cacheComponents) 标志：
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+```js filename="next.config.js" switcher
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+然后向您已确定远程缓存合理的函数或组件中添加‘use cache: remote’。处理器实现通过 [`cacheHandlers`](/docs/app/api-reference/config/next-config-js/cacheHandlers) 配置，尽管托管服务商通常应自动提供此功能。如果您是自行托管，请参阅 `cacheHandlers` 配置参考以设置您的缓存存储。
+
+### 何时避免使用远程缓存
+
+- 如果您已经有了封装您数据层的服务端 key-value 存储，`use cache` 可能足以将数据包含在静态外壳中而无需增加另一层缓存
+- 如果操作已经很快（< 50ms）（由于接近性或本地访问），远程缓存查找可能不会提高性能
+- 如果缓存键的每个请求值主要是唯一的（搜索过滤器、价格范围、用户特定参数），缓存利用率将接近零
+- 如果数据频繁更改（秒到分钟级），缓存命中很快过期，导致频繁未命中和等待上游重新验证
+
+### 何时使用远程缓存
+
+远程缓存主要在内容延迟到请求时（静态外壳之外）提供最大价值。当组件访问诸如 [`cookies()`](/docs/app/api-reference/functions/cookies)、[`headers()`](/docs/app/api-reference/functions/headers) 或 [`searchParams`](/docs/app/api-reference/file-conventions/page#searchparams-optional) 之类请求值的请求时，通常会发生这种情况，将其放在 Suspense 边界内。在此上下文中：
+
+- 每个请求执行该组件并查找缓存
+- 在 Serverless 环境中，每个实例都有属于自己的临时内存，缓存命中率很低
+- 远程缓存提供所有实例间的共享缓存，提高命中率并减少后端负载
+
+‘use cache: remote’具有说服力的场景：
+
+- **速率限制 API**：您的上游服务有关闭限制或请求配额，您可能面临触及限制的风险
+- **保护缓慢的后端**：在高流量下，您的数据库或 API 成为瓶颈
+- **高成本操作**：数据库查询或计算，重复运行成本高昂
+- **不稳定或不可靠的服务**：偶尔失败或有可用性问题的外部服务
+
+在这些情况下，远程缓存的成本和延迟因避免了更糟糕的结果（速率限制错误、后端过载、高昂的计算费用或较差的用户体验）而合理化。
+
+对于静态外壳内容，`use cache` 通常已足够。如果您的上游源无法处理并发重新验证请求（如速率限制 CMS），`use cache: remote` 充当共享缓存层。这与在数据库前放置键值存储的模式相同，但在代码中声明。
+
+### use cache: remote 与 use cache 和 use cache: private 的区别
+
+Next.js 提供三种缓存指令，每种设计用于不同的用例：
+
+| 功能                                 | `use cache`                     | `'use cache: remote'`             | `'use cache: private'` |
+| --------------------------------------- | ------------------------------- | --------------------------------- | ---------------------- |
+| **服务端缓存**                 | 内存 或 缓存处理器      | 远程缓存处理器              | 无                   |
+| **缓存范围**                         | 所有用户共享         | 所有用户共享           | 每个客户端（浏览器）   |
+| **能直接访问 cookies/headers** | 否（必须作为参数传递）     | 否（必须作为参数传递）       | 是                    |
+| **服务器缓存利用率**            | 静态外壳外可能很低 | 高（实例间共享）    | N/A                    |
+| **额外成本**                    | 无                            | 基础设施（存储、网络） | 无                   |
+| **延迟影响**                      | 无                            | 缓存处理器查找              | 无                   |
+
+### 使用运行时数据缓存
+
+Both `use cache` and `'use cache: remote'` 都无法直接访问运行时值，如 cookies 或 search params。您可以提取这些值并将它们作为参数传递给缓存函数。请参阅 [处理运行时数据](/docs/app/getting-started/caching#working-with-runtime-apis) 了解此模式。
+
+> **小贴士**：`use cache` 将条目存储在内存中。在 Serverless 环境中，内存不在实例间共享，通常在响应请求后销毁，导致运行时缓存频繁未命中。
+
+### 缓存键的考量
+
+仔细考虑您在缓存键中包含哪些值。每个唯一值都会创建单独的缓存条目，降低缓存利用率。请考虑以下包含搜索过滤器的示例：
+
+```tsx filename="app/products/[category]/page.tsx"
+import { Suspense } from 'react'
+
+export default async function ProductsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ category: string }>
+  searchParams: Promise<{ minPrice?: string }>
+}) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProductList params={params} searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function ProductList({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ category: string }>
+  searchParams: Promise<{ minPrice?: string }>
+}) {
+  const { category } = await params
+
+  const { minPrice } = await searchParams
+
+  // Cache only on category (few unique values)
+  // Don't include price filter (many unique values)
+  const products = await getProductsByCategory(category)
+
+  // Filter price in memory instead of creating cache entries
+  // for every price value
+  const filtered = minPrice
+    ? products.filter((p) => p.price >= parseFloat(minPrice))
+    : products
+
+  return <div>{/* render filtered products */}</div>
+}
+
+async function getProductsByCategory(category: string) {
+  'use cache: remote'
+  // Only category is part of the cache key
+  // Much better utilization than caching every price filter value
+  return db.products.findByCategory(category)
+}
+```
+
+在此示例中，远程处理器为每个缓存条目存储更多数据（一个分类中的所有产品）以提高更高的缓存命中率。当缓存未命中的成本（访问后端）超过更大条目的存储成本时，这是值得的。
+
+同样的原则适用于用户特定数据。与其直接缓存每个用户的数据，不如使用用户偏好来确定要缓存的共享数据。
+
+例如，如果用户的会话中有语言偏好，提取该偏好并使用它来缓存共享内容：
+
+- 与其远程缓存 `getUserProfile(sessionID)`（每个用户创建一个条目）
+- 远程缓存 `getCMSContent(language)`（每种语言创建一个条目）
+
+```tsx filename="app/components/welcome-message.tsx"
+import { cookies } from 'next/headers'
+import { cacheLife } from 'next/cache'
+
+export async function WelcomeMessage() {
+  // Extract the language preference (not unique per user)
+  const language = (await cookies()).get('language')?.value || 'en'
+
+  // Cache based on language (few unique values: en, es, fr, de, etc.)
+  // All users who prefer 'en' share the same cache entry
+  const content = await getCMSContent(language)
+
+  return <div>{content.welcomeMessage}</div>
+}
+
+async function getCMSContent(language: string) {
+  'use cache: remote'
+  cacheLife({ expire: 3600 })
+  // Creates ~10-50 cache entries (one per language)
+  // instead of thousands (one per user)
+  return cms.getHomeContent(language)
+}
+```
+
+这样，所有偏好相同语言的用户共享一个缓存条目，提高缓存利用率并降低您的 CMS 负载。
+
+这两个示例中的模式相同：找到唯一值较少的维度（分类 vs 价格，语言 vs 用户 ID），在该维度上缓存，然后在内存中过滤或选择其余部分。
+
+如果 `getUserProfile` 使用的服务无法随前端负载扩展，您仍然可以使用带有短 `cacheLife` 的 `use cache` 指令进行内存缓存。然而，对于大多数用户数据，您可能希望直接从源获取（正如上述指南中已经提到的，这可能已经被键值存储封装）。
+
+仅当您有合规要求或无法重构为作为参数传递运行时数据时，才使用 [`'use cache: private'`](/docs/app/api-reference/directives/use-cache-private)。
+
+### 嵌套规则
+
+远程缓存有特定的嵌套规则：
+
+- 远程缓存**可以**嵌套在其他远程缓存中（`'use cache: remote'`）
+- 远程缓存**可以**嵌套在普通缓存中（`'use cache'`）
+- 远程缓存**不能**嵌套在私有缓存中（`'use cache: private'`）
+- 私有缓存**不能**嵌套在远程缓存中
+
+```tsx
+// VALID: Remote inside remote
+async function outerRemote() {
+  'use cache: remote'
+  const result = await innerRemote()
+  return result
+}
+
+async function innerRemote() {
+  'use cache: remote'
+  return getData()
+}
+
+// VALID: Remote inside regular cache
+async function outerCache() {
+  'use cache'
+  // The inner remote cache will work when deferred to request time
+  const result = await innerRemote()
+  return result
+}
+
+async function innerRemote() {
+  'use cache: remote'
+  return getData()
+}
+
+// INVALID: Remote inside private
+async function outerPrivate() {
+  'use cache: private'
+  const result = await innerRemote() // Error!
+  return result
+}
+
+async function innerRemote() {
+  'use cache: remote'
+  return getData()
+}
+
+// INVALID: Private inside remote
+async function outerRemote() {
+  'use cache: remote'
+  const result = await innerPrivate() // Error!
+  return result
+}
+
+async function innerPrivate() {
+  'use cache: private'
+  return getData()
+}
+```
+
+## 示例
+
+以下示例展示了使用‘use cache: remote’的常见模式。有关 `cacheLife` 参数（`stale`、`revalidate`、`expire`）的详细信息，请参阅 [`cacheLife` API 参考](/docs/app/api-reference/functions/cacheLife)。
+
+### 使用用户偏好
+
+根据用户的货币偏好缓存产品定价。由于货币存储在 Cookie 中，此组件在请求时渲染。远程缓存在此很有价值，因为所有具有相同货币的用户共享缓存价格，并在 Serverless 环境中，所有实例共享同一个远程缓存。
+
+```tsx filename="app/product/[id]/page.tsx" switcher
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheTag, cacheLife } from 'next/cache'
+
+export async function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
+  return (
+    <div>
+      <ProductDetails id={id} />
+      <Suspense fallback={<div>Loading price...</div>}>
+        <ProductPrice productId={id} />
+      </Suspense>
+    </div>
+  )
+}
+
+function ProductDetails({ id }: { id: string }) {
+  return <div>Product: {id}</div>
+}
+
+async function ProductPrice({ productId }: { productId: string }) {
+  // Reading cookies defers this component to request time
+  const currency = (await cookies()).get('currency')?.value ?? 'USD'
+
+  // Cache the price per product and currency combination
+  // All users with the same currency share this cache entry
+  const price = await getProductPrice(productId, currency)
+
+  return (
+    <div>
+      Price: {price} {currency}
+    </div>
+  )
+}
+
+async function getProductPrice(productId: string, currency: string) {
+  'use cache: remote'
+  cacheTag(`product-price-${productId}`)
+  cacheLife({ expire: 3600 }) // 1 hour
+
+  // Cached per (productId, currency) - few currencies means high cache utilization
+  return db.products.getPrice(productId, currency)
+}
+```
+
+```jsx filename="app/product/[id]/page.js" switcher
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheTag, cacheLife } from 'next/cache'
+
+export async function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+
+export default async function ProductPage({ params }) {
+  const { id } = await params
+
+  return (
+    <div>
+      <ProductDetails id={id} />
+      <Suspense fallback={<div>Loading price...</div>}>
+        <ProductPrice productId={id} />
+      </Suspense>
+    </div>
+  )
+}
+
+function ProductDetails({ id }) {
+  return <div>Product: {id}</div>
+}
+
+async function ProductPrice({ productId }) {
+  // Reading cookies defers this component to request time
+  const currency = (await cookies()).get('currency')?.value ?? 'USD'
+
+  // Cache the price per product and currency combination
+  // All users with the same currency share this cache entry
+  const price = await getProductPrice(productId, currency)
+
+  return (
+    <div>
+      Price: {price} {currency}
+    </div>
+  )
+}
+
+async function getProductPrice(productId, currency) {
+  'use cache: remote'
+  cacheTag(`product-price-${productId}`)
+  cacheLife({ expire: 3600 }) // 1 hour
+
+  // Cached per (productId, currency) - few currencies means high cache utilization
+  return db.products.getPrice(productId, currency)
+}
+```
+
+### 减少数据库负载
+
+缓存昂贵的数据库查询，减少数据库负载。在此示例中，我们没有访问 `cookies()`、`headers()` 或 `searchParams`。如果我们有要求不将这些统计信息包含在静态外壳中，我们可以使用 [`connection()`](/docs/app/api-reference/functions/connection) 明确延迟到请求时：
+
+```tsx filename="app/dashboard/page.tsx"
+import { Suspense } from 'react'
+import { connection } from 'next/server'
+import { cacheLife, cacheTag } from 'next/cache'
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div>Loading stats...</div>}>
+      <DashboardStats />
+    </Suspense>
+  )
+}
+
+async function DashboardStats() {
+  // Defer to request time
+  await connection()
+
+  const stats = await getGlobalStats()
+
+  return <StatsDisplay stats={stats} />
+}
+
+async function getGlobalStats() {
+  'use cache: remote'
+  cacheTag('global-stats')
+  cacheLife({ expire: 60 }) // 1 minute
+
+  // This expensive database query is cached and shared across all users,
+  // reducing load on your database
+  const stats = await db.analytics.aggregate({
+    total_users: 'count',
+    active_sessions: 'count',
+    revenue: 'sum',
+  })
+
+  return stats
+}
+```
+
+通过此设置，无论多少用户访问仪表板，您的上游数据库每分钟最多看到一个请求。
+
+### 流式环境中的 API 响应
+
+缓存流式传输期间或动态操作后获取的 API 响应：
+
+```tsx filename="app/feed/page.tsx"
+import { Suspense } from 'react'
+import { connection } from 'next/server'
+import { cacheLife, cacheTag } from 'next/cache'
+
+export default async function FeedPage() {
+  return (
+    <div>
+      <Suspense fallback={<Skeleton />}>
+        <FeedItems />
+      </Suspense>
+    </div>
+  )
+}
+
+async function FeedItems() {
+  // Defer to request time
+  await connection()
+
+  const items = await getFeedItems()
+
+  return items.map((item) => <FeedItem key={item.id} item={item} />)
+}
+
+async function getFeedItems() {
+  'use cache: remote'
+  cacheTag('feed-items')
+  cacheLife({ expire: 120 }) // 2 minutes
+
+  // This API call is cached, reducing requests to your external service
+  const response = await fetch('https://api.example.com/feed')
+  return response.json()
+}
+```
+
+### 动态检查后的计算数据
+
+缓存动态安全或功能检查后发生的昂贵计算：
+
+```tsx filename="app/reports/page.tsx"
+import { connection } from 'next/server'
+import { cacheLife } from 'next/cache'
+
+export default async function ReportsPage() {
+  // Defer to request time (for security check)
+  await connection()
+
+  const report = await generateReport()
+
+  return <ReportViewer report={report} />
+}
+
+async function generateReport() {
+  'use cache: remote'
+  cacheLife({ expire: 3600 }) // 1 hour
+
+  // This expensive computation is cached and shared across all authorized users,
+  // avoiding repeated calculations
+  const data = await db.transactions.findMany()
+
+  return {
+    totalRevenue: calculateRevenue(data),
+    topProducts: analyzeProducts(data),
+    trends: calculateTrends(data),
+  }
+}
+```
+
+### 混合缓存策略
+
+结合静态、远程和私有缓存以获得最佳性能：
+
+```tsx filename="app/product/[id]/page.tsx"
+import { Suspense } from 'react'
+import { connection } from 'next/server'
+import { cookies } from 'next/headers'
+import { cacheLife, cacheTag } from 'next/cache'
+
+// Static product data - prerendered at build time
+async function getProduct(id: string) {
+  'use cache'
+  cacheTag(`product-${id}`)
+
+  // This is cached at build time and shared across all users
+  return db.products.find({ where: { id } })
+}
+
+// Shared pricing data - cached at runtime in remote handler
+async function getProductPrice(id: string) {
+  'use cache: remote'
+  cacheTag(`product-price-${id}`)
+  cacheLife({ expire: 300 }) // 5 minutes
+
+  // This is cached at runtime and shared across all users
+  return db.products.getPrice({ where: { id } })
+}
+
+// User-specific recommendations - private cache per user
+async function getRecommendations(productId: string) {
+  'use cache: private'
+  cacheLife({ expire: 60 }) // 1 minute
+
+  const sessionId = (await cookies()).get('session-id')?.value
+
+  // This is cached per-user and never shared
+  return db.recommendations.findMany({
+    where: { productId, sessionId },
+  })
+}
+
+export default async function ProductPage({ params }) {
+  const { id } = await params
+
+  // Static product data
+  const product = await getProduct(id)
+
+  return (
+    <div>
+      <ProductDetails product={product} />
+
+      {/* Dynamic shared price */}
+      <Suspense fallback={<PriceSkeleton />}>
+        <ProductPriceComponent productId={id} />
+      </Suspense>
+
+      {/* Dynamic personalized recommendations */}
+      <Suspense fallback={<RecommendationsSkeleton />}>
+        <ProductRecommendations productId={id} />
+      </Suspense>
+    </div>
+  )
+}
+
+function ProductDetails({ product }) {
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>{product.description}</p>
+    </div>
+  )
+}
+
+async function ProductPriceComponent({ productId }) {
+  // Defer to request time
+  await connection()
+
+  const price = await getProductPrice(productId)
+  return <div>Price: ${price}</div>
+}
+
+async function ProductRecommendations({ productId }) {
+  const recommendations = await getRecommendations(productId)
+  return <RecommendationsList items={recommendations} />
+}
+
+function PriceSkeleton() {
+  return <div>Loading price...</div>
+}
+
+function RecommendationsSkeleton() {
+  return <div>Loading recommendations...</div>
+}
+
+function RecommendationsList({ items }) {
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={item.id}>{item.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+> **小贴士**：
+>
+> - 远程缓存存储在服务器端缓存处理器中，并在所有用户间共享
+> - `‘use cache: remote’` 在静态外壳之外工作，[`use cache`](/docs/app/api-reference/directives/use-cache) 可能不提供服务端缓存命中
+> - 使用 [`cacheTag()`](/docs/app/api-reference/functions/cacheTag) 和 [`revalidateTag()`](/docs/app/api-reference/functions/revalidateTag) 按需使远程缓存失效
+> - 使用 [`cacheLife()`](/docs/app/api-reference/functions/cacheLife) 配置缓存过期
+> - 对于用户特定数据，使用 [`'use cache: private'`](/docs/app/api-reference/directives/use-cache-private) 而不是`‘use cache: remote’`
+> - 远程缓存通过在服务器端存储计算或获取的数据来减少源负载
+
+## 平台支持
+
+| 部署选项                                                   | 是否支持 |
+| ------------------------------------------------------------------- | --------- |
+| [Node.js server](/docs/app/getting-started/deploying#nodejs-server) | 是       |
+| [Docker container](/docs/app/getting-started/deploying#docker)      | 是       |
+| [Static export](/docs/app/getting-started/deploying#static-export)  | 否        |
+| [Adapters](/docs/app/getting-started/deploying#adapters)            | 是       |
+
+## 版本历史
+
+| 版本      | 变更                                                             |
+| --------- | ------------------------------------------------------------------- |
+| `v16.0.0` | 通过缓存组件功能启用 `“使用缓存：远程”`。 |

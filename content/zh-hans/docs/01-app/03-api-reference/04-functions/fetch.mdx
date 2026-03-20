@@ -1,0 +1,117 @@
+---
+title: fetch
+description: 扩展 fetch 函数的 API 参考。
+---
+
+Next.js 扩展了 [Web `fetch()` API](https://developer.mozilla.org/docs/Web/API/Fetch_API)，允许服务器上的每个请求设置其自己的持久缓存和重新验证语义。
+
+在浏览器中，`cache` 选项表示 `fetch` 请求如何与 `_浏览器_` 的 HTTP 缓存交互。有了这个扩展，`cache` 表示 `_服务器端_` `fetch` 请求如何与框架的持久化缓存交互。
+
+您可以在服务器组件 (Server Components) 内部直接使用 `async` 和 `await` 调用 `fetch`。
+
+```tsx filename="app/page.tsx" switcher
+export default async function Page() {
+  let data = await fetch('https://api.vercel.app/blog')
+  let posts = await data.json()
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+```jsx filename="app/page.js" switcher
+export default async function Page() {
+  let data = await fetch('https://api.vercel.app/blog')
+  let posts = await data.json()
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## `fetch(url, options)`
+
+由于 Next.js 扩展了 [Web `fetch()` API](https://developer.mozilla.org/docs/Web/API/Fetch_API)，您可以使用任何[可用的原生选项](https://developer.mozilla.org/docs/Web/API/fetch#parameters)。
+
+### `options.cache`
+
+配置请求应如何与 Next.js [缓存](/docs/app/getting-started/caching) 交互。
+
+```ts
+fetch(`https://...`, { cache: 'force-cache' | 'no-store' })
+```
+
+- **`auto no cache`**（默认）：在开发模式下，Next.js 每次请求时都从远程服务器获取资源，但在 `next build` 期间只获取一次，因为该路由将被静态预渲染。如果检测到路由上有 [请求时 API (Request-time APIs)](/docs/app/glossary#request-time-apis)，Next.js 将在每次请求时获取资源。
+- **`no-store`**：Next.js 在每次请求时都从远程服务器获取资源，即使在路由上未检测到请求时 API (Request-time APIs)。
+- **`force-cache`**：Next.js 在其服务器端缓存中查找匹配的请求。
+  - 如果有匹配且条目有效，则从缓存返回。
+  - 如果没有匹配或匹配已过期，Next.js 将从远程服务器获取资源，并使用下载的资源更新缓存。
+
+### `options.next.revalidate`
+
+```ts
+fetch(`https://...`, { next: { revalidate: false | 0 | number } })
+```
+
+设置资源的缓存生存期（以秒为单位）。
+
+- **`false`** - 无限期缓存资源。语义上等同于 `revalidate: Infinity`。HTTP 缓存可能会随时间淘汰较旧的资源。
+- **`0`** - 阻止资源被缓存。
+- **`number`** (数字) - （以秒为单位）指定资源的缓存生存期最多为 `n` 秒。
+
+> **小知识**：
+>
+> - 如果单个 `fetch()` 请求设置的 `revalidate` 数值低于路由的 [默认 `revalidate`](/docs/app/guides/caching-without-cache-components#route-segment-config-revalidate)，整个路由的重新验证间隔将减少。
+> - 如果在同一路由中具有相同 URL 的两个 `fetch` 请求具有不同的 `revalidate` 值，则使用较低的值。
+> - 例如 `{ revalidate: 3600, cache: 'no-store' }` 这样的冲突选项是不允许使用的，两者都将被忽略，并且在开发模式下会向终端打印警告。
+
+### `options.next.tags`
+
+```ts
+fetch(`https://...`, { next: { tags: ['collection'] } })
+```
+
+设置资源的缓存标签。随后可使用 [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) 按需重新验证数据。自定义标签的最大长度为 256 个字符，最大标签项数为 128 个。
+
+## 记忆化 (Memoization)
+
+使用相同 URL 和选项的 `GET` `fetch` 请求在服务器渲染过程中会自动 [记忆化 (Memoization)](/docs/app/glossary#memoization)。如果你在多个服务器组件、布局、页面、`generateStaticParams` 和 `generateViewport` 中调用相同的 `fetch`，Next.js 只执行一次并共享结果。
+
+若要禁用，请将 [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController) 信号传递给 `fetch`：
+
+```js
+const { signal } = new AbortController()
+fetch(url, { signal })
+```
+
+> **小知识**：[路由处理程序 (Route Handlers)](/docs/app/api-reference/file-conventions/route) 中不适用记忆化，因为它们不属于 React 组件树。
+
+## 故障排除
+
+### Fetch 默认 `auto no store` 和 `cache: 'no-store'` 在开发模式中未显示新数据
+
+在本地开发中，Next.js 会在跨热模块替换 (HMR) 时缓存服务器组件中的 `fetch` 响应，以实现更快的响应并降低计费 API 调用的成本。
+
+默认情况下，[HMR 缓存](/docs/app/api-reference/config/next-config-js/serverComponentsHmrCache)适用于所有 fetch 请求，包括具有默认 `auto no cache` 和 `cache: 'no-store'` 选项的请求。这意味着未缓存的请求在 HMR 刷新之间不会显示新数据。但是，缓存将在导航或页面完全重新加载时清除。
+
+有关更多信息，请参阅 [`serverComponentsHmrCache`](/docs/app/api-reference/config/next-config-js/serverComponentsHmrCache) 文档。
+
+### 开发中的硬刷新和缓存
+
+在开发模式下，如果请求包含 `cache-control: no-cache` 头，`options.cache`、`options.next.revalidate` 和 `options.next.tags` 将被忽略，并且 `fetch` 请求将直接从源获取。
+
+当在开发工具中禁用缓存或进行硬刷新时，浏览器通常会包含 `cache-control: no-cache`。
+
+## 版本历史
+
+| Version   | 变更内容             |
+| --------- | ------------------- |
+| `v13.0.0` | 引入了 `fetch`。 |

@@ -82,7 +82,8 @@ function validateFrontmatter(translation: string): boolean {
       const match = line.match(/^(title|description):\s*(.+)/);
       if (match) {
         const val = match[2];
-        if (val.startsWith('`') || val.startsWith("'") || val.startsWith('"')) {
+        // Backtick-starting values are LLM errors; quotes are valid YAML (needed for : in values)
+        if (val.startsWith('`')) {
           return false;
         }
       }
