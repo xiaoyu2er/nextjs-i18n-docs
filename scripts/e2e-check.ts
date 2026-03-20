@@ -89,7 +89,7 @@ function contentPathToUrl(
   // Convert file path to URL path (Astro uses github-slugger to lowercase segments)
   let urlPath = rel
     .replace(/\.mdx$/, '')
-    .replace(/\/index$/, '')
+    .replace(/(^|\/)index$/, '')
     .replace(/\\/g, '/')
     .split('/')
     .map((segment) => githubSlug(segment))
@@ -184,6 +184,20 @@ async function startDevServer(
     env: { ...process.env, FORCE_COLOR: '0' },
   });
 
+  // Capture stderr for error extraction
+  const stderrLines: string[] = [];
+  const MAX_STDERR_LINES = 500;
+  let stderrBuf = '';
+  proc.stderr?.on('data', (chunk: Buffer) => {
+    stderrBuf += chunk.toString();
+    const lines = stderrBuf.split('\n');
+    stderrBuf = lines.pop() ?? '';
+    for (const line of lines) {
+      stderrLines.push(line);
+      if (stderrLines.length > MAX_STDERR_LINES) stderrLines.shift();
+    }
+  });
+
   // Wait for server to be ready
   const ready = await waitForServer('http://localhost:4321/', 120000);
   if (!ready) {
@@ -205,10 +219,91 @@ async function startDevServer(
     kill: () => {
       proc.kill('SIGTERM');
     },
+    /** Return recent stderr lines, optionally clearing the buffer */
+    getStderr: (clear = false) => {
+      const lines = [...stderrLines];
+      if (clear) stderrLines.length = 0;
+      return lines;
+    },
   };
 }
 
 // ── Page Checking ──
+
+/**
+ * Extract error details from server stderr for a given URL.
+ * Astro dev server prints errors like:
+ *   [ERROR] Could not parse expression with acorn
+ *     Stack trace:
+ *       at /path/to/file.mdx:53:67
+ *
+ * We search for [ERROR] blocks and match file paths related to the URL.
+ */
+function extractStderrDetails(
+  stderrLines: string[],
+  url: string,
+): string | null {
+  // Convert URL to likely file path segments for matching
+  // e.g., /zh-hans/blog/next-15-2/ → ["zh-hans", "blog", "next-15-2"]
+  const segments = url.split('/').filter(Boolean).slice(-2); // last 2 segments are most specific
+
+  if (segments.length === 0) return null;
+
+  // Find [ERROR] lines and their context
+  const errorBlocks: string[] = [];
+  let currentBlock: string[] = [];
+  let inError = false;
+
+  for (const rawLine of stderrLines) {
+    // Strip ANSI escape codes
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ESC sequences
+    const line = rawLine.replace(/\x1b\[[0-9;]*m/g, '').replace(/\[\d+m/g, '');
+    if (line.includes('[ERROR]')) {
+      if (currentBlock.length > 0) errorBlocks.push(currentBlock.join('\n'));
+      currentBlock = [line];
+      inError = true;
+    } else if (inError) {
+      if (
+        line.startsWith('  ') ||
+        line.includes('Stack trace') ||
+        line.includes('Caused by') ||
+        line.includes('at ')
+      ) {
+        currentBlock.push(line);
+      } else {
+        if (currentBlock.length > 0) errorBlocks.push(currentBlock.join('\n'));
+        currentBlock = [];
+        inError = false;
+      }
+    }
+  }
+  if (currentBlock.length > 0) errorBlocks.push(currentBlock.join('\n'));
+
+  // Find blocks that mention file paths matching the URL
+  for (const block of errorBlocks) {
+    const matchesUrl = segments.every((seg) => block.includes(seg));
+    if (matchesUrl) {
+      // Extract the key info: error message + file location
+      const errorMsg = block.match(/\[ERROR\]\s*(.+)/)?.[1] ?? 'Unknown error';
+      const fileLoc = block.match(/at\s+([^\n]+\.mdx:\d+:\d+)/)?.[1] ?? '';
+      const causedBy = block.match(/Caused by:\s*\n\s*(.+)/)?.[1] ?? '';
+      const parts = [errorMsg];
+      if (fileLoc) parts.push(`at ${fileLoc}`);
+      if (causedBy) parts.push(`caused by: ${causedBy}`);
+      return parts.join(' | ');
+    }
+  }
+
+  // Fallback: return the most recent error block if no URL match found
+  if (errorBlocks.length > 0) {
+    const last = errorBlocks[errorBlocks.length - 1];
+    const errorMsg = last.match(/\[ERROR\]\s*(.+)/)?.[1] ?? 'Unknown error';
+    const fileLoc = last.match(/at\s+([^\n]+\.mdx:\d+:\d+)/)?.[1] ?? '';
+    return `(recent) ${errorMsg}${fileLoc ? ` | at ${fileLoc}` : ''}`;
+  }
+
+  return null;
+}
 
 interface CheckResult {
   url: string;
@@ -242,24 +337,32 @@ async function checkUrl(
       errors.push(`HTTP ${res.status}`);
     }
 
-    // Check for Astro error pages
-    if (body.includes('AstroError') || body.includes('MDXError')) {
-      const match = body.match(/(AstroError|MDXError)[^<]*/);
-      errors.push(
-        match ? match[0].substring(0, 100) : 'Astro/MDX error in page',
-      );
+    // Extract error type from <title> — Astro/Vite error pages use:
+    //   <title>MDXError</title>, <title>AstroUserError</title>, etc.
+    // The actual error details are only in the server stderr, not in the response body.
+    const titleMatch = body.match(/<title>([^<]+)<\/title>/);
+    const title = titleMatch?.[1] ?? '';
+    const isErrorPage =
+      title.includes('Error') ||
+      title === '500' ||
+      title === 'Internal Server Error';
+
+    if (isErrorPage && res.status >= 400) {
+      errors.push(title);
     }
 
-    // Check for "Internal Server Error" — only match if it's a bare error page,
-    // not documentation content that mentions the phrase in code examples.
-    // Astro dev error pages have <title>InternalServerError or just the text as the whole body.
+    // Check for Astro error content in larger pages (error overlay within a rendered page)
     if (
-      body.includes('Internal Server Error') &&
-      (body.length < 1000 ||
-        body.includes('<title>Internal Server Error') ||
-        body.includes('<title>500'))
+      body.length > 200 &&
+      (body.includes('AstroError') || body.includes('MDXError'))
     ) {
-      errors.push('Internal Server Error');
+      // Only flag if it's in error-related elements, not in documentation content
+      if (body.includes('vite-error-overlay') || body.includes('astro-error')) {
+        const match = body.match(/(AstroError|MDXError)[^<]*/);
+        errors.push(
+          match ? match[0].substring(0, 200) : 'Astro/MDX error in page',
+        );
+      }
     }
 
     // Check for empty content (very short body = broken page)
@@ -267,14 +370,22 @@ async function checkUrl(
       errors.push(`Suspiciously short response (${body.length} bytes)`);
     }
 
-    // Retry on transient errors (Internal Server Error, timeouts)
+    // Retry on transient errors only — NOT on MDX/Astro errors (those are deterministic)
     if (errors.length > 0 && retries > 0) {
-      const isTransient = errors.some(
-        (e) => e.includes('Internal Server Error') || e.includes('HTTP 5'),
+      const isDeterministic = errors.some(
+        (e) =>
+          e.includes('MDXError') ||
+          e.includes('AstroError') ||
+          e.includes('AstroUserError'),
       );
-      if (isTransient) {
-        await new Promise((r) => setTimeout(r, 3000));
-        return checkUrl(baseUrl, urlPath, retries - 1);
+      if (!isDeterministic) {
+        const isTransient = errors.some(
+          (e) => e.includes('HTTP 5') || e.includes('HTTP 502'),
+        );
+        if (isTransient) {
+          await new Promise((r) => setTimeout(r, 3000));
+          return checkUrl(baseUrl, urlPath, retries - 1);
+        }
       }
     }
 
@@ -445,10 +556,18 @@ async function main() {
       console.log(`   ⏱  Avg response: ${avgDuration}ms`);
 
       if (failed.length > 0) {
+        // Extract error details from server stderr
+        const stderrLog = server?.getStderr?.() ?? [];
         console.log(`\n   Failed URLs:`);
         for (const f of failed) {
           console.log(`   - ${f.url}`);
           console.log(`     ${f.error}`);
+          // Find related stderr lines: look for ERROR blocks that mention
+          // a file path matching this URL's likely source file
+          const details = extractStderrDetails(stderrLog, f.url);
+          if (details) {
+            console.log(`     📋 ${details}`);
+          }
         }
       }
     }
