@@ -1122,8 +1122,12 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
   let totalSkipped = 0;
   let totalMissing = 0;
   let chunkErrors = 0;
+  let chunksCompleted = 0;
 
-  for (let i = 0; i < maxChunks; i++) {
+  const concurrency = opts.concurrency;
+  console.log(`   Concurrency: ${concurrency}\n`);
+
+  async function processChunk(i: number) {
     const chunk = chunks[i];
     const uncached: Record<string, string> = {};
     const nodeTypes: Record<string, string> = {};
@@ -1182,16 +1186,37 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
       totalCached += cached;
       totalSkipped += skipped;
       totalMissing += result.missing.length;
+      chunksCompleted++;
       console.log(
-        `✅ ${chunkLabel} — +${cached} cached, ${skipped} skipped, ${result.missing.length} missing`,
+        `✅ ${chunkLabel} — +${cached} cached, ${skipped} skipped, ${result.missing.length} missing [${chunksCompleted}/${maxChunks} done]`,
       );
     } catch (err) {
       chunkErrors++;
+      chunksCompleted++;
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`❌ ${chunkLabel} — ${msg.substring(0, 100)}`);
       flog(`ERROR: ${msg}`);
     }
   }
+
+  // Run chunks with concurrency limit
+  const pending: Promise<void>[] = [];
+  for (let i = 0; i < maxChunks; i++) {
+    const p = processChunk(i);
+    pending.push(p);
+    if (pending.length >= concurrency) {
+      await Promise.race(pending);
+      // Remove settled promises
+      for (let j = pending.length - 1; j >= 0; j--) {
+        const status = await Promise.race([
+          pending[j].then(() => 'done'),
+          Promise.resolve('pending'),
+        ]);
+        if (status === 'done') pending.splice(j, 1);
+      }
+    }
+  }
+  await Promise.all(pending);
 
   const elapsed = Date.now() - startTime;
 
