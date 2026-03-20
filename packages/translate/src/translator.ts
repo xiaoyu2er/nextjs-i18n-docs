@@ -228,7 +228,9 @@ function isModelError(msg: string): boolean {
   return (
     (msg.includes('400') && msg.includes('not a valid')) ||
     msg.includes('404') ||
-    msg.includes('No endpoints found')
+    msg.includes('No endpoints found') ||
+    msg.includes('Empty response from API') ||
+    msg.includes('guardrail restrictions')
   );
 }
 
@@ -862,6 +864,7 @@ async function translateJsonChunk(
         msg.includes('timeout') ||
         msg.includes('ECONNRESET') ||
         msg.includes('truncated') ||
+        msg.includes('Empty response') ||
         msg.includes('Failed to parse JSON');
 
       if (!isRetryable || attempt === maxAttempts) {
