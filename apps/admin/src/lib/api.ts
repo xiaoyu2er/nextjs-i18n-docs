@@ -75,7 +75,11 @@ export interface Model {
   promptPrice: number;
   completionPrice: number;
   contextLength: number;
+  maxOutput: number;
   isFree: boolean;
+  supportsJson: boolean;
+  supportsTools: boolean;
+  provider: string;
 }
 
 export const api = {

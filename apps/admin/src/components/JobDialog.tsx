@@ -14,18 +14,17 @@ interface Props {
 
 function formatPrice(price: number) {
   if (price === 0) return 'Free';
+  if (price < 0.01) return `$${price.toFixed(4)}/M`;
   return `$${price.toFixed(2)}/M`;
 }
 
-function ModelOption({ m }: { m: Model }) {
-  return (
-    <option value={m.id}>
-      {m.isFree ? '🆓 ' : ''}
-      {m.name} — in: {formatPrice(m.promptPrice)} · out:{' '}
-      {formatPrice(m.completionPrice)} · {(m.contextLength / 1000).toFixed(0)}k
-    </option>
-  );
+function ctxLabel(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  return `${(n / 1000).toFixed(0)}k`;
 }
+
+type PriceFilter = 'all' | 'free' | 'cheap' | 'mid';
+type CtxFilter = 'all' | '32k' | '64k' | '128k';
 
 export function JobDialog({
   langs,
@@ -40,8 +39,14 @@ export function JobDialog({
   const [max, setMax] = useState(files?.length || 50);
   const [concurrency, setConcurrency] = useState(3);
   const [model, setModel] = useState('');
-  const [modelFilter, setModelFilter] = useState('');
+  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Filters
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
+  const [ctxFilter, setCtxFilter] = useState<CtxFilter>('all');
+  const [jsonOnly, setJsonOnly] = useState(false);
+  const [providerFilter, setProviderFilter] = useState('all');
 
   const { data: models, isLoading: modelsLoading } = useQuery({
     queryKey: ['models'],
@@ -49,23 +54,41 @@ export function JobDialog({
     staleTime: 5 * 60 * 1000,
   });
 
-  const filteredModels = useMemo(() => {
+  // Unique providers
+  const providers = useMemo(() => {
     if (!models) return [];
-    if (!modelFilter) return models;
-    const q = modelFilter.toLowerCase();
-    return models.filter(
-      (m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q),
-    );
-  }, [models, modelFilter]);
+    const set = new Set(models.map((m) => m.provider));
+    return [...set].sort();
+  }, [models]);
 
-  const freeModels = useMemo(
-    () => filteredModels.filter((m) => m.isFree),
-    [filteredModels],
-  );
-  const paidModels = useMemo(
-    () => filteredModels.filter((m) => !m.isFree),
-    [filteredModels],
-  );
+  const filtered = useMemo(() => {
+    if (!models) return [];
+    return models.filter((m) => {
+      // Search
+      if (search) {
+        const q = search.toLowerCase();
+        if (
+          !m.id.toLowerCase().includes(q) &&
+          !m.name.toLowerCase().includes(q)
+        )
+          return false;
+      }
+      // Price
+      if (priceFilter === 'free' && !m.isFree) return false;
+      if (priceFilter === 'cheap' && m.promptPrice > 0.5) return false;
+      if (priceFilter === 'mid' && m.promptPrice > 5) return false;
+      // Context
+      if (ctxFilter === '32k' && m.contextLength < 32_000) return false;
+      if (ctxFilter === '64k' && m.contextLength < 64_000) return false;
+      if (ctxFilter === '128k' && m.contextLength < 128_000) return false;
+      // JSON support
+      if (jsonOnly && !m.supportsJson) return false;
+      // Provider
+      if (providerFilter !== 'all' && m.provider !== providerFilter)
+        return false;
+      return true;
+    });
+  }, [models, search, priceFilter, ctxFilter, jsonOnly, providerFilter]);
 
   const qc = useQueryClient();
   const create = useMutation({
@@ -86,7 +109,7 @@ export function JobDialog({
   });
 
   const translatable = langs.filter((l) => l !== 'en');
-  const selectedModel = models?.find((m) => m.id === model);
+  const selected = models?.find((m) => m.id === model);
 
   return (
     <div
@@ -98,18 +121,9 @@ export function JobDialog({
       <div className="dialog dialog-wide">
         <h3>Start Translation Job</h3>
 
-        {error && (
-          <div
-            style={{
-              color: 'var(--red)',
-              fontSize: '0.85rem',
-              marginBottom: '0.5rem',
-            }}
-          >
-            {error}
-          </div>
-        )}
+        {error && <div className="dialog-error">{error}</div>}
 
+        {/* Job config */}
         <div className="dialog-grid">
           <div>
             <label>Language</label>
@@ -121,7 +135,6 @@ export function JobDialog({
               ))}
             </select>
           </div>
-
           <div>
             <label>Version</label>
             <select
@@ -135,7 +148,6 @@ export function JobDialog({
               ))}
             </select>
           </div>
-
           <div>
             <label>Max files</label>
             <input
@@ -144,7 +156,6 @@ export function JobDialog({
               onChange={(e) => setMax(Number(e.target.value))}
             />
           </div>
-
           <div>
             <label>Concurrency</label>
             <input
@@ -155,48 +166,97 @@ export function JobDialog({
           </div>
         </div>
 
-        {/* Model selector */}
+        {/* Model section */}
         <label>Model</label>
-        <input
-          type="text"
-          placeholder="Search models..."
-          value={modelFilter}
-          onChange={(e) => setModelFilter(e.target.value)}
-          className="model-search"
-        />
-        <select
-          className="model-select"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          size={8}
-        >
-          <option value="">Default (from .env)</option>
-          {modelsLoading && <option disabled>Loading models...</option>}
-          {freeModels.length > 0 && (
-            <optgroup label="🆓 Free">
-              {freeModels.map((m) => (
-                <ModelOption key={m.id} m={m} />
-              ))}
-            </optgroup>
+
+        {/* Filters row */}
+        <div className="model-filters">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="model-search-input"
+          />
+          <select
+            value={priceFilter}
+            onChange={(e) => setPriceFilter(e.target.value as PriceFilter)}
+          >
+            <option value="all">Any price</option>
+            <option value="free">🆓 Free only</option>
+            <option value="cheap">≤$0.50/M</option>
+            <option value="mid">≤$5/M</option>
+          </select>
+          <select
+            value={ctxFilter}
+            onChange={(e) => setCtxFilter(e.target.value as CtxFilter)}
+          >
+            <option value="all">Any context</option>
+            <option value="32k">≥32k</option>
+            <option value="64k">≥64k</option>
+            <option value="128k">≥128k</option>
+          </select>
+          <select
+            value={providerFilter}
+            onChange={(e) => setProviderFilter(e.target.value)}
+          >
+            <option value="all">All providers</option>
+            {providers.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <label className="model-filter-check">
+            <input
+              type="checkbox"
+              checked={jsonOnly}
+              onChange={(e) => setJsonOnly(e.target.checked)}
+            />
+            JSON
+          </label>
+        </div>
+
+        {/* Model list */}
+        <div className="model-list">
+          <div
+            className={`model-item${model === '' ? ' active' : ''}`}
+            onClick={() => setModel('')}
+          >
+            <span className="model-name">Default (from .env)</span>
+          </div>
+          {modelsLoading && (
+            <div className="model-item disabled">Loading models...</div>
           )}
-          {paidModels.length > 0 && (
-            <optgroup label="💰 Paid">
-              {paidModels.map((m) => (
-                <ModelOption key={m.id} m={m} />
-              ))}
-            </optgroup>
+          {filtered.map((m) => (
+            <ModelRow
+              key={m.id}
+              m={m}
+              active={model === m.id}
+              onClick={() => setModel(m.id)}
+            />
+          ))}
+          {!modelsLoading && filtered.length === 0 && (
+            <div className="model-item disabled">No models match filters</div>
           )}
-        </select>
-        {selectedModel && (
+        </div>
+        <div className="model-count">
+          {filtered.length} model{filtered.length !== 1 ? 's' : ''}
+          {models ? ` / ${models.length} total` : ''}
+        </div>
+
+        {/* Selected model info */}
+        {selected && (
           <div className="model-info">
-            <strong>{selectedModel.name}</strong>
-            {selectedModel.isFree && <span className="badge-free">FREE</span>}
+            <strong>{selected.name}</strong>
+            {selected.isFree && <span className="badge-free">FREE</span>}
+            {selected.supportsJson && <span className="badge-json">JSON</span>}
             <br />
-            <span>
-              Input: {formatPrice(selectedModel.promptPrice)} · Output:{' '}
-              {formatPrice(selectedModel.completionPrice)} · Context:{' '}
-              {(selectedModel.contextLength / 1000).toFixed(0)}k
-            </span>
+            In: {formatPrice(selected.promptPrice)} · Out:{' '}
+            {formatPrice(selected.completionPrice)} · Ctx:{' '}
+            {ctxLabel(selected.contextLength)}
+            {selected.maxOutput > 0 &&
+              ` · Max out: ${ctxLabel(selected.maxOutput)}`}
           </div>
         )}
 
@@ -223,6 +283,32 @@ export function JobDialog({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ModelRow({
+  m,
+  active,
+  onClick,
+}: {
+  m: Model;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div className={`model-item${active ? ' active' : ''}`} onClick={onClick}>
+      <span className="model-name">
+        {m.isFree && '🆓 '}
+        {m.name}
+      </span>
+      <span className="model-meta">
+        {m.supportsJson && '📋 '}
+        {ctxLabel(m.contextLength)} ·{' '}
+        {m.isFree
+          ? 'Free'
+          : `$${m.promptPrice.toFixed(2)}/$${m.completionPrice.toFixed(2)}`}
+      </span>
     </div>
   );
 }
