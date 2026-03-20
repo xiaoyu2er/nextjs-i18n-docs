@@ -75,17 +75,43 @@ function validateFrontmatter(translation: string): boolean {
     // Quick checks before full parse
     if (yamlContent.includes('NEEDS_TRANSLATION')) return false;
     if (yamlContent.endsWith('author:')) return false; // truncated author list
+    // Reject full-width colons in YAML keys (LLM using Chinese punctuation)
+    if (/^[\w-]+：/m.test(yamlContent)) return false;
 
     // Only validate translated fields (title, description)
-    // Other fields (headline, author, date, image) are preserved from original
     const lines = yamlContent.split('\n');
     for (const line of lines) {
       const match = line.match(/^(title|description):\s*(.+)/);
       if (match) {
         const val = match[2];
-        // Backtick-starting values are LLM errors; quotes are valid YAML (needed for : in values)
-        if (val.startsWith('`')) {
-          return false;
+        if (val.startsWith('`')) return false;
+      }
+    }
+
+    // Check multiline YAML values have proper indentation
+    // e.g., description: >-\n  line1\n  line2 (all continuation lines must be indented)
+    let inMultiline = false;
+    let multilineIndent = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.match(/^[\w-]+:\s*[>|]-?\s*$/)) {
+        // Start of multiline scalar (>-, |-, etc.)
+        inMultiline = true;
+        multilineIndent = 0;
+      } else if (inMultiline) {
+        if (line.trim() === '') continue;
+        const indent = line.match(/^(\s*)/)?.[1].length ?? 0;
+        if (multilineIndent === 0) {
+          multilineIndent = indent;
+        }
+        if (indent < multilineIndent && indent > 0) {
+          return false; // inconsistent indentation
+        }
+        if (indent === 0 && !line.match(/^[\w-]+:/)) {
+          return false; // non-indented continuation line
+        }
+        if (indent === 0 && line.match(/^[\w-]+:/)) {
+          inMultiline = false; // new key starts
         }
       }
     }
