@@ -175,6 +175,15 @@ class JobManager {
     return this.jobs.get(id);
   }
 
+  /** Remove a finished job from the list */
+  remove(id: string): boolean {
+    const job = this.jobs.get(id);
+    if (!job || job.status === 'running') return false;
+    this.jobs.delete(id);
+    this.subscribers.delete(id);
+    return true;
+  }
+
   /** Subscribe to job events (for SSE) */
   subscribe(id: string, callback: (event: JobEvent) => void): () => void {
     if (!this.subscribers.has(id)) {
@@ -212,11 +221,16 @@ class JobManager {
     this.emit(id, { type: 'log', data: line });
 
     // Parse progress from pipeline output
+    // "Files: 563 total"
+    const filesMatch = line.match(/Files:\s+(\d+)\s+total/);
+    if (filesMatch) {
+      job.totalFiles = Number.parseInt(filesMatch[1], 10);
+    }
+
     if (line.includes('fully cached')) {
       const m = line.match(/(\d+) fully cached, (\d+) need translation/);
       if (m) {
         job.cachedFiles = Number.parseInt(m[1], 10);
-        job.totalFiles = Number.parseInt(m[1], 10) + Number.parseInt(m[2], 10);
         this.emit(id, { type: 'progress', data: { ...job } });
       }
     } else if (line.startsWith('⏳') || line.includes('uncached')) {

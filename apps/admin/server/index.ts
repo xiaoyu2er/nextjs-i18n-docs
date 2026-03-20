@@ -273,19 +273,31 @@ const dashboardHtml = /* html */ `
     if (state.jobs.length === 0) { el.innerHTML = '<span style="color:var(--fg-muted);font-size:0.85rem">No jobs yet</span>'; return; }
 
     el.innerHTML = state.jobs.map(j => {
-      const total = j.cachedFiles + (j.totalFiles - j.cachedFiles);
-      const done = j.cachedFiles + j.translatedFiles;
-      const pct = total > 0 ? (done / total * 100) : 0;
+      const toTranslate = j.totalFiles - j.cachedFiles;
+      const pct = toTranslate > 0 ? (j.translatedFiles / toTranslate * 100) : (j.totalFiles > 0 ? 100 : 0);
       const canCancel = j.status === 'running';
+      const canDelete = j.status !== 'running';
+
+      // Progress text: "3/22 translated (541 cached, 563 total)"
+      let progressText = '';
+      if (j.totalFiles > 0) {
+        progressText = j.translatedFiles + '/' + toTranslate + ' translated';
+        if (j.cachedFiles > 0) progressText += ' (' + j.cachedFiles + ' cached, ' + j.totalFiles + ' total)';
+        if (j.errorFiles > 0) progressText += ' · ' + j.errorFiles + ' errors';
+      }
+
       return '<div class="job-item">' +
         '<div class="header">' +
           '<span class="status ' + j.status + '">' + j.status + '</span>' +
           '<strong>' + j.lang + '/' + j.version + '</strong>' +
           (j.currentFile ? '<span style="color:var(--fg-muted)"> · ' + j.currentFile + '</span>' : '') +
+          '<span style="flex:1"></span>' +
           (canCancel ? '<button onclick="cancelJob(\\'' + j.id + '\\')">⏹ Stop</button>' : '') +
+          (canDelete ? '<button onclick="deleteJob(\\'' + j.id + '\\')" style="margin-left:0.25rem">🗑 Remove</button>' : '') +
         '</div>' +
         '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
-        '<div class="meta">' + done + '/' + total + ' files · started ' + new Date(j.startedAt).toLocaleTimeString() +
+        '<div class="meta">' + progressText +
+          ' · started ' + new Date(j.startedAt).toLocaleTimeString() +
           (j.finishedAt ? ' · finished ' + new Date(j.finishedAt).toLocaleTimeString() : '') +
           (j.exitCode != null && j.exitCode !== 0 ? ' · exit code: ' + j.exitCode : '') +
         '</div>' +
@@ -329,7 +341,22 @@ const dashboardHtml = /* html */ `
       concurrency: parseInt(document.getElementById('job-concurrency').value) || 3,
     };
     closeDialog();
-    await apiPost('/jobs', body);
+    try {
+      const res = await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) {
+        alert('Failed to start job: ' + (data.error || 'Unknown error'));
+        return;
+      }
+    } catch (err) {
+      alert('Failed to start job: ' + err.message);
+      return;
+    }
+    refreshJobs();
+  }
+
+  async function deleteJob(id) {
+    await apiDelete('/jobs/' + id);
     refreshJobs();
   }
 

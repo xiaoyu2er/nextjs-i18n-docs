@@ -45,10 +45,17 @@ app.get('/:id', (c) => {
   return c.json(job);
 });
 
-/** DELETE /api/jobs/:id — Cancel a running job */
+/** DELETE /api/jobs/:id — Cancel a running job or remove a finished one */
 app.delete('/:id', (c) => {
-  const ok = jobManager.cancel(c.req.param('id'));
-  if (!ok) return c.json({ error: 'Job not found or not running' }, 404);
+  const id = c.req.param('id');
+  const job = jobManager.get(id);
+  if (!job) return c.json({ error: 'Job not found' }, 404);
+
+  if (job.status === 'running') {
+    jobManager.cancel(id);
+  } else {
+    jobManager.remove(id);
+  }
   return c.json({ ok: true });
 });
 
