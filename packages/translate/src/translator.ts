@@ -627,12 +627,19 @@ async function translateJsonChunk(
   const { baseURL, apiKey, model } = resolveApiConfig(opts);
   const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
   const client = new OpenAI({ baseURL, apiKey });
+  const log = opts.logger ?? console.warn;
 
   let lastError: Error | undefined;
   const requestedMd5s = Object.keys(opts.uncached);
 
+  // Log request details
+  log(`🔧 model=${model} keys=${requestedMd5s.length} max_tokens=${maxTokens}`);
+  log(`📤 system prompt (${systemPrompt.length} chars)`);
+  log(`📤 user message (${userMessage.length} chars)`);
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
+      const t0 = Date.now();
       const response = await client.chat.completions.create({
         model,
         messages: [
@@ -660,7 +667,20 @@ async function translateJsonChunk(
         reasoning: { exclude: true },
       });
 
+      const elapsed = Date.now() - t0;
       const choice = response.choices?.[0];
+      const usage = response.usage;
+
+      // Log response details
+      log(
+        `📥 response in ${(elapsed / 1000).toFixed(1)}s` +
+          ` | finish=${choice?.finish_reason}` +
+          ` | content=${choice?.message?.content?.length ?? 0} chars` +
+          (usage
+            ? ` | tokens: in=${usage.prompt_tokens} out=${usage.completion_tokens} total=${usage.total_tokens}`
+            : ''),
+      );
+
       if (!choice?.message?.content) {
         throw new Error('Empty response from API');
       }
@@ -686,7 +706,6 @@ async function translateJsonChunk(
       }
 
       // Validate: check for missing and extra keys
-      const log = opts.logger ?? console.warn;
       const returnedMd5s = new Set(Object.keys(parsed));
       const missing = requestedMd5s.filter((md5) => !returnedMd5s.has(md5));
       const extra = [...returnedMd5s].filter(
