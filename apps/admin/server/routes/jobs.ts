@@ -9,7 +9,7 @@ app.get('/', (c) => {
   return c.json(
     jobManager.list().map((j) => ({
       ...j,
-      logLines: undefined, // Don't send full logs in list view
+      logLines: j.logLines.slice(-20), // Last 20 lines in list view
     })),
   );
 });

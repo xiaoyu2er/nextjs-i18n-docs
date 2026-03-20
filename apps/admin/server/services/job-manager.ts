@@ -15,6 +15,8 @@ export interface Job {
   max: number;
   concurrency: number;
 
+  exitCode?: number | null;
+
   // Progress
   totalFiles: number;
   cachedFiles: number;
@@ -127,10 +129,20 @@ class JobManager {
 
     proc.on('exit', (code) => {
       job.status = code === 0 ? 'completed' : 'failed';
+      job.exitCode = code;
       job.finishedAt = new Date().toISOString();
       job.currentFile = undefined;
+      this.addLog(id, `Process exited with code ${code}`);
       this.processes.delete(id);
       this.emit(id, { type: 'exit', code });
+    });
+
+    proc.on('error', (err) => {
+      job.status = 'failed';
+      job.finishedAt = new Date().toISOString();
+      this.addLog(id, `Process error: ${err.message}`);
+      this.processes.delete(id);
+      this.emit(id, { type: 'exit', code: -1 });
     });
 
     return job;

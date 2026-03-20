@@ -166,6 +166,7 @@ const dashboardHtml = /* html */ `
   let state = { version: 'latest', lang: null, data: null, files: null, jobs: [] };
 
   // ── API ──
+  function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   const api = (path) => fetch('/api' + path).then(r => r.json());
   const apiPost = (path, body) => fetch('/api' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
   const apiDelete = (path) => fetch('/api' + path, { method: 'DELETE' }).then(r => r.json());
@@ -286,7 +287,9 @@ const dashboardHtml = /* html */ `
         '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
         '<div class="meta">' + done + '/' + total + ' files · started ' + new Date(j.startedAt).toLocaleTimeString() +
           (j.finishedAt ? ' · finished ' + new Date(j.finishedAt).toLocaleTimeString() : '') +
+          (j.exitCode != null && j.exitCode !== 0 ? ' · exit code: ' + j.exitCode : '') +
         '</div>' +
+        (j.logLines && j.logLines.length > 0 ? '<div class="log-viewer">' + j.logLines.map(l => '<div class="line' + (l.includes('[stderr]') || l.includes('error') || l.includes('Error') ? ' err' : '') + '">' + escapeHtml(l) + '</div>').join('') + '</div>' : '') +
       '</div>';
     }).join('');
   }
