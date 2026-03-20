@@ -20,8 +20,8 @@
 import {
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -153,8 +153,13 @@ function parseFrontmatter(content: string): {
 
 function resolveSourceFile(locale: string, sourceRef: string): string | null {
   const parts = sourceRef.split('/');
-  // For versioned builds, CONTENT_SRC already points to content-v{N}/
-  return resolveSourceInDir(join(CONTENT_SRC, locale, 'docs'), parts);
+  // Try locale-specific source first, fall back to EN
+  return (
+    resolveSourceInDir(join(CONTENT_SRC, locale, 'docs'), parts) ??
+    (locale !== 'en'
+      ? resolveSourceInDir(join(CONTENT_SRC, 'en', 'docs'), parts)
+      : null)
+  );
 }
 
 function resolveSourceInDir(
