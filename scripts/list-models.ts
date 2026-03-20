@@ -87,7 +87,11 @@ const models = data
       maxOutput: m.top_provider?.max_completion_tokens ?? 0,
     };
   })
-  .sort((a, b) => a.promptPrice - b.promptPrice);
+  .sort((a, b) => {
+    // Free first, then by context length desc (proxy for model quality)
+    if (a.isFree !== b.isFree) return a.isFree ? -1 : 1;
+    return b.contextLength - a.contextLength;
+  });
 
 if (jsonOut) {
   console.log(JSON.stringify(models, null, 2));
