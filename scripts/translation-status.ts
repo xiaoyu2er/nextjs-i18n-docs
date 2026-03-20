@@ -56,7 +56,7 @@ interface CliOptions {
   json: boolean;
   lang: string | null;
   version: string | null;
-  /** Show files identical to EN that need (re-)translation */
+  /** Show files that need (re-)translation: identical to EN or partially translated */
   untranslated: boolean;
 }
 
@@ -283,30 +283,37 @@ function main() {
 
 // ── Untranslated file detection ──
 
-interface UntranslatedFile {
+interface IncompleteFile {
   relPath: string;
   section: string;
-  /** Whether cache has full coverage (file can be re-assembled from cache) */
+  /** 'identical' = file is byte-identical to EN; 'partial' = file differs but cache is incomplete */
+  reason: 'identical' | 'partial';
+  /** Whether cache has full coverage (file can be re-assembled without LLM) */
   hasCacheCoverage: boolean;
-  /** Node-level: cachedNodes/totalNodes */
+  /** cachedNodes / totalNodes */
   cachePct: number;
+  /** Absolute counts for detail */
+  cachedNodes: number;
+  totalNodes: number;
+  /** Number of nodes missing from cache */
+  missingNodes: number;
 }
 
 interface UntranslatedResult {
   version: string;
   contentDir: string;
-  langs: Record<string, UntranslatedFile[]>;
+  langs: Record<string, IncompleteFile[]>;
 }
 
 /**
- * Find locale files that are identical to their EN source.
- * These are files that were either never translated or reset to EN.
+ * Find files that need translation work:
+ * 1. Files identical to EN (reset or never translated)
+ * 2. Files that differ from EN but have incomplete cache coverage (partial translation)
  */
 function findUntranslatedFiles(
   versions: { version: string; dir: string }[],
   langs: string[],
 ): UntranslatedResult[] {
-  // Load caches for checking if files CAN be re-assembled
   const cacheMap = new Map<string, Set<string>>();
   for (const lang of langs) {
     cacheMap.set(lang, loadCacheKeys(lang));
@@ -319,6 +326,8 @@ function findUntranslatedFiles(
     const enDir = join(contentDir, 'en');
     if (!existsSync(enDir)) continue;
 
+    const enFiles = walkMdx(enDir);
+
     const result: UntranslatedResult = {
       version,
       contentDir: dir,
@@ -329,44 +338,66 @@ function findUntranslatedFiles(
       const langDir = join(contentDir, lang);
       if (!existsSync(langDir)) continue;
 
+      // biome-ignore lint/style/noNonNullAssertion: guaranteed by loop above
       const cacheKeys = cacheMap.get(lang)!;
-      const untranslated: UntranslatedFile[] = [];
+      const incomplete: IncompleteFile[] = [];
 
-      const langFiles = walkMdx(langDir);
-      for (const langFile of langFiles) {
-        const relPath = relative(langDir, langFile);
-        const enFile = join(enDir, relPath);
-        if (!existsSync(enFile)) continue;
+      for (const enFile of enFiles) {
+        const relPath = relative(enDir, enFile);
+        const langFile = join(langDir, relPath);
 
-        // Compare file contents
-        const langContent = readFileSync(langFile, 'utf8');
         const enContent = readFileSync(enFile, 'utf8');
+        const nodes = parseMdx(enContent);
+        const translatable = nodes.filter((n) => n.needsTranslation && n.md5);
+        const totalNodes = translatable.length;
+        if (totalNodes === 0) continue;
 
-        if (langContent === enContent) {
-          // Check cache coverage
-          const nodes = parseMdx(enContent);
-          const translatable = nodes.filter((n) => n.needsTranslation && n.md5);
-          const cached = translatable.filter((n) => cacheKeys.has(n.md5!));
-          const totalNodes = translatable.length;
-          const cachedNodes = cached.length;
+        // biome-ignore lint/style/noNonNullAssertion: filtered above
+        const cachedNodes = translatable.filter((n) =>
+          cacheKeys.has(n.md5!),
+        ).length;
+        const missingNodes = totalNodes - cachedNodes;
 
-          untranslated.push({
+        // Determine reason
+        const isIdentical =
+          existsSync(langFile) && readFileSync(langFile, 'utf8') === enContent;
+        const hasFullCache = cachedNodes === totalNodes;
+
+        if (isIdentical) {
+          // File is identical to EN — always needs work
+          incomplete.push({
             relPath,
             section: getSection(relPath),
-            hasCacheCoverage: cachedNodes === totalNodes && totalNodes > 0,
-            cachePct: totalNodes > 0 ? (cachedNodes / totalNodes) * 100 : 0,
+            reason: 'identical',
+            hasCacheCoverage: hasFullCache,
+            cachePct: (cachedNodes / totalNodes) * 100,
+            cachedNodes,
+            totalNodes,
+            missingNodes,
+          });
+        } else if (!hasFullCache) {
+          // File differs from EN but cache is incomplete — partial translation
+          incomplete.push({
+            relPath,
+            section: getSection(relPath),
+            reason: 'partial',
+            hasCacheCoverage: false,
+            cachePct: (cachedNodes / totalNodes) * 100,
+            cachedNodes,
+            totalNodes,
+            missingNodes,
           });
         }
+        // else: file differs from EN AND cache is complete — fully translated, skip
       }
 
-      if (untranslated.length > 0) {
-        // Sort: files with cache coverage first (easy wins), then by section
-        untranslated.sort((a, b) => {
-          if (a.hasCacheCoverage !== b.hasCacheCoverage)
-            return a.hasCacheCoverage ? -1 : 1;
-          return a.relPath.localeCompare(b.relPath);
+      if (incomplete.length > 0) {
+        // Sort: identical first, then partial; within each group by cachePct desc
+        incomplete.sort((a, b) => {
+          if (a.reason !== b.reason) return a.reason === 'identical' ? -1 : 1;
+          return b.cachePct - a.cachePct;
         });
-        result.langs[lang] = untranslated;
+        result.langs[lang] = incomplete;
       }
     }
 
@@ -381,54 +412,85 @@ function printUntranslatedReport(results: UntranslatedResult[]) {
   console.log(
     '═══════════════════════════════════════════════════════════════════════════════════',
   );
-  console.log('  Untranslated Files (identical to EN)');
+  console.log('  Incomplete Translation Files');
   console.log(
     '═══════════════════════════════════════════════════════════════════════════════════',
   );
 
   for (const r of results) {
-    const totalUntranslated = Object.values(r.langs).reduce(
+    const totalIncomplete = Object.values(r.langs).reduce(
       (sum, files) => sum + files.length,
       0,
     );
-    if (totalUntranslated === 0) continue;
+    if (totalIncomplete === 0) continue;
 
     console.log('');
     console.log(`  📦 ${r.version.toUpperCase()} (${r.contentDir})`);
 
     for (const [lang, files] of Object.entries(r.langs)) {
-      const withCache = files.filter((f) => f.hasCacheCoverage).length;
-      const withoutCache = files.length - withCache;
+      const identical = files.filter((f) => f.reason === 'identical');
+      const partial = files.filter((f) => f.reason === 'partial');
+      const assembleOnly = files.filter((f) => f.hasCacheCoverage);
+      const totalMissing = files.reduce((s, f) => s + f.missingNodes, 0);
 
       console.log('');
       console.log(
-        `  ${lang}: ${files.length} files need translation (${withCache} can be assembled from cache)`,
+        `  ${lang}: ${files.length} incomplete files (${totalMissing} nodes missing from cache)`,
       );
       console.log(
-        '  ─────────────────────────────────────────────────────────────────────────',
+        '  ─────────────────────────────────────────────────────────────────────────────',
       );
 
-      for (const f of files) {
-        const icon = f.hasCacheCoverage ? '🟢' : f.cachePct > 50 ? '🟡' : '🔴';
-        const cachePctStr = `${f.cachePct.toFixed(0)}%`.padStart(4);
-        console.log(`    ${icon} ${cachePctStr} cache  ${f.relPath}`);
+      // Show identical-to-EN files
+      if (identical.length > 0) {
+        console.log(
+          `\n    📄 Identical to EN (${identical.length} files — reset or never translated):`,
+        );
+        for (const f of identical) {
+          const icon = f.hasCacheCoverage
+            ? '🟢'
+            : f.cachePct > 50
+              ? '🟡'
+              : '🔴';
+          const cachePctStr = `${f.cachePct.toFixed(0)}%`.padStart(4);
+          const missing =
+            f.missingNodes > 0 ? ` (${f.missingNodes} nodes missing)` : '';
+          console.log(
+            `      ${icon} ${cachePctStr} cache  ${f.relPath}${missing}`,
+          );
+        }
       }
 
-      if (withCache > 0) {
-        console.log('');
+      // Show partially translated files
+      if (partial.length > 0) {
         console.log(
-          `    💡 ${withCache} files can be re-assembled without LLM calls:`,
+          `\n    📝 Partially translated (${partial.length} files — some nodes missing from cache):`,
         );
+        for (const f of partial) {
+          const icon = f.cachePct > 80 ? '🟡' : '🔴';
+          const cachePctStr = `${f.cachePct.toFixed(0)}%`.padStart(4);
+          console.log(
+            `      ${icon} ${cachePctStr} cache  ${f.relPath}  (${f.missingNodes}/${f.totalNodes} nodes missing)`,
+          );
+        }
+      }
+
+      // Suggestions
+      console.log('');
+      if (assembleOnly.length > 0) {
         console.log(
-          `       bun run packages/translate/src/batch.pipeline.ts --lang ${lang} --max ${withCache}`,
+          `    💡 ${assembleOnly.length} files can be re-assembled from cache (no LLM needed)`,
         );
       }
-      if (withoutCache > 0) {
-        console.log(`    ⚡ ${withoutCache} files need LLM translation:`);
+      const needLlm = files.length - assembleOnly.length;
+      if (needLlm > 0) {
         console.log(
-          `       bun run packages/translate/src/batch.pipeline.ts --lang ${lang} --max ${files.length}`,
+          `    ⚡ ${needLlm} files need LLM translation (${totalMissing} nodes)`,
         );
       }
+      console.log(
+        `    → bun run packages/translate/src/batch.pipeline.ts --lang ${lang} --max ${files.length}`,
+      );
     }
   }
 
