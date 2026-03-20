@@ -50,11 +50,7 @@ export function App() {
     (v: string) => {
       setParams({
         v: v === 'latest' ? null : v,
-        lang: null,
         file: null,
-        status: null,
-        section: null,
-        view: null,
       });
       bump();
     },
