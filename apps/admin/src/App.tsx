@@ -20,7 +20,7 @@ function readParams() {
     lang: p.get('lang') || null,
     file: p.get('file') || null,
     showFiles: p.get('files') !== '0',
-    view: (p.get('view') as ViewMode) || 'split',
+    view: (p.get('view') as ViewMode) || 'lang',
     status: (p.get('status') as StatusFilter) || 'all',
     section: (p.get('section') as SectionFilter) || 'all',
   };
