@@ -1,0 +1,226 @@
+---
+title: revalidatePath 路径重新验证函数
+description: revalidatePath 函数的 API 参考。
+---
+
+`revalidatePath` 允许您按需使特定路径的 [缓存数据](/docs/app/getting-started/caching) 失效。
+
+## 使用方法
+
+`revalidatePath` 可以在服务器函数和路由处理器中调用。
+
+`revalidatePath` 不能在客户端组件或代理中调用，因为它仅在服务器环境中有效。
+
+> **小知识**：
+>
+> - **服务器函数**：立即更新 UI（如果您正在查看受影响的路径）。目前，它还导致所有之前访问过的页面在再次导航时刷新。此行为是临时的，未来将更新为仅适用于特定路径。
+> - **路由处理器**：标记路径以进行重新验证。重新验证会在下次访问指定路径时完成。这意味着使用动态路由段调用 `revalidatePath` 不会立即触发大量重新验证。失效仅在下次访问该路径时发生。
+
+## 参数
+
+```tsx
+revalidatePath(path: string, type?: 'page' | 'layout'): void;
+```
+
+- `path`: 代表您路由文件结构的字符串。这可以是一个字面路径，如 `/product/123`，或是带有动态段的路由模式，如 `/product/[slug]`。不要附加 `/page` 或 `/layout`，请使用 `type` 参数。长度不得超过 1024 个字符。此值区分大小写。无论您的 [`trailingSlash`](/docs/app/api-reference/config/next-config-js/trailingSlash) 配置如何，您都不需要包含尾随斜杠。
+- `type`: （可选）`'page'` 或 `'layout'` 字符串，用于更改要重新验证的路径类型。如果 `path` 包含动态段，例如 `/product/[slug]`，则此参数是必需的。如果 `path` 是像 `/product/1` 这样的字面路径，则省略 `type`。
+
+当您想要刷新 [单个页面](#revalidating-a-specific-path) 时，使用字面路径。使用路由模式加上 `type` 来刷新 [所有匹配的页面](#revalidating-a-page-path)。
+
+## 返回
+
+`revalidatePath` 不返回值。
+
+## 可失效的内容
+
+路径参数可以指向页面、布局或路由处理器：
+
+- **Pages**: 使特定页面失效
+- **Layouts**: 使布局（该段落的 `layout.tsx`）失效，以及其下的所有嵌套布局及其下的所有页面
+- **Route Handlers**: 使路由处理器内访问的缓存数据失效。例如 `revalidatePath("/api/data")` 会使此 GET 处理器失效：
+
+```ts filename="app/api/data/route.ts"
+export async function GET() {
+  const data = await fetch('https://api.vercel.app/blog', {
+    cache: 'force-cache',
+  })
+
+  return Response.json(await data.json())
+}
+```
+
+## 结合 `revalidatePath` 使用重写
+
+使用 [重写](/docs/app/api-reference/config/next-config-js/rewrites) 时，您必须传递 **目的地** 路径（实际的路由文件位置），而不是浏览器地址栏中显示的源路径。
+
+例如，如果您有一个从 `/blog` 到 `/news` 的重写：
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/blog',
+        destination: '/news',
+      },
+    ]
+  },
+}
+```
+
+要重新验证此页面，请使用目的地路径：
+
+```ts
+// Correct: use the destination path
+revalidatePath('/news')
+
+// Incorrect: the source path won't match the cache entry
+revalidatePath('/blog')
+```
+
+这是因为 `revalidatePath` 基于路由文件结构进行操作，而不是用户可见的 URL。缓存条目根据其由哪个路由文件渲染进行标记。
+
+## 与 `revalidateTag` 和 `updateTag` 的关系
+
+`revalidatePath`、[`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) 和 [`updateTag`](/docs/app/api-reference/functions/updateTag) 有不同的用途：
+
+- **`revalidatePath`**: 使特定页面或布局路径失效
+- **`revalidateTag`**: 将具有特定标签的数据标记为 **过期**。适用于所有使用这些标签的页面
+- **`updateTag`**: 使具有特定标签的数据过期。适用于所有使用这些标签的页面
+
+当您调用 `revalidatePath` 时，仅指定路径在下一次访问时获取新数据。使用相同数据标签的其他页面将继续提供缓存数据，直到这些特定标签也被重新验证：
+
+```tsx
+// Page A: /blog
+const posts = await fetch('https://api.vercel.app/blog', {
+  next: { tags: ['posts'] },
+})
+
+// Page B: /dashboard
+const recentPosts = await fetch('https://api.vercel.app/blog?limit=5', {
+  next: { tags: ['posts'] },
+})
+```
+
+调用 `revalidatePath('/blog')` 后：
+
+- **页面 A (/blog)**：显示新数据（页面已重新渲染）
+- **页面 B (/dashboard)**：仍显示旧数据（缓存标签 'posts' 未失效）
+
+了解 [`revalidateTag` 和 `updateTag`](/docs/app/api-reference/functions/updateTag#differences-from-revalidatetag) 之间的区别。
+
+### 构建重新验证工具
+
+`revalidatePath` 和 `updateTag` 是互补的基础原语，通常在实用程序函数中一起使用，以确保应用程序中全面的数据一致性：
+
+```ts
+'use server'
+
+import { revalidatePath, updateTag } from 'next/cache'
+
+export async function updatePost() {
+  await updatePostInDatabase()
+
+  revalidatePath('/blog') // Refresh the blog page
+  updateTag('posts') // Refresh all pages using 'posts' tag
+}
+```
+
+此模式确保特定页面和任何使用相同数据的页面保持一致。
+
+## 示例
+
+### 重新验证特定路径
+
+```ts
+import { revalidatePath } from 'next/cache'
+revalidatePath('/blog/post-1')
+```
+
+这将使一个特定路径在下一次页面访问时失效并重新验证。
+
+### 重新验证页面路径
+
+```ts
+import { revalidatePath } from 'next/cache'
+revalidatePath('/blog/[slug]', 'page')
+// or with route groups
+revalidatePath('/(main)/blog/[slug]', 'page')
+```
+
+这将使任何匹配提供的 `page` 文件的路径在下一次页面访问时失效并重新验证。这_不会_使特定页面下的页面失效。例如，`/blog/[slug]` 不会使 `/blog/[slug]/[author]` 失效。
+
+### 重新验证布局路径
+
+```ts
+import { revalidatePath } from 'next/cache'
+revalidatePath('/blog/[slug]', 'layout')
+// or with route groups
+revalidatePath('/(main)/post/[slug]', 'layout')
+```
+
+这将使任何匹配提供的 `layout` 文件的路径在下一次页面访问时失效并重新验证。这将导致具有相同布局的子页面在下一次访问时失效并重新验证。例如，在上一种情况下，`/blog/[slug]/[another]` 也将被失效并在下一次访问时重新验证。
+
+### 重新验证所有数据
+
+```ts
+import { revalidatePath } from 'next/cache'
+
+revalidatePath('/', 'layout')
+```
+
+这将清除 [客户端缓存](/docs/app/glossary#client-cache)，并为下一次页面访问时重新验证失效所有缓存数据。
+
+### 服务器函数
+
+```ts filename="app/actions.ts" switcher
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export default async function submit() {
+  await submitForm()
+  revalidatePath('/')
+}
+```
+
+### 路由处理程序
+
+```ts filename="app/api/revalidate/route.ts" switcher
+import { revalidatePath } from 'next/cache'
+import type { NextRequest } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (path) {
+    revalidatePath(path)
+    return Response.json({ revalidated: true, now: Date.now() })
+  }
+
+  return Response.json({
+    revalidated: false,
+    now: Date.now(),
+    message: 'Missing path to revalidate',
+  })
+}
+```
+
+```js filename="app/api/revalidate/route.js" switcher
+import { revalidatePath } from 'next/cache'
+
+export async function GET(request) {
+  const path = request.nextUrl.searchParams.get('path')
+
+  if (path) {
+    revalidatePath(path)
+    return Response.json({ revalidated: true, now: Date.now() })
+  }
+
+  return Response.json({
+    revalidated: false,
+    now: Date.now(),
+    message: 'Missing path to revalidate',
+  })
+}
+```

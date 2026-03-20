@@ -13,7 +13,7 @@ export class FileLogger {
       .replace(/[:.]/g, '-')
       .replace('T', '_')
       .slice(0, 19);
-    this.logDir = path.join(baseDir, `translate-${lang}-${ts}`);
+    this.logDir = path.join(baseDir, `${ts}-translate-${lang}`);
     fs.mkdirSync(this.logDir, { recursive: true });
 
     // Write a summary log too
