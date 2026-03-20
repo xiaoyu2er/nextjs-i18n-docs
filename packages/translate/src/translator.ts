@@ -24,6 +24,8 @@ export interface TranslateOptions {
   maxTokens?: number;
   /** File path for logging */
   filePath?: string;
+  /** Logger callback for detailed per-file logging */
+  logger?: (message: string) => void;
 }
 
 /** Default max output tokens */
@@ -552,9 +554,9 @@ export async function translateJson(
     currentChunkTokens += entryTokens;
   }
 
-  const logPrefix = opts.filePath ? `[${opts.filePath}] ` : '';
-  console.log(
-    `   📦 ${logPrefix}Splitting ${entries.length} nodes into ${chunks.length} chunks (~${targetTokensPerChunk} tokens each)`,
+  const log = opts.logger ?? console.log;
+  log(
+    `📦 Splitting ${entries.length} nodes into ${chunks.length} chunks (~${targetTokensPerChunk} tokens each)`,
   );
 
   for (let i = 0; i < chunks.length; i++) {
@@ -661,30 +663,28 @@ async function translateJsonChunk(
       }
 
       // Validate: check for missing and extra keys
+      const log = opts.logger ?? console.warn;
       const returnedMd5s = new Set(Object.keys(parsed));
       const missing = requestedMd5s.filter((md5) => !returnedMd5s.has(md5));
       const extra = [...returnedMd5s].filter(
         (md5) => !requestedMd5s.includes(md5),
       );
 
-      const logPrefix = opts.filePath ? `[${opts.filePath}] ` : '';
       if (missing.length > 0) {
-        console.warn(
-          `⚠️ ${logPrefix}JSON missing ${missing.length}/${requestedMd5s.length} keys`,
-        );
+        log(`⚠️ JSON missing ${missing.length}/${requestedMd5s.length} keys`);
       }
       if (extra.length > 0) {
-        console.warn(`⚠️ ${logPrefix}JSON has ${extra.length} extra keys`);
+        log(`⚠️ JSON has ${extra.length} extra keys`);
         if (missing.length > requestedMd5s.length * 0.5) {
-          console.warn('   Extra key samples:');
+          log('   Extra key samples:');
           for (const k of extra.slice(0, 3)) {
-            console.warn(
+            log(
               `     ${k.substring(0, 16)}… = ${String(parsed[k]).substring(0, 60).replace(/\n/g, '↵')}`,
             );
           }
-          console.warn('   Expected key samples:');
+          log('   Expected key samples:');
           for (const k of requestedMd5s.slice(0, 3)) {
-            console.warn(`     ${k.substring(0, 16)}…`);
+            log(`     ${k.substring(0, 16)}…`);
           }
         }
       }
@@ -692,11 +692,9 @@ async function translateJsonChunk(
       // Try to recover extra keys → missing keys (LLM may have corrupted a key)
       if (extra.length > 0 && missing.length > 0) {
         for (const extraKey of extra) {
-          // Find closest missing key by character similarity
           let bestMatch: string | null = null;
           let bestDist = Number.POSITIVE_INFINITY;
           for (const missKey of missing) {
-            // Simple: count matching characters at same position
             let diff = Math.abs(extraKey.length - missKey.length);
             const minLen = Math.min(extraKey.length, missKey.length);
             for (let i = 0; i < minLen; i++) {
@@ -707,10 +705,9 @@ async function translateJsonChunk(
               bestMatch = missKey;
             }
           }
-          // Accept if ≤3 chars different (typo-level corruption)
           if (bestMatch && bestDist <= 3) {
-            console.warn(
-              `   🔧 Recovered key: ${extraKey} → ${bestMatch} (${bestDist} char diff)`,
+            log(
+              `🔧 Recovered key: ${extraKey} → ${bestMatch} (${bestDist} char diff)`,
             );
             parsed[bestMatch] = parsed[extraKey];
             missing.splice(missing.indexOf(bestMatch), 1);
@@ -743,7 +740,8 @@ async function translateJsonChunk(
       }
 
       const backoff = INITIAL_BACKOFF_MS * 2 ** (attempt - 1);
-      console.warn(
+      const retryLog = opts.logger ?? console.warn;
+      retryLog(
         `⚠️ Attempt ${attempt}/${MAX_RETRIES} failed: ${lastError.message}. Retrying in ${backoff / 1000}s...`,
       );
       await sleep(backoff);

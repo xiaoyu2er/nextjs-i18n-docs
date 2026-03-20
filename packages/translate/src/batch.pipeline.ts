@@ -45,6 +45,7 @@ import {
   type TranslateOptions,
   translateJson,
 } from './translator';
+import { FileLogger, formatDuration, TableUI } from './ui';
 
 // Note: translateAssembled (legacy whole-file mode) still exported for backward compatibility
 
@@ -98,16 +99,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 
-function formatDuration(ms: number): string {
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  const remainSecs = secs % 60;
-  if (mins < 60) return `${mins}m${remainSecs}s`;
-  const hours = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hours}h${remainMins}m`;
-}
+// formatDuration imported from ./ui
 
 // ── CLI Arg Parsing ──────────────────────────────────────────────────
 
@@ -270,6 +262,7 @@ async function translateFile(
   opts: CliOptions,
   langConfig: LangConfig,
   cache: TranslationCache,
+  logger?: (message: string) => void,
 ): Promise<TranslateFileResult> {
   const sourceContent = fs.readFileSync(sourcePath, 'utf8');
   const assembleResult = assemble(sourceContent, opts.lang, cache, relPath);
@@ -306,6 +299,8 @@ async function translateFile(
     return { status: 'cached', newTranslations: 0, diffs: 0, mdxErrors: [] };
   }
 
+  const log = logger ?? console.log;
+
   // Translate via structured JSON — send typed nodes, receive {md5: translation}
   const jsonResult = await translateJson({
     assembledContent: assembleResult.content,
@@ -319,6 +314,7 @@ async function translateFile(
     model: opts.model || undefined,
     maxTokens: opts.maxTokens,
     filePath: relPath,
+    logger,
     docsContext:
       opts.docsContext ||
       'Next.js is a React framework for building full-stack web applications.',
@@ -329,8 +325,8 @@ async function translateFile(
   const returned = Object.keys(jsonResult.translations).length;
   const missed = jsonResult.missing.length;
   if (returned < requested) {
-    console.log(
-      `   📊 LLM returned ${returned}/${requested} keys${missed > 0 ? `, ${missed} missing` : ''}`,
+    log(
+      `📊 LLM returned ${returned}/${requested} keys${missed > 0 ? `, ${missed} missing` : ''}`,
     );
   }
   let newTranslations = 0;
@@ -346,16 +342,14 @@ async function translateFile(
       if (!validateFrontmatter(finalTranslation)) {
         _badTranslations++;
         const preview = finalTranslation.substring(0, 80).replace(/\n/g, '↵');
-        console.warn(`   ⚠️ Bad YAML for ${md5.substring(0, 12)}…: ${preview}`);
+        log(`⚠️ Bad YAML for ${md5.substring(0, 12)}…: ${preview}`);
         continue;
       }
     }
 
     // Sanity check: skip empty translations
     if (!finalTranslation.trim()) {
-      console.warn(
-        `   ⚠️ Empty translation for ${md5.substring(0, 12)}…, skipping`,
-      );
+      log(`⚠️ Empty translation for ${md5.substring(0, 12)}…, skipping`);
       continue;
     }
     cache.set(opts.lang, md5, finalTranslation);
@@ -371,9 +365,7 @@ async function translateFile(
       retryTypes[md5] = nodeTypes[md5];
     }
     try {
-      console.log(
-        `   ↳ Retrying ${jsonResult.missing.length} missing nodes...`,
-      );
+      log(`↳ Retrying ${jsonResult.missing.length} missing nodes...`);
       const retryResult = await translateJson({
         assembledContent: '',
         uncached: retryUncached,
@@ -386,6 +378,7 @@ async function translateFile(
         model: opts.model || undefined,
         maxTokens: opts.maxTokens,
         filePath: relPath,
+        logger,
         docsContext:
           opts.docsContext ||
           'Next.js is a React framework for building full-stack web applications.',
@@ -395,56 +388,50 @@ async function translateFile(
       )) {
         const srcText = uncached[md5] ?? '';
         if (isFrontmatter(srcText) && !validateFrontmatter(translation)) {
-          console.warn(
-            `   ⚠️ Bad YAML in retry for ${md5.substring(0, 12)}…, skipping`,
-          );
+          log(`⚠️ Bad YAML in retry for ${md5.substring(0, 12)}…, skipping`);
           continue;
         }
         cache.set(opts.lang, md5, translation);
         newTranslations++;
       }
       if (retryResult.missing.length > 0) {
-        console.warn(
-          `   ⚠️ ${retryResult.missing.length} nodes still missing after retry:`,
-        );
+        log(`⚠️ ${retryResult.missing.length} nodes still missing after retry:`);
         for (const md5 of retryResult.missing) {
           const src = uncached[md5] ?? '';
           const preview = src.split('\n')[0].substring(0, 80);
-          console.warn(`      ${md5.substring(0, 12)}… ${preview}`);
+          log(`   ${md5.substring(0, 12)}… ${preview}`);
         }
       }
     } catch (err) {
-      console.warn(
+      log(
         `   ⚠️ Retry failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   } else if (jsonResult.missing.length > 10) {
-    console.warn(
-      `   ⚠️ ${jsonResult.missing.length}/${Object.keys(uncached).length} nodes missing (too many to retry):`,
+    log(
+      `⚠️ ${jsonResult.missing.length}/${Object.keys(uncached).length} nodes missing (too many to retry):`,
     );
     for (const md5 of jsonResult.missing.slice(0, 5)) {
       const src = uncached[md5] ?? '';
       const preview = src.split('\n')[0].substring(0, 80);
-      console.warn(`      ${md5.substring(0, 12)}… ${preview}`);
+      log(`   ${md5.substring(0, 12)}… ${preview}`);
     }
     if (jsonResult.missing.length > 5) {
-      console.warn(`      ... and ${jsonResult.missing.length - 5} more`);
+      log(`   ... and ${jsonResult.missing.length - 5} more`);
     }
   }
 
   // Re-assemble from source structure + updated cache
-  // Structure is ALWAYS correct since we control the assembly
   const reassembled = assemble(sourceContent, opts.lang, cache, relPath);
   const finalContent = reassembled.allCached
     ? reassembled.content
-    : // Strip NEEDS_TRANSLATION markers for any still-uncached nodes
-      reassembled.content
+    : reassembled.content
         .replace(new RegExp(`${NEEDS_TRANSLATION_START}\\n?`, 'g'), '')
         .replace(new RegExp(`\\n?${NEEDS_TRANSLATION_END}`, 'g'), '');
 
   if (!reassembled.allCached) {
-    console.warn(
-      `   ⚠️ ${reassembled.uncachedCount}/${reassembled.totalTranslatable} nodes still uncached (English text in output)`,
+    log(
+      `⚠️ ${reassembled.uncachedCount}/${reassembled.totalTranslatable} nodes still uncached (English text in output)`,
     );
   }
 
@@ -511,7 +498,6 @@ async function runTranslate(opts: CliOptions): Promise<void> {
     }
 
     // Scan all files, separate cached vs needs-translation
-    // --max limits the number of files to TRANSLATE, not scan
     const cachedFiles: string[] = [];
     const translateFiles: string[] = [];
 
@@ -545,8 +531,28 @@ async function runTranslate(opts: CliOptions): Promise<void> {
 
     console.log(`   Concurrency: ${opts.concurrency}\n`);
 
+    // Initialize UI and file logger
+    const logDir = path.join(opts.outputDir, '.logs');
+    const fileLogger = new FileLogger(logDir, lang);
+    const ui = new TableUI({
+      lang,
+      totalFiles: files.length,
+      cachedFiles: cachedFiles.length,
+      translateFiles,
+    });
+
+    fileLogger.log('_run', `Source: ${opts.docsRoot}`);
+    fileLogger.log(
+      '_run',
+      `Model: ${opts.model || process.env.OPENROUTER_MODEL || 'default'}`,
+    );
+    fileLogger.log(
+      '_run',
+      `Files: ${files.length} total, ${cachedFiles.length} cached, ${translateFiles.length} to translate`,
+    );
+    fileLogger.log('_run', `Concurrency: ${opts.concurrency}`);
+
     // Stats
-    const totalCached = cachedFiles.length;
     let totalTranslated = 0;
     let totalSkipped = 0;
     let totalNewTranslations = 0;
@@ -554,19 +560,32 @@ async function runTranslate(opts: CliOptions): Promise<void> {
     let totalErrors = 0;
     let totalMdxErrors = 0;
     const failedFiles: string[] = [];
-    const startTime = Date.now();
-    const fileTimes: number[] = [];
-    let completed = 0;
 
-    // Translate
+    // Translate with UI updates
     await executeInBatches(
       translateFiles,
       async (relPath) => {
         const sourcePath = path.join(opts.docsRoot, relPath);
         const fileStart = Date.now();
-        completed++;
-        const progress = `[${completed}/${translateFiles.length}]`;
-        console.log(`${progress} ⏳ ${relPath}...`);
+        const flog = (msg: string) => fileLogger.log(relPath, msg);
+
+        // Get node counts for UI
+        const sourceContent = fs.readFileSync(sourcePath, 'utf8');
+        const { uncached: uc, total: nodeTotal } = extractUncached(
+          sourceContent,
+          lang,
+          cache,
+        );
+
+        ui.update(relPath, {
+          status: 'translating',
+          cached: nodeTotal - Object.keys(uc).length,
+          total: nodeTotal,
+        });
+        ui.logLine(
+          `⏳ ${relPath} (${Object.keys(uc).length}/${nodeTotal} uncached)...`,
+        );
+        flog(`Start: ${Object.keys(uc).length}/${nodeTotal} uncached nodes`);
 
         try {
           const result = await translateFile(
@@ -575,40 +594,52 @@ async function runTranslate(opts: CliOptions): Promise<void> {
             opts,
             langConfig,
             cache,
+            flog,
           );
 
           const fileElapsed = Date.now() - fileStart;
-          fileTimes.push(fileElapsed);
-
-          const elapsed = Date.now() - startTime;
-          const remaining = translateFiles.length - completed;
-          const avgTime =
-            fileTimes.length > 0
-              ? fileTimes.reduce((a, b) => a + b, 0) / fileTimes.length
-              : 0;
-          const eta = remaining * (avgTime / opts.concurrency);
-          const timeInfo = `[${formatDuration(elapsed)} elapsed, ETA ${remaining > 0 && avgTime > 0 ? formatDuration(eta) : '-'}]`;
 
           if (result.mdxErrors.length > 0) {
             totalMdxErrors += result.mdxErrors.length;
+            for (const e of result.mdxErrors) {
+              flog(`MDX Error: ${e}`);
+            }
           }
 
           if (result.status === 'translated') {
             totalTranslated++;
             totalNewTranslations += result.newTranslations;
             totalDiffs += result.diffs;
-            console.log(
-              `${progress} ✅ ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''}) ${timeInfo}`,
+            ui.update(relPath, {
+              status: 'done',
+              newTrans: result.newTranslations,
+              mdxErrors: result.mdxErrors.length,
+              elapsed: fileElapsed,
+            });
+            ui.logLine(
+              `✅ ${relPath} (+${result.newTranslations} cached${result.diffs > 0 ? `, ${result.diffs} diffs` : ''}) [${formatDuration(fileElapsed)}]`,
+            );
+            flog(
+              `Done: +${result.newTranslations} cached, ${result.diffs} diffs, ${result.mdxErrors.length} MDX errors [${formatDuration(fileElapsed)}]`,
             );
             cache.save(lang);
           } else {
             totalSkipped++;
-            console.log(`${progress} ⏭️  ${relPath} (skipped)`);
+            ui.update(relPath, { status: 'skipped', elapsed: fileElapsed });
+            ui.logLine(`⏭️  ${relPath} (skipped)`);
+            flog('Skipped');
           }
         } catch (err) {
           totalErrors++;
           const msg = err instanceof Error ? err.message : String(err);
-          console.error(`${progress} ❌ ${relPath}: ${msg}`);
+          const fileElapsed = Date.now() - fileStart;
+          ui.update(relPath, {
+            status: 'error',
+            error: msg,
+            elapsed: fileElapsed,
+          });
+          ui.logLine(`❌ ${relPath}: ${msg}`);
+          flog(`Error: ${msg}`);
           failedFiles.push(relPath);
         }
       },
@@ -617,27 +648,22 @@ async function runTranslate(opts: CliOptions): Promise<void> {
 
     // Final save
     cache.save(lang);
+    fileLogger.close();
 
     // Summary
-    console.log(`\n${'═'.repeat(60)}`);
-    console.log(`📊 Summary (${lang}):`);
-    console.log(`   Cached (no API call): ${totalCached}`);
-    console.log(`   Translated: ${totalTranslated}`);
-    console.log(`   Skipped: ${totalSkipped}`);
-    console.log(`   New translations cached: ${totalNewTranslations}`);
-    console.log(`   Errors: ${totalErrors}`);
-    console.log(`   Diffs: ${totalDiffs}`);
-    console.log(`   MDX errors: ${totalMdxErrors}`);
-    console.log(`   Cache size: ${cache.stats(lang).size} entries`);
-    console.log(`   Total time: ${formatDuration(Date.now() - startTime)}`);
-    console.log(`   Output: ${path.join(opts.outputDir, lang)}`);
-
-    if (failedFiles.length > 0) {
-      console.log(`\n❌ Failed files (${failedFiles.length}):`);
-      for (const f of failedFiles) {
-        console.log(`   - ${f}`);
-      }
-    }
+    ui.finish({
+      totalCached: cachedFiles.length,
+      totalTranslated,
+      totalSkipped,
+      totalNewTranslations,
+      totalErrors,
+      totalDiffs,
+      totalMdxErrors,
+      cacheSize: cache.stats(lang).size,
+      outputDir: path.join(opts.outputDir, lang),
+      failedFiles,
+      logDir: fileLogger.getLogDir(),
+    });
   }
 }
 
