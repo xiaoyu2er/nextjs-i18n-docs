@@ -226,6 +226,28 @@ function filterContent(body: string): string {
     );
   }
 
+  // Wrap bare component-like JSX tags in backticks (outside code blocks)
+  // e.g., <HomePage> → `<HomePage>`, <Header /> → `<Header />`
+  // Only targets PascalCase tags that MDX would try to resolve as components
+  const lines = result.split('\n');
+  let inCodeBlock = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trimStart().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+    // Skip lines that are purely JSX (component usage like <AppOnly>)
+    if (line.trim().match(/^<\/?[A-Z]\w*[\s/>]/)) continue;
+    // Wrap bare <PascalCase> tags not already in backticks
+    lines[i] = line.replace(
+      /(?<!`)(<\/?[A-Z][a-zA-Z0-9]*(?:\s[^>]*)?\s*\/?>)(?!`)/g,
+      '`$1`',
+    );
+  }
+  result = lines.join('\n');
+
   return result;
 }
 
