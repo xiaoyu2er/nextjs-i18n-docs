@@ -46,6 +46,8 @@ class JobManager {
     max?: number;
     concurrency?: number;
     model?: string;
+    modelRotate?: string[];
+    md5?: boolean;
     files?: string[];
   }): Job {
     // Prevent duplicate jobs for same lang
@@ -83,7 +85,13 @@ class JobManager {
       String(opts.concurrency ?? 3),
     ];
 
-    if (opts.model) {
+    if (opts.md5) {
+      args.push('--md5');
+    }
+
+    if (opts.modelRotate && opts.modelRotate.length > 0) {
+      args.push('--model-rotate', opts.modelRotate.join(','));
+    } else if (opts.model) {
       args.push('--model', opts.model);
     }
 

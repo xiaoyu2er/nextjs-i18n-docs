@@ -101,6 +101,8 @@ export const api = {
     max?: number;
     concurrency?: number;
     model?: string;
+    modelRotate?: string[];
+    md5?: boolean;
     files?: string[];
   }) =>
     request<Job>('/jobs', {

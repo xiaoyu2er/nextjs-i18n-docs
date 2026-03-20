@@ -23,15 +23,15 @@ interface OpenRouterModel {
   supported_parameters: string[];
 }
 
-let cachedModels: OpenRouterModel[] | null = null;
+let cachedResult: ReturnType<typeof formatModels> | null = null;
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
 /** GET /api/models — List OpenRouter models */
 app.get('/', async (c) => {
   const now = Date.now();
-  if (cachedModels && now - cacheTime < CACHE_TTL) {
-    return c.json(formatModels(cachedModels));
+  if (cachedResult && now - cacheTime < CACHE_TTL) {
+    return c.json(cachedResult);
   }
 
   try {
@@ -40,9 +40,9 @@ app.get('/', async (c) => {
       return c.json({ error: `OpenRouter API error: ${res.status}` }, 502);
     }
     const { data } = (await res.json()) as { data: OpenRouterModel[] };
-    cachedModels = data;
+    cachedResult = formatModels(data);
     cacheTime = now;
-    return c.json(formatModels(data));
+    return c.json(cachedResult);
   } catch (err) {
     return c.json(
       { error: err instanceof Error ? err.message : 'Failed to fetch models' },
@@ -74,7 +74,9 @@ function formatModels(models: OpenRouterModel[]) {
         contextLength: m.context_length,
         maxOutput: m.top_provider?.max_completion_tokens ?? 0,
         isFree: pp === 0 && cp === 0,
-        supportsJson: m.supported_parameters?.includes('response_format'),
+        supportsJson:
+          m.supported_parameters?.includes('response_format') ||
+          m.supported_parameters?.includes('structured_outputs'),
         supportsTools: m.supported_parameters?.includes('tools'),
         provider: m.id.split('/')[0],
       };

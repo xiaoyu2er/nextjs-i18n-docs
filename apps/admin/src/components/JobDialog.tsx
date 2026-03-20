@@ -24,6 +24,7 @@ function ctxLabel(n: number) {
 }
 
 type SortKey = 'price-asc' | 'price-desc' | 'context-desc' | 'name';
+type Mode = 'file' | 'md5';
 
 const CTX_STEPS = [0, 8, 16, 32, 64, 128, 200, 512, 1024, 2048];
 
@@ -37,16 +38,21 @@ export function JobDialog({
 }: Props) {
   const [lang, setLang] = useState(defaultLang || langs[0]);
   const [version, setVersion] = useState(defaultVersion || versions[0]);
-  const [max, setMax] = useState(files?.length || 50);
+  const [mode, setMode] = useState<Mode>(files?.length ? 'file' : 'md5');
+  const [max, setMax] = useState(files?.length || 10);
   const [concurrency, setConcurrency] = useState(3);
-  const [model, setModel] = useState('');
-  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // Model selection
+  const [modelMode, setModelMode] = useState<'single' | 'rotate'>('rotate');
+  const [singleModel, setSingleModel] = useState('');
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+
   // Filters
-  const [sort, setSort] = useState<SortKey>('price-asc');
-  const [ctxSlider, setCtxSlider] = useState(0); // index into CTX_STEPS
-  const [freeOnly, setFreeOnly] = useState(false);
+  const [sort, setSort] = useState<SortKey>('context-desc');
+  const [ctxSlider, setCtxSlider] = useState(0);
+  const [freeOnly, setFreeOnly] = useState(true);
   const [jsonOnly, setJsonOnly] = useState(false);
 
   const minCtx = CTX_STEPS[ctxSlider] * 1000;
@@ -74,7 +80,6 @@ export function JobDialog({
       return true;
     });
 
-    // Sort
     result = [...result];
     switch (sort) {
       case 'price-asc':
@@ -90,21 +95,46 @@ export function JobDialog({
         result.sort((a, b) => a.name.localeCompare(b.name));
         break;
     }
-
     return result;
   }, [models, search, freeOnly, minCtx, jsonOnly, sort]);
 
+  function toggleModel(id: string) {
+    setSelectedModels((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   const qc = useQueryClient();
   const create = useMutation({
-    mutationFn: () =>
-      api.createJob({
+    mutationFn: () => {
+      // Build model rotate list with max_output info
+      let modelRotate: string[] | undefined;
+      let model: string | undefined;
+
+      if (modelMode === 'rotate' && selectedModels.size > 0) {
+        modelRotate = [...selectedModels].map((id) => {
+          const m = models?.find((x) => x.id === id);
+          const maxOut = m?.maxOutput || m?.contextLength || 0;
+          return maxOut > 0 ? `${id}:${maxOut}` : id;
+        });
+      } else if (modelMode === 'single' && singleModel) {
+        model = singleModel;
+      }
+
+      return api.createJob({
         lang,
         version,
         max,
         concurrency,
-        model: model || undefined,
+        model,
+        modelRotate,
+        md5: mode === 'md5',
         files: files?.length ? files : undefined,
-      }),
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['jobs'] });
       onClose();
@@ -113,7 +143,8 @@ export function JobDialog({
   });
 
   const translatable = langs.filter((l) => l !== 'en');
-  const selected = models?.find((m) => m.id === model);
+  const selectedModelInfo =
+    modelMode === 'single' ? models?.find((m) => m.id === singleModel) : null;
 
   return (
     <div
@@ -126,6 +157,35 @@ export function JobDialog({
         <h3>Start Translation Job</h3>
 
         {error && <div className="dialog-error">{error}</div>}
+
+        {/* Mode toggle */}
+        <div className="dialog-mode-toggle">
+          <button
+            type="button"
+            className={mode === 'file' ? 'active' : ''}
+            onClick={() => {
+              setMode('file');
+              setMax(files?.length || 50);
+            }}
+          >
+            📄 File mode
+          </button>
+          <button
+            type="button"
+            className={mode === 'md5' ? 'active' : ''}
+            onClick={() => {
+              setMode('md5');
+              setMax(10);
+            }}
+          >
+            🔑 MD5 mode
+          </button>
+        </div>
+        <div className="dialog-mode-hint">
+          {mode === 'file'
+            ? 'Translate file by file. --max = number of files.'
+            : 'Batch translate uncached keys from DB. --max = API calls (~100 keys each).'}
+        </div>
 
         {/* Job config */}
         <div className="dialog-grid">
@@ -153,7 +213,7 @@ export function JobDialog({
             </select>
           </div>
           <div>
-            <label>Max files</label>
+            <label>{mode === 'file' ? 'Max files' : 'Max API calls'}</label>
             <input
               type="number"
               value={max}
@@ -170,8 +230,26 @@ export function JobDialog({
           </div>
         </div>
 
-        {/* Model section */}
-        <label>Model</label>
+        {/* Model mode toggle */}
+        <div className="dialog-section-hdr">
+          <span>Model</span>
+          <div className="dialog-mode-toggle small">
+            <button
+              type="button"
+              className={modelMode === 'rotate' ? 'active' : ''}
+              onClick={() => setModelMode('rotate')}
+            >
+              🔄 Rotate
+            </button>
+            <button
+              type="button"
+              className={modelMode === 'single' ? 'active' : ''}
+              onClick={() => setModelMode('single')}
+            >
+              ☝️ Single
+            </button>
+          </div>
+        </div>
 
         {/* Filters */}
         <div className="model-filters">
@@ -186,9 +264,9 @@ export function JobDialog({
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
           >
+            <option value="context-desc">Context ↓</option>
             <option value="price-asc">Price ↑</option>
             <option value="price-desc">Price ↓</option>
-            <option value="context-desc">Context ↓</option>
             <option value="name">Name A-Z</option>
           </select>
           <label className="model-filter-check">
@@ -208,7 +286,7 @@ export function JobDialog({
               checked={jsonOnly}
               onChange={(e) => setJsonOnly(e.target.checked)}
             />
-            Structured output
+            JSON mode
           </label>
         </div>
 
@@ -229,12 +307,14 @@ export function JobDialog({
 
         {/* Model list */}
         <div className="model-list">
-          <div
-            className={`model-item${model === '' ? ' active' : ''}`}
-            onClick={() => setModel('')}
-          >
-            <span className="model-name">Default (from .env)</span>
-          </div>
+          {modelMode === 'single' && (
+            <div
+              className={`model-item${singleModel === '' ? ' active' : ''}`}
+              onClick={() => setSingleModel('')}
+            >
+              <span className="model-name">Default (from .env)</span>
+            </div>
+          )}
           {modelsLoading && (
             <div className="model-item disabled">Loading models...</div>
           )}
@@ -242,8 +322,17 @@ export function JobDialog({
             <ModelRow
               key={m.id}
               m={m}
-              active={model === m.id}
-              onClick={() => setModel(m.id)}
+              mode={modelMode}
+              active={
+                modelMode === 'single'
+                  ? singleModel === m.id
+                  : selectedModels.has(m.id)
+              }
+              onClick={() =>
+                modelMode === 'single'
+                  ? setSingleModel(m.id)
+                  : toggleModel(m.id)
+              }
             />
           ))}
           {!modelsLoading && filtered.length === 0 && (
@@ -251,24 +340,29 @@ export function JobDialog({
           )}
         </div>
         <div className="model-count">
+          {modelMode === 'rotate' && selectedModels.size > 0 && (
+            <strong>{selectedModels.size} selected · </strong>
+          )}
           {filtered.length} model{filtered.length !== 1 ? 's' : ''}
           {models ? ` / ${models.length} total` : ''}
         </div>
 
         {/* Selected model info */}
-        {selected && (
+        {modelMode === 'single' && selectedModelInfo && (
           <div className="model-info">
-            <strong>{selected.name}</strong>
-            {selected.isFree && <span className="badge-free">FREE</span>}
-            {selected.supportsJson && (
-              <span className="badge-json">Structured</span>
+            <strong>{selectedModelInfo.name}</strong>
+            {selectedModelInfo.isFree && (
+              <span className="badge-free">FREE</span>
+            )}
+            {selectedModelInfo.supportsJson && (
+              <span className="badge-json">JSON</span>
             )}
             <br />
-            In: {formatPrice(selected.promptPrice)}/M · Out:{' '}
-            {formatPrice(selected.completionPrice)}/M · Ctx:{' '}
-            {ctxLabel(selected.contextLength)}
-            {selected.maxOutput > 0 &&
-              ` · Max out: ${ctxLabel(selected.maxOutput)}`}
+            In: {formatPrice(selectedModelInfo.promptPrice)}/M · Out:{' '}
+            {formatPrice(selectedModelInfo.completionPrice)}/M · Ctx:{' '}
+            {ctxLabel(selectedModelInfo.contextLength)}
+            {selectedModelInfo.maxOutput > 0 &&
+              ` · Max out: ${ctxLabel(selectedModelInfo.maxOutput)}`}
           </div>
         )}
 
@@ -301,15 +395,26 @@ export function JobDialog({
 
 function ModelRow({
   m,
+  mode,
   active,
   onClick,
 }: {
   m: Model;
+  mode: 'single' | 'rotate';
   active: boolean;
   onClick: () => void;
 }) {
   return (
     <div className={`model-item${active ? ' active' : ''}`} onClick={onClick}>
+      {mode === 'rotate' && (
+        <input
+          type="checkbox"
+          checked={active}
+          onChange={() => {}}
+          onClick={(e) => e.stopPropagation()}
+          style={{ marginRight: '0.4rem', flexShrink: 0 }}
+        />
+      )}
       <span className="model-name">
         {m.isFree && '🆓 '}
         {m.name}

@@ -22,6 +22,8 @@ app.post('/', async (c) => {
     max?: number;
     concurrency?: number;
     model?: string;
+    modelRotate?: string[];
+    md5?: boolean;
     files?: string[];
   }>();
 
