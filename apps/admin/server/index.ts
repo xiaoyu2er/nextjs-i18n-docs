@@ -273,18 +273,19 @@ const dashboardHtml = /* html */ `
     if (state.jobs.length === 0) { el.innerHTML = '<span style="color:var(--fg-muted);font-size:0.85rem">No jobs yet</span>'; return; }
 
     el.innerHTML = state.jobs.map(j => {
-      const toTranslate = j.totalFiles - j.cachedFiles;
-      const pct = toTranslate > 0 ? (j.translatedFiles / toTranslate * 100) : (j.totalFiles > 0 ? 100 : 0);
+      const pct = j.toTranslate > 0 ? (j.translatedFiles / j.toTranslate * 100) : (j.status === 'completed' ? 100 : 0);
       const canCancel = j.status === 'running';
       const canDelete = j.status !== 'running';
 
-      // Progress text: "3/22 translated (541 cached, 563 total)"
+      // Progress: "3/22 files translated (563 total)"
       let progressText = '';
-      if (j.totalFiles > 0) {
-        progressText = j.translatedFiles + '/' + toTranslate + ' translated';
-        if (j.cachedFiles > 0) progressText += ' (' + j.cachedFiles + ' cached, ' + j.totalFiles + ' total)';
-        if (j.errorFiles > 0) progressText += ' · ' + j.errorFiles + ' errors';
+      if (j.toTranslate > 0) {
+        progressText = j.translatedFiles + '/' + j.toTranslate + ' files translated';
+        if (j.totalFiles > 0) progressText += ' (' + j.totalFiles + ' total)';
+      } else if (j.totalFiles > 0) {
+        progressText = 'scanning ' + j.totalFiles + ' files...';
       }
+      if (j.errorFiles > 0) progressText += ' · ' + j.errorFiles + ' errors';
 
       return '<div class="job-item">' +
         '<div class="header">' +

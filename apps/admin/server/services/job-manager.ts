@@ -18,8 +18,8 @@ export interface Job {
   exitCode?: number | null;
 
   // Progress
-  totalFiles: number;
-  cachedFiles: number;
+  totalFiles: number; // total EN files
+  toTranslate: number; // files that need translation in this run
   translatedFiles: number;
   errorFiles: number;
   currentFile?: string;
@@ -97,7 +97,7 @@ class JobManager {
       max: opts.max ?? 999,
       concurrency: opts.concurrency ?? 3,
       totalFiles: 0,
-      cachedFiles: 0,
+      toTranslate: 0,
       translatedFiles: 0,
       errorFiles: 0,
       logLines: [],
@@ -230,7 +230,7 @@ class JobManager {
     if (line.includes('fully cached')) {
       const m = line.match(/(\d+) fully cached, (\d+) need translation/);
       if (m) {
-        job.cachedFiles = Number.parseInt(m[1], 10);
+        job.toTranslate = Number.parseInt(m[2], 10);
         this.emit(id, { type: 'progress', data: { ...job } });
       }
     } else if (line.startsWith('⏳') || line.includes('uncached')) {

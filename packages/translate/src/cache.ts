@@ -68,8 +68,7 @@ export class TranslationCache {
         file    TEXT    NOT NULL,
         line    INTEGER NOT NULL,
         version TEXT    NOT NULL DEFAULT 'latest',
-        PRIMARY KEY (version, key, file, line),
-        FOREIGN KEY (key) REFERENCES sources(key) ON DELETE CASCADE
+        PRIMARY KEY (version, key, file, line)
       ) WITHOUT ROWID;
 
       CREATE TABLE IF NOT EXISTS translations (
