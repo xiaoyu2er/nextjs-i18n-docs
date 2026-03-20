@@ -597,7 +597,11 @@ async function translateJsonChunk(
             strict: false,
             schema: {
               type: 'object',
-              additionalProperties: { type: 'string' },
+              properties: Object.fromEntries(
+                requestedMd5s.map((k) => [k, { type: 'string' }]),
+              ),
+              required: requestedMd5s,
+              additionalProperties: false,
             },
           },
         },
