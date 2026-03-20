@@ -56,11 +56,18 @@ interface CliOptions {
   json: boolean;
   lang: string | null;
   version: string | null;
+  /** Show files identical to EN that need (re-)translation */
+  untranslated: boolean;
 }
 
 function parseArgs(): CliOptions {
   const args = process.argv.slice(2);
-  const opts: CliOptions = { json: false, lang: null, version: null };
+  const opts: CliOptions = {
+    json: false,
+    lang: null,
+    version: null,
+    untranslated: false,
+  };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--json':
@@ -71,6 +78,9 @@ function parseArgs(): CliOptions {
         break;
       case '--version':
         opts.version = args[++i];
+        break;
+      case '--untranslated':
+        opts.untranslated = true;
         break;
     }
   }
@@ -257,11 +267,176 @@ function main() {
   }
 
   // Output
-  if (opts.json) {
+  if (opts.untranslated) {
+    const result = findUntranslatedFiles(versions, langs);
+    if (opts.json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      printUntranslatedReport(result);
+    }
+  } else if (opts.json) {
     console.log(JSON.stringify(allVersionStats, null, 2));
   } else {
     printReport(allVersionStats);
   }
+}
+
+// ── Untranslated file detection ──
+
+interface UntranslatedFile {
+  relPath: string;
+  section: string;
+  /** Whether cache has full coverage (file can be re-assembled from cache) */
+  hasCacheCoverage: boolean;
+  /** Node-level: cachedNodes/totalNodes */
+  cachePct: number;
+}
+
+interface UntranslatedResult {
+  version: string;
+  contentDir: string;
+  langs: Record<string, UntranslatedFile[]>;
+}
+
+/**
+ * Find locale files that are identical to their EN source.
+ * These are files that were either never translated or reset to EN.
+ */
+function findUntranslatedFiles(
+  versions: { version: string; dir: string }[],
+  langs: string[],
+): UntranslatedResult[] {
+  // Load caches for checking if files CAN be re-assembled
+  const cacheMap = new Map<string, Set<string>>();
+  for (const lang of langs) {
+    cacheMap.set(lang, loadCacheKeys(lang));
+  }
+
+  const results: UntranslatedResult[] = [];
+
+  for (const { version, dir } of versions) {
+    const contentDir = join(ROOT, dir);
+    const enDir = join(contentDir, 'en');
+    if (!existsSync(enDir)) continue;
+
+    const result: UntranslatedResult = {
+      version,
+      contentDir: dir,
+      langs: {},
+    };
+
+    for (const lang of langs) {
+      const langDir = join(contentDir, lang);
+      if (!existsSync(langDir)) continue;
+
+      const cacheKeys = cacheMap.get(lang)!;
+      const untranslated: UntranslatedFile[] = [];
+
+      const langFiles = walkMdx(langDir);
+      for (const langFile of langFiles) {
+        const relPath = relative(langDir, langFile);
+        const enFile = join(enDir, relPath);
+        if (!existsSync(enFile)) continue;
+
+        // Compare file contents
+        const langContent = readFileSync(langFile, 'utf8');
+        const enContent = readFileSync(enFile, 'utf8');
+
+        if (langContent === enContent) {
+          // Check cache coverage
+          const nodes = parseMdx(enContent);
+          const translatable = nodes.filter((n) => n.needsTranslation && n.md5);
+          const cached = translatable.filter((n) => cacheKeys.has(n.md5!));
+          const totalNodes = translatable.length;
+          const cachedNodes = cached.length;
+
+          untranslated.push({
+            relPath,
+            section: getSection(relPath),
+            hasCacheCoverage: cachedNodes === totalNodes && totalNodes > 0,
+            cachePct: totalNodes > 0 ? (cachedNodes / totalNodes) * 100 : 0,
+          });
+        }
+      }
+
+      if (untranslated.length > 0) {
+        // Sort: files with cache coverage first (easy wins), then by section
+        untranslated.sort((a, b) => {
+          if (a.hasCacheCoverage !== b.hasCacheCoverage)
+            return a.hasCacheCoverage ? -1 : 1;
+          return a.relPath.localeCompare(b.relPath);
+        });
+        result.langs[lang] = untranslated;
+      }
+    }
+
+    results.push(result);
+  }
+
+  return results;
+}
+
+function printUntranslatedReport(results: UntranslatedResult[]) {
+  console.log('');
+  console.log(
+    '═══════════════════════════════════════════════════════════════════════════════════',
+  );
+  console.log('  Untranslated Files (identical to EN)');
+  console.log(
+    '═══════════════════════════════════════════════════════════════════════════════════',
+  );
+
+  for (const r of results) {
+    const totalUntranslated = Object.values(r.langs).reduce(
+      (sum, files) => sum + files.length,
+      0,
+    );
+    if (totalUntranslated === 0) continue;
+
+    console.log('');
+    console.log(`  📦 ${r.version.toUpperCase()} (${r.contentDir})`);
+
+    for (const [lang, files] of Object.entries(r.langs)) {
+      const withCache = files.filter((f) => f.hasCacheCoverage).length;
+      const withoutCache = files.length - withCache;
+
+      console.log('');
+      console.log(
+        `  ${lang}: ${files.length} files need translation (${withCache} can be assembled from cache)`,
+      );
+      console.log(
+        '  ─────────────────────────────────────────────────────────────────────────',
+      );
+
+      for (const f of files) {
+        const icon = f.hasCacheCoverage ? '🟢' : f.cachePct > 50 ? '🟡' : '🔴';
+        const cachePctStr = `${f.cachePct.toFixed(0)}%`.padStart(4);
+        console.log(`    ${icon} ${cachePctStr} cache  ${f.relPath}`);
+      }
+
+      if (withCache > 0) {
+        console.log('');
+        console.log(
+          `    💡 ${withCache} files can be re-assembled without LLM calls:`,
+        );
+        console.log(
+          `       bun run packages/translate/src/batch.pipeline.ts --lang ${lang} --max ${withCache}`,
+        );
+      }
+      if (withoutCache > 0) {
+        console.log(`    ⚡ ${withoutCache} files need LLM translation:`);
+        console.log(
+          `       bun run packages/translate/src/batch.pipeline.ts --lang ${lang} --max ${files.length}`,
+        );
+      }
+    }
+  }
+
+  console.log('');
+  console.log(
+    '═══════════════════════════════════════════════════════════════════════════════════',
+  );
+  console.log('');
 }
 
 // ── Pretty Print ──
