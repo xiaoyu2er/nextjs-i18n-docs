@@ -486,6 +486,7 @@ function generateBlogIndex(contentRoot: string) {
   interface BlogPost {
     slug: string;
     title: string;
+    description: string;
     date: Date;
     dateStr: string;
   }
@@ -497,12 +498,22 @@ function generateBlogIndex(contentRoot: string) {
     const { frontmatter } = parseFrontmatter(content);
     if (!frontmatter.title || !frontmatter.date) continue;
     const date = new Date(frontmatter.date.trim());
+    const escapeAttr = (s: string) =>
+      s
+        .replace(/^['"]|['"]$/g, '')
+        .replace(/&apos;/g, "'")
+        .replace(/"/g, '&quot;');
+    const cleanMultiline = (s: string) =>
+      s
+        .replace(/^>-?\s*\n\s*/, '') // strip >- prefix
+        .replace(/\n\s+/g, ' ') // join continuation lines
+        .trim();
     posts.push({
       slug: file.replace(/\.mdx$/, ''),
-      title: frontmatter.title
-        .replace(/^['"]|['"]$/g, '') // strip wrapping quotes
-        .replace(/&apos;/g, "'") // decode HTML entities
-        .replace(/"/g, '&quot;'), // escape for MDX attribute
+      title: escapeAttr(frontmatter.title),
+      description: frontmatter.description
+        ? escapeAttr(cleanMultiline(frontmatter.description))
+        : '',
       date,
       dateStr: date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -533,13 +544,25 @@ hero:
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
+<style>{\`
+.sl-link-card .description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+\`}</style>
+
 `;
 
   const years = [...byYear.keys()].sort((a, b) => b - a);
   for (const year of years) {
     mdx += `## ${year}\n\n<CardGrid>\n`;
     for (const post of byYear.get(year)!) {
-      mdx += `  <LinkCard title="${post.title}" href="./${post.slug}/" description="${post.dateStr}" />\n`;
+      const desc = post.description
+        ? `${post.dateStr} — ${post.description}`
+        : post.dateStr;
+      mdx += `  <LinkCard title="${post.title}" href="./${post.slug}/" description="${desc}" />\n`;
     }
     mdx += '</CardGrid>\n\n';
   }
