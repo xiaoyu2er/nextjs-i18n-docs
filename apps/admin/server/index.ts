@@ -76,7 +76,15 @@ nav h1{font-size:1.1rem;font-weight:700}
 .file-row .mini-fill{height:100%;border-radius:2px}
 .preview-wrap{border:1px solid var(--border);border-radius:.5rem;overflow:hidden;max-height:70vh;display:flex;flex-direction:column}
 .preview-hdr{padding:.75rem 1rem;background:var(--card);border-bottom:1px solid var(--border);font-weight:600;font-size:.85rem;display:flex;align-items:center;gap:.5rem}
+.preview-toc{padding:.5rem 1rem;background:var(--bg);border-bottom:1px solid var(--border);max-height:180px;overflow-y:auto;font-size:.75rem;line-height:1.8}
+.preview-toc a{color:var(--fg2);text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:.25rem;padding:0 .5rem}
+.preview-toc a:hover{color:var(--accent);background:var(--hover)}
+.preview-toc a.h2{padding-left:.5rem}
+.preview-toc a.h3{padding-left:1.5rem}
+.preview-toc a.h4{padding-left:2.5rem}
 .preview-body{overflow-y:auto;flex:1;padding:1rem;font-family:'SF Mono','Fira Code',monospace;font-size:.75rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#ccc}
+.preview-body .heading-line{color:var(--accent);font-weight:700}
+.preview-body .heading-anchor{display:block;margin-top:-0.5rem;padding-top:0.5rem}
 .preview-tabs{display:flex;gap:.25rem}
 .preview-tab{padding:.25rem .75rem;border-radius:.25rem;border:1px solid var(--border);background:transparent;color:var(--fg2);cursor:pointer;font-size:.75rem}
 .preview-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -135,6 +143,7 @@ nav h1{font-size:1.1rem;font-weight:700}
           <span class="spacer"></span>
           <div class="preview-tabs" id="preview-tabs"></div>
         </div>
+        <div class="preview-toc hidden" id="preview-toc"></div>
         <div class="preview-body" id="preview-body"></div>
       </div>
     </div>
@@ -281,15 +290,50 @@ async function loadPreview(file,lang){
     '<button class="preview-tab'+(t===lang?' active':'')+'" onclick="switchPreviewTab(\\''+t+'\\')">'+FLAGS[t]+' '+t+'</button>'
   ).join('');
   document.getElementById('preview-title').textContent=file;
-  document.getElementById('preview-body').textContent='Loading...';
+  document.getElementById('preview-body').innerHTML='<div class="loading">Loading...</div>';
+  document.getElementById('preview-toc').classList.add('hidden');
   try{
     const d=await api('/status/content/'+S.ver+'/'+lang+'/'+file);
-    document.getElementById('preview-body').textContent=d.content||'(empty)';
+    renderPreviewContent(d.content||'');
   }catch{document.getElementById('preview-body').textContent='Failed to load';}
 }
 async function switchPreviewTab(lang){
   S.previewLang=lang;
   if(S.previewFile)await loadPreview(S.previewFile,lang);
+}
+
+// ── Preview rendering with TOC ──
+function renderPreviewContent(raw){
+  var lines=raw.split('\\n');
+  var headings=[];
+  var htmlLines=[];
+  var headingRe=/^(#{1,6})\\s+(.+)/;
+  var linkRe=/\\[.*?\\]\\(.*?\\)/g;
+  for(var i=0;i<lines.length;i++){
+    var m=lines[i].match(headingRe);
+    if(m){
+      var level=m[1].length;
+      var text=m[2].replace(linkRe,'').replace(/\x60/g,'').replace(/\\*/g,'').trim();
+      var id='h-'+i;
+      headings.push({id:id,level:level,text:text});
+      htmlLines.push('<span class="heading-anchor" id="'+id+'"></span><span class="heading-line">'+escHtml(lines[i])+'</span>');
+    }else{
+      htmlLines.push(escHtml(lines[i]));
+    }
+  }
+  document.getElementById('preview-body').innerHTML=htmlLines.join('\\n');
+  var toc=document.getElementById('preview-toc');
+  if(headings.length>0){
+    toc.classList.remove('hidden');
+    toc.innerHTML=headings.map(function(h){
+      return '<a class="h'+h.level+'" href="#" onclick="scrollToHeading(\\''+h.id+'\\',event)">'+'#'.repeat(h.level)+' '+escHtml(h.text)+'</a>';
+    }).join('');
+  }else{toc.classList.add('hidden');}
+}
+function scrollToHeading(id,e){
+  e.preventDefault();
+  const el=document.getElementById(id);
+  if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 // ── Jobs ──
