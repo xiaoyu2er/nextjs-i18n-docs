@@ -34,7 +34,6 @@ function parseContent(content: string, prefix: string) {
       }
     }
   }
-  // Add frontmatter lines as-is
   for (let i = 0; i < start; i++) {
     rendered.push({ html: escapeHtml(lines[i]), isHeading: false });
   }
@@ -43,20 +42,22 @@ function parseContent(content: string, prefix: string) {
     const line = lines[i];
     const nextLine = lines[i + 1];
 
-    // ATX heading: ## Text or ## Text[](#anchor)
     const m = line.match(/^(#{1,6})\s+(.+)/);
-    // Setext heading: text followed by === or ---
     const setext =
       !m && nextLine && /^[=-]{2,}\s*$/.test(nextLine) && line.trim().length > 0
         ? line
         : null;
 
     if (m || setext) {
-      const level = m ? m[1].length : nextLine.startsWith('=') ? 1 : 2;
-      const raw = m ? m[2] : setext!;
+      const level = m
+        ? m[1].length
+        : (nextLine as string).startsWith('=')
+          ? 1
+          : 2;
+      const raw = m ? m[2] : (setext as string);
       const text = raw
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // [text](url) → text
-        .replace(/\[]\(#[^)]*\)/g, '') // [](#anchor) → ''
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/\[]\(#[^)]*\)/g, '')
         .replace(/[`*[\]]/g, '')
         .trim();
       const id = `${prefix}-h-${i}`;
@@ -103,6 +104,8 @@ interface Props {
   file: string;
   viewMode: ViewMode;
   onViewMode: (m: ViewMode) => void;
+  showToc: boolean;
+  onToggleToc: () => void;
   onClose?: () => void;
 }
 
@@ -112,6 +115,8 @@ export function Preview({
   file,
   viewMode,
   onViewMode,
+  showToc,
+  onToggleToc,
   onClose,
 }: Props) {
   const enRef = useRef<HTMLPreElement>(null);
@@ -141,7 +146,6 @@ export function Preview({
     [transData?.content],
   );
 
-  // Synced scrolling (only in split mode)
   const syncScroll = useCallback(
     (source: HTMLElement | null, target: HTMLElement | null) => {
       if (!source || !target || syncing.current) return;
@@ -173,45 +177,54 @@ export function Preview({
     };
   }, [syncScroll, mode]);
 
-  const showEn = mode === 'split' || mode === 'en';
-  const showTrans = !isEn && (mode === 'split' || mode === 'lang');
-  const isSingle = !showEn || !showTrans;
+  const showEnPane = mode === 'split' || mode === 'en';
+  const showTransPane = !isEn && (mode === 'split' || mode === 'lang');
 
   function scrollToHeading(idx: number) {
-    if (showEn && en.headings[idx]) {
+    if (showEnPane && en.headings[idx]) {
       const el = document.getElementById(en.headings[idx].id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    if (showTrans && trans.headings[idx]) {
+    if (showTransPane && trans.headings[idx]) {
       const el = document.getElementById(trans.headings[idx].id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
-  // Show headings from visible content; fallback to the other if empty
-  const primaryHeadings = showTrans ? trans.headings : en.headings;
-  const fallbackHeadings = showTrans ? en.headings : trans.headings;
+  const primaryHeadings = showTransPane ? trans.headings : en.headings;
+  const fallbackHeadings = showTransPane ? en.headings : trans.headings;
   const tocHeadings =
     primaryHeadings.length > 0 ? primaryHeadings : fallbackHeadings;
 
+  const hasToc = showToc && tocHeadings.length > 0;
+  const paneCount = [showEnPane, showTransPane].filter(Boolean).length;
+  const gridCols =
+    paneCount === 2
+      ? hasToc
+        ? '1fr 1fr 180px'
+        : '1fr 1fr'
+      : hasToc
+        ? '1fr 180px'
+        : '1fr';
+
   return (
-    <div className="preview-outer">
-      <div className="preview-wrap">
-        {/* Header */}
-        <div className="preview-hdr">
-          <span className="preview-filename">{file}</span>
-          {onClose && (
-            <button
-              type="button"
-              className="preview-close"
-              onClick={onClose}
-              title="Close preview"
-            >
-              ✕
-            </button>
-          )}
+    <div className="preview-wrap">
+      {/* Header */}
+      <div className="preview-hdr">
+        <span className="preview-filename">{file}</span>
+        {onClose && (
+          <button
+            type="button"
+            className="preview-close"
+            onClick={onClose}
+            title="Close preview"
+          >
+            ✕
+          </button>
+        )}
+        <div className="preview-toggle">
           {!isEn && (
-            <div className="preview-toggle">
+            <>
               <button
                 type="button"
                 className={mode === 'split' ? 'active' : ''}
@@ -236,56 +249,62 @@ export function Preview({
               >
                 {FLAGS[lang]}
               </button>
-            </div>
+            </>
           )}
-        </div>
-
-        {/* Content panels */}
-        <div className={`preview-split${isSingle ? ' single' : ''}`}>
-          {showEn && (
-            <div className="preview-pane">
-              <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
-              {enData ? (
-                <ContentBody rendered={en.rendered} bodyRef={enRef} />
-              ) : (
-                <div className="preview-body loading">Loading...</div>
-              )}
-            </div>
-          )}
-          {showTrans && (
-            <div className="preview-pane">
-              <div className="preview-pane-hdr">
-                {FLAGS[lang]} {lang}
-              </div>
-              {transData ? (
-                <ContentBody rendered={trans.rendered} bodyRef={transRef} />
-              ) : (
-                <div className="preview-body loading">Loading...</div>
-              )}
-            </div>
-          )}
+          <button
+            type="button"
+            className={showToc ? 'active' : ''}
+            onClick={onToggleToc}
+            title="Toggle table of contents"
+          >
+            ☰
+          </button>
         </div>
       </div>
 
-      {/* TOC — absolute right */}
-      {tocHeadings.length > 0 && (
-        <div className="preview-toc">
-          <div className="preview-toc-title">On this page</div>
-          {tocHeadings.map((h, idx) => (
-            <a
-              key={h.id}
-              href={`#${h.id}`}
-              className={`h${h.level}`}
-              onClick={(e) => {
-                e.preventDefault();
-                scrollToHeading(idx);
-              }}
-            >
-              {h.text}
-            </a>
-          ))}
-        </div>
-      )}
+      {/* Content panels + TOC */}
+      <div className="preview-split" style={{ gridTemplateColumns: gridCols }}>
+        {showEnPane && (
+          <div className="preview-pane">
+            <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
+            {enData ? (
+              <ContentBody rendered={en.rendered} bodyRef={enRef} />
+            ) : (
+              <div className="preview-body loading">Loading...</div>
+            )}
+          </div>
+        )}
+        {showTransPane && (
+          <div className="preview-pane">
+            <div className="preview-pane-hdr">
+              {FLAGS[lang]} {lang}
+            </div>
+            {transData ? (
+              <ContentBody rendered={trans.rendered} bodyRef={transRef} />
+            ) : (
+              <div className="preview-body loading">Loading...</div>
+            )}
+          </div>
+        )}
+        {showToc && tocHeadings.length > 0 && (
+          <div className="preview-toc">
+            <div className="preview-toc-title">On this page</div>
+            {tocHeadings.map((h, idx) => (
+              <a
+                key={h.id}
+                href={`#${h.id}`}
+                className={`h${h.level}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToHeading(idx);
+                }}
+              >
+                {h.text}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

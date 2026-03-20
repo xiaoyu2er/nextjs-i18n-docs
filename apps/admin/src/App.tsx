@@ -21,6 +21,7 @@ function readParams() {
     file: p.get('file') || null,
     showFiles: p.get('files') !== '0',
     view: (p.get('view') as ViewMode) || 'lang',
+    toc: p.get('toc') !== '0',
     status: (p.get('status') as StatusFilter) || 'all',
     section: (p.get('section') as SectionFilter) || 'all',
   };
@@ -50,7 +51,7 @@ export function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  const { version, lang, file, showFiles, view, status, section } =
+  const { version, lang, file, showFiles, view, toc, status, section } =
     readParams();
 
   // ── URL setters ──
@@ -93,6 +94,14 @@ export function App() {
   const setView = useCallback(
     (m: ViewMode) => {
       setParams({ view: m === 'lang' ? null : m });
+      bump();
+    },
+    [bump],
+  );
+
+  const setToc = useCallback(
+    (show: boolean) => {
+      setParams({ toc: show ? null : '0' });
       bump();
     },
     [bump],
@@ -264,6 +273,8 @@ export function App() {
                   file={file}
                   viewMode={view}
                   onViewMode={setView}
+                  showToc={toc}
+                  onToggleToc={() => setToc(!toc)}
                   onClose={() => setFile(null)}
                 />
               )}
