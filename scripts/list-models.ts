@@ -34,6 +34,19 @@ const maxPrice = Number.parseFloat(getOpt('max-price', '999999'));
 const minCtx = Number.parseInt(getOpt('min-ctx', '0'), 10) * 1000;
 const jsonOut = hasFlag('json');
 const rotateCmd = hasFlag('rotate-cmd');
+const noExclude = hasFlag('no-exclude');
+
+// Models known to be bad for structured translation
+const EXCLUDED_MODELS = new Set([
+  'openrouter/free', // Meta-router, unreliable
+  'google/gemma-3n-e2b-it:free', // 2B, too small
+  'google/gemma-3n-e4b-it:free', // 4B, too small
+  'google/gemma-3-4b-it:free', // 4B, too small
+  'qwen/qwen3-4b:free', // 4B, empty responses
+  'arcee-ai/trinity-mini:free', // Returns garbage for multi-key requests
+  'arcee-ai/trinity-large-preview:free', // 404 with json_schema
+  'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', // 24B, low quality
+]);
 
 const res = await fetch('https://openrouter.ai/api/v1/models');
 if (!res.ok) {
@@ -54,6 +67,7 @@ const models = data
     const ppM = pp * 1e6;
     const isFree = pp === 0 && cp === 0;
 
+    if (!noExclude && EXCLUDED_MODELS.has(m.id)) return false;
     if (freeOnly && !isFree) return false;
     if (ppM > maxPrice) return false;
     if (m.context_length < minCtx) return false;
