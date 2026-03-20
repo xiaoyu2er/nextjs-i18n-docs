@@ -533,6 +533,7 @@ export async function translateJson(
           { role: 'user', content: userMessage },
         ],
         max_tokens: maxTokens,
+        response_format: { type: 'json_object' },
         // @ts-expect-error OpenRouter extra params
         provider: { require_parameters: true },
         reasoning: { exclude: true },

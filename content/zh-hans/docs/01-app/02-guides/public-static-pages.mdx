@@ -1,0 +1,253 @@
+---
+title: 构建公开页面
+description: 学习如何构建公开的、"静态"页面，这些页面跨用户共享数据，例如落地页、列表页（产品、博客等）、营销和新闻站点。
+nav_title: 公开页面
+---
+
+公开页面向每个用户展示相同的内容。常见的例子包括落地页、营销页面和产品页面。
+
+由于数据是共享的，这类页面可以提前[预渲染](/docs/app/glossary#prerendering)并重复使用。这能带来更快的页面加载速度和更低的服务器成本。
+
+本指南将向你展示如何构建跨用户共享数据的公开页面。
+
+## 示例
+
+作为示例，我们将构建一个产品列表页面。
+
+我们将从一个静态标题开始，添加一个带有异步外部数据的产品列表，并学习如何在不阻塞响应的情况下渲染它。最后，我们将添加一个用户特定的促销横幅，而无需将整个页面切换为[动态渲染](/docs/app/glossary#dynamic-rendering)。
+
+你可以在此处找到本示例中使用的资源：
+
+- [视频](https://youtu.be/F6romq71KtI)
+- [演示](https://cache-components-public-pages.labs.vercel.dev/)
+- [代码](https://github.com/vercel-labs/cache-components-public-pages)
+
+### 步骤 1：添加简单的页头 (Header)
+
+让我们从一个简单的标题开始。
+
+```tsx filename="app/products/page.tsx"
+// Static component
+function Header() {
+  return <h1>Shop</h1>
+}
+
+export default async function Page() {
+  return (
+    <>
+      <Header />
+    </>
+  )
+}
+```
+
+#### 静态组件 (Static components)
+
+`<Header />` 组件不依赖于任何在请求之间变化的输入，例如：外部数据、请求头、路由参数、当前时间或随机值。
+
+由于其输出永不改变且可以提前确定，这类组件被称为**静态**组件。由于没有理由等待请求，Next.js 可以在[构建时](/docs/app/glossary#build-time)安全地**预渲染**页面。
+
+我们可以通过运行 [`next build`](/docs/app/api-reference/cli/next#next-build-options) 来确认这一点。
+
+```bash filename="Terminal"
+Route (app)      Revalidate  Expire
+┌ ○ /products           15m      1y
+└ ○ /_not-found
+
+○  (Static)  prerendered as static content
+```
+
+请注意，即使我们没有添加任何显式配置，产品路由也被标记为静态。
+
+### 步骤 2：添加产品列表 (product list)
+
+现在，让我们获取并渲染我们的产品列表。
+
+```tsx filename="app/products/page.tsx"
+import db from '@/db'
+import { List } from '@/app/products/ui'
+
+function Header() {}
+
+// Dynamic component
+async function ProductList() {
+  const products = await db.product.findMany()
+  return <List items={products} />
+}
+
+export default async function Page() {
+  return (
+    <>
+      <Header />
+      <ProductList />
+    </>
+  )
+}
+```
+
+与标题不同，产品列表依赖于外部数据。
+
+#### 动态组件 (Dynamic components)
+
+由于此数据**可能**随时间变化，因此渲染输出不再保证是稳定的。这使得产品列表成为一个**动态**组件。
+
+如果没有指导，框架会假定你希望在每个用户请求时获取**最新**数据。这种设计选择反映了标准的 Web 行为，即通过新的服务器请求来渲染页面。
+
+但是，如果此组件在请求时渲染，获取其数据将延迟**整个**路由的响应。如果我们刷新页面，我们可以看到这种情况发生。
+
+即使标题是即时渲染的，它也无法发送到浏览器，直到产品列表完成获取。
+
+为了保护我们免受这种性能骤降的影响，Next.js 将在我们第一次**等待**数据时显示一个[警告](/docs/messages/blocking-route)：`Blocking data was accessed outside of Suspense`
+
+此时，我们必须决定如何**解除**响应阻塞。要么：
+
+- [**缓存**](/docs/app/glossary#cache-components)该组件，使其变得**稳定**，并可以与页面的其余部分一起预渲染。
+- [**流式传输**](/docs/app/glossary#streaming)该组件，使其变为**非阻塞**，页面的其余部分无需等待它。
+
+在我们的例子中，产品目录是跨所有用户共享的，因此缓存是正确的选择。
+
+### 缓存组件 (Cache components)
+
+我们可以使用 [`'use cache'`](/docs/app/api-reference/directives/use-cache) 指令将函数标记为可缓存。
+
+```tsx filename="app/products/page.tsx"
+import db from '@/db'
+import { List } from '@/app/products/ui'
+
+function Header() {}
+
+// Cache component
+async function ProductList() {
+  'use cache'
+  const products = await db.product.findMany()
+  return <List items={products} />
+}
+
+export default async function Page() {
+  return (
+    <>
+      <Header />
+      <ProductList />
+    </>
+  )
+}
+```
+
+这会将其变成一个[缓存组件](/docs/app/glossary#cache-components)。第一次运行时，无论我们返回什么都会被缓存并重用。
+
+如果缓存组件的输入在请求到达**之前**就可用，它可以像静态组件一样被预渲染。
+
+如果我们再次刷新，可以看到页面立即加载，因为缓存组件不会阻塞响应。而且，如果我们再次运行 `next build`，可以确认页面仍然是静态的：
+
+```bash filename="Terminal"
+Route (app)      Revalidate  Expire
+┌ ○ /products           15m      1y
+└ ○ /_not-found
+
+○  (Static)  prerendered as static content
+```
+
+但是，页面很少能永远保持静态。
+
+### 步骤 3：添加动态促销横幅 (promotion banner)
+
+迟早，即使是简单的页面也需要一些动态内容。为了演示这一点，让我们添加一个促销横幅：
+
+```tsx filename="app/products/page.tsx"
+import db from '@/db'
+import { List, Promotion } from '@/app/products/ui'
+import { getPromotion } from '@/app/products/data'
+
+function Header() {}
+
+async function ProductList() {}
+
+// Dynamic component
+async function PromotionContent() {
+  const promotion = await getPromotion()
+  return <Promotion data={promotion} />
+}
+
+export default async function Page() {
+  return (
+    <>
+      <PromotionContent />
+      <Header />
+      <ProductList />
+    </>
+  )
+}
+```
+
+再次强调，这最初是动态的。和之前一样，引入阻塞行为会触发 Next.js 警告。
+
+上次，数据是共享的，因此可以被缓存。这次，促销取决于特定于请求的输入，如用户位置和 A/B 测试，因此我们无法通过缓存来避免阻塞行为。
+
+### 部分预渲染 (Partial prerendering)
+
+添加动态内容并不意味着我们必须回到完全阻塞的渲染。我们可以使用流式传输来解除响应阻塞。
+
+Next.js 默认支持流式传输。我们可以使用 [Suspense 边界](/docs/app/glossary#suspense-boundary)来告诉框架将流式响应切片为*块*的位置，以及内容加载时显示的回退 UI。
+
+```tsx filename="app/products/page.tsx"
+import { Suspense } from 'react'
+import db from '@/db'
+import { List, Promotion, PromotionSkeleton } from '@/app/products/ui'
+import { getPromotion } from '@/app/products/data'
+
+function Header() {}
+
+async function ProductList() {}
+
+// Dynamic component (streamed)
+async function PromotionContent() {
+  const promotion = await getPromotion()
+  return <Promotion data={promotion} />
+}
+
+export default async function Page() {
+  return (
+    <>
+      <Suspense fallback={<PromotionSkeleton />}>
+        <PromotionContent />
+      </Suspense>
+      <Header />
+      <ProductList />
+    </>
+  )
+}
+```
+
+回退内容与我们的静态和缓存内容一起被预渲染。内部组件稍后在其异步工作完成后流式传入。
+
+通过此更改，Next.js 可以将可预渲染的工作与请求时的工作分开，该路由变为[部分预渲染](/docs/app/glossary#partial-prerendering-ppr)。
+
+同样，我们可以通过运行 `next build` 来确认这一点：
+
+```bash filename="Terminal"
+Route (app)      Revalidate  Expire
+┌ ◐ /products    15m      1y
+└ ◐ /_not-found
+
+◐  (Partial Prerender)  Prerendered as static HTML with dynamic server-streamed content
+```
+
+在[**构建时**](/docs/app/glossary#build-time)，页面的大部分内容，包括标题、产品列表和促销回退，都被渲染、缓存并推送到内容分发网络。
+
+在[**请求时**](/docs/app/glossary#dynamic-rendering)，预渲染的部分从靠近用户的 CDN 节点即时提供。
+
+同时，用户特定的促销内容在服务器上渲染，流式传输到客户端，并替换到回退位置。
+
+如果我们最后一次刷新页面，可以看到页面的大部分内容立即加载，而动态部分在可用时流式传入。
+
+### 下一步 (Next steps)
+
+我们已经学习了如何构建大部分是静态但包含动态内容的页面。
+
+我们从一个静态页面开始，添加了异步工作，并通过缓存可以预渲染的部分和流式传输无法预渲染的部分来解决阻塞行为。
+
+在未来的指南中，我们将学习如何：
+
+- 重新验证预渲染的页面或缓存的数据。
+- 使用路由参数创建同一页面的变体。
+- 创建包含个性化用户数据的私有页面。
