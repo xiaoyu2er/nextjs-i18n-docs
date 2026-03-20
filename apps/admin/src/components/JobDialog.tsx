@@ -410,9 +410,8 @@ function ModelRow({
         <input
           type="checkbox"
           checked={active}
-          onChange={() => {}}
-          onClick={(e) => e.stopPropagation()}
-          style={{ marginRight: '0.4rem', flexShrink: 0 }}
+          readOnly
+          className="model-check"
         />
       )}
       <span className="model-name">
