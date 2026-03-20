@@ -144,6 +144,7 @@ interface CliOptions {
   maxTokens: number;
   concurrency: number;
   dryRun: boolean;
+  md5Mode: boolean;
   status: boolean;
   repair: boolean;
   annotateFiles: string;
@@ -184,6 +185,7 @@ function parseArgs(argv: string[]): CliOptions {
     maxTokens: Number.parseInt(getOpt('max-tokens', '16384'), 10),
     concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
+    md5Mode: hasFlag('md5'),
     status: hasFlag('status'),
     repair: hasFlag('repair'),
     annotateFiles: getOpt('annotate', ''),
@@ -1010,6 +1012,159 @@ async function runLookup(opts: CliOptions): Promise<void> {
   }
 }
 
+// ── MD5 mode ──────────────────────────────────────────────────────────
+
+function detectVersion(docsRoot: string): string {
+  if (docsRoot.includes('content-v13')) return 'v13';
+  if (docsRoot.includes('content-v14')) return 'v14';
+  if (docsRoot.includes('content-v15')) return 'v15';
+  return 'latest';
+}
+
+async function runMd5Translate(opts: CliOptions): Promise<void> {
+  const { langs, docsContext } = await loadLangConfigs(opts.configPath);
+  opts.docsContext = docsContext;
+
+  const lang = opts.lang;
+  const langConfig = langs[lang];
+  if (!langConfig) {
+    console.error(
+      `❌ Language "${lang}" not found. Available: ${Object.keys(langs).join(', ')}`,
+    );
+    return;
+  }
+
+  const version = detectVersion(opts.docsRoot);
+
+  console.log(`\n📦 MD5 mode: Translating to ${lang} (${langConfig.name})`);
+  console.log(`   Version: ${version}`);
+  console.log(`   Engine: ${opts.apiType}`);
+  if (opts.modelRotate.length > 0) {
+    console.log(
+      `   Model: rotate(${opts.modelRotate.length}): ${opts.modelRotate.join(', ')}`,
+    );
+  } else {
+    console.log(
+      `   Model: ${opts.model || process.env.OPENROUTER_MODEL || 'default'}`,
+    );
+  }
+
+  const cache = new TranslationCache(opts.cacheDir);
+  cache.load(lang);
+
+  // Get all untranslated keys from DB
+  const untranslated = cache.untranslatedKeys(lang, version);
+  console.log(
+    `\n📦 ${untranslated.length} untranslated keys for ${version}/${lang}`,
+  );
+
+  if (untranslated.length === 0) {
+    console.log('✅ All keys translated. Nothing to do.');
+    return;
+  }
+
+  // Apply --max limit
+  const toTranslate = untranslated.slice(0, opts.max);
+  if (opts.max < untranslated.length) {
+    console.log(
+      `   Processing ${toTranslate.length} of ${untranslated.length} (--max ${opts.max})`,
+    );
+  }
+
+  if (opts.dryRun) {
+    console.log(`\n⏭️  Dry run — would translate ${toTranslate.length} keys`);
+    for (const k of toTranslate.slice(0, 10)) {
+      console.log(
+        `   ${k.key.substring(0, 16)}… [${k.type}] ${k.text.substring(0, 60).replace(/\n/g, '↵')}`,
+      );
+    }
+    if (toTranslate.length > 10) {
+      console.log(`   ... and ${toTranslate.length - 10} more`);
+    }
+    return;
+  }
+
+  // Build uncached + nodeTypes maps
+  const uncached: Record<string, string> = {};
+  const nodeTypes: Record<string, string> = {};
+  for (const k of toTranslate) {
+    uncached[k.key] = k.text;
+    nodeTypes[k.key] = k.type;
+  }
+
+  const logDir = path.resolve('.logs');
+  const { FileLogger } = await import('./ui');
+  const fileLogger = new FileLogger(logDir, lang);
+  console.log(`   Logs: ${fileLogger.getLogDir()}\n`);
+
+  const flog = (msg: string) => fileLogger.log('_md5-batch', msg);
+  flog(`MD5 mode: ${toTranslate.length} keys, version=${version}`);
+
+  const startTime = Date.now();
+
+  try {
+    // translateJson handles chunking internally
+    const result = await translateJson({
+      assembledContent: '',
+      uncached,
+      nodeTypes,
+      langName: langConfig.name,
+      guide: langConfig.guide,
+      apiType: opts.apiType,
+      apiBaseUrl: opts.apiBaseUrl || undefined,
+      apiKey: opts.apiKey || undefined,
+      model: opts.model || undefined,
+      modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
+      maxTokens: opts.maxTokens,
+      filePath: '_md5-batch',
+      logger: flog,
+      docsContext:
+        opts.docsContext ||
+        'Next.js is a React framework for building full-stack web applications.',
+    });
+
+    // Cache results
+    let cached = 0;
+    let skipped = 0;
+    for (const [md5, translation] of Object.entries(result.translations)) {
+      if (!translation.trim()) {
+        skipped++;
+        continue;
+      }
+      // Validate frontmatter if applicable
+      const srcType = nodeTypes[md5];
+      if (srcType === 'frontmatter') {
+        const rebuilt = rebuildFrontmatter(uncached[md5], translation);
+        if (!validateFrontmatter(rebuilt)) {
+          flog(`⚠️ Bad YAML for ${md5.substring(0, 12)}…, skipping`);
+          skipped++;
+          continue;
+        }
+        cache.set(lang, md5, rebuilt);
+      } else {
+        cache.set(lang, md5, translation);
+      }
+      cached++;
+    }
+
+    const elapsed = Date.now() - startTime;
+    const missing = result.missing.length;
+
+    console.log(`\n✅ MD5 batch complete in ${formatDuration(elapsed)}`);
+    console.log(`   +${cached} cached, ${skipped} skipped, ${missing} missing`);
+    console.log(
+      `   Remaining: ${untranslated.length - cached} untranslated keys`,
+    );
+  } catch (err) {
+    const elapsed = Date.now() - startTime;
+    console.error(
+      `\n❌ MD5 batch failed after ${formatDuration(elapsed)}: ${err instanceof Error ? err.message : err}`,
+    );
+  }
+
+  fileLogger.close();
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1023,6 +1178,8 @@ async function main() {
     await runLookup(opts);
   } else if (opts.status) {
     await runStatus(opts);
+  } else if (opts.md5Mode) {
+    await runMd5Translate(opts);
   } else {
     await runTranslate(opts);
   }

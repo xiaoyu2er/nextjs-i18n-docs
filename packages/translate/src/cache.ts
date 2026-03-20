@@ -259,6 +259,30 @@ export class TranslationCache {
     return row ?? undefined;
   }
 
+  /**
+   * Get all untranslated source keys for a language and version.
+   * Returns keys with their EN source text and type.
+   */
+  untranslatedKeys(
+    lang: string,
+    version = 'latest',
+    limit = 0,
+  ): { key: string; text: string; type: string }[] {
+    const sql = `
+      SELECT DISTINCT s.key, s.text, s.type
+      FROM source_files sf
+      JOIN sources s ON s.key = sf.key
+      LEFT JOIN translations t ON t.key = sf.key AND t.lang = ?
+      WHERE sf.version = ? AND t.key IS NULL
+      ${limit > 0 ? `LIMIT ${limit}` : ''}
+    `;
+    return this.db.prepare(sql).all(lang, version) as {
+      key: string;
+      text: string;
+      type: string;
+    }[];
+  }
+
   // ── Dashboard queries ──
 
   /** Get translation stats for all languages */
