@@ -1063,33 +1063,48 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
     return;
   }
 
-  // Apply --max limit
-  const toTranslate = untranslated.slice(0, opts.max);
-  if (opts.max < untranslated.length) {
-    console.log(
-      `   Processing ${toTranslate.length} of ${untranslated.length} (--max ${opts.max})`,
-    );
+  // Pre-chunk by estimated token size
+  const maxTokens = opts.maxTokens;
+  const targetTokensPerChunk = Math.floor(maxTokens * 0.7);
+
+  type ChunkEntry = { key: string; text: string; type: string };
+  const chunks: ChunkEntry[][] = [[]];
+  let currentChunkTokens = 0;
+
+  for (const k of untranslated) {
+    const entryTokens = Math.ceil((k.text.length * 1.5) / 4 + 40);
+    if (
+      currentChunkTokens + entryTokens > targetTokensPerChunk &&
+      chunks[chunks.length - 1].length > 0
+    ) {
+      chunks.push([]);
+      currentChunkTokens = 0;
+    }
+    chunks[chunks.length - 1].push(k);
+    currentChunkTokens += entryTokens;
   }
+
+  // --max limits API calls (chunks), not keys
+  const maxChunks = Math.min(chunks.length, opts.max);
+  const totalKeys = chunks
+    .slice(0, maxChunks)
+    .reduce((s, c) => s + c.length, 0);
+
+  console.log(
+    `   ${chunks.length} chunks (~${targetTokensPerChunk} tokens each), ${maxChunks} to process`,
+  );
+  console.log(`   ${totalKeys} keys in ${maxChunks} API calls`);
 
   if (opts.dryRun) {
-    console.log(`\n⏭️  Dry run — would translate ${toTranslate.length} keys`);
-    for (const k of toTranslate.slice(0, 10)) {
+    console.log(`\n⏭️  Dry run — would make ${maxChunks} API calls`);
+    for (let i = 0; i < Math.min(maxChunks, 5); i++) {
+      const c = chunks[i];
       console.log(
-        `   ${k.key.substring(0, 16)}… [${k.type}] ${k.text.substring(0, 60).replace(/\n/g, '↵')}`,
+        `   Chunk ${i + 1}: ${c.length} keys, ~${c.reduce((s, k) => s + k.text.length, 0)} chars`,
       );
     }
-    if (toTranslate.length > 10) {
-      console.log(`   ... and ${toTranslate.length - 10} more`);
-    }
+    if (maxChunks > 5) console.log(`   ... and ${maxChunks - 5} more chunks`);
     return;
-  }
-
-  // Build uncached + nodeTypes maps
-  const uncached: Record<string, string> = {};
-  const nodeTypes: Record<string, string> = {};
-  for (const k of toTranslate) {
-    uncached[k.key] = k.text;
-    nodeTypes[k.key] = k.type;
   }
 
   const logDir = path.resolve('.logs');
@@ -1098,69 +1113,95 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
   console.log(`   Logs: ${fileLogger.getLogDir()}\n`);
 
   const flog = (msg: string) => fileLogger.log('_md5-batch', msg);
-  flog(`MD5 mode: ${toTranslate.length} keys, version=${version}`);
+  flog(
+    `MD5 mode: ${totalKeys} keys in ${maxChunks} chunks, version=${version}`,
+  );
 
   const startTime = Date.now();
+  let totalCached = 0;
+  let totalSkipped = 0;
+  let totalMissing = 0;
+  let chunkErrors = 0;
 
-  try {
-    // translateJson handles chunking internally
-    const result = await translateJson({
-      assembledContent: '',
-      uncached,
-      nodeTypes,
-      langName: langConfig.name,
-      guide: langConfig.guide,
-      apiType: opts.apiType,
-      apiBaseUrl: opts.apiBaseUrl || undefined,
-      apiKey: opts.apiKey || undefined,
-      model: opts.model || undefined,
-      modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
-      maxTokens: opts.maxTokens,
-      filePath: '_md5-batch',
-      logger: flog,
-      docsContext:
-        opts.docsContext ||
-        'Next.js is a React framework for building full-stack web applications.',
-    });
+  for (let i = 0; i < maxChunks; i++) {
+    const chunk = chunks[i];
+    const uncached: Record<string, string> = {};
+    const nodeTypes: Record<string, string> = {};
+    for (const k of chunk) {
+      uncached[k.key] = k.text;
+      nodeTypes[k.key] = k.type;
+    }
 
-    // Cache results
-    let cached = 0;
-    let skipped = 0;
-    for (const [md5, translation] of Object.entries(result.translations)) {
-      if (!translation.trim()) {
-        skipped++;
-        continue;
-      }
-      // Validate frontmatter if applicable
-      const srcType = nodeTypes[md5];
-      if (srcType === 'frontmatter') {
-        const rebuilt = rebuildFrontmatter(uncached[md5], translation);
-        if (!validateFrontmatter(rebuilt)) {
-          flog(`⚠️ Bad YAML for ${md5.substring(0, 12)}…, skipping`);
+    const chunkLabel = `chunk ${i + 1}/${maxChunks} (${chunk.length} keys)`;
+    console.log(`⏳ ${chunkLabel}...`);
+    flog(`--- ${chunkLabel} ---`);
+
+    try {
+      const result = await translateJson({
+        assembledContent: '',
+        uncached,
+        nodeTypes,
+        langName: langConfig.name,
+        guide: langConfig.guide,
+        apiType: opts.apiType,
+        apiBaseUrl: opts.apiBaseUrl || undefined,
+        apiKey: opts.apiKey || undefined,
+        model: opts.model || undefined,
+        modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
+        maxTokens: opts.maxTokens,
+        filePath: `_md5-chunk-${i + 1}`,
+        logger: flog,
+        docsContext:
+          opts.docsContext ||
+          'Next.js is a React framework for building full-stack web applications.',
+      });
+
+      // Cache results
+      let cached = 0;
+      let skipped = 0;
+      for (const [md5, translation] of Object.entries(result.translations)) {
+        if (!translation.trim()) {
           skipped++;
           continue;
         }
-        cache.set(lang, md5, rebuilt);
-      } else {
-        cache.set(lang, md5, translation);
+        const srcType = nodeTypes[md5];
+        if (srcType === 'frontmatter') {
+          const rebuilt = rebuildFrontmatter(uncached[md5], translation);
+          if (!validateFrontmatter(rebuilt)) {
+            flog(`⚠️ Bad YAML for ${md5.substring(0, 12)}…, skipping`);
+            skipped++;
+            continue;
+          }
+          cache.set(lang, md5, rebuilt);
+        } else {
+          cache.set(lang, md5, translation);
+        }
+        cached++;
       }
-      cached++;
+
+      totalCached += cached;
+      totalSkipped += skipped;
+      totalMissing += result.missing.length;
+      console.log(
+        `✅ ${chunkLabel} — +${cached} cached, ${skipped} skipped, ${result.missing.length} missing`,
+      );
+    } catch (err) {
+      chunkErrors++;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`❌ ${chunkLabel} — ${msg.substring(0, 100)}`);
+      flog(`ERROR: ${msg}`);
     }
-
-    const elapsed = Date.now() - startTime;
-    const missing = result.missing.length;
-
-    console.log(`\n✅ MD5 batch complete in ${formatDuration(elapsed)}`);
-    console.log(`   +${cached} cached, ${skipped} skipped, ${missing} missing`);
-    console.log(
-      `   Remaining: ${untranslated.length - cached} untranslated keys`,
-    );
-  } catch (err) {
-    const elapsed = Date.now() - startTime;
-    console.error(
-      `\n❌ MD5 batch failed after ${formatDuration(elapsed)}: ${err instanceof Error ? err.message : err}`,
-    );
   }
+
+  const elapsed = Date.now() - startTime;
+
+  console.log(`\n✅ MD5 batch complete in ${formatDuration(elapsed)}`);
+  console.log(
+    `   +${totalCached} cached, ${totalSkipped} skipped, ${totalMissing} missing, ${chunkErrors} errors`,
+  );
+  console.log(
+    `   Remaining: ~${untranslated.length - totalCached} untranslated keys`,
+  );
 
   fileLogger.close();
 }
