@@ -68,7 +68,7 @@ export function App() {
 
   const setLang = useCallback(
     (l: string | null) => {
-      setParams({ lang: l, file: null });
+      setParams({ lang: l });
       bump();
     },
     [bump],
