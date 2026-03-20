@@ -584,39 +584,50 @@ export async function translateJson(
   const entries = Object.entries(opts.uncached);
   const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
 
-  // Estimate output tokens: ~1.5x input chars / 4 (chars per token) + JSON overhead
-  // Input text becomes both input AND output (translated), so output ≈ input size
-  const totalInputChars = entries.reduce(
-    (sum, [, text]) => sum + text.length,
-    0,
-  );
-  // Conservative: ~4 chars per token for mixed CJK/ASCII, output ≈ input + JSON keys/syntax
-  const estimatedOutputTokens = Math.ceil(
-    (totalInputChars * 1.5) / 4 + entries.length * 40,
-  );
+  // Estimate total context tokens per chunk.
+  // Total context = system prompt + user message (source texts) + json_schema + output
+  // Each entry contributes to:
+  //   - input: source text + JSON key (user message) + schema property/required
+  //   - output: translated text + JSON key
+  // Per entry ≈ text_chars * 2.5 / 4 (input text + output) + 80 (JSON/schema overhead per key)
+  // System prompt ≈ 2500 chars / 4 ≈ 625 tokens (fixed overhead)
+  const SYSTEM_PROMPT_TOKENS = 700;
 
-  // If estimated output fits in max_tokens, send in one shot
-  if (estimatedOutputTokens <= maxTokens * 0.85) {
+  function estimateChunkTokens(chunkEntries: [string, string][]) {
+    const textTokens = chunkEntries.reduce(
+      (sum, [, text]) => sum + Math.ceil((text.length * 2.5) / 4),
+      0,
+    );
+    // JSON schema: each key appears in properties + required (~80 tokens per key)
+    const schemaTokens = chunkEntries.length * 80;
+    return SYSTEM_PROMPT_TOKENS + textTokens + schemaTokens;
+  }
+
+  const totalEstimated = estimateChunkTokens(entries);
+
+  // If everything fits in context, send in one shot
+  if (totalEstimated <= maxTokens * 0.85) {
     return translateJsonChunk(opts);
   }
 
-  // Split into chunks that fit within max_tokens
+  // Split into chunks that fit within context limit
   const allTranslations: Record<string, string> = {};
   const allMissing: string[] = [];
   const allExtra: string[] = [];
 
-  const targetTokensPerChunk = Math.floor(maxTokens * 0.7);
+  // Target: 60% of max context to leave room for output
+  const targetTokensPerChunk = Math.floor(maxTokens * 0.6);
   const chunks: [string, string][][] = [[]];
-  let currentChunkTokens = 0;
+  let currentChunkTokens = SYSTEM_PROMPT_TOKENS;
 
   for (const entry of entries) {
-    const entryTokens = Math.ceil((entry[1].length * 1.5) / 4 + 40);
+    const entryTokens = Math.ceil((entry[1].length * 2.5) / 4 + 80);
     if (
       currentChunkTokens + entryTokens > targetTokensPerChunk &&
       chunks[chunks.length - 1].length > 0
     ) {
       chunks.push([]);
-      currentChunkTokens = 0;
+      currentChunkTokens = SYSTEM_PROMPT_TOKENS;
     }
     chunks[chunks.length - 1].push(entry);
     currentChunkTokens += entryTokens;

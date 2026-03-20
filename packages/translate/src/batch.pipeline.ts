@@ -1100,22 +1100,25 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
     return;
   }
 
-  // Pre-chunk by estimated token size
+  // Pre-chunk by estimated context tokens
+  // Total context = system prompt + user message + json_schema + output
+  // Per entry ≈ text * 2.5 / 4 (input+output) + 80 (schema overhead)
   const maxTokens = opts.maxTokens;
-  const targetTokensPerChunk = Math.floor(maxTokens * 0.7);
+  const SYSTEM_PROMPT_TOKENS = 700;
+  const targetTokensPerChunk = Math.floor(maxTokens * 0.6);
 
   type ChunkEntry = { key: string; text: string; type: string };
   const chunks: ChunkEntry[][] = [[]];
-  let currentChunkTokens = 0;
+  let currentChunkTokens = SYSTEM_PROMPT_TOKENS;
 
   for (const k of untranslated) {
-    const entryTokens = Math.ceil((k.text.length * 1.5) / 4 + 40);
+    const entryTokens = Math.ceil((k.text.length * 2.5) / 4 + 80);
     if (
       currentChunkTokens + entryTokens > targetTokensPerChunk &&
       chunks[chunks.length - 1].length > 0
     ) {
       chunks.push([]);
-      currentChunkTokens = 0;
+      currentChunkTokens = SYSTEM_PROMPT_TOKENS;
     }
     chunks[chunks.length - 1].push(k);
     currentChunkTokens += entryTokens;
