@@ -1,0 +1,203 @@
+---
+title: NextResponse
+description: NextResponse 的 API 参考。
+---
+
+{/* 本文档的内容在应用路由和页面路由之间共享。您可以使用 `<PagesOnly>Content</PagesOnly>` 组件来添加仅适用于页面路由的内容。任何共享内容不应包裹在组件中。 */}
+
+NextResponse 扩展了 [Web 响应 API (Web Response API)](https://developer.mozilla.org/docs/Web/API/Response)，并提供了额外的便捷方法。
+
+## `cookies`
+
+读取或修改响应的 [`Set-Cookie`](https://developer.mozilla.org/docs/Web/HTTP/Headers/Set-Cookie) 头。
+
+### `set(name, value)`
+
+给定名称，在响应上设置具有给定值的 Cookie。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// Set a cookie to hide the banner
+response.cookies.set('show-banner', 'false')
+// Response will have a `Set-Cookie:show-banner=false;path=/home` header
+return response
+```
+
+### `get(name)`
+
+给定一个 Cookie 名称，返回该 Cookie 的值。如果未找到该 Cookie，则返回 `undefined`。如果找到多个同名 Cookie，则返回第一个。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// { name: 'show-banner', value: 'false', Path: '/home' }
+response.cookies.get('show-banner')
+```
+
+### `getAll()`
+
+给定一个 Cookie 名称，返回该 Cookie 的值。如果未提供名称，则返回响应上的所有 Cookie。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// [
+//   { name: 'experiments', value: 'new-pricing-page', Path: '/home' },
+//   { name: 'experiments', value: 'winter-launch', Path: '/home' },
+// ]
+response.cookies.getAll('experiments')
+// Alternatively, get all cookies for the response
+response.cookies.getAll()
+```
+
+### `has(name)`
+
+给定一个 Cookie 名称，如果 Cookie 存在于响应中，则返回 `true`。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// Returns true if cookie exists, false if it does not
+response.cookies.has('experiments')
+```
+
+### `delete(name)`
+
+给定一个 Cookie 名称，从响应中删除该 Cookie。
+
+```ts
+// Given incoming request /home
+let response = NextResponse.next()
+// Returns true for deleted, false if nothing is deleted
+response.cookies.delete('experiments')
+```
+
+## `json()`
+
+生成一个带有给定 JSON 主体的响应。
+
+```ts filename="app/api/route.ts" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request: Request) {
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+}
+```
+
+## `redirect()`
+
+生成一个重定向到给定 [URL](https://developer.mozilla.org/docs/Web/API/URL) 的响应。
+
+```ts
+import { NextResponse } from 'next/server'
+
+return NextResponse.redirect(new URL('/new', request.url))
+```
+
+可以在 `NextResponse.redirect()` 方法中使用 [URL](https://developer.mozilla.org/docs/Web/API/URL) 对象之前先创建并修改它。例如，您可以使用 `request.nextUrl` 属性获取当前 URL，然后修改它以重定向到不同的 URL。
+
+```ts
+import { NextResponse } from 'next/server'
+
+// Given an incoming request...
+const loginUrl = new URL('/login', request.url)
+// Add ?from=/incoming-url to the /login URL
+loginUrl.searchParams.set('from', request.nextUrl.pathname)
+// And redirect to the new URL
+return NextResponse.redirect(loginUrl)
+```
+
+## `rewrite()`
+
+生成一个重写（代理）给定 [URL](https://developer.mozilla.org/docs/Web/API/URL) 的响应，同时保留原始 URL。
+
+```ts
+import { NextResponse } from 'next/server'
+
+// Incoming request: /about, browser shows /about
+// Rewritten request: /proxy, browser shows /about
+return NextResponse.rewrite(new URL('/proxy', request.url))
+```
+
+## `next()`
+
+ `next()` 方法对代理 (Proxy) 很有用，因为它允许您提前返回并继续路由。
+
+```ts
+import { NextResponse } from 'next/server'
+
+return NextResponse.next()
+```
+
+在生成响应时，您还可以将 `headers` 通过 `NextResponse.next({ request: { headers } })` 向上游转发：
+
+```ts
+import { NextResponse } from 'next/server'
+
+// Given an incoming request...
+const newHeaders = new Headers(request.headers)
+// Add a new header
+newHeaders.set('x-version', '123')
+// Forward the modified request headers upstream
+return NextResponse.next({
+  request: {
+    // New request headers
+    headers: newHeaders,
+  },
+})
+```
+
+这会将 `newHeaders` 向上流转发到目标页面、路由或服务器操作，不会向客户端暴露它们。虽然此模式对于向上传递数据很有用，但应谨慎使用，因为包含此数据的标头可能会转发到外部服务。
+
+相比之下，`NextResponse.next({ headers })` 是将响应头从代理 (Proxy) 发送到客户端的简写。这**不**是良好的做法，应予以避免。除了其他原因外，设置像 `Content-Type` 这样的响应头会覆盖框架的预期（例如，服务器操作 (Server Actions) 使用的 `Content-Type`），从而导致提交失败或流式响应中断。
+
+```ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+async function proxy(request: NextRequest) {
+  const headers = await injectAuth(request.headers)
+  // DO NOT forward headers like this
+  return NextResponse.next({ headers })
+}
+```
+
+通常，应避免复制所有传入请求标头，因为这可能导致敏感数据泄露给客户端或上游服务。
+
+建议采取防御性方法，使用允许列表创建传入请求标头的子集。例如，您可以丢弃自定义 `x-*` 标头，仅转发已知的安全标头：
+
+```ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+function proxy(request: NextRequest) {
+  const incoming = new Headers(request.headers)
+  const forwarded = new Headers()
+
+  for (const [name, value] of incoming) {
+    const headerName = name.toLowerCase()
+    // Keep only known-safe headers, discard custom x-* and other sensitive ones
+    if (
+      !headerName.startsWith('x-') &&
+      headerName !== 'authorization' &&
+      headerName !== 'cookie'
+    ) {
+      // Preserve original header name casing
+      forwarded.set(name, value)
+    }
+  }
+
+  return NextResponse.next({
+    request: {
+      headers: forwarded,
+    },
+  })
+}
+```

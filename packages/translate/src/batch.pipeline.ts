@@ -318,6 +318,7 @@ async function translateFile(
     apiKey: opts.apiKey || undefined,
     model: opts.model || undefined,
     maxTokens: opts.maxTokens,
+    filePath: relPath,
     docsContext:
       opts.docsContext ||
       'Next.js is a React framework for building full-stack web applications.',
@@ -384,6 +385,7 @@ async function translateFile(
         apiKey: opts.apiKey || undefined,
         model: opts.model || undefined,
         maxTokens: opts.maxTokens,
+        filePath: relPath,
         docsContext:
           opts.docsContext ||
           'Next.js is a React framework for building full-stack web applications.',

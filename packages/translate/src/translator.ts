@@ -22,6 +22,8 @@ export interface TranslateOptions {
   model?: string;
   /** Max output tokens (default: 16384) */
   maxTokens?: number;
+  /** File path for logging */
+  filePath?: string;
 }
 
 /** Default max output tokens */
@@ -550,8 +552,9 @@ export async function translateJson(
     currentChunkTokens += entryTokens;
   }
 
+  const logPrefix = opts.filePath ? `[${opts.filePath}] ` : '';
   console.log(
-    `   📦 Splitting ${entries.length} nodes into ${chunks.length} chunks (~${targetTokensPerChunk} tokens each)`,
+    `   📦 ${logPrefix}Splitting ${entries.length} nodes into ${chunks.length} chunks (~${targetTokensPerChunk} tokens each)`,
   );
 
   for (let i = 0; i < chunks.length; i++) {
@@ -664,15 +667,14 @@ async function translateJsonChunk(
         (md5) => !requestedMd5s.includes(md5),
       );
 
+      const logPrefix = opts.filePath ? `[${opts.filePath}] ` : '';
       if (missing.length > 0) {
         console.warn(
-          `⚠️ JSON translation missing ${missing.length}/${requestedMd5s.length} keys`,
+          `⚠️ ${logPrefix}JSON missing ${missing.length}/${requestedMd5s.length} keys`,
         );
       }
       if (extra.length > 0) {
-        console.warn(
-          `⚠️ JSON translation has ${extra.length} extra keys (ignored)`,
-        );
+        console.warn(`⚠️ ${logPrefix}JSON has ${extra.length} extra keys`);
         if (missing.length > requestedMd5s.length * 0.5) {
           console.warn('   Extra key samples:');
           for (const k of extra.slice(0, 3)) {
@@ -708,7 +710,7 @@ async function translateJsonChunk(
           // Accept if ≤3 chars different (typo-level corruption)
           if (bestMatch && bestDist <= 3) {
             console.warn(
-              `   🔧 Recovered key: ${extraKey.substring(0, 12)}… → ${bestMatch.substring(0, 12)}… (${bestDist} char diff)`,
+              `   🔧 Recovered key: ${extraKey} → ${bestMatch} (${bestDist} char diff)`,
             );
             parsed[bestMatch] = parsed[extraKey];
             missing.splice(missing.indexOf(bestMatch), 1);
