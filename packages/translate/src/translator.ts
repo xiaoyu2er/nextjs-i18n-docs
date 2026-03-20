@@ -705,7 +705,10 @@ async function translateJsonChunk(
     const client = new OpenAI({ baseURL, apiKey });
 
     // Per-model max_tokens (from model-rotate info), fallback to global
-    const effectiveMaxTokens = opts.modelMaxTokens?.get(model) ?? maxTokens;
+    const modelCap = opts.modelMaxTokens?.get(model);
+    const effectiveMaxTokens = modelCap
+      ? Math.min(maxTokens, modelCap)
+      : maxTokens;
 
     log(
       `🔧 attempt=${attempt}/${maxAttempts} model=${model} keys=${requestedMd5s.length} max_tokens=${effectiveMaxTokens}`,

@@ -1152,8 +1152,8 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
   const fileLogger = new FileLogger(logDir, lang);
   console.log(`   Logs: ${fileLogger.getLogDir()}\n`);
 
-  const flog = (msg: string) => fileLogger.log('_md5-batch', msg);
-  flog(
+  fileLogger.log(
+    '_md5-summary',
     `MD5 mode: ${totalKeys} keys in ${maxChunks} chunks, version=${version}`,
   );
 
@@ -1176,9 +1176,12 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
       nodeTypes[k.key] = k.type;
     }
 
+    const chunkLogName = `_md5-chunk-${String(i + 1).padStart(3, '0')}`;
+    const clog = (msg: string) => fileLogger.log(chunkLogName, msg);
+
     const chunkLabel = `chunk ${i + 1}/${maxChunks} (${chunk.length} keys)`;
     console.log(`⏳ ${chunkLabel}...`);
-    flog(`--- ${chunkLabel} ---`);
+    clog(`${chunkLabel}`);
 
     try {
       const result = await translateJson({
@@ -1195,8 +1198,8 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
         modelMaxTokens:
           opts.modelMaxTokens.size > 0 ? opts.modelMaxTokens : undefined,
         maxTokens: opts.maxTokens,
-        filePath: `_md5-chunk-${i + 1}`,
-        logger: flog,
+        filePath: chunkLogName,
+        logger: clog,
         docsContext:
           opts.docsContext ||
           'Next.js is a React framework for building full-stack web applications.',
@@ -1214,7 +1217,7 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
         if (srcType === 'frontmatter') {
           const rebuilt = rebuildFrontmatter(uncached[md5], translation);
           if (!validateFrontmatter(rebuilt)) {
-            flog(`⚠️ Bad YAML for ${md5.substring(0, 12)}…, skipping`);
+            clog(`⚠️ Bad YAML for ${md5.substring(0, 12)}…, skipping`);
             skipped++;
             continue;
           }
@@ -1237,7 +1240,7 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
       chunksCompleted++;
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`❌ ${chunkLabel} — ${msg.substring(0, 100)}`);
-      flog(`ERROR: ${msg}`);
+      clog(`ERROR: ${msg}`);
     }
   }
 
