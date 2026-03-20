@@ -50,6 +50,92 @@ for major, version in sorted(data['versions'].items(), key=lambda x: int(x[0])):
   echo ""
 done
 
+# Step 3: Dedup EN + sync locale file structure to match EN
+echo "🧹 Cleaning content directories..."
+python3 -c "
+import os, re
+from collections import defaultdict
+
+PROJECT_ROOT = '$PROJECT_ROOT'
+
+# Process each content root (latest + versioned)
+content_roots = [os.path.join(PROJECT_ROOT, 'content')]
+for v in ['13', '14', '15']:
+    d = os.path.join(PROJECT_ROOT, f'content-v{v}')
+    if os.path.isdir(d):
+        content_roots.append(d)
+
+total_deduped = 0
+total_orphans = 0
+
+for content_root in content_roots:
+    en_dir = os.path.join(content_root, 'en')
+    if not os.path.isdir(en_dir):
+        continue
+
+    # 1. Dedup EN: remove duplicate slugs, keep highest numeric prefix
+    for root, dirs, files in os.walk(en_dir):
+        by_slug = defaultdict(list)
+        for f in files:
+            if not f.endswith('.mdx'):
+                continue
+            m = re.match(r'^(\d+)-(.+)$', f)
+            if m:
+                by_slug[m.group(2)].append((int(m.group(1)), f))
+        for slug, entries in by_slug.items():
+            if len(entries) <= 1:
+                continue
+            entries.sort(key=lambda x: x[0])
+            keep = entries[-1][1]
+            for _, fname in entries[:-1]:
+                path = os.path.join(root, fname)
+                rel = os.path.relpath(path, PROJECT_ROOT)
+                print(f'  dedup: rm {rel} (keeping {keep})')
+                os.remove(path)
+                total_deduped += 1
+
+    # 2. Build set of EN files (relative paths)
+    en_files = set()
+    for root, dirs, files in os.walk(en_dir):
+        for f in files:
+            if f.endswith('.mdx'):
+                rel = os.path.relpath(os.path.join(root, f), en_dir)
+                en_files.add(rel)
+
+    # 3. Remove orphan locale files not in EN
+    for locale_name in os.listdir(content_root):
+        if locale_name == 'en':
+            continue
+        locale_dir = os.path.join(content_root, locale_name)
+        if not os.path.isdir(locale_dir):
+            continue
+        for root, dirs, files in os.walk(locale_dir):
+            for f in files:
+                if not f.endswith('.mdx'):
+                    continue
+                rel = os.path.relpath(os.path.join(root, f), locale_dir)
+                if rel not in en_files:
+                    path = os.path.join(root, f)
+                    rel_from_root = os.path.relpath(path, PROJECT_ROOT)
+                    print(f'  orphan: rm {rel_from_root}')
+                    os.remove(path)
+                    total_orphans += 1
+
+    # 4. Remove empty directories
+    for root, dirs, files in os.walk(content_root, topdown=False):
+        for d in dirs:
+            dp = os.path.join(root, d)
+            if not os.listdir(dp):
+                os.rmdir(dp)
+
+if total_deduped > 0:
+    print(f'  Deduped: {total_deduped} files')
+if total_orphans > 0:
+    print(f'  Orphans removed: {total_orphans} files')
+if total_deduped == 0 and total_orphans == 0:
+    print('  All clean')
+"
+
 # Cleanup
 rm -rf "$TMP_DIR"
 
