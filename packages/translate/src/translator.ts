@@ -198,25 +198,30 @@ function repairJson(raw: string): string {
   return result;
 }
 
-/** Round-robin counter for model rotation */
-let rotateIndex = 0;
-
 /** Models that returned 400/404 — skip them for the rest of the run */
 const deadModels = new Set<string>();
 
+/** Models that hit 429 — temporarily deprioritized */
+const rateLimitedModels = new Set<string>();
+
 /**
- * Pick the next model from the rotation list, or fall back to single model.
- * Skips models marked as dead (400/404 errors).
+ * Pick the best available model from the rotation list.
+ * Priority: first alive non-rate-limited model (list order = quality order).
+ * Falls back to rate-limited models if all good ones are exhausted.
  */
 function pickModel(opts: TranslateOptions): string | undefined {
   if (opts.modelRotate && opts.modelRotate.length > 0) {
     const alive = opts.modelRotate.filter((m) => !deadModels.has(m));
     if (alive.length === 0) {
-      // All dead — reset and try again
       deadModels.clear();
-      return opts.modelRotate[rotateIndex++ % opts.modelRotate.length];
+      return opts.modelRotate[0];
     }
-    return alive[rotateIndex++ % alive.length];
+    // Prefer non-rate-limited models (list order = best first)
+    const preferred = alive.filter((m) => !rateLimitedModels.has(m));
+    if (preferred.length > 0) return preferred[0];
+    // All alive models are rate-limited — clear and retry the best
+    rateLimitedModels.clear();
+    return alive[0];
   }
   return opts.model;
 }
@@ -854,7 +859,14 @@ async function translateJsonChunk(
       if (isModelError(msg) && opts.modelRotate?.length) {
         deadModels.add(model);
         log(`💀 Model ${model} is dead (${msg.substring(0, 80)}), skipping`);
-        continue; // No backoff, try next model immediately
+        continue;
+      }
+
+      // Rate limited (429): deprioritize model, try next immediately
+      if (msg.includes('429') && opts.modelRotate?.length) {
+        rateLimitedModels.add(model);
+        log(`⏳ Model ${model} rate-limited, trying next model`);
+        continue;
       }
 
       const isRetryable =
