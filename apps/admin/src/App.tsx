@@ -7,51 +7,155 @@ import { LangGrid } from './components/LangGrid';
 import { Preview } from './components/Preview';
 import { api } from './lib/api';
 
+type ViewMode = 'split' | 'en' | 'lang';
+type StatusFilter = 'all' | 'complete' | 'partial' | 'missing';
+type SectionFilter = 'all' | 'docs' | 'blog' | 'learn';
+
+// ── URL state helpers ──
+
+function readParams() {
+  const p = new URLSearchParams(window.location.search);
+  return {
+    version: p.get('v') || 'latest',
+    lang: p.get('lang') || null,
+    file: p.get('file') || null,
+    showFiles: p.get('files') !== '0',
+    view: (p.get('view') as ViewMode) || 'split',
+    status: (p.get('status') as StatusFilter) || 'all',
+    section: (p.get('section') as SectionFilter) || 'all',
+  };
+}
+
+function setParams(updates: Record<string, string | null>) {
+  const next = new URLSearchParams(window.location.search);
+  for (const [k, v] of Object.entries(updates)) {
+    if (v === null || v === '') next.delete(k);
+    else next.set(k, v);
+  }
+  const qs = next.toString();
+  window.history.replaceState(null, '', qs ? `?${qs}` : '/');
+}
+
 export function App() {
-  const [version, setVersion] = useState('latest');
-  const [lang, setLang] = useState<string | null>(null);
+  // bump to force re-read from URL
+  const [, rerender] = useState(0);
+  const bump = useCallback(() => rerender((n) => n + 1), []);
+
+  const { version, lang, file, showFiles, view, status, section } =
+    readParams();
+
+  // ── URL setters ──
+
+  const setVersion = useCallback(
+    (v: string) => {
+      setParams({
+        v: v === 'latest' ? null : v,
+        lang: null,
+        file: null,
+        status: null,
+        section: null,
+        view: null,
+      });
+      bump();
+    },
+    [bump],
+  );
+
+  const setLang = useCallback(
+    (l: string | null) => {
+      setParams({ lang: l, file: null });
+      bump();
+    },
+    [bump],
+  );
+
+  const setFile = useCallback(
+    (f: string | null) => {
+      setParams({ file: f });
+      bump();
+    },
+    [bump],
+  );
+
+  const setShowFiles = useCallback(
+    (show: boolean) => {
+      setParams({ files: show ? null : '0' });
+      bump();
+    },
+    [bump],
+  );
+
+  const setView = useCallback(
+    (m: ViewMode) => {
+      setParams({ view: m === 'split' ? null : m });
+      bump();
+    },
+    [bump],
+  );
+
+  const setStatusFilter = useCallback(
+    (s: StatusFilter) => {
+      setParams({ status: s === 'all' ? null : s });
+      bump();
+    },
+    [bump],
+  );
+
+  const setSectionFilter = useCallback(
+    (s: SectionFilter) => {
+      setParams({ section: s === 'all' ? null : s });
+      bump();
+    },
+    [bump],
+  );
+
+  // ── Non-URL state ──
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState(false);
-  const [showFiles, setShowFiles] = useState(true);
   const [dialogFiles, setDialogFiles] = useState<string[] | undefined>();
 
-  const { data: status } = useQuery({
+  // ── Queries ──
+  const { data: statusData } = useQuery({
     queryKey: ['status'],
     queryFn: api.status,
   });
 
   const { data: files } = useQuery({
     queryKey: ['files', version, lang],
-    queryFn: () => api.fileCoverage(version, lang!),
+    queryFn: () => api.fileCoverage(version, lang as string),
     enabled: !!lang,
   });
 
-  const handleSelectVersion = useCallback((v: string) => {
-    setVersion(v);
-    setLang(null);
-    setPreviewFile(null);
-    setSelected(new Set());
-  }, []);
+  // ── Handlers ──
+  const handleSelectVersion = useCallback(
+    (v: string) => {
+      setVersion(v);
+      setSelected(new Set());
+    },
+    [setVersion],
+  );
 
-  const handleSelectLang = useCallback((l: string) => {
-    setLang(l);
-    setPreviewFile(null);
-    setSelected(new Set());
-  }, []);
+  const handleSelectLang = useCallback(
+    (l: string) => {
+      setLang(l);
+      setSelected(new Set());
+    },
+    [setLang],
+  );
 
-  const handleToggle = useCallback((file: string) => {
+  const handleToggle = useCallback((f: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(file)) next.delete(file);
-      else next.add(file);
+      if (next.has(f)) next.delete(f);
+      else next.add(f);
       return next;
     });
   }, []);
 
-  const handleSelectAll = useCallback((fileList: string[]) => {
-    setSelected(new Set(fileList));
-  }, []);
+  const handleSelectAll = useCallback(
+    (fileList: string[]) => setSelected(new Set(fileList)),
+    [],
+  );
 
   const handleClear = useCallback(() => setSelected(new Set()), []);
 
@@ -65,7 +169,7 @@ export function App() {
     setShowDialog(true);
   }, []);
 
-  if (!status) return <div className="loading">Loading...</div>;
+  if (!statusData) return <div className="loading">Loading...</div>;
 
   return (
     <>
@@ -80,7 +184,7 @@ export function App() {
       <div className="container">
         {/* Version tabs */}
         <div className="tabs">
-          {status.versions.map((v) => (
+          {statusData.versions.map((v) => (
             <button
               key={v}
               type="button"
@@ -94,7 +198,7 @@ export function App() {
 
         {/* Language cards */}
         <LangGrid
-          data={status}
+          data={statusData}
           version={version}
           selectedLang={lang}
           onSelect={handleSelectLang}
@@ -110,36 +214,40 @@ export function App() {
               <button
                 type="button"
                 className={`btn btn-sm${showFiles ? ' active' : ''}`}
-                onClick={() => setShowFiles((v) => !v)}
+                onClick={() => setShowFiles(!showFiles)}
               >
                 {showFiles ? '◀ Hide files' : '▶ Show files'}
               </button>
-              {previewFile && (
-                <span className="file-panel-current">{previewFile}</span>
-              )}
+              {file && <span className="file-panel-current">{file}</span>}
             </div>
             <div
-              className={`file-panel${!showFiles ? ' no-list' : ''}${!previewFile ? ' no-preview' : ''}`}
+              className={`file-panel${!showFiles ? ' no-list' : ''}${!file ? ' no-preview' : ''}`}
             >
               {showFiles && (
                 <FileList
                   files={files}
                   lang={lang}
-                  activeFile={previewFile}
+                  activeFile={file}
                   selected={selected}
-                  onSelect={setPreviewFile}
+                  statusFilter={status}
+                  sectionFilter={section}
+                  onStatusFilter={setStatusFilter}
+                  onSectionFilter={setSectionFilter}
+                  onSelect={setFile}
                   onToggle={handleToggle}
                   onSelectAll={handleSelectAll}
                   onClear={handleClear}
                   onTranslateSelected={handleTranslateSelected}
                 />
               )}
-              {previewFile && (
+              {file && (
                 <Preview
                   version={version}
                   lang={lang}
-                  file={previewFile}
-                  onClose={() => setPreviewFile(null)}
+                  file={file}
+                  viewMode={view}
+                  onViewMode={setView}
+                  onClose={() => setFile(null)}
                 />
               )}
             </div>
@@ -150,8 +258,8 @@ export function App() {
       {/* Job dialog */}
       {showDialog && (
         <JobDialog
-          langs={status.langs}
-          versions={status.versions}
+          langs={statusData.langs}
+          versions={statusData.versions}
           defaultLang={lang || undefined}
           defaultVersion={version}
           files={dialogFiles}

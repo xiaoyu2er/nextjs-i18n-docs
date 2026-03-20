@@ -1,21 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { FileCoverage } from '../lib/api';
 import { getSection, statusIcon } from '../lib/flags';
+
+export type StatusFilter = 'all' | 'complete' | 'partial' | 'missing';
+export type SectionFilter = 'all' | 'docs' | 'blog' | 'learn';
 
 interface Props {
   files: FileCoverage[];
   lang: string;
   activeFile: string | null;
   selected: Set<string>;
+  statusFilter: StatusFilter;
+  sectionFilter: SectionFilter;
+  onStatusFilter: (f: StatusFilter) => void;
+  onSectionFilter: (f: SectionFilter) => void;
   onSelect: (file: string) => void;
   onToggle: (file: string) => void;
   onSelectAll: (files: string[]) => void;
   onClear: () => void;
   onTranslateSelected: () => void;
 }
-
-type StatusFilter = 'all' | 'complete' | 'partial' | 'missing';
-type SectionFilter = 'all' | 'docs' | 'blog' | 'learn';
 
 function filePct(f: FileCoverage) {
   return f.total > 0 ? (f.translated / f.total) * 100 : 100;
@@ -33,15 +37,16 @@ export function FileList({
   lang,
   activeFile,
   selected,
+  statusFilter,
+  sectionFilter,
+  onStatusFilter,
+  onSectionFilter,
   onSelect,
   onToggle,
   onSelectAll,
   onClear,
   onTranslateSelected,
 }: Props) {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [sectionFilter, setSectionFilter] = useState<SectionFilter>('all');
-
   const filtered = useMemo(() => {
     let result = files.map((f) => ({
       ...f,
@@ -105,7 +110,7 @@ export function FileList({
         <span className="spacer" />
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          onChange={(e) => onStatusFilter(e.target.value as StatusFilter)}
         >
           <option value="all">All</option>
           <option value="complete">✅ Complete</option>
@@ -114,7 +119,7 @@ export function FileList({
         </select>
         <select
           value={sectionFilter}
-          onChange={(e) => setSectionFilter(e.target.value as SectionFilter)}
+          onChange={(e) => onSectionFilter(e.target.value as SectionFilter)}
         >
           <option value="all">All sections</option>
           <option value="docs">docs</option>

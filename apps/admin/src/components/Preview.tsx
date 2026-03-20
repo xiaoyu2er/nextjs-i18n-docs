@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { api } from '../lib/api';
 import { FLAGS } from '../lib/flags';
 
@@ -69,29 +69,31 @@ function ContentBody({
   );
 }
 
-type ViewMode = 'split' | 'en' | 'lang';
+export type ViewMode = 'split' | 'en' | 'lang';
 
 interface Props {
   version: string;
   lang: string;
   file: string;
+  viewMode: ViewMode;
+  onViewMode: (m: ViewMode) => void;
   onClose?: () => void;
 }
 
-export function Preview({ version, lang, file, onClose }: Props) {
+export function Preview({
+  version,
+  lang,
+  file,
+  viewMode,
+  onViewMode,
+  onClose,
+}: Props) {
   const enRef = useRef<HTMLPreElement>(null);
   const transRef = useRef<HTMLPreElement>(null);
   const syncing = useRef(false);
 
   const isEn = lang === 'en';
-  const [mode, setMode] = useState<ViewMode>('split');
-
-  // Reset to split when switching language
-  const prevLangRef = useRef(lang);
-  if (prevLangRef.current !== lang) {
-    prevLangRef.current = lang;
-    setMode(isEn ? 'en' : 'split');
-  }
+  const mode = isEn ? 'en' : viewMode;
 
   const { data: enData } = useQuery({
     queryKey: ['content', version, 'en', file],
@@ -160,7 +162,6 @@ export function Preview({ version, lang, file, onClose }: Props) {
     }
   }
 
-  // Use EN headings for TOC (always available), fall back to trans for lang-only
   const tocHeadings = showEn ? en.headings : trans.headings;
 
   return (
@@ -183,7 +184,7 @@ export function Preview({ version, lang, file, onClose }: Props) {
             <button
               type="button"
               className={mode === 'split' ? 'active' : ''}
-              onClick={() => setMode('split')}
+              onClick={() => onViewMode('split')}
               title="Side by side"
             >
               ◫
@@ -191,7 +192,7 @@ export function Preview({ version, lang, file, onClose }: Props) {
             <button
               type="button"
               className={mode === 'en' ? 'active' : ''}
-              onClick={() => setMode('en')}
+              onClick={() => onViewMode('en')}
               title="EN only"
             >
               {FLAGS.en}
@@ -199,7 +200,7 @@ export function Preview({ version, lang, file, onClose }: Props) {
             <button
               type="button"
               className={mode === 'lang' ? 'active' : ''}
-              onClick={() => setMode('lang')}
+              onClick={() => onViewMode('lang')}
               title={`${lang} only`}
             >
               {FLAGS[lang]}
