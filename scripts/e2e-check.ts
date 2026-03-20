@@ -212,6 +212,7 @@ interface CheckResult {
 async function checkUrl(
   baseUrl: string,
   urlPath: string,
+  retries = 2,
 ): Promise<CheckResult> {
   const fullUrl = `${baseUrl}${urlPath}`;
   const start = Date.now();
@@ -250,6 +251,17 @@ async function checkUrl(
       errors.push(`Suspiciously short response (${body.length} bytes)`);
     }
 
+    // Retry on transient errors (Internal Server Error, timeouts)
+    if (errors.length > 0 && retries > 0) {
+      const isTransient = errors.some(
+        (e) => e.includes('Internal Server Error') || e.includes('HTTP 5'),
+      );
+      if (isTransient) {
+        await new Promise((r) => setTimeout(r, 2000));
+        return checkUrl(baseUrl, urlPath, retries - 1);
+      }
+    }
+
     return {
       url: urlPath,
       status: res.status,
@@ -258,6 +270,11 @@ async function checkUrl(
       duration,
     };
   } catch (err) {
+    // Retry on network errors
+    if (retries > 0) {
+      await new Promise((r) => setTimeout(r, 2000));
+      return checkUrl(baseUrl, urlPath, retries - 1);
+    }
     return {
       url: urlPath,
       status: 0,
