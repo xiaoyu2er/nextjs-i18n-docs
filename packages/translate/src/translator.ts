@@ -374,7 +374,8 @@ RULES:
 7. CRITICAL: Inline code wrapped in backticks (\`...\`) MUST keep the backticks. Example: \`<Link>\` must stay as \`<Link>\`, NOT become bare <Link>. Bare HTML tags will BREAK the document.
 
 TYPE-SPECIFIC RULES:
-- "frontmatter": YAML metadata. Translate values only, keep keys unchanged.
+- "frontmatter": YAML metadata. Translate values ONLY. Keys like "title:", "description:" MUST stay in English.
+  NEVER translate YAML keys. Output: "title: 翻译后的标题" NOT "标题: ..."
   CRITICAL: Never start a value with \` ' " or use : in values. Must be valid YAML.
 - "heading": Keep ## or ### prefix exactly as original.
 - "list": Keep - or 1. markers and indentation.
@@ -439,13 +440,35 @@ export function rebuildFrontmatter(
   const transLines = translated.split('\n');
 
   // Extract translated title and description
-  const transTitle = transLines.find((l) => l.startsWith('title:'));
+  // LLM might translate YAML keys (e.g., "标题:" instead of "title:").
+  // Try English keys first, then fall back to detecting translated keys.
+  let transTitle = transLines.find((l) => l.startsWith('title:'));
+  if (!transTitle) {
+    // Find first non-empty line that looks like a key:value (translated key)
+    const firstKV = transLines.find(
+      (l) => l.match(/^[^\s:]+[:：]\s*.+/) && !l.startsWith('description'),
+    );
+    if (firstKV) {
+      // Extract value and reconstruct with English key
+      const val = firstKV.replace(/^[^\s:：]+[:：]\s*/, '');
+      transTitle = `title: ${val}`;
+    }
+  }
+
   const transDescLines: string[] = [];
   let inDesc = false;
   for (const line of transLines) {
-    if (line.startsWith('description:')) {
+    if (
+      line.startsWith('description:') ||
+      (line.match(/^[^\s:-]+[:：]\s*>-?\s*$/) && !line.startsWith('---'))
+    ) {
       inDesc = true;
-      transDescLines.push(line);
+      // Normalize key to English
+      if (!line.startsWith('description:')) {
+        transDescLines.push(line.replace(/^[^\s:：]+[:：]/, 'description:'));
+      } else {
+        transDescLines.push(line);
+      }
     } else if (inDesc && (line.startsWith('  ') || line.startsWith('\t'))) {
       transDescLines.push(line);
     } else {
