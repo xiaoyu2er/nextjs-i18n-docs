@@ -221,7 +221,7 @@ export function App() {
               {file && <span className="file-panel-current">{file}</span>}
             </div>
             <div
-              className={`file-panel${!showFiles ? ' no-list' : ''}${!file ? ' no-preview' : ''}`}
+              className={`file-panel${!showFiles ? ' no-list' : ''}${!file ? ' no-preview' : ''}${file && view !== 'split' ? ' single-view' : ''}`}
             >
               {showFiles && (
                 <FileList
