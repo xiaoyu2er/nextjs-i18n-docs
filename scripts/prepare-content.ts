@@ -539,7 +539,7 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
   for (const year of years) {
     mdx += `## ${year}\n\n<CardGrid>\n`;
     for (const post of byYear.get(year)!) {
-      mdx += `  <LinkCard title="${post.title}" href="/blog/${post.slug}/" description="${post.dateStr}" />\n`;
+      mdx += `  <LinkCard title="${post.title}" href="./${post.slug}/" description="${post.dateStr}" />\n`;
     }
     mdx += '</CardGrid>\n\n';
   }
