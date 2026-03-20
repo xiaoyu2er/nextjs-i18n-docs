@@ -140,6 +140,7 @@ interface CliOptions {
   apiBaseUrl: string;
   apiKey: string;
   model: string;
+  modelRotate: string[];
   maxTokens: number;
   concurrency: number;
   dryRun: boolean;
@@ -176,6 +177,10 @@ function parseArgs(argv: string[]): CliOptions {
     apiBaseUrl: getOpt('api-base-url', ''),
     apiKey: getOpt('api-key', ''),
     model: getOpt('model', ''),
+    modelRotate: getOpt('model-rotate', '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     maxTokens: Number.parseInt(getOpt('max-tokens', '16384'), 10),
     concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
@@ -338,6 +343,7 @@ async function translateFile(
     apiBaseUrl: opts.apiBaseUrl || undefined,
     apiKey: opts.apiKey || undefined,
     model: opts.model || undefined,
+    modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
     maxTokens: opts.maxTokens,
     filePath: relPath,
     logger,
@@ -402,6 +408,7 @@ async function translateFile(
         apiBaseUrl: opts.apiBaseUrl || undefined,
         apiKey: opts.apiKey || undefined,
         model: opts.model || undefined,
+        modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
         maxTokens: opts.maxTokens,
         filePath: relPath,
         logger,
@@ -505,9 +512,15 @@ async function runTranslate(opts: CliOptions): Promise<void> {
     console.log(`\n📦 Translating to ${lang} (${langConfig.name})`);
     console.log(`   Source: ${opts.docsRoot}`);
     console.log(`   Engine: ${opts.apiType}`);
-    console.log(
-      `   Model: ${opts.model || process.env.OPENROUTER_MODEL || 'default'}`,
-    );
+    if (opts.modelRotate.length > 0) {
+      console.log(
+        `   Model: rotate(${opts.modelRotate.length}): ${opts.modelRotate.join(', ')}`,
+      );
+    } else {
+      console.log(
+        `   Model: ${opts.model || process.env.OPENROUTER_MODEL || 'default'}`,
+      );
+    }
 
     // Find files
     const files = await glob(opts.pattern, { cwd: opts.docsRoot });

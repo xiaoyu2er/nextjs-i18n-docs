@@ -20,6 +20,8 @@ export interface TranslateOptions {
   apiKey?: string;
   /** Model name override */
   model?: string;
+  /** List of models to rotate through (overrides model) */
+  modelRotate?: string[];
   /** Max output tokens (default: 16384) */
   maxTokens?: number;
   /** File path for logging */
@@ -196,6 +198,21 @@ function repairJson(raw: string): string {
   return result;
 }
 
+/** Round-robin counter for model rotation */
+let rotateIndex = 0;
+
+/**
+ * Pick the next model from the rotation list, or fall back to single model.
+ */
+function pickModel(opts: TranslateOptions): string | undefined {
+  if (opts.modelRotate && opts.modelRotate.length > 0) {
+    const model = opts.modelRotate[rotateIndex % opts.modelRotate.length];
+    rotateIndex++;
+    return model;
+  }
+  return opts.model;
+}
+
 /**
  * Resolve API configuration for the given API type.
  * Returns { baseURL, apiKey, model } with defaults applied.
@@ -218,7 +235,7 @@ function resolveApiConfig(opts: TranslateOptions): {
       baseURL: opts.apiBaseUrl ?? 'https://openrouter.ai/api/v1',
       apiKey,
       model:
-        opts.model ??
+        pickModel(opts) ??
         process.env.OPENROUTER_MODEL ??
         'deepseek/deepseek-chat-v3-0324:free',
     };
@@ -234,7 +251,7 @@ function resolveApiConfig(opts: TranslateOptions): {
     return {
       baseURL: opts.apiBaseUrl ?? 'https://api.deepseek.com',
       apiKey,
-      model: opts.model ?? 'deepseek-chat',
+      model: pickModel(opts) ?? 'deepseek-chat',
     };
   }
 
@@ -248,7 +265,7 @@ function resolveApiConfig(opts: TranslateOptions): {
   return {
     baseURL: opts.apiBaseUrl ?? 'https://api.anthropic.com/v1',
     apiKey,
-    model: opts.model ?? 'claude-sonnet-4-20250514',
+    model: pickModel(opts) ?? 'claude-sonnet-4-20250514',
   };
 }
 
