@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FileList } from './components/FileList';
 import { JobDialog } from './components/JobDialog';
 import { JobPanel } from './components/JobPanel';
@@ -40,6 +40,15 @@ export function App() {
   // bump to force re-read from URL
   const [, rerender] = useState(0);
   const bump = useCallback(() => rerender((n) => n + 1), []);
+
+  // Theme
+  const [theme, setThemeState] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved === 'light' ? 'light' : 'dark';
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
 
   const { version, lang, file, showFiles, view, status, section } =
     readParams();
@@ -174,6 +183,18 @@ export function App() {
         <span className="spacer" />
         <button type="button" className="btn" onClick={handleNewJob}>
           + New Job
+        </button>
+        <button
+          type="button"
+          className="btn btn-icon"
+          onClick={() => {
+            const next = theme === 'light' ? 'dark' : 'light';
+            setThemeState(next);
+            localStorage.setItem('theme', next);
+          }}
+          title="Toggle theme"
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
         </button>
       </nav>
 
