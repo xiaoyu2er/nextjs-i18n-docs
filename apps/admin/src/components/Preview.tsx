@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { api } from '../lib/api';
 import { FLAGS } from '../lib/flags';
 
@@ -9,14 +9,20 @@ interface Heading {
   text: string;
 }
 
+interface ParsedLine {
+  html: string;
+  isHeading: boolean;
+  id?: string;
+}
+
 function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function parseContent(content: string) {
+function parseContent(content: string, prefix: string) {
   const lines = content.split('\n');
   const headings: Heading[] = [];
-  const rendered: Array<{ html: string; isHeading: boolean; id?: string }> = [];
+  const rendered: ParsedLine[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -27,7 +33,7 @@ function parseContent(content: string) {
         .replace(/\[.*?\]\(.*?\)/g, '')
         .replace(/[`*[\]]/g, '')
         .trim();
-      const id = `h-${i}`;
+      const id = `${prefix}-h-${i}`;
       headings.push({ id, level, text });
       rendered.push({ html: escapeHtml(line), isHeading: true, id });
     } else {
@@ -38,6 +44,31 @@ function parseContent(content: string) {
   return { headings, rendered };
 }
 
+function ContentBody({
+  rendered,
+  bodyRef,
+}: {
+  rendered: ParsedLine[];
+  bodyRef: React.RefObject<HTMLPreElement | null>;
+}) {
+  return (
+    <pre className="preview-body" ref={bodyRef}>
+      {rendered.map((line, i) => (
+        <span key={line.id ?? i}>
+          {line.isHeading ? (
+            <span className="hl" id={line.id}>
+              <span dangerouslySetInnerHTML={{ __html: line.html }} />
+            </span>
+          ) : (
+            <span dangerouslySetInnerHTML={{ __html: line.html }} />
+          )}
+          {'\n'}
+        </span>
+      ))}
+    </pre>
+  );
+}
+
 interface Props {
   version: string;
   lang: string;
@@ -45,69 +76,92 @@ interface Props {
 }
 
 export function Preview({ version, lang, file }: Props) {
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const tabs = lang === 'en' ? (['en'] as const) : (['en', lang] as const);
-  const [viewLang, setViewLang] = useState(lang === 'en' ? 'en' : lang);
+  const enRef = useRef<HTMLPreElement>(null);
+  const transRef = useRef<HTMLPreElement>(null);
+  const syncing = useRef(false);
 
-  // Reset tab when lang changes
-  const prevLangRef = useRef(lang);
-  if (prevLangRef.current !== lang) {
-    prevLangRef.current = lang;
-    setViewLang(lang === 'en' ? 'en' : lang);
-  }
+  const isEn = lang === 'en';
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['content', version, viewLang, file],
-    queryFn: () => api.fileContent(version, viewLang, file),
+  const { data: enData } = useQuery({
+    queryKey: ['content', version, 'en', file],
+    queryFn: () => api.fileContent(version, 'en', file),
   });
 
-  const { headings, rendered } = useMemo(
-    () => parseContent(data?.content || ''),
-    [data?.content],
+  const { data: transData } = useQuery({
+    queryKey: ['content', version, lang, file],
+    queryFn: () => api.fileContent(version, lang, file),
+    enabled: !isEn,
+  });
+
+  const en = useMemo(
+    () => parseContent(enData?.content || '', 'en'),
+    [enData?.content],
+  );
+  const trans = useMemo(
+    () => parseContent(transData?.content || '', 'tr'),
+    [transData?.content],
   );
 
-  function scrollTo(id: string) {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Synced scrolling
+  const syncScroll = useCallback(
+    (source: HTMLElement | null, target: HTMLElement | null) => {
+      if (!source || !target || syncing.current) return;
+      syncing.current = true;
+      const ratio =
+        source.scrollTop / (source.scrollHeight - source.clientHeight || 1);
+      target.scrollTop =
+        ratio * (target.scrollHeight - target.clientHeight || 1);
+      requestAnimationFrame(() => {
+        syncing.current = false;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const enEl = enRef.current;
+    const trEl = transRef.current;
+    if (!enEl || !trEl) return;
+
+    const onEnScroll = () => syncScroll(enEl, trEl);
+    const onTrScroll = () => syncScroll(trEl, enEl);
+    enEl.addEventListener('scroll', onEnScroll, { passive: true });
+    trEl.addEventListener('scroll', onTrScroll, { passive: true });
+    return () => {
+      enEl.removeEventListener('scroll', onEnScroll);
+      trEl.removeEventListener('scroll', onTrScroll);
+    };
+  }, [syncScroll]);
+
+  function scrollToBoth(enId: string, idx: number) {
+    const enEl = document.getElementById(enId);
+    if (enEl) enEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Find matching heading in translated content by index
+    if (!isEn && trans.headings[idx]) {
+      const trEl = document.getElementById(trans.headings[idx].id);
+      if (trEl) trEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   return (
     <div className="preview-wrap">
+      {/* Header */}
       <div className="preview-hdr">
-        <span
-          style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {file}
-        </span>
-        <span className="spacer" />
-        <div className="preview-tabs">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={`preview-tab${t === viewLang ? ' active' : ''}`}
-              onClick={() => setViewLang(t)}
-            >
-              {FLAGS[t]} {t}
-            </button>
-          ))}
-        </div>
+        <span className="preview-filename">{file}</span>
       </div>
 
-      {headings.length > 0 && (
+      {/* TOC */}
+      {en.headings.length > 0 && (
         <div className="preview-toc">
-          {headings.map((h) => (
+          {en.headings.map((h, idx) => (
             <a
               key={h.id}
               href={`#${h.id}`}
               className={`h${h.level}`}
               onClick={(e) => {
                 e.preventDefault();
-                scrollTo(h.id);
+                scrollToBoth(h.id, idx);
               }}
             >
               {'#'.repeat(h.level)} {h.text}
@@ -116,22 +170,27 @@ export function Preview({ version, lang, file }: Props) {
         </div>
       )}
 
-      <div className="preview-body" ref={bodyRef}>
-        {isLoading ? (
-          <div className="loading">Loading...</div>
-        ) : (
-          rendered.map((line, i) => (
-            <span key={line.id ?? i}>
-              {line.isHeading ? (
-                <span className="hl" id={line.id}>
-                  <span dangerouslySetInnerHTML={{ __html: line.html }} />
-                </span>
-              ) : (
-                <span dangerouslySetInnerHTML={{ __html: line.html }} />
-              )}
-              {'\n'}
-            </span>
-          ))
+      {/* Side-by-side panels */}
+      <div className={`preview-split${isEn ? ' single' : ''}`}>
+        <div className="preview-pane">
+          <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
+          {enData ? (
+            <ContentBody rendered={en.rendered} bodyRef={enRef} />
+          ) : (
+            <div className="preview-body loading">Loading...</div>
+          )}
+        </div>
+        {!isEn && (
+          <div className="preview-pane">
+            <div className="preview-pane-hdr">
+              {FLAGS[lang]} {lang}
+            </div>
+            {transData ? (
+              <ContentBody rendered={trans.rendered} bodyRef={transRef} />
+            ) : (
+              <div className="preview-body loading">Loading...</div>
+            )}
+          </div>
         )}
       </div>
     </div>
