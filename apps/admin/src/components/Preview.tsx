@@ -162,7 +162,11 @@ export function Preview({
     }
   }
 
-  const tocHeadings = en.headings.length > 0 ? en.headings : trans.headings;
+  // Show headings from visible content; fallback to the other if empty
+  const primaryHeadings = showTrans ? trans.headings : en.headings;
+  const fallbackHeadings = showTrans ? en.headings : trans.headings;
+  const tocHeadings =
+    primaryHeadings.length > 0 ? primaryHeadings : fallbackHeadings;
 
   return (
     <div className="preview-outer">
