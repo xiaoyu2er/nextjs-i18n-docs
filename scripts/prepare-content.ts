@@ -210,10 +210,6 @@ function filterContent(body: string): string {
     '$1 [$2](#$3)',
   );
 
-  // Ensure blank line before JSX components (<Image, <AppOnly, etc.)
-  // Without this, remark may parse preceding text + component as a setext heading
-  result = result.replace(/([^\n])\n(<[A-Z])/g, '$1\n\n$2');
-
   // For versioned builds, rewrite internal doc links:
   // /docs/app/... → /docs/{version}/app/...
   // /docs/pages/... → /docs/{version}/pages/...
