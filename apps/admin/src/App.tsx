@@ -13,6 +13,7 @@ export function App() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [showDialog, setShowDialog] = useState(false);
+  const [showFiles, setShowFiles] = useState(true);
   const [dialogFiles, setDialogFiles] = useState<string[] | undefined>();
 
   const { data: status } = useQuery({
@@ -104,22 +105,40 @@ export function App() {
 
         {/* File list + Preview */}
         {lang && files && (
-          <div className={`file-panel${previewFile ? '' : ' no-preview'}`}>
-            <FileList
-              files={files}
-              lang={lang}
-              activeFile={previewFile}
-              selected={selected}
-              onSelect={setPreviewFile}
-              onToggle={handleToggle}
-              onSelectAll={handleSelectAll}
-              onClear={handleClear}
-              onTranslateSelected={handleTranslateSelected}
-            />
-            {previewFile && (
-              <Preview version={version} lang={lang} file={previewFile} />
-            )}
-          </div>
+          <>
+            <div className="file-panel-toolbar">
+              <button
+                type="button"
+                className={`btn btn-sm${showFiles ? ' active' : ''}`}
+                onClick={() => setShowFiles((v) => !v)}
+              >
+                {showFiles ? '◀ Hide files' : '▶ Show files'}
+              </button>
+              {previewFile && (
+                <span className="file-panel-current">{previewFile}</span>
+              )}
+            </div>
+            <div
+              className={`file-panel${!showFiles ? ' no-list' : ''}${!previewFile ? ' no-preview' : ''}`}
+            >
+              {showFiles && (
+                <FileList
+                  files={files}
+                  lang={lang}
+                  activeFile={previewFile}
+                  selected={selected}
+                  onSelect={setPreviewFile}
+                  onToggle={handleToggle}
+                  onSelectAll={handleSelectAll}
+                  onClear={handleClear}
+                  onTranslateSelected={handleTranslateSelected}
+                />
+              )}
+              {previewFile && (
+                <Preview version={version} lang={lang} file={previewFile} />
+              )}
+            </div>
+          </>
         )}
       </div>
 
