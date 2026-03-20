@@ -510,30 +510,52 @@ export async function translateJson(
   },
 ): Promise<JsonTranslateResult> {
   const entries = Object.entries(opts.uncached);
-  const CHUNK_SIZE = 50;
+  const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
 
-  // If small enough, translate in one shot
-  if (entries.length <= CHUNK_SIZE) {
+  // Estimate output tokens: ~1.5x input chars / 4 (chars per token) + JSON overhead
+  // Input text becomes both input AND output (translated), so output ≈ input size
+  const totalInputChars = entries.reduce(
+    (sum, [, text]) => sum + text.length,
+    0,
+  );
+  // Conservative: ~4 chars per token for mixed CJK/ASCII, output ≈ input + JSON keys/syntax
+  const estimatedOutputTokens = Math.ceil(
+    (totalInputChars * 1.5) / 4 + entries.length * 40,
+  );
+
+  // If estimated output fits in max_tokens, send in one shot
+  if (estimatedOutputTokens <= maxTokens * 0.85) {
     return translateJsonChunk(opts);
   }
 
-  // Split into chunks and translate sequentially
+  // Split into chunks that fit within max_tokens
   const allTranslations: Record<string, string> = {};
   const allMissing: string[] = [];
   const allExtra: string[] = [];
 
-  const chunks: Record<string, string>[] = [];
-  for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
-    const chunkEntries = entries.slice(i, i + CHUNK_SIZE);
-    chunks.push(Object.fromEntries(chunkEntries));
+  const targetTokensPerChunk = Math.floor(maxTokens * 0.7);
+  const chunks: [string, string][][] = [[]];
+  let currentChunkTokens = 0;
+
+  for (const entry of entries) {
+    const entryTokens = Math.ceil((entry[1].length * 1.5) / 4 + 40);
+    if (
+      currentChunkTokens + entryTokens > targetTokensPerChunk &&
+      chunks[chunks.length - 1].length > 0
+    ) {
+      chunks.push([]);
+      currentChunkTokens = 0;
+    }
+    chunks[chunks.length - 1].push(entry);
+    currentChunkTokens += entryTokens;
   }
 
   console.log(
-    `   📦 Splitting ${entries.length} nodes into ${chunks.length} chunks of ≤${CHUNK_SIZE}`,
+    `   📦 Splitting ${entries.length} nodes into ${chunks.length} chunks (~${targetTokensPerChunk} tokens each)`,
   );
 
   for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
+    const chunk = Object.fromEntries(chunks[i]);
     const chunkNodeTypes: Record<string, string> = {};
     for (const md5 of Object.keys(chunk)) {
       chunkNodeTypes[md5] = opts.nodeTypes[md5] ?? 'paragraph';
