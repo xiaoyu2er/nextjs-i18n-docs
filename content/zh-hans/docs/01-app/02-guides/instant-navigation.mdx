@@ -1,0 +1,289 @@
+---
+title: 确保即时导航
+description: 了解如何组织您的应用以预取和预渲染更多内容，提供即时的页面加载和客户端导航。
+nav_title: 即时导航
+version: draft
+related:
+  title: 了解更多
+  description: 探索完整的即时 API、缓存和重新验证。
+  links:
+    - app/api-reference/file-conventions/route-segment-config/instant
+    - app/getting-started/caching
+    - app/getting-started/revalidating
+    - app/guides/prefetching
+---
+
+启用[缓存组件](/docs/app/api-reference/config/next-config-js/cacheComponents)后，将未缓存的数据包装在 `<Suspense>` 边界内可以实现即时导航——但前提是边界位于正确的位置。放错位置的边界可能会悄无声息地阻塞客户端导航，特别是在入口点因共享布局而异的情况下。**始终从应该即时导航的路由导出 `unstable_instant`**——它会在开发时和构建时验证缓存结构，在问题到达用户之前就将其捕获。
+
+本指南从一个即时导航的产品页面开始，然后展示如何捕获并修复一个 Suspense 边界位置不正确的页面。
+
+## 可实现即时跳转的页面
+
+位于 `/store/[slug]` 的产品页面获取两样东西：产品详情（名称、价格）和实时库存。产品详情很少更改，因此使用 `use cache` 进行缓存。库存必须保持最新，并在其自己的 `<Suspense>` 后备方案后流式传输：
+
+```tsx filename="app/store/[slug]/page.tsx" highlight={1,12-19,25}
+export const unstable_instant = { prefetch: 'static' }
+
+import { Suspense } from 'react'
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  return (
+    <div>
+      <Suspense fallback={<p>Loading product...</p>}>
+        {params.then(({ slug }) => (
+          <ProductInfo slug={slug} />
+        ))}
+      </Suspense>
+      <Suspense fallback={<p>Checking availability...</p>}>
+        <Inventory params={params} />
+      </Suspense>
+    </div>
+  )
+}
+
+async function ProductInfo({ slug }: { slug: string }) {
+  'use cache'
+  const product = await fetchProduct(slug)
+  return (
+    <>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+    </>
+  )
+}
+
+async function Inventory({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const inventory = await fetchInventory(slug)
+  return <p>{inventory.count} in stock</p>
+}
+```
+
+这里没有 `generateStaticParams`，所以 `[slug]` 是一个动态段，`slug` 只能在请求时获知。await `params` 会暂停，这就是为什么每个读取它的组件都有自己的 `<Suspense>` 边界。`params` Promise 通过 `.then()` 内联解析，因此缓存的 `ProductInfo` 接收一个普通的 `slug` 字符串。
+
+第 1 行的 [`unstable_instant`](/docs/app/api-reference/file-conventions/route-segment-config/instant) 导出告诉 Next.js 验证此页面在每个可能的入口点都产生一个即时的[静态外壳](/docs/app/glossary#static-shell)。验证在开发期间和构建时运行。如果某个组件会阻塞导航，错误叠加层会准确告诉你是哪一个并提出修复建议。
+
+### 使用 Next.js DevTools 进行检查
+
+在您的 Next.js 配置中启用即时导航 DevTools 开关：
+
+```ts filename="next.config.ts" highlight={5-7}
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+  experimental: {
+    instantNavigationDevToolsToggle: true,
+  },
+}
+
+export default nextConfig
+```
+
+打开 Next.js DevTools 并选择 **Instant Navs**。您将看到两个选项：
+
+- **页面加载**：点击 **Reload** 刷新页面，并将其冻结为此路由生成的初始静态 UI，在任何动态数据流入之前。
+- **客户端导航**：启用后，点击应用中的任何链接会显示该页面的预取 UI，而不是完整结果。
+
+尝试一下**页面加载**。“正在加载产品...”和“正在检查可用性...”会作为单独的后备方案出现。首次访问时缓存是冷的，因此两个后备方案都可见。再次导航到该页面，产品名称会立即从缓存中显示。
+
+现在尝试**客户端导航**（从 `/store/shoes` 点击链接到 `/store/hats`）。产品名称和价格立即出现（已缓存）。“正在检查可用性...”显示库存将流入的位置。
+
+> **请注意：** 页面加载和客户端导航可能产生不同的外壳。像 `useSearchParams` 这样的客户端钩子在页面加载时会暂停（在构建时搜索参数未知），但在客户端导航时会同步解析（路由器已经拥有这些参数）。
+
+<details>
+
+<summary>为什么页面加载和客户端导航会产生不同的外壳</summary>
+
+在页面加载时，整个页面从文档根节点渲染。每个组件都在服务器上运行，任何暂停的内容都会被完整树中最近的 Suspense 边界捕获。
+
+在客户端导航（点击链接）时，Next.js 仅重新渲染源路由和目标路由共享布局以下的部分。共享布局之上的组件不会重新渲染。这意味着根布局中的 Suspense 边界在页面加载时覆盖所有内容，但对于 `/store/shoes` 和 `/store/hats` 之间的客户端导航，共享的 `/store` 布局是入口点。根 Suspense 在其之上，没有效果。
+
+这也是客户端钩子行为不同的原因。`useSearchParams()` 在服务器渲染期间暂停，因为搜索参数在构建时不可用。但在客户端导航时，路由器已经从 URL 拥有这些参数，因此钩子会同步解析。同一个组件在客户端导航时可能出现在即时外壳中，但在页面加载时出现在后备方案之后。
+
+</details>
+
+### 使用 e2e 测试防止回归
+
+验证在开发期间和构建时捕获结构问题。为了防止代码库演进过程中的回归，`@next/playwright` 包包含一个 `instant()` 辅助函数，用于断言即时外壳中确切出现的内容：
+
+```typescript filename="e2e/navigation.test.ts"
+import { test, expect } from '@playwright/test'
+import { instant } from '@next/playwright'
+
+test('product title appears instantly', async ({ page }) => {
+  await page.goto('/store/shoes')
+
+  await instant(page, async () => {
+    await page.click('a[href="/store/hats"]')
+    await expect(page.locator('h1')).toContainText('Baseball Cap')
+  })
+
+  // After instant() exits, dynamic content streams in
+  await expect(page.locator('text=in stock')).toBeVisible()
+})
+```
+
+`instant()` 在回调针对静态外壳运行时会阻塞动态内容。它解析后，动态内容流入，您可以断言完整页面。
+
+无需为每个导航编写 `instant()` 测试。构建时验证已经提供了结构保证。对最重要的用户流使用 `instant()`。
+
+## 修复阻塞的页面
+
+现在考虑一个不同的路由 `/shop/[slug]`，它具有相同的数据需求，但没有本地 Suspense 边界或缓存：
+
+```tsx filename="app/shop/[slug]/page.tsx"
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = await fetchProduct(slug)
+  const inventory = await fetchInventory(slug)
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+      <p>{inventory.count} in stock</p>
+    </div>
+  )
+}
+```
+
+根布局将 `{children}` 包装在 `<Suspense>` 中：
+
+```tsx filename="app/layout.tsx" highlight={9-11}
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <Suspense fallback={<p>Loading...</p>}>{children}</Suspense>
+      </body>
+    </html>
+  )
+}
+```
+
+在初始页面加载时，根 Suspense 捕获异步工作，并在后备方案后流式传输页面。一切似乎正常。但在从 `/shop/shoes` 到 `/shop/hats` 的客户端导航时，共享的 `/shop` 布局是入口点。根 `<Suspense>` 边界在该布局之上，因此对该导航不可见。页面获取未缓存的数据且没有本地边界，因此旧页面保持可见，直到服务器完成渲染，使导航感觉无响应。
+
+### 步骤 1：添加即时验证
+
+添加 `unstable_instant` 导出以暴露问题：
+
+```tsx filename="app/shop/[slug]/page.tsx" highlight={1}
+export const unstable_instant = { prefetch: 'static' }
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = await fetchProduct(slug)
+  const inventory = await fetchInventory(slug)
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+      <p>{inventory.count} in stock</p>
+    </div>
+  )
+}
+```
+
+Next.js 现在会在路由中的每个共享布局边界处模拟导航。await `params` 和两个数据获取都被标记为违规，因为它们在 Suspense 边界之外暂停或访问未缓存的数据。每个错误都会识别具体的组件并建议修复方案。
+
+### 步骤 2：修复错误
+
+查看数据。没有 `generateStaticParams`，所以 `slug` 只能在请求时获知。await `params` 会暂停，因此每个读取它的组件都需要自己的 `<Suspense>` 边界。
+
+决定如何处理每次获取：
+
+- **产品详情**（名称、价格）很少更改。使用 `use cache` 将其作为 `slug` 的函数进行缓存。
+- **库存**必须从上游保持最新。保持其未缓存状态，并让其在 `<Suspense>` 后备方案后流式传输。
+
+结果与第一部分的结构相同：
+
+```tsx filename="app/shop/[slug]/page.tsx" highlight={1,12-19,25}
+export const unstable_instant = { prefetch: 'static' }
+
+import { Suspense } from 'react'
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  return (
+    <div>
+      <Suspense fallback={<p>Loading product...</p>}>
+        {params.then(({ slug }) => (
+          <ProductInfo slug={slug} />
+        ))}
+      </Suspense>
+      <Suspense fallback={<p>Checking availability...</p>}>
+        <Inventory params={params} />
+      </Suspense>
+    </div>
+  )
+}
+
+async function ProductInfo({ slug }: { slug: string }) {
+  'use cache'
+  const product = await fetchProduct(slug)
+  return (
+    <>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+    </>
+  )
+}
+
+async function Inventory({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const inventory = await fetchInventory(slug)
+  return <p>{inventory.count} in stock</p>
+}
+```
+
+验证通过。打开 DevTools 并尝试客户端导航。产品名称和价格立即出现，并且“正在检查可用性...”显示库存将流入的位置。
+
+<details>
+
+<summary>验证如何检查每个入口点</summary>
+
+当您向路由添加 `unstable_instant` 时，Next.js 不仅检查初始页面加载。它会在路由层次结构中每个可能的共享布局边界处模拟导航。
+
+对于像 `/shop/[slug]` 这样的路由，验证检查：
+
+- 从外部进入（页面加载）：完整树渲染，根布局 Suspense 捕获所有内容
+- 从 `/shop` 下的同级进入（从 `/shop/shoes` 到 `/shop/hats` 的客户端导航）：仅页面段重新渲染，`/shop` 布局是入口点
+
+每个入口点都是独立验证的。覆盖一条路径的 Suspense 边界可能对另一条路径不可见。这就是为什么一个页面可能通过初始加载检查，但对于同级导航失败，以及随着路由数量增长，手动捕获这些问题很困难的原因。
+
+</details>
+
+## 使用 `instant = false` 禁用
+
+并非每个布局都能即时实现。一个读取 cookie 并获取用户特定数据的仪表板布局对于第一个入口可能过于动态。您可以在该布局上设置 `instant = false` 以将其从验证中豁免：
+
+```tsx filename="app/dashboard/layout.tsx"
+export const unstable_instant = false
+```
+
+这告诉验证：不要求进入 `/dashboard` 是即时的，但仍然允许您通过在内部段上使用 `instant` 来验证其中的同级导航。通过在 `/dashboard` 下的页面段添加 `instant`，仍然可以检查从 `/dashboard/a` 到 `/dashboard/b` 的导航。
+
+## 下一步
+
+- [即时 API 参考](/docs/app/api-reference/file-conventions/route-segment-config/instant)，了解所有配置选项，包括运行时预取和使用 `instant = false` 的增量采用
+- [缓存](/docs/app/getting-started/caching)，了解 `use cache`、Suspense 和部分预渲染的背景知识
+- [重新验证](/docs/app/getting-started/revalidating)，了解如何使用 `cacheLife` 和 `updateTag` 使缓存数据过期

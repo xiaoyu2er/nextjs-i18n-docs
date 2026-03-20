@@ -1,0 +1,915 @@
+---
+title: 如何使用 Next.js 作为前端后端
+nav_title: 前端后端
+description: 学习如何使用 Next.js 作为后端框架
+related:
+  title: API 参考
+  description: 了解更多关于路由处理器、代理和重写的信息
+  links:
+    - app/api-reference/file-conventions/route
+    - app/api-reference/file-conventions/proxy
+    - app/api-reference/config/next-config-js/rewrites
+---
+
+Next.js 支持"前端后端" (Backend for Frontend) 模式。这使您可以创建公开的端点来处理 HTTP 请求并返回任何内容类型——不仅仅是 HTML。您还可以访问数据源并执行副作用，例如更新远程数据。
+
+如果您正在开始一个新项目，使用带有 `--api` 标志的 `create-next-app` 会自动在新项目的 `app/` 文件夹中包含一个示例 `route.ts`，演示如何创建 API 端点。
+
+```bash package="pnpm"
+pnpm create next-app --api
+```
+
+```bash package="npm"
+npx create-next-app@latest --api
+```
+
+```bash package="yarn"
+yarn create next-app --api
+```
+
+```bash package="bun"
+bun create next-app --api
+```
+
+> **须知**：Next.js 的后端功能并非完整的后端替代方案。它们充当一个 API 层，该层：
+>
+> - 可公开访问
+> - 处理任何 HTTP 请求
+> - 可以返回任何内容类型
+
+要实现此模式，请使用：
+
+- [路由处理器](/docs/app/api-reference/file-conventions/route)
+- [`proxy`](/docs/app/api-reference/file-conventions/proxy)
+- 在 Pages 路由器中，[API 路由](/docs/pages/building-your-application/routing/api-routes)
+
+## 公开端点
+
+路由处理器是公开的 HTTP 端点。任何客户端都可以访问它们。
+
+使用 `route.ts` 或 `route.js` 文件约定创建路由处理器：
+
+```ts filename="/app/api/route.ts" switcher
+export function GET(request: Request) {}
+```
+
+```js filename="/app/api/route.js" switcher
+export function GET(request) {}
+```
+
+这将处理发送到 `/api` 的 `GET` 请求。
+
+对可能抛出异常的操作使用 `try/catch` 块：
+
+```ts filename="/app/api/route.ts" switcher
+import { submit } from '@/lib/submit'
+
+export async function POST(request: Request) {
+  try {
+    await submit(request)
+    return new Response(null, { status: 204 })
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected error'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+```js filename="/app/api/route.js" switcher
+import { submit } from '@/lib/submit'
+
+export async function POST(request) {
+  try {
+    await submit(request)
+    return new Response(null, { status: 204 })
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected error'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+避免在发送到客户端的错误消息中暴露敏感信息。
+
+要限制访问，请实现身份验证和授权。参见[身份验证](/docs/app/guides/authentication)。
+
+## 内容类型
+
+路由处理器允许您提供非 UI 响应，包括 JSON、XML、图像、文件和纯文本。
+
+Next.js 为常见端点使用文件约定：
+
+- [`sitemap.xml`](/docs/app/api-reference/file-conventions/metadata/sitemap)
+- [`opengraph-image.jpg`, `twitter-image`](/docs/app/api-reference/file-conventions/metadata/opengraph-image)
+- [favicon, app icon 和 apple-icon](/docs/app/api-reference/file-conventions/metadata/app-icons)
+- [`manifest.json`](/docs/app/api-reference/file-conventions/metadata/manifest)
+- [`robots.txt`](/docs/app/api-reference/file-conventions/metadata/robots)
+
+您也可以定义自定义的，例如：
+
+- `llms.txt`
+- `rss.xml`
+- `.well-known`
+
+例如，`app/rss.xml/route.ts` 为 `rss.xml` 创建一个路由处理器。
+
+```ts filename="/app/rss.xml/route.ts" switcher
+export async function GET(request: Request) {
+  const rssResponse = await fetch(/* rss endpoint */)
+  const rssData = await rssResponse.json()
+
+  const rssFeed = `<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+ <title>${rssData.title}</title>
+ <description>${rssData.description}</description>
+ <link>${rssData.link}</link>
+ <copyright>${rssData.copyright}</copyright>
+ ${rssData.items.map((item) => {
+   return `<item>
+    <title>${item.title}</title>
+    <description>${item.description}</description>
+    <link>${item.link}</link>
+    <pubDate>${item.publishDate}</pubDate>
+    <guid isPermaLink="false">${item.guid}</guid>
+ </item>`
+ })}
+</channel>
+</rss>`
+
+  const headers = new Headers({ 'content-type': 'application/xml' })
+
+  return new Response(rssFeed, { headers })
+}
+```
+
+```js filename="/app/rss.xml/route.js" switcher
+export async function GET(request) {
+  const rssResponse = await fetch(/* rss endpoint */)
+  const rssData = await rssResponse.json()
+
+  const rssFeed = `<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+ <title>${rssData.title}</title>
+ <description>${rssData.description}</description>
+ <link>${rssData.link}</link>
+ <copyright>${rssData.copyright}</copyright>
+ ${rssData.items.map((item) => {
+   return `<item>
+    <title>${item.title}</title>
+    <description>${item.description}</description>
+    <link>${item.link}</link>
+    <pubDate>${item.publishDate}</pubDate>
+    <guid isPermaLink="false">${item.guid}</guid>
+ </item>`
+ })}
+</channel>
+</rss>`
+
+  const headers = new Headers({ 'content-type': 'application/xml' })
+
+  return new Response(rssFeed, { headers })
+}
+```
+
+清理用于生成标记的任何输入。
+
+### 内容协商
+
+您可以使用[重写](/docs/app/api-reference/config/next-config-js/rewrites)配合头部匹配，根据请求的 `Accept` 头从同一 URL 提供不同的内容类型。这被称为[内容协商](https://developer.mozilla.org/en-US/docs/Web/HTTP/Content_negotiation)。
+
+例如，一个文档站点可能从相同的 `/docs/…` URL 为浏览器提供 HTML 页面，为 AI 代理提供原始 Markdown。
+
+**1. 配置一个匹配 `Accept` 头的重写：**
+
+```js filename="next.config.js"
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/docs/:slug*',
+        destination: '/docs/md/:slug*',
+        has: [
+          {
+            type: 'header',
+            key: 'accept',
+            value: '(.*)text/markdown(.*)',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+当对 `/docs/getting-started` 的请求包含 `Accept: text/markdown` 时，重写将其路由到 `/docs/md/getting-started`。该路径下的路由处理器返回 Markdown 响应。未在其 `Accept` 头中发送 `text/markdown` 的客户端将继续收到正常的 HTML 页面。
+
+**2. 为 Markdown 响应创建一个路由处理器：**
+
+```ts filename="app/docs/md/[...slug]/route.ts" switcher
+import { getDocsMd, generateDocsStaticParams } from '@/lib/docs'
+
+export async function generateStaticParams() {
+  return generateDocsStaticParams()
+}
+
+export async function GET(_: Request, ctx: RouteContext<'/docs/md/[...slug]'>) {
+  const { slug } = await ctx.params
+  const mdDoc = await getDocsMd({ slug })
+
+  if (mdDoc == null) {
+    return new Response(null, { status: 404 })
+  }
+
+  return new Response(mdDoc, {
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      Vary: 'Accept',
+    },
+  })
+}
+```
+
+```js filename="app/docs/md/[...slug]/route.js" switcher
+import { getDocsMd, generateDocsStaticParams } from '@/lib/docs'
+
+export async function generateStaticParams() {
+  return generateDocsStaticParams()
+}
+
+export async function GET(_, { params }) {
+  const { slug } = await params
+  const mdDoc = await getDocsMd({ slug })
+
+  if (mdDoc == null) {
+    return new Response(null, { status: 404 })
+  }
+
+  return new Response(mdDoc, {
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      Vary: 'Accept',
+    },
+  })
+}
+```
+
+[`Vary: Accept`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Vary) 响应头告诉缓存响应体依赖于 `Accept` 请求头。没有它，共享缓存可能会将缓存的 Markdown 响应提供给浏览器（反之亦然）。大多数托管提供商已在其缓存键中包含 `Accept` 头，但显式设置 `Vary` 可以确保在所有 CDN 和代理缓存中的行为正确。
+
+`generateStaticParams` 允许您在构建时预渲染 Markdown 变体，以便可以从边缘提供服务，而无需在每个请求时都访问源服务器。
+
+**3. 使用 `curl` 测试：**
+
+```bash
+# Returns Markdown
+curl -H "Accept: text/markdown" https://example.com/docs/getting-started
+
+# Returns the normal HTML page
+curl https://example.com/docs/getting-started
+```
+
+> **须知：**
+>
+> - `/docs/md/...` 路由在没有重写的情况下仍然可以直接访问。如果您想将其限制为仅通过重写提供服务，请使用 [`proxy`](/docs/app/api-reference/file-conventions/proxy) 来阻止不包含预期 `Accept` 头的直接请求。
+> - 对于更高级的协商逻辑，您可以使用 [`proxy`](/docs/app/api-reference/file-conventions/proxy) 而不是重写，以获得更大的灵活性。
+
+### 处理请求体
+
+使用 Request 的[实例方法](https://developer.mozilla.org/en-US/docs/Web/API/Request#instance_methods)，如 `.json()`、`.formData()` 或 `.text()` 来访问请求体。
+
+`GET` 和 `HEAD` 请求不携带请求体。
+
+```ts filename="/app/api/echo-body/route.ts" switcher
+export async function POST(request: Request) {
+  const res = await request.json()
+  return Response.json({ res })
+}
+```
+
+```js filename="/app/api/echo-body/route.js" switcher
+export async function POST(request) {
+  const res = await request.json()
+  return Response.json({ res })
+}
+```
+
+> **须知**：在将数据传递给其他系统之前，请验证数据。
+
+```ts filename="/app/api/send-email/route.ts" switcher
+import { sendMail, validateInputs } from '@/lib/email-transporter'
+
+export async function POST(request: Request) {
+  const formData = await request.formData()
+  const email = formData.get('email')
+  const contents = formData.get('contents')
+
+  try {
+    await validateInputs({ email, contents })
+    const info = await sendMail({ email, contents })
+
+    return Response.json({ messageId: info.messageId })
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected exception'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+```js filename="/app/api/send-email/route.js" switcher
+import { sendMail, validateInputs } from '@/lib/email-transporter'
+
+export async function POST(request) {
+  const formData = await request.formData()
+  const email = formData.get('email')
+  const contents = formData.get('contents')
+
+  try {
+    await validateInputs({ email, contents })
+    const info = await sendMail({ email, contents })
+
+    return Response.json({ messageId: info.messageId })
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected exception'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+请求体只能读取一次。如果需要再次读取，请克隆请求：
+
+```ts filename="/app/api/clone/route.ts" switcher
+export async function POST(request: Request) {
+  try {
+    const clonedRequest = request.clone()
+
+    await request.body()
+    await clonedRequest.body()
+    await request.body() // Throws error
+
+    return new Response(null, { status: 204 })
+  } catch {
+    return new Response(null, { status: 500 })
+  }
+}
+```
+
+```js filename="/app/api/clone/route.js" switcher
+export async function POST(request) {
+  try {
+    const clonedRequest = request.clone()
+
+    await request.body()
+    await clonedRequest.body()
+    await request.body() // Throws error
+
+    return new Response(null, { status: 204 })
+  } catch {
+    return new Response(null, { status: 500 })
+  }
+}
+```
+
+## 操作数据
+
+路由处理器可以转换、过滤和聚合来自一个或多个来源的数据。这使逻辑远离前端，并避免暴露内部系统。
+
+您还可以将繁重的计算卸载到服务器，并减少客户端的电池和数据使用。
+
+```ts file="/app/api/weather/route.ts" switcher
+import { parseWeatherData } from '@/lib/weather'
+
+export async function POST(request: Request) {
+  const body = await request.json()
+  const searchParams = new URLSearchParams({ lat: body.lat, lng: body.lng })
+
+  try {
+    const weatherResponse = await fetch(`${weatherEndpoint}?${searchParams}`)
+
+    if (!weatherResponse.ok) {
+      /* handle error */
+    }
+
+    const weatherData = await weatherResponse.text()
+    const payload = parseWeatherData.asJSON(weatherData)
+
+    return new Response(payload, { status: 200 })
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected exception'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+```js file="/app/api/weather/route.js" switcher
+import { parseWeatherData } from '@/lib/weather'
+
+export async function POST(request) {
+  const body = await request.json()
+  const searchParams = new URLSearchParams({ lat: body.lat, lng: body.lng })
+
+  try {
+    const weatherResponse = await fetch(`${weatherEndpoint}?${searchParams}`)
+
+    if (!weatherResponse.ok) {
+      /* handle error */
+    }
+
+    const weatherData = await weatherResponse.text()
+    const payload = parseWeatherData.asJSON(weatherData)
+
+    return new Response(payload, { status: 200 })
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected exception'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+> **须知**：此示例使用 `POST` 以避免将地理位置数据放在 URL 中。`GET` 请求可能会被缓存或记录，这可能暴露敏感信息。
+
+## 代理到后端
+
+您可以使用路由处理器作为到另一个后端的 `proxy`。在转发请求之前添加验证逻辑。
+
+```ts filename="/app/api/[...slug]/route.ts" switcher
+import { isValidRequest } from '@/lib/utils'
+
+export async function POST(request: Request, { params }) {
+  const clonedRequest = request.clone()
+  const isValid = await isValidRequest(clonedRequest)
+
+  if (!isValid) {
+    return new Response(null, { status: 400, statusText: 'Bad Request' })
+  }
+
+  const { slug } = await params
+  const pathname = slug.join('/')
+  const proxyURL = new URL(pathname, 'https://nextjs.org')
+  const proxyRequest = new Request(proxyURL, request)
+
+  try {
+    return fetch(proxyRequest)
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected exception'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+```js filename="/app/api/[...slug]/route.js" switcher
+import { isValidRequest } from '@/lib/utils'
+
+export async function POST(request, { params }) {
+  const clonedRequest = request.clone()
+  const isValid = await isValidRequest(clonedRequest)
+
+  if (!isValid) {
+    return new Response(null, { status: 400, statusText: 'Bad Request' })
+  }
+
+  const { slug } = await params
+  const pathname = slug.join('/')
+  const proxyURL = new URL(pathname, 'https://nextjs.org')
+  const proxyRequest = new Request(proxyURL, request)
+
+  try {
+    return fetch(proxyRequest)
+  } catch (reason) {
+    const message =
+      reason instanceof Error ? reason.message : 'Unexpected exception'
+
+    return new Response(message, { status: 500 })
+  }
+}
+```
+
+或者使用：
+
+- `proxy` [重写](#proxy)
+- `next.config.js` 中的 [`rewrites`](/docs/app/api-reference/config/next-config-js/rewrites)。
+
+## NextRequest 和 NextResponse
+
+Next.js 扩展了 [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) 和 [`Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response) Web API，增加了简化常见操作的方法。这些扩展在路由处理器和 `proxy` 中都可用。
+
+两者都提供了用于读取和操作 cookie 的方法。
+
+`NextRequest` 包含 [`nextUrl`](/docs/app/api-reference/functions/next-request#nexturl) 属性，它暴露了传入请求的解析值，例如，它使访问请求路径名和搜索参数变得更容易。
+
+`NextResponse` 提供了诸如 `next()`、`json()`、`redirect()` 和 `rewrite()` 等辅助方法。
+
+您可以将 `NextRequest` 传递给任何期望 `Request` 的函数。同样，您可以在期望 `Response` 的地方返回 `NextResponse`。
+
+```ts filename="/app/echo-pathname/route.ts" switcher
+import { type NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const nextUrl = request.nextUrl
+
+  if (nextUrl.searchParams.get('redirect')) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  if (nextUrl.searchParams.get('rewrite')) {
+    return NextResponse.rewrite(new URL('/', request.url))
+  }
+
+  return NextResponse.json({ pathname: nextUrl.pathname })
+}
+```
+
+```js filename="/app/echo-pathname/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  const nextUrl = request.nextUrl
+
+  if (nextUrl.searchParams.get('redirect')) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  if (nextUrl.searchParams.get('rewrite')) {
+    return NextResponse.rewrite(new URL('/', request.url))
+  }
+
+  return NextResponse.json({ pathname: nextUrl.pathname })
+}
+```
+
+了解更多关于 [`NextRequest`](/docs/app/api-reference/functions/next-request) 和 [`NextResponse`](/docs/app/api-reference/functions/next-response) 的信息。
+
+## Webhook 和回调 URL
+
+使用路由处理器接收来自第三方应用程序的事件通知。
+
+例如，当内容在 CMS 中更改时重新验证路由。配置 CMS 在更改时调用特定端点。
+
+```ts filename="/app/webhook/route.ts" switcher
+import { type NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const token = request.nextUrl.searchParams.get('token')
+
+  if (token !== process.env.REVALIDATE_SECRET_TOKEN) {
+    return NextResponse.json({ success: false }, { status: 401 })
+  }
+
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (!tag) {
+    return NextResponse.json({ success: false }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return NextResponse.json({ success: true })
+}
+```
+
+```js filename="/app/webhook/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  const token = request.nextUrl.searchParams.get('token')
+
+  if (token !== process.env.REVALIDATE_SECRET_TOKEN) {
+    return NextResponse.json({ success: false }, { status: 401 })
+  }
+
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (!tag) {
+    return NextResponse.json({ success: false }, { status: 400 })
+  }
+
+  revalidateTag(tag)
+
+  return NextResponse.json({ success: true })
+}
+```
+
+回调 URL 是另一个用例。当用户完成第三方流程后，第三方会将其发送到回调 URL。使用路由处理器验证响应并决定将用户重定向到哪里。
+
+```ts filename="/app/auth/callback/route.ts" switcher
+import { type NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const token = request.nextUrl.searchParams.get('session_token')
+  const redirectUrl = request.nextUrl.searchParams.get('redirect_url')
+
+  const response = NextResponse.redirect(new URL(redirectUrl, request.url))
+
+  response.cookies.set({
+    value: token,
+    name: '_token',
+    path: '/',
+    secure: true,
+    httpOnly: true,
+    expires: undefined, // session cookie
+  })
+
+  return response
+}
+```
+
+```js filename="/app/auth/callback/route.js" switcher
+import { NextResponse } from 'next/server'
+
+export async function GET(request) {
+  const token = request.nextUrl.searchParams.get('session_token')
+  const redirectUrl = request.nextUrl.searchParams.get('redirect_url')
+
+  const response = NextResponse.redirect(new URL(redirectUrl, request.url))
+
+  response.cookies.set({
+    value: token,
+    name: '_token',
+    path: '/',
+    secure: true,
+    httpOnly: true,
+    expires: undefined, // session cookie
+  })
+
+  return response
+}
+```
+
+## 重定向
+
+```ts filename="app/api/route.ts" switcher
+import { redirect } from 'next/navigation'
+
+export async function GET(request: Request) {
+  redirect('https://nextjs.org/')
+}
+```
+
+```js filename="app/api/route.js" switcher
+import { redirect } from 'next/navigation'
+
+export async function GET(request) {
+  redirect('https://nextjs.org/')
+}
+```
+
+了解更多关于重定向的信息，请参阅 [`redirect`](/docs/app/api-reference/functions/redirect) 和 [`permanentRedirect`](/docs/app/api-reference/functions/permanentRedirect)。
+
+## 代理 (Proxy)
+
+每个项目只允许一个 `proxy` 文件。使用 `config.matcher` 来定位特定路径。了解更多关于 [`proxy`](/docs/app/api-reference/file-conventions/proxy) 的信息。
+
+使用 `proxy` 在请求到达路由路径之前生成响应。
+
+```ts filename="proxy.ts" switcher
+import { isAuthenticated } from '@lib/auth'
+
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function proxy(request: Request) {
+  if (!isAuthenticated(request)) {
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { isAuthenticated } from '@lib/auth'
+
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function proxy(request) {
+  if (!isAuthenticated(request)) {
+    return Response.json(
+      { success: false, message: 'authentication failed' },
+      { status: 401 }
+    )
+  }
+}
+```
+
+您还可以使用 `proxy` 来代理请求：
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request: Request) {
+  if (request.nextUrl.pathname === '/proxy-this-path') {
+    const rewriteUrl = new URL('https://nextjs.org')
+    return NextResponse.rewrite(rewriteUrl)
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  if (request.nextUrl.pathname === '/proxy-this-path') {
+    const rewriteUrl = new URL('https://nextjs.org')
+    return NextResponse.rewrite(rewriteUrl)
+  }
+}
+```
+
+`proxy` 可以产生的另一种响应类型是重定向：
+
+```ts filename="proxy.ts" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request: Request) {
+  if (request.nextUrl.pathname === '/v1/docs') {
+    request.nextUrl.pathname = '/v2/docs'
+    return NextResponse.redirect(request.nextUrl)
+  }
+}
+```
+
+```js filename="proxy.js" switcher
+import { NextResponse } from 'next/server'
+
+export function proxy(request) {
+  if (request.nextUrl.pathname === '/v1/docs') {
+    request.nextUrl.pathname = '/v2/docs'
+    return NextResponse.redirect(request.nextUrl)
+  }
+}
+```
+
+## 安全性
+
+### 处理头部
+
+要慎重决定头部的去向，并避免将传入的请求头部直接传递到传出的响应中。
+
+- **上游请求头部**：在代理中，`NextResponse.next({ request: { headers } })` 会修改您的服务器收到的头部，而不会将它们暴露给客户端。
+- **响应头部**：`new Response(..., { headers })`、`NextResponse.json(..., { headers })`、`NextResponse.next({ headers })` 或 `response.headers.set(...)` 会将头部发送回客户端。如果敏感值被附加到这些头部，它们将对客户端可见。
+
+了解更多关于 [代理中的 NextResponse 头部](/docs/app/api-reference/functions/next-response#next)。
+
+### 速率限制
+
+您可以在 Next.js 后端实现速率限制。除了基于代码的检查外，请启用主机提供的任何速率限制功能。
+
+```ts filename="/app/resource/route.ts" switcher
+import { NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/rate-limit'
+
+export async function POST(request: Request) {
+  const { rateLimited } = await checkRateLimit(request)
+
+  if (rateLimited) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+  }
+
+  return new Response(null, { status: 204 })
+}
+```
+
+```js filename="/app/resource/route.js" switcher
+import { NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/rate-limit'
+
+export async function POST(request) {
+  const { rateLimited } = await checkRateLimit(request)
+
+  if (rateLimited) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+  }
+
+  return new Response(null, { status: 204 })
+}
+```
+
+### 验证负载
+
+永远不要信任传入的请求数据。在使用前验证内容类型和大小，并针对 XSS 进行清理。
+
+使用超时来防止滥用并保护服务器资源。
+
+将用户生成的静态资源存储在专用服务中。尽可能从浏览器上传它们，并将返回的 URI 存储在数据库中以减少请求大小。
+
+### 访问受保护资源
+
+在授予访问权限之前，始终验证凭证。不要仅依赖代理进行身份验证和授权。
+
+从响应和后端日志中移除敏感或不必要的数据。
+
+定期轮换凭证和 API 密钥。
+
+## 预检请求
+
+预检请求使用 `OPTIONS` 方法来询问服务器是否允许基于来源、方法和头部的请求。
+
+如果未定义 `OPTIONS`，Next.js 会自动添加它，并根据其他定义的方法设置 `Allow` 头部。
+
+- [CORS](/docs/app/api-reference/file-conventions/route#cors)
+
+## 库模式
+
+社区库通常为路由处理器使用工厂模式。
+
+```ts filename="/app/api/[...path]/route.ts"
+import { createHandler } from 'third-party-library'
+
+const handler = createHandler({
+  /* library-specific options */
+})
+
+export const GET = handler
+// or
+export { handler as POST }
+```
+
+这为 `GET` 和 `POST` 请求创建了一个共享的处理程序。该库根据请求中的 `method` 和 `pathname` 自定义行为。
+
+库也可以提供一个 `proxy` 工厂。
+
+```ts filename="proxy.ts"
+import { createMiddleware } from 'third-party-library'
+
+export default createMiddleware()
+```
+
+> **须知**：第三方库可能仍然将 `proxy` 称为 `middleware`。
+
+## 更多示例
+
+查看更多关于使用[路由处理器](/docs/app/api-reference/file-conventions/route#examples)和 [`proxy`](/docs/app/api-reference/file-conventions/proxy#examples) API 参考的示例。
+
+这些示例包括：处理 [Cookies](/docs/app/api-reference/file-conventions/route#cookies)、[Headers](/docs/app/api-reference/file-conventions/route#headers)、[Streaming](/docs/app/api-reference/file-conventions/route#streaming)、代理[否定匹配](/docs/app/api-reference/file-conventions/proxy#negative-matching)以及其他有用的代码片段。
+
+## 注意事项
+
+### 服务器组件
+
+在服务器组件中直接从数据源获取数据，而不是通过路由处理器。
+
+对于在构建时预渲染的服务器组件，使用路由处理器将导致构建步骤失败。这是因为在构建时没有服务器来监听这些请求。
+
+对于按需渲染的服务器组件，从路由处理器获取数据会更慢，因为处理器和渲染过程之间存在额外的 HTTP 往返。
+
+> 服务器端的 `fetch` 请求使用绝对 URL。这意味着需要一次 HTTP 往返到外部服务器。在开发期间，您自己的开发服务器充当外部服务器。在构建时没有服务器，而在运行时，服务器通过您的公开域名可用。
+
+服务器组件涵盖了大多数数据获取需求。然而，客户端获取数据可能对于以下情况是必要的：
+
+- 依赖于客户端专属 Web API 的数据：
+  - 地理定位 API
+  - 存储 API
+  - 音频 API
+  - 文件 API
+- 频繁轮询的数据
+
+对于这些情况，请使用像 [`swr`](https://swr.vercel.app/) 或 [`react-query`](https://tanstack.com/query/latest/docs/framework/react/overview) 这样的社区库。
+
+### 服务器操作
+
+服务器操作允许您从客户端运行服务器端代码。它们的主要目的是从您的前端客户端变更数据。
+
+服务器操作是排队执行的。将它们用于数据获取会引入顺序执行。
+
+### `export` 模式
+
+`export` 模式输出一个没有运行时服务器的静态站点。需要 Next.js 运行时的功能[不受支持](/docs/app/guides/static-exports#unsupported-features)，因为此模式生成静态站点，没有运行时服务器。
+
+在 `export` 模式下，仅支持 `GET` 路由处理器，并结合将 [`dynamic`](/docs/app/guides/caching-without-cache-components#dynamic) 路由段配置设置为 `'force-static'`。
+
+这可用于生成静态 HTML、JSON、TXT 或其他文件。
+
+```js filename="app/hello-world/route.ts"
+export const dynamic = 'force-static'
+
+export function GET() {
+  return new Response('Hello World', { status: 200 })
+}
+```
+
+### 部署环境
+
+某些主机将路由处理器部署为 lambda 函数。这意味着：
+
+- 路由处理器无法在请求之间共享数据。
+- 环境可能不支持写入文件系统。
+- 长时间运行的处理器可能会因超时而终止。
+- WebSocket 将无法工作，因为连接会在超时后关闭，或在响应生成后关闭。

@@ -509,6 +509,63 @@ export async function translateJson(
     nodeTypes: Record<string, string>;
   },
 ): Promise<JsonTranslateResult> {
+  const entries = Object.entries(opts.uncached);
+  const CHUNK_SIZE = 50;
+
+  // If small enough, translate in one shot
+  if (entries.length <= CHUNK_SIZE) {
+    return translateJsonChunk(opts);
+  }
+
+  // Split into chunks and translate sequentially
+  const allTranslations: Record<string, string> = {};
+  const allMissing: string[] = [];
+  const allExtra: string[] = [];
+
+  const chunks: Record<string, string>[] = [];
+  for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+    const chunkEntries = entries.slice(i, i + CHUNK_SIZE);
+    chunks.push(Object.fromEntries(chunkEntries));
+  }
+
+  console.log(
+    `   📦 Splitting ${entries.length} nodes into ${chunks.length} chunks of ≤${CHUNK_SIZE}`,
+  );
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const chunkNodeTypes: Record<string, string> = {};
+    for (const md5 of Object.keys(chunk)) {
+      chunkNodeTypes[md5] = opts.nodeTypes[md5] ?? 'paragraph';
+    }
+
+    const result = await translateJsonChunk({
+      ...opts,
+      uncached: chunk,
+      nodeTypes: chunkNodeTypes,
+    });
+
+    Object.assign(allTranslations, result.translations);
+    allMissing.push(...result.missing);
+    allExtra.push(...result.extra);
+  }
+
+  return {
+    translations: allTranslations,
+    missing: allMissing,
+    extra: allExtra,
+  };
+}
+
+/**
+ * Translate a single chunk of nodes via JSON mode.
+ */
+async function translateJsonChunk(
+  opts: TranslateOptions & {
+    uncached: Record<string, string>;
+    nodeTypes: Record<string, string>;
+  },
+): Promise<JsonTranslateResult> {
   const systemPrompt = buildJsonPrompt({
     langName: opts.langName,
     guide: opts.guide,
@@ -580,6 +637,18 @@ export async function translateJson(
         console.warn(
           `⚠️ JSON translation has ${extra.length} extra keys (ignored)`,
         );
+        if (missing.length > requestedMd5s.length * 0.5) {
+          console.warn('   Extra key samples:');
+          for (const k of extra.slice(0, 3)) {
+            console.warn(
+              `     ${k.substring(0, 16)}… = ${String(parsed[k]).substring(0, 60).replace(/\n/g, '↵')}`,
+            );
+          }
+          console.warn('   Expected key samples:');
+          for (const k of requestedMd5s.slice(0, 3)) {
+            console.warn(`     ${k.substring(0, 16)}…`);
+          }
+        }
       }
 
       // Filter to only requested keys

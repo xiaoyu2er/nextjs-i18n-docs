@@ -1,34 +1,128 @@
 ---
-source-updated-at: 2025-05-16T04:52:11.000Z
-translation-updated-at: 2025-05-19T23:02:42.259Z
-title: 如何优化包打包
-nav_title: 包打包
-description: 学习如何优化应用的服务器端和客户端打包。
+title: 优化包构建
+nav_title: Package Bundling
+description: 学习如何使用 Turbopack 的 Next.js 包分析器 (Next.js Bundle Analyzer for Turbopack) 和 Webpack 的 `@next/bundle-analyzer` 插件来分析并优化应用的服务器与客户端构建。
 related:
-  description: 了解更多关于为生产环境优化应用的信息。
+  description: Learn more about optimizing your application for production.
   links:
     - app/guides/production-checklist
 ---
 
-打包外部包可以显著提升应用性能。<AppOnly>默认情况下，Next.js 会自动打包在服务端组件 (Server Components) 和路由处理器 (Route Handlers) 中导入的包。本指南将带您分析并进一步优化包打包。</AppOnly> <PagesOnly>默认情况下，应用中导入的包不会被自动打包。如果外部包未预先打包（例如从 monorepo 或 `node_modules` 导入），这可能会影响性能或导致无法运行。本指南将带您分析并配置包打包。</PagesOnly>
+打包是将应用代码及其依赖项合并为客户端和服务器的优化输出文件的过程。更小的构建加载更快，减少 JavaScript 执行时间，改善 [核心网络指标 (Core Web Vitals)](https://web.dev/articles/vitals)，并降低服务器冷启动时间。
 
-## 分析 JavaScript 包
+Next.js 通过代码分割、摇树优化等技术自动优化构建。然而，在某些情况下您可能需要手动优化构建。
 
-[`@next/bundle-analyzer`](https://www.npmjs.com/package/@next/bundle-analyzer) 是 Next.js 的一个插件，可帮助您管理应用包的大小。它会生成每个包及其依赖项大小的可视化报告。您可利用这些信息移除大型依赖项、拆分代码或进行[懒加载 (lazy-load)](/docs/app/guides/lazy-loading)。
+有两个工具可以分析您的应用构建：
 
-### 安装
+- [Turbopack 专用 Next.js 包分析器 (实验性) (#nextjs-bundle-analyzer-experimental)](#nextjs-bundle-analyzer-experimental)
+- [Webpack 的 `@next/bundle-analyzer` 插件](#nextbundle-analyzer-for-webpack)
 
-运行以下命令安装插件：
+本指南将介绍如何使用每个工具，以及如何 [优化大型构建](#optimizing-large-bundles)。
 
-```bash
-npm i @next/bundle-analyzer
-# 或
-yarn add @next/bundle-analyzer
-# 或
+## Next.js Bundle Analyzer (实验性)
+
+> 支持 v16.1 及更高版本。您可以在 [专用的 GitHub 讨论](https://github.com/vercel/next.js/discussions/86731) 中分享反馈，并查看 [turbopack-bundle-analyzer-demo.vercel.sh](https://turbopack-bundle-analyzer-demo.vercel.sh/) 上的演示。
+
+Next.js Bundle Analyzer 与 Turbopack 的模块图集成。您可以使用精确的导入追踪来检查服务器和客户端模块，从而更容易找到大型依赖项。打开交互式 Bundle Analyzer 演示以探索模块图。
+
+### 第一步：运行 Turbopack Bundle Analyzer
+
+要开始使用，请运行以下命令并在浏览器中打开交互式视图。
+
+```bash filename="Terminal" package="npm"
+npx next experimental-analyze
+```
+
+```bash filename="Terminal" package="yarn"
+yarn next experimental-analyze
+```
+
+```bash filename="Terminal" package="pnpm"
+pnpm next experimental-analyze
+```
+
+```bash filename="Terminal" package="bun"
+bunx next experimental-analyze
+```
+
+### 第二步：过滤和检查模块
+
+在 UI 中，您可以按路由、环境（客户端或服务器）和类型（JavaScript, CSS, JSON）进行过滤，或按文件搜索：
+
+<Video
+  caption="Next.js 包分析器 UI 演示"
+  src="/videos/bundle-analyzer.mp4"
+  width={1708}
+  height={1080}
+/>
+
+### 第三步：使用导入链追踪模块
+
+树状图将每个模块显示为矩形。模块的大小由矩形的面积表示。
+
+点击模块以查看其大小，检查其完整的导入链，并查看它在应用中确切的使用位置：
+
+<Image
+  caption="Next.js Bundle Analyzer 导入链视图"
+  srcLight="/docs/light/bundle-analyzer.png"
+  srcDark="/docs/dark/bundle-analyzer.png"
+  width={1600}
+  height={874}
+/>
+
+### 第四步：将输出写入磁盘以便共享或比较差异
+
+如果您想与队友分享分析结果，或在优化前后比较构建大小，您可以跳过交互式视图，并使用 `--output` 标志将分析保存为静态文件：
+
+```bash filename="Terminal" package="npm"
+npx next experimental-analyze --output
+```
+
+```bash filename="Terminal" package="yarn"
+yarn next experimental-analyze --output
+```
+
+```bash filename="Terminal" package="pnpm"
+pnpm next experimental-analyze --output
+```
+
+```bash filename="Terminal" package="bun"
+bunx next experimental-analyze --output
+```
+
+此命令将输出写入 `.next/diagnostics/analyze`。您可以将此目录复制到其他位置以比较结果：
+
+```bash filename="Terminal"
+cp -r .next/diagnostics/analyze ./analyze-before-refactor
+```
+
+> Bundle Analyzer 还有更多选项，完整列表请参见 Next.js CLI 参考文档。
+
+## Webpack 的 `@next/bundle-analyzer`
+
+`[`@next/bundle-analyzer`](https://www.npmjs.com/package/@next/bundle-analyzer)` 是一个插件，可帮助您管理应用构建的大小。它会生成每个包及其依赖项大小的可视化报告。您可以使用这些信息来删除大型依赖项、拆分或 [懒加载](/docs/app/guides/lazy-loading) 代码。
+
+### 第一步：安装
+
+运行以下命令来安装该插件：
+
+```bash package="pnpm"
 pnpm add @next/bundle-analyzer
 ```
 
-然后，将打包分析器的配置添加到 `next.config.js`：
+```bash package="npm"
+npm install @next/bundle-analyzer
+```
+
+```bash package="yarn"
+yarn add @next/bundle-analyzer
+```
+
+```bash package="bun"
+bun add @next/bundle-analyzer
+```
+
+然后，将包分析器的设置添加到您的 `next.config.js` 文件中。
 
 ```js filename="next.config.js"
 /** @type {import('next').NextConfig} */
@@ -41,25 +135,27 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 module.exports = withBundleAnalyzer(nextConfig)
 ```
 
-### 生成报告
+### 第二步：生成报告
 
-运行以下命令分析您的包：
+运行以下命令来分析您的包：
 
 ```bash
 ANALYZE=true npm run build
-# 或
+# or
 ANALYZE=true yarn build
-# 或
+# or
 ANALYZE=true pnpm build
 ```
 
-报告将在浏览器中打开三个新标签页供您检查。定期评估应用的包有助于长期保持应用性能。
+报告将在浏览器中打开三个新标签页，您可以在其中进行检查。
 
-## 优化包导入
+## 优化大型构建
 
-某些包（如图标库）可能导出数百个模块，这会在开发和生产环境中引发性能问题。
+一旦您识别出大型模块，解决方案将取决于您的用例。以下是常见原因及解决方法：
 
-您可以通过在 `next.config.js` 中添加 [`optimizePackageImports`](/docs/app/api-reference/config/next-config-js/optimizePackageImports) 选项来优化这些包的导入方式。该选项仅加载您实际使用的模块，同时仍允许您使用包含多个命名导出的导入语句。
+### 导出项较多的包
+
+如果您正在使用导出数百个模块的包（例如图标和实用程序库），您可以在 `next.config.js` 文件中使用 [`optimizePackageImports`](/docs/app/api-reference/config/next-config-js/optimizePackageImports) 选项来优化这些导入的解析方式。此选项将仅加载您 _实际_ 使用的模块，同时仍提供编写包含许多命名导入的导入语句的便利。
 
 ```js filename="next.config.js"
 /** @type {import('next').NextConfig} */
@@ -72,13 +168,109 @@ const nextConfig = {
 module.exports = nextConfig
 ```
 
-Next.js 还会自动优化部分库，因此它们无需包含在 optimizePackageImports 列表中。查看[完整列表](https://nextjs.org/docs/app/api-reference/config/next-config-js/optimizePackageImports)。
+> **小提示：** Next.js 还会自动优化一些库，因此它们不需要包含在 `optimizePackageImports` 列表中。查看 [完整列表](/docs/app/api-reference/config/next-config-js/optimizePackageImports) 以了解受支持的包。
+
+### 重型客户端负载
+
+客户端构建过大的一个常见原因是在客户端组件中执行昂贵的渲染工作。这通常发生在仅用于将数据转换为 UI 的库中，例如语法高亮、图表渲染或 Markdown 解析。
+
+如果该工作不需要浏览器 API 或用户交互，可以在服务器组件中运行。
+
+在此示例中，基于 Prism 的高亮器在客户端组件中运行。尽管最终输出只是一个 `<code>` 块，但整个高亮库都被打包到客户端 JavaScript 构建中：
+
+```tsx filename="app/blog/[slug]/page.tsx"
+'use client'
+
+import Highlight from 'prism-react-renderer'
+import theme from 'prism-react-renderer/themes/github'
+
+export default function Page() {
+  const code = `export function hello() {
+    console.log("hi")
+  }`
+
+  return (
+    <article>
+      <h1>Blog Post Title</h1>
+
+      {/* The prism package and its tokenization logic are shipped to the client */}
+      <Highlight code={code} language="tsx" theme={theme}>
+        {({ className, style, tokens, getLineProps, getTokenProps }) => (
+          <pre className={className} style={style}>
+            <code>
+              {tokens.map((line, i) => (
+                <div key={i} {...getLineProps({ line })}>
+                  {line.map((token, key) => (
+                    <span key={key} {...getTokenProps({ token })} />
+                  ))}
+                </div>
+              ))}
+            </code>
+          </pre>
+        )}
+      </Highlight>
+    </article>
+  )
+}
+```
+
+这增加了构建大小，因为客户端必须下载并执行高亮库，即使结果是静态 HTML。
+
+相反，将高亮逻辑移动到服务器组件并在服务器上渲染最终的 HTML。客户端将只接收渲染后的标记。
+
+```tsx filename="app/blog/[slug]/page.tsx"
+import { codeToHtml } from 'shiki'
+
+export default async function Page() {
+  const code = `export function hello() {
+    console.log("hi")
+  }`
+
+  // The Shiki package runs on the server and is never bundled for the client.
+  const highlightedHtml = await codeToHtml(code, {
+    lang: 'tsx',
+    theme: 'github-dark',
+  })
+
+  return (
+    <article>
+      <h1>Blog Post Title</h1>
+
+      {/* Client receives plain markup */}
+      <pre>
+        <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+      </pre>
+    </article>
+  )
+}
+```
+
+<AppOnly>
+
+### 特定包排除在构建之外
+
+在服务器组件和路由处理器中导入的包会被 Next.js 自动打包。
+
+您可以在 `next.config.js` 中使用 [`serverExternalPackages`](/docs/app/api-reference/config/next-config-js/serverExternalPackages) 选项来将特定包排除在构建之外。
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  serverExternalPackages: ['package-name'],
+}
+
+module.exports = nextConfig
+```
+
+</AppOnly>
 
 <PagesOnly>
 
-## 打包特定包
+### 未预打包的外部包
 
-要打包特定包，您可以在 `next.config.js` 中使用 [`transpilePackages`](/docs/app/api-reference/config/next-config-js/transpilePackages) 选项。此选项适用于打包未预先打包的外部包，例如来自 monorepo 或 `node_modules` 的包。
+默认情况下，导入到您的应用中的包不会被打包。如果外部包未预打包（例如，从 monorepo 或 `node_modules` 导入），这可能会影响性能。
+
+若要打包特定包，您可以在 `next.config.js` 中使用 [`transpilePackages`](/docs/app/api-reference/config/next-config-js/transpilePackages) 选项。
 
 ```js filename="next.config.js"
 /** @type {import('next').NextConfig} */
@@ -89,9 +281,7 @@ const nextConfig = {
 module.exports = nextConfig
 ```
 
-## 打包所有包
-
-要自动打包所有包（应用路由 (App Router) 中的默认行为），您可以在 `next.config.js` 中使用 [`bundlePagesRouterDependencies`](/docs/pages/api-reference/config/next-config-js/bundlePagesRouterDependencies) 选项。
+若要自动打包所有包，您可以在 `next.config.js` 中使用 [`bundlePagesRouterDependencies`](/docs/pages/api-reference/config/next-config-js/bundlePagesRouterDependencies) 选项。
 
 ```js filename="next.config.js"
 /** @type {import('next').NextConfig} */
@@ -102,16 +292,16 @@ const nextConfig = {
 module.exports = nextConfig
 ```
 
-## 排除特定包不参与打包
+### 特定包排除在构建之外
 
-如果启用了 [`bundlePagesRouterDependencies`](/docs/pages/api-reference/config/next-config-js/bundlePagesRouterDependencies) 选项，您可以通过在 `next.config.js` 中使用 [`serverExternalPackages`](/docs/pages/api-reference/config/next-config-js/serverExternalPackages) 选项将特定包排除在自动打包之外：
+如果您识别出不应包含在构建中的包，您可以在 `next.config.js` 中使用 [`serverExternalPackages`](/docs/pages/api-reference/config/next-config-js/serverExternalPackages) 选项将特定包排除在自动构建之外：
 
 ```js filename="next.config.js"
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 在页面路由 (Pages Router) 中自动打包外部包：
+  // Automatically bundle external packages:
   bundlePagesRouterDependencies: true,
-  // 为应用路由和页面路由排除特定包不参与打包：
+  // Opt specific packages out of bundling:
   serverExternalPackages: ['package-name'],
 }
 
@@ -120,21 +310,3 @@ module.exports = nextConfig
 
 </PagesOnly>
 
-<AppOnly>
-
-## 排除特定包不参与打包
-
-由于 Next.js 会自动打包在服务端组件和路由处理器中导入的包，您可以通过在 `next.config.js` 中使用 [`serverExternalPackages`](/docs/app/api-reference/config/next-config-js/serverExternalPackages) 选项将特定包排除在打包之外。
-
-```js filename="next.config.js"
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  serverExternalPackages: ['package-name'],
-}
-
-module.exports = nextConfig
-```
-
-Next.js 包含一个当前正在兼容性改进中的流行包列表，这些包会自动被排除。查看[完整列表](/docs/app/api-reference/config/next-config-js/serverExternalPackages)。
-
-</AppOnly>
