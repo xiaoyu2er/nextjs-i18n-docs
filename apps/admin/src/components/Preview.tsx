@@ -209,9 +209,8 @@ export function Preview({
           )}
 
           {blocks.map((block, i) => {
-            // Skip gap blocks (whitespace/comments between nodes)
-            if (!block.md5 && showGutter) return null;
-
+            const isGap = !block.md5;
+            const isBlank = isGap && !block.source.trim();
             const isHighlighted = block.md5 && block.md5 === highlightMd5;
             const h = extractHeading(block.source, 'b', i);
             const blockId = block.md5
@@ -223,18 +222,22 @@ export function Preview({
                 // biome-ignore lint/suspicious/noArrayIndexKey: static block order
                 key={i}
                 id={blockId}
-                className={`block-row${isHighlighted ? ' block-highlight' : ''}`}
+                className={`block-row${isHighlighted ? ' block-highlight' : ''}${isBlank ? ' block-blank' : ''}${isGap && !isBlank ? ' block-gap' : ''}`}
                 style={{ gridTemplateColumns: gridCols }}
               >
                 {showGutter && (
                   <span className="block-gutter">
-                    {block.md5 && (
+                    {block.md5 ? (
                       <code
                         className={`gutter-md5 ${block.translation != null ? 'done' : 'miss'}`}
                         title={`${block.type} · ${block.md5}`}
                       >
                         {block.md5.slice(0, 6)}
                       </code>
+                    ) : isBlank ? (
+                      <span className="gutter-blank" />
+                    ) : (
+                      <span className="gutter-gap">{block.type}</span>
                     )}
                   </span>
                 )}
