@@ -73,13 +73,6 @@ RULES:
 3. Keep ALL other content (already translated text, code blocks, HTML tags) EXACTLY as-is — do not modify a single character
 4. Preserve all Markdown formatting, heading levels, links, inline code
 5. Keep code blocks, file paths, URLs, variable names unchanged
-6. For frontmatter (YAML between ---):
-   - Translate ONLY the values, keep all keys unchanged
-   - Keep the exact same keys in the exact same order
-   - Do NOT add or remove any frontmatter fields
-   - Do NOT wrap values in quotes unless the original had quotes
-   - Keep the --- delimiters exactly as-is
-7. NEVER start a frontmatter value with backticks, quotes, or special characters
 
 CRITICAL STRUCTURE RULES:
 8. PRESERVE BLANK LINES EXACTLY. Every blank line in the input MUST appear in the output at the same position. Blank lines separate paragraphs, code blocks, headings, and lists — removing them merges content and BREAKS the document structure.
@@ -406,7 +399,7 @@ TASK: Translate the provided nodes to ${opts.langName} and return as JSON.
 
 INPUT: A JSON object with a "nodes" array. Each node has:
 - "key": unique identifier (use as key in your response)
-- "type": one of frontmatter, heading, paragraph, list, blockquote, html
+- "type": one of heading, paragraph, list, blockquote, html
 - "text": the content to translate
 
 OUTPUT: A single valid JSON object mapping each key to its translation. No other text.
@@ -421,17 +414,14 @@ RULES:
 7. CRITICAL: Inline code wrapped in backticks (\`...\`) MUST keep the backticks. Example: \`<Link>\` must stay as \`<Link>\`, NOT become bare <Link>. Bare HTML tags will BREAK the document.
 
 TYPE-SPECIFIC RULES:
-- "frontmatter": YAML metadata. Translate values ONLY. Keys like "title:", "description:" MUST stay in English.
-  NEVER translate YAML keys. Output: "title: 翻译后的标题" NOT "标题: ..."
-  CRITICAL: Never start a value with \` ' " or use : in values. Must be valid YAML.
 - "heading": Keep ## or ### prefix exactly as original.
 - "list": Keep - or 1. markers and indentation.
 - "blockquote": Keep > prefix.
 - "html": Translate human text only. Keep all tags/attributes unchanged.
 
 EXAMPLE:
-Input: {"nodes":[{"key":"a1","type":"frontmatter","text":"title: Getting Started\\ndescription: Learn Next.js\\n---"},{"key":"b2","type":"heading","text":"## Installation"},{"key":"c3","type":"paragraph","text":"Run the following command:"}]}
-Output: {"a1":"title: 入门指南\\ndescription: 学习 Next.js\\n---","b2":"## 安装","c3":"运行以下命令："}`;
+Input: {"nodes":[{"key":"b2","type":"heading","text":"## Installation"},{"key":"c3","type":"paragraph","text":"Run the following command:"}]}
+Output: {"b2":"## 安装","c3":"运行以下命令："}`;
 
   if (opts.docsContext) {
     prompt += `\n\nCONTEXT:\n${opts.docsContext}`;
@@ -448,100 +438,6 @@ Output: {"a1":"title: 入门指南\\ndescription: 学习 Next.js\\n---","b2":"##
  * Build structured JSON user message from uncached nodes.
  * Each node gets a type based on its AST classification.
  */
-/**
- * Extract only translatable fields from frontmatter YAML.
- * Only title and description need translation.
- * Other fields (author, date, image, etc.) are kept as-is.
- */
-function extractTranslatableFrontmatter(text: string): {
-  translatable: string;
-  template: string;
-} {
-  const lines = text.split('\n');
-  const titleLine = lines.find((l) => l.startsWith('title:'));
-  const descLines: string[] = [];
-  let inDesc = false;
-  for (const line of lines) {
-    if (line.startsWith('description:')) {
-      inDesc = true;
-      descLines.push(line);
-    } else if (inDesc && (line.startsWith('  ') || line.startsWith('\t'))) {
-      descLines.push(line);
-    } else {
-      inDesc = false;
-    }
-  }
-  const translatable =
-    (titleLine || '') + (descLines.length ? `\n${descLines.join('\n')}` : '');
-  return { translatable, template: text };
-}
-
-/**
- * Rebuild full frontmatter by replacing title/description with translations.
- */
-export function rebuildFrontmatter(
-  original: string,
-  translated: string,
-): string {
-  const lines = original.split('\n');
-  const transLines = translated.split('\n');
-
-  // Extract translated title and description
-  // LLM might translate YAML keys (e.g., "标题:" instead of "title:").
-  // Try English keys first, then fall back to detecting translated keys.
-  let transTitle = transLines.find((l) => l.startsWith('title:'));
-  if (!transTitle) {
-    // Find first non-empty line that looks like a key:value (translated key)
-    const firstKV = transLines.find(
-      (l) => l.match(/^[^\s:]+[:：]\s*.+/) && !l.startsWith('description'),
-    );
-    if (firstKV) {
-      // Extract value and reconstruct with English key
-      const val = firstKV.replace(/^[^\s:：]+[:：]\s*/, '');
-      transTitle = `title: ${val}`;
-    }
-  }
-
-  const transDescLines: string[] = [];
-  let inDesc = false;
-  for (const line of transLines) {
-    if (
-      line.startsWith('description:') ||
-      (line.match(/^[^\s:-]+[:：]\s*>-?\s*$/) && !line.startsWith('---'))
-    ) {
-      inDesc = true;
-      // Normalize key to English
-      if (!line.startsWith('description:')) {
-        transDescLines.push(line.replace(/^[^\s:：]+[:：]/, 'description:'));
-      } else {
-        transDescLines.push(line);
-      }
-    } else if (inDesc && (line.startsWith('  ') || line.startsWith('\t'))) {
-      transDescLines.push(line);
-    } else {
-      inDesc = false;
-    }
-  }
-
-  // Replace in original
-  const result: string[] = [];
-  let skipDesc = false;
-  for (const line of lines) {
-    if (line.startsWith('title:') && transTitle) {
-      result.push(transTitle);
-    } else if (line.startsWith('description:')) {
-      skipDesc = true;
-      result.push(...transDescLines);
-    } else if (skipDesc && (line.startsWith('  ') || line.startsWith('\t'))) {
-      // skip continuation of original description
-    } else {
-      skipDesc = false;
-      result.push(line);
-    }
-  }
-  return result.join('\n');
-}
-
 export function buildJsonUserMessage(
   uncached: Record<string, string>,
   nodeTypes: Record<string, string>,
@@ -549,16 +445,7 @@ export function buildJsonUserMessage(
   const nodes: TranslationNode[] = [];
   for (const [md5, text] of Object.entries(uncached)) {
     const type = nodeTypes[md5] ?? 'paragraph';
-    let simpleType = type;
-    let nodeText = text;
-
-    if (text.includes('title:') && text.includes('---')) {
-      simpleType = 'frontmatter';
-      // Only send translatable fields (title + description)
-      const { translatable } = extractTranslatableFrontmatter(text);
-      nodeText = translatable;
-    }
-    nodes.push({ key: md5, type: simpleType, text: nodeText });
+    nodes.push({ key: md5, type, text });
   }
   return JSON.stringify({ nodes });
 }

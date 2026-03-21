@@ -42,7 +42,6 @@ import { TranslationCache } from './cache';
 import { validateMdx, validateMdxCompile } from './mdx-validator';
 import { parseMdx } from './parser';
 import {
-  rebuildFrontmatter,
   type TranslateOptions,
   translateJson,
   translateJsonChunk,
@@ -52,77 +51,6 @@ import { FileLogger, formatDuration, TableUI } from './ui';
 // Note: translateAssembled (legacy whole-file mode) still exported for backward compatibility
 
 // ── Helpers ──────────────────────────────────────────────────────────
-
-/**
- * Check if a node's source text looks like YAML frontmatter.
- */
-function isFrontmatter(text: string): boolean {
-  const t = text.trim();
-  return (
-    (t.includes('title:') || t.includes('description:')) && t.endsWith('---')
-  );
-}
-
-/**
- * Validate translated frontmatter is parseable YAML.
- * Returns false if YAML is broken (truncated, bad indentation, etc.)
- */
-function validateFrontmatter(translation: string): boolean {
-  try {
-    if (typeof translation !== 'string') return false;
-    const t = translation.trim();
-    // Strip trailing ---
-    const yamlContent = t.endsWith('---') ? t.slice(0, -3).trim() : t;
-    if (!yamlContent) return false;
-
-    // Quick checks before full parse
-    if (yamlContent.includes('NEEDS_TRANSLATION')) return false;
-    if (yamlContent.endsWith('author:')) return false; // truncated author list
-    // Reject full-width colons in YAML keys (LLM using Chinese punctuation)
-    if (/^[\w-]+：/m.test(yamlContent)) return false;
-
-    // Only validate translated fields (title, description)
-    const lines = yamlContent.split('\n');
-    for (const line of lines) {
-      const match = line.match(/^(title|description):\s*(.+)/);
-      if (match) {
-        const val = match[2];
-        if (val.startsWith('`')) return false;
-      }
-    }
-
-    // Check multiline YAML values have proper indentation
-    // e.g., description: >-\n  line1\n  line2 (all continuation lines must be indented)
-    let inMultiline = false;
-    let multilineIndent = 0;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.match(/^[\w-]+:\s*[>|]-?\s*$/)) {
-        // Start of multiline scalar (>-, |-, etc.)
-        inMultiline = true;
-        multilineIndent = 0;
-      } else if (inMultiline) {
-        if (line.trim() === '') continue;
-        const indent = line.match(/^(\s*)/)?.[1].length ?? 0;
-        if (multilineIndent === 0) {
-          multilineIndent = indent;
-        }
-        if (indent < multilineIndent && indent > 0) {
-          return false; // inconsistent indentation
-        }
-        if (indent === 0 && !line.match(/^[\w-]+:/)) {
-          return false; // non-indented continuation line
-        }
-        if (indent === 0 && line.match(/^[\w-]+:/)) {
-          inMultiline = false; // new key starts
-        }
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -407,22 +335,10 @@ async function translateFile(
     );
   }
   let newTranslations = 0;
-  let _badTranslations = 0;
+  const _badTranslations = 0;
   for (const [md5, translation] of Object.entries(jsonResult.translations)) {
-    const srcText = uncached[md5] ?? '';
-    let finalTranslation = translation;
-
-    // For frontmatter: LLM only translated title+description.
-    // Rebuild full frontmatter with original author/date/image fields.
-    if (isFrontmatter(srcText)) {
-      finalTranslation = rebuildFrontmatter(srcText, translation);
-      if (!validateFrontmatter(finalTranslation)) {
-        _badTranslations++;
-        const preview = finalTranslation.substring(0, 80).replace(/\n/g, '↵');
-        log(`⚠️ Bad YAML for ${md5.substring(0, 12)}…: ${preview}`);
-        continue;
-      }
-    }
+    const _srcText = uncached[md5] ?? '';
+    const finalTranslation = translation;
 
     // Sanity check: skip empty translations
     if (!finalTranslation.trim()) {
@@ -467,11 +383,6 @@ async function translateFile(
       for (const [md5, translation] of Object.entries(
         retryResult.translations,
       )) {
-        const srcText = uncached[md5] ?? '';
-        if (isFrontmatter(srcText) && !validateFrontmatter(translation)) {
-          log(`⚠️ Bad YAML in retry for ${md5.substring(0, 12)}…, skipping`);
-          continue;
-        }
         cache.set(opts.lang, md5, translation);
         newTranslations++;
       }
