@@ -267,16 +267,23 @@ export class TranslationCache {
     lang: string,
     version = 'latest',
     limit = 0,
+    files?: string[],
   ): { key: string; text: string; type: string }[] {
+    let fileFilter = '';
+    const params: unknown[] = [lang, version];
+    if (files && files.length > 0) {
+      fileFilter = ` AND sf.file IN (${files.map(() => '?').join(',')})`;
+      params.push(...files);
+    }
     const sql = `
       SELECT DISTINCT s.key, s.text, s.type
       FROM source_files sf
       JOIN sources s ON s.key = sf.key
       LEFT JOIN translations t ON t.key = sf.key AND t.lang = ?
-      WHERE sf.version = ? AND t.key IS NULL
+      WHERE sf.version = ? AND t.key IS NULL${fileFilter}
       ${limit > 0 ? `LIMIT ${limit}` : ''}
     `;
-    return this.db.prepare(sql).all(lang, version) as {
+    return this.db.prepare(sql).all(...params) as {
       key: string;
       text: string;
       type: string;

@@ -24,6 +24,7 @@
  *   --api-base-url <u>  API base URL override
  *   --max-tokens <n>    Max output tokens (default: 16384)
  *   --context-length <n> Model context window size (default: 32768)
+ *   --files <paths>     Comma-separated file paths to translate (MD5 mode only)
  *   --config <path>     Translation config file (default: translation.config.example.mjs)
  */
 import fs from 'node:fs';
@@ -66,6 +67,7 @@ interface CliOptions {
   cacheDir: string;
   lang: string;
   pattern: string;
+  files: string[];
   max: number;
   apiType: TranslateOptions['apiType'];
   apiBaseUrl: string;
@@ -142,6 +144,7 @@ function parseArgs(argv: string[]): CliOptions {
     cacheDir: path.resolve(PROJECT_ROOT, getOpt('cache-dir', '.cache')),
     lang: getOpt('lang', 'zh-hans'),
     pattern: getOpt('pattern', '**/*.mdx'),
+    files: getOpt('files', '').split(',').filter(Boolean),
     max: Number.parseInt(getOpt('max', '999999'), 10),
     apiType: getOpt('api-type', 'openrouter') as TranslateOptions['apiType'],
     apiBaseUrl: getOpt('api-base-url', ''),
@@ -1007,8 +1010,9 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
   const cache = new TranslationCache(opts.cacheDir);
   cache.load(lang);
 
-  // Get all untranslated keys from DB
-  const untranslated = cache.untranslatedKeys(lang, version);
+  // Get untranslated keys from DB (optionally filtered by files)
+  const fileFilter = opts.files.length > 0 ? opts.files : undefined;
+  const untranslated = cache.untranslatedKeys(lang, version, 0, fileFilter);
   console.log(
     `\n📦 ${untranslated.length} untranslated keys for ${version}/${lang}`,
   );

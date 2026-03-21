@@ -93,11 +93,9 @@ class JobManager {
       args.push('--model', opts.model);
     }
 
-    // Support specific file selection via glob brace expansion
+    // Pass specific files to translate
     if (opts.files && opts.files.length > 0) {
-      const pattern =
-        opts.files.length === 1 ? opts.files[0] : `{${opts.files.join(',')}}`;
-      args.push('--pattern', pattern);
+      args.push('--files', opts.files.join(','));
     }
 
     const proc = spawn('bun', args, {
