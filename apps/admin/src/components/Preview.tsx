@@ -96,6 +96,10 @@ function ContentBody({
   );
 }
 
+function truncate(s: string, max: number) {
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
 export type ViewMode = 'split' | 'en' | 'lang';
 
 interface Props {
@@ -106,6 +110,8 @@ interface Props {
   onViewMode: (m: ViewMode) => void;
   showToc: boolean;
   onToggleToc: () => void;
+  showNodes: boolean;
+  onToggleNodes: () => void;
   onClose?: () => void;
 }
 
@@ -117,6 +123,8 @@ export function Preview({
   onViewMode,
   showToc,
   onToggleToc,
+  showNodes,
+  onToggleNodes,
   onClose,
 }: Props) {
   const enRef = useRef<HTMLPreElement>(null);
@@ -127,6 +135,9 @@ export function Preview({
   const mode = isEn ? 'en' : viewMode;
 
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
+  const [nodeFilter, setNodeFilter] = useState<
+    'all' | 'missing' | 'translated'
+  >('all');
 
   const { data: enData } = useQuery({
     queryKey: ['content', version, 'en', file],
@@ -153,6 +164,13 @@ export function Preview({
     () => parseContent(transData?.content || '', 'tr'),
     [transData?.content],
   );
+
+  const filteredNodes = useMemo(() => {
+    if (!nodes) return [];
+    if (nodeFilter === 'missing') return nodes.filter((n) => !n.translation);
+    if (nodeFilter === 'translated') return nodes.filter((n) => n.translation);
+    return nodes;
+  }, [nodes, nodeFilter]);
 
   const syncScroll = useCallback(
     (source: HTMLElement | null, target: HTMLElement | null) => {
@@ -215,6 +233,9 @@ export function Preview({
         ? '1fr 180px'
         : '1fr';
 
+  const translatedCount = nodes?.filter((n) => n.translation).length ?? 0;
+  const totalCount = nodes?.length ?? 0;
+
   return (
     <div className="preview-wrap">
       {/* Header */}
@@ -267,11 +288,27 @@ export function Preview({
           >
             ☰
           </button>
+          {!isEn && (
+            <button
+              type="button"
+              className={showNodes ? 'active' : ''}
+              onClick={onToggleNodes}
+              title="Toggle nodes panel"
+            >
+              🧩
+            </button>
+          )}
         </div>
       </div>
 
       {/* Content panels + TOC */}
-      <div className="preview-split" style={{ gridTemplateColumns: gridCols }}>
+      <div
+        className="preview-split"
+        style={{
+          gridTemplateColumns: gridCols,
+          flex: showNodes ? '1 1 50%' : '1',
+        }}
+      >
         {showEnPane && (
           <div className="preview-pane">
             <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
@@ -294,78 +331,119 @@ export function Preview({
             )}
           </div>
         )}
-        {showToc && (tocHeadings.length > 0 || nodes) && (
+        {showToc && tocHeadings.length > 0 && (
           <div className="preview-toc">
-            {tocHeadings.length > 0 && (
-              <>
-                <div className="preview-toc-title">On this page</div>
-                {tocHeadings.map((h, idx) => (
-                  <a
-                    key={h.id}
-                    href={`#${h.id}`}
-                    className={`h${h.level}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      scrollToHeading(idx);
-                    }}
-                  >
-                    {h.text}
-                  </a>
-                ))}
-              </>
-            )}
-            {nodes && !isEn && (
-              <div className="preview-nodes">
-                <div className="preview-toc-title">
-                  Nodes ({nodes.filter((n) => n.translation).length}/
-                  {nodes.length})
-                </div>
-                {nodes.map((n) => (
-                  <div
-                    key={n.key}
-                    className={`node-item ${n.translation ? 'translated' : 'missing'} ${expandedNode === n.key ? 'expanded' : ''}`}
-                    onClick={() =>
-                      setExpandedNode(expandedNode === n.key ? null : n.key)
-                    }
-                    onKeyDown={() => {}}
-                  >
-                    <div className="node-summary">
-                      <span className="node-status">
-                        {n.translation ? '✅' : '❌'}
-                      </span>
-                      <span className="node-type">{n.type}</span>
-                      <code className="node-md5">{n.key.slice(0, 8)}</code>
-                    </div>
-                    {expandedNode === n.key && (
-                      <div className="node-detail">
-                        <div className="node-source">
-                          <span className="node-label">EN:</span>
-                          <pre>
-                            {n.source.slice(0, 200)}
-                            {n.source.length > 200 ? '…' : ''}
-                          </pre>
-                        </div>
-                        {n.translation && (
-                          <div className="node-trans">
-                            <span className="node-label">{lang}:</span>
-                            <pre>
-                              {n.translation.slice(0, 200)}
-                              {n.translation.length > 200 ? '…' : ''}
-                            </pre>
-                          </div>
-                        )}
-                        <div className="node-meta">
-                          MD5: <code>{n.key}</code> · L{n.line}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="preview-toc-title">On this page</div>
+            {tocHeadings.map((h, idx) => (
+              <a
+                key={h.id}
+                href={`#${h.id}`}
+                className={`h${h.level}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToHeading(idx);
+                }}
+              >
+                {h.text}
+              </a>
+            ))}
           </div>
         )}
       </div>
+
+      {/* Nodes panel (bottom) */}
+      {showNodes && nodes && !isEn && (
+        <div className="nodes-panel">
+          <div className="nodes-panel-hdr">
+            <span className="nodes-panel-title">
+              🧩 Nodes — {translatedCount}/{totalCount} translated
+              {totalCount > 0 && (
+                <span className="nodes-pct">
+                  {' '}
+                  ({Math.round((translatedCount / totalCount) * 100)}%)
+                </span>
+              )}
+            </span>
+            <div className="nodes-filter">
+              <button
+                type="button"
+                className={nodeFilter === 'all' ? 'active' : ''}
+                onClick={() => setNodeFilter('all')}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={nodeFilter === 'missing' ? 'active' : ''}
+                onClick={() => setNodeFilter('missing')}
+              >
+                ❌ Missing ({totalCount - translatedCount})
+              </button>
+              <button
+                type="button"
+                className={nodeFilter === 'translated' ? 'active' : ''}
+                onClick={() => setNodeFilter('translated')}
+              >
+                ✅ Done ({translatedCount})
+              </button>
+            </div>
+          </div>
+          <div className="nodes-table-wrap">
+            <table className="nodes-table">
+              <thead>
+                <tr>
+                  <th className="col-status" />
+                  <th className="col-type">Type</th>
+                  <th className="col-md5">MD5</th>
+                  <th className="col-line">Line</th>
+                  <th className="col-source">EN Source</th>
+                  <th className="col-trans">Translation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredNodes.map((n) => (
+                  <tr
+                    key={n.key}
+                    className={`${n.translation ? 'translated' : 'missing'} ${expandedNode === n.key ? 'expanded' : ''}`}
+                    onClick={() =>
+                      setExpandedNode(expandedNode === n.key ? null : n.key)
+                    }
+                  >
+                    <td className="col-status">
+                      {n.translation ? '✅' : '❌'}
+                    </td>
+                    <td className="col-type">
+                      <span className="type-badge">{n.type}</span>
+                    </td>
+                    <td className="col-md5">
+                      <code title={n.key}>{n.key.slice(0, 8)}</code>
+                    </td>
+                    <td className="col-line">{n.line}</td>
+                    <td className="col-source">
+                      <div className="cell-text">
+                        {expandedNode === n.key
+                          ? n.source
+                          : truncate(n.source.replace(/\n/g, ' '), 120)}
+                      </div>
+                    </td>
+                    <td className="col-trans">
+                      {n.translation ? (
+                        <div className="cell-text">
+                          {expandedNode === n.key
+                            ? n.translation
+                            : truncate(n.translation.replace(/\n/g, ' '), 120)}
+                        </div>
+                      ) : (
+                        <span className="cell-empty">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

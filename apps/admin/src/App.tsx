@@ -22,6 +22,7 @@ function readParams() {
     showFiles: p.get('files') !== '0',
     view: (p.get('view') as ViewMode) || 'lang',
     toc: p.get('toc') !== '0',
+    nodes: p.get('nodes') === '1',
     status: (p.get('status') as StatusFilter) || 'all',
     section: (p.get('section') as SectionFilter) || 'all',
   };
@@ -51,7 +52,7 @@ export function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  const { version, lang, file, showFiles, view, toc, status, section } =
+  const { version, lang, file, showFiles, view, toc, nodes, status, section } =
     readParams();
 
   // ── URL setters ──
@@ -98,6 +99,10 @@ export function App() {
     },
     [bump],
   );
+
+  const setNodes = useCallback((show: boolean) => {
+    setParams({ nodes: show ? '1' : null });
+  }, []);
 
   const setToc = useCallback(
     (show: boolean) => {
@@ -275,6 +280,8 @@ export function App() {
                   onViewMode={setView}
                   showToc={toc}
                   onToggleToc={() => setToc(!toc)}
+                  showNodes={nodes}
+                  onToggleNodes={() => setNodes(!nodes)}
                   onClose={() => setFile(null)}
                 />
               )}
