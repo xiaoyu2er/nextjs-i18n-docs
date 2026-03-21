@@ -900,10 +900,23 @@ async function translateJsonChunk(
         continue;
       }
 
-      // Rate limited (429): deprioritize model, try next immediately
+      // Rate limited (429): deprioritize model, try next
       if (msg.includes('429') && opts.modelRotate?.length) {
         rateLimitedModels.add(model);
-        log(`⏳ Model ${model} rate-limited, trying next model`);
+        // If all models are rate-limited, wait before retrying
+        const alive = opts.modelRotate.filter(
+          (m) => !deadModels.has(m) && !rateLimitedModels.has(m),
+        );
+        if (alive.length === 0) {
+          const waitSec = 30;
+          log(
+            `⏳ All models rate-limited. Waiting ${waitSec}s before retry...`,
+          );
+          await sleep(waitSec * 1000);
+          rateLimitedModels.clear();
+        } else {
+          log(`⏳ Model ${model} rate-limited, trying next model`);
+        }
         continue;
       }
 
