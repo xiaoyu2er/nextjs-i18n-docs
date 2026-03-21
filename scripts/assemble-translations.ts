@@ -80,7 +80,6 @@ for (const vDef of versions) {
 
   for (const lang of langs) {
     let written = 0;
-    let skipped = 0;
 
     for (const enFile of enFiles) {
       const relPath = enFile.slice(enDir.length + 1);
@@ -88,22 +87,17 @@ for (const vDef of versions) {
 
       const result = assemble(content, lang, cache, relPath, true);
 
-      // Only write if at least one node was translated
-      if (result.cachedCount > 0) {
-        const outPath = join(ROOT, vDef.dir, lang, relPath);
-        ensureDir(outPath);
-        writeFileSync(outPath, result.content);
-        written++;
-      } else {
-        skipped++;
-      }
+      // Always write — fallback to EN source for uncached nodes.
+      // This ensures stale translated files are replaced.
+      const outPath = join(ROOT, vDef.dir, lang, relPath);
+      ensureDir(outPath);
+      writeFileSync(outPath, result.content);
+      written++;
     }
 
     _totalFiles += enFiles.length;
     totalWritten += written;
-    console.log(
-      `[${vDef.version}/${lang}] ${written} files written, ${skipped} skipped (no translations)`,
-    );
+    console.log(`[${vDef.version}/${lang}] ${written} files written`);
   }
 }
 
