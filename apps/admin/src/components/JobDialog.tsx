@@ -139,11 +139,12 @@ export function JobDialog({
 
         {error && <div className="dialog-error">{error}</div>}
 
-        <div className="dialog-mode-hint">
-          {mode === 'file'
-            ? 'Translate file by file. --max = number of files.'
-            : 'Batch translate uncached keys from DB. --max = API calls (~100 keys each).'}
-        </div>
+        {files?.length && (
+          <div className="dialog-mode-hint">
+            Translating {files.length} selected file
+            {files.length > 1 ? 's' : ''}
+          </div>
+        )}
 
         {/* Job config */}
         <div className="dialog-grid">
