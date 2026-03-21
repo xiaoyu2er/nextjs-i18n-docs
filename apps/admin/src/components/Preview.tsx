@@ -303,11 +303,8 @@ export function Preview({
 
       {/* Content panels + TOC */}
       <div
-        className="preview-split"
-        style={{
-          gridTemplateColumns: gridCols,
-          flex: showNodes ? '1 1 50%' : '1',
-        }}
+        className={`preview-split${showNodes ? ' has-nodes' : ''}`}
+        style={{ gridTemplateColumns: gridCols }}
       >
         {showEnPane && (
           <div className="preview-pane">
