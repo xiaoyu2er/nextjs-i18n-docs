@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { api, type Job } from '../lib/api';
 
 function escapeHtml(s: string) {
@@ -82,11 +83,31 @@ function JobItem({ job }: { job: Job }) {
 }
 
 export function JobPanel() {
+  const qc = useQueryClient();
+  const prevRunning = useRef(new Set<string>());
+
   const { data: jobs = [] } = useQuery({
     queryKey: ['jobs'],
     queryFn: api.jobs,
     refetchInterval: 3000,
   });
+
+  // Detect completed jobs and refresh data
+  useEffect(() => {
+    const currentRunning = new Set(
+      jobs.filter((j) => j.status === 'running').map((j) => j.id),
+    );
+    const justFinished = [...prevRunning.current].filter(
+      (id) => !currentRunning.has(id),
+    );
+    if (justFinished.length > 0) {
+      // Invalidate all file/status queries
+      qc.invalidateQueries({ queryKey: ['files'] });
+      qc.invalidateQueries({ queryKey: ['fileBlocks'] });
+      qc.invalidateQueries({ queryKey: ['status'] });
+    }
+    prevRunning.current = currentRunning;
+  }, [jobs, qc]);
 
   return (
     <div className="jobs-panel">
