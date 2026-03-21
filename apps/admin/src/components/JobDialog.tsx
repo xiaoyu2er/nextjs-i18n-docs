@@ -44,9 +44,7 @@ export function JobDialog({
   const [error, setError] = useState<string | null>(null);
 
   // Model selection
-  const [modelMode, setModelMode] = useState<'single' | 'rotate'>('rotate');
-  const [singleModel, setSingleModel] = useState('');
-  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+  const [selectedModel, setSelectedModel] = useState('');
   const [search, setSearch] = useState('');
 
   // Filters
@@ -98,39 +96,15 @@ export function JobDialog({
     return result;
   }, [models, search, freeOnly, minCtx, jsonOnly, sort]);
 
-  function toggleModel(id: string) {
-    setSelectedModels((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   const qc = useQueryClient();
   const create = useMutation({
     mutationFn: () => {
-      // Build model rotate list with max_output info
-      let modelRotate: string[] | undefined;
-      let model: string | undefined;
-
-      if (modelMode === 'rotate' && selectedModels.size > 0) {
-        modelRotate = [...selectedModels].map((id) => {
-          const m = models?.find((x) => x.id === id);
-          const maxOut = m?.maxOutput || m?.contextLength || 0;
-          return maxOut > 0 ? `${id}:${maxOut}` : id;
-        });
-      } else if (modelMode === 'single' && singleModel) {
-        model = singleModel;
-      }
-
       return api.createJob({
         lang,
         version,
         max,
         concurrency,
-        model,
-        modelRotate,
+        model: selectedModel || undefined,
         md5: mode === 'md5',
         files: files?.length ? files : undefined,
       });
@@ -143,8 +117,9 @@ export function JobDialog({
   });
 
   const translatable = langs.filter((l) => l !== 'en');
-  const selectedModelInfo =
-    modelMode === 'single' ? models?.find((m) => m.id === singleModel) : null;
+  const selectedModelInfo = selectedModel
+    ? models?.find((m) => m.id === selectedModel)
+    : null;
 
   return (
     <div
@@ -233,22 +208,6 @@ export function JobDialog({
         {/* Model mode toggle */}
         <div className="dialog-section-hdr">
           <span>Model</span>
-          <div className="dialog-mode-toggle small">
-            <button
-              type="button"
-              className={modelMode === 'rotate' ? 'active' : ''}
-              onClick={() => setModelMode('rotate')}
-            >
-              🔄 Rotate
-            </button>
-            <button
-              type="button"
-              className={modelMode === 'single' ? 'active' : ''}
-              onClick={() => setModelMode('single')}
-            >
-              ☝️ Single
-            </button>
-          </div>
         </div>
 
         {/* Filters */}
@@ -307,14 +266,12 @@ export function JobDialog({
 
         {/* Model list */}
         <div className="model-list">
-          {modelMode === 'single' && (
-            <div
-              className={`model-item${singleModel === '' ? ' active' : ''}`}
-              onClick={() => setSingleModel('')}
-            >
-              <span className="model-name">Default (from .env)</span>
-            </div>
-          )}
+          <div
+            className={`model-item${selectedModel === '' ? ' active' : ''}`}
+            onClick={() => setSelectedModel('')}
+          >
+            <span className="model-name">Default (from .env)</span>
+          </div>
           {modelsLoading && (
             <div className="model-item disabled">Loading models...</div>
           )}
@@ -322,17 +279,9 @@ export function JobDialog({
             <ModelRow
               key={m.id}
               m={m}
-              mode={modelMode}
-              active={
-                modelMode === 'single'
-                  ? singleModel === m.id
-                  : selectedModels.has(m.id)
-              }
-              onClick={() =>
-                modelMode === 'single'
-                  ? setSingleModel(m.id)
-                  : toggleModel(m.id)
-              }
+              mode="single"
+              active={selectedModel === m.id}
+              onClick={() => setSelectedModel(m.id)}
             />
           ))}
           {!modelsLoading && filtered.length === 0 && (
@@ -340,15 +289,12 @@ export function JobDialog({
           )}
         </div>
         <div className="model-count">
-          {modelMode === 'rotate' && selectedModels.size > 0 && (
-            <strong>{selectedModels.size} selected · </strong>
-          )}
           {filtered.length} model{filtered.length !== 1 ? 's' : ''}
           {models ? ` / ${models.length} total` : ''}
         </div>
 
         {/* Selected model info */}
-        {modelMode === 'single' && selectedModelInfo && (
+        {selectedModelInfo && (
           <div className="model-info">
             <strong>{selectedModelInfo.name}</strong>
             {selectedModelInfo.isFree && (
