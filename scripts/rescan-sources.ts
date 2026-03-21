@@ -73,6 +73,26 @@ for (const vDef of versions) {
   console.log(`✅ ${vDef.version}: ${files.length} files, ${nodeCount} nodes`);
 }
 
+// Clean orphan translations (keys not in any source_files)
+const orphans = cache.db
+  .prepare(
+    `DELETE FROM translations WHERE key NOT IN (SELECT DISTINCT key FROM source_files)`,
+  )
+  .run();
+if (orphans.changes > 0) {
+  console.log(`🗑️  Deleted ${orphans.changes} orphan translations`);
+}
+
+// Clean orphan sources
+const orphanSources = cache.db
+  .prepare(
+    `DELETE FROM sources WHERE key NOT IN (SELECT DISTINCT key FROM source_files)`,
+  )
+  .run();
+if (orphanSources.changes > 0) {
+  console.log(`🗑️  Deleted ${orphanSources.changes} orphan sources`);
+}
+
 const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 console.log(`\nDone in ${elapsed}s`);
 cache.db.close();
