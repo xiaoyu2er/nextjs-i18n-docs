@@ -57,6 +57,8 @@ export const FRONTMATTER_TRANSLATABLE_FIELDS = [
   'title',
   'description',
   'nav_title',
+  'related.title',
+  'related.description',
 ];
 
 /**
