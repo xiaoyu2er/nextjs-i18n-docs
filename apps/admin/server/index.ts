@@ -25,12 +25,30 @@ app.post('/api/open-file', async (c) => {
     return c.json({ error: 'Invalid path' }, 400);
   }
 
-  const editor = process.env.EDITOR_CMD || 'code';
-  const proc = Bun.spawn([editor, fullPath], {
-    stdio: ['ignore', 'ignore', 'ignore'],
-  });
-  await proc.exited;
-  return c.json({ opened: fullPath });
+  const candidates = process.env.EDITOR_CMD
+    ? [process.env.EDITOR_CMD]
+    : ['code', 'cursor', 'zed'];
+
+  for (const cmd of candidates) {
+    const which = Bun.spawn(['which', cmd], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    await which.exited;
+    if (which.exitCode === 0) {
+      Bun.spawn([cmd, fullPath], { stdio: ['ignore', 'ignore', 'ignore'] });
+      return c.json({ opened: fullPath, editor: cmd });
+    }
+  }
+
+  // Fallback: OS default
+  const fallback =
+    process.platform === 'darwin'
+      ? 'open'
+      : process.platform === 'win32'
+        ? 'start'
+        : 'xdg-open';
+  Bun.spawn([fallback, fullPath], { stdio: ['ignore', 'ignore', 'ignore'] });
+  return c.json({ opened: fullPath, editor: fallback });
 });
 
 const adminRoot = resolve(import.meta.dirname, '..');
