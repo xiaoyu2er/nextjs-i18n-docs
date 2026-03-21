@@ -154,40 +154,32 @@ function ContentBody({
     );
   }
 
-  // Two-div layout: gutter (fixed) + content (scrollable together)
+  // Per-line grid rows: gutter and content always aligned
   return (
-    <div className="preview-body-split" ref={bodyRef}>
-      <div className="gutter-col">
-        {rendered.map((line, i) => (
+    <div className="preview-body-gutter" ref={bodyRef}>
+      {rendered.map((line, i) => {
+        const isHighlighted = line.md5 && line.md5 === highlightMd5;
+        return (
           <div
-            key={line.id ? `g-${line.id}` : `g-${i}`}
-            className="gutter-line"
+            key={line.id ?? i}
+            className={`gutter-row${isHighlighted ? ' line-highlight' : ''}`}
           >
-            {line.md5 && (
-              <code
-                className={`gutter-md5 ${line.hasTranslation ? 'done' : 'miss'}`}
-                title={`${line.nodeType} · ${line.md5}`}
-              >
-                {line.md5.slice(0, 6)}
-              </code>
-            )}
-          </div>
-        ))}
-      </div>
-      <pre className="content-col">
-        {rendered.map((line, i) => {
-          const isHighlighted = line.md5 && line.md5 === highlightMd5;
-          return (
-            <span
-              key={line.id ?? i}
-              className={isHighlighted ? 'line-highlight' : undefined}
-            >
-              {lineContent(line)}
-              {'\n'}
+            <span className="gutter-cell">
+              {line.md5 && (
+                <code
+                  className={`gutter-md5 ${line.hasTranslation ? 'done' : 'miss'}`}
+                  title={`${line.nodeType} · ${line.md5}`}
+                >
+                  {line.md5.slice(0, 6)}
+                </code>
+              )}
             </span>
-          );
-        })}
-      </pre>
+            <span className="content-cell" id={line.id}>
+              {lineContent(line)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
