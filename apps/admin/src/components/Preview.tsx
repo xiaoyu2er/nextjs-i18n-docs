@@ -149,17 +149,21 @@ export function Preview({
     <div className="preview-wrap">
       {/* Header */}
       <div className="preview-hdr">
-        {window.__PROJECT_ROOT ? (
-          <a
-            className="preview-filename"
-            href={`vscode://file/${window.__PROJECT_ROOT}/content/${version}/${file}`}
-            title="Click to open in VS Code"
-          >
-            {file}
-          </a>
-        ) : (
-          <span className="preview-filename">{file}</span>
-        )}
+        <a
+          className="preview-filename"
+          href="#"
+          title="Click to open in editor"
+          onClick={(e) => {
+            e.preventDefault();
+            fetch('/api/open-file', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ file: `content/${version}/${file}` }),
+            });
+          }}
+        >
+          {file}
+        </a>
         {!isEn && totalCount > 0 && (
           <span className="preview-stats">
             {translatedCount}/{totalCount} (

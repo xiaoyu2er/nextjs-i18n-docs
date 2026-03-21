@@ -11,9 +11,27 @@ app.route('/api/status', statusRoutes);
 app.route('/api/jobs', jobRoutes);
 app.route('/api/models', modelRoutes);
 app.get('/api/health', (c) => c.json({ ok: true }));
-app.get('/api/config', (c) =>
-  c.json({ projectRoot: resolve(import.meta.dirname, '../../..') }),
-);
+const PROJECT_ROOT = resolve(import.meta.dirname, '../../..');
+app.get('/api/config', (c) => c.json({ projectRoot: PROJECT_ROOT }));
+
+/** Open a file in the user's editor */
+app.post('/api/open-file', async (c) => {
+  const { file } = await c.req.json<{ file: string }>();
+  if (!file) return c.json({ error: 'Missing file' }, 400);
+
+  const fullPath = resolve(PROJECT_ROOT, file);
+  // Prevent path traversal
+  if (!fullPath.startsWith(PROJECT_ROOT)) {
+    return c.json({ error: 'Invalid path' }, 400);
+  }
+
+  const editor = process.env.EDITOR_CMD || 'code';
+  const proc = Bun.spawn([editor, fullPath], {
+    stdio: ['ignore', 'ignore', 'ignore'],
+  });
+  await proc.exited;
+  return c.json({ opened: fullPath });
+});
 
 const adminRoot = resolve(import.meta.dirname, '..');
 const port = Number(process.env.PORT) || 3456;

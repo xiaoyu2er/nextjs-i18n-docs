@@ -7,12 +7,6 @@ import { LangGrid } from './components/LangGrid';
 import { Preview } from './components/Preview';
 import { api } from './lib/api';
 
-declare global {
-  interface Window {
-    __PROJECT_ROOT?: string;
-  }
-}
-
 type ViewMode = 'split' | 'en' | 'lang';
 type StatusFilter = 'all' | 'complete' | 'partial' | 'missing';
 type SectionFilter = 'all' | 'docs' | 'blog' | 'learn';
@@ -56,16 +50,6 @@ export function App() {
   });
   // Toast
   const [toast, setToast] = useState<string | null>(null);
-
-  // Fetch project root for vscode:// links
-  useEffect(() => {
-    fetch('/api/config')
-      .then((r) => r.json())
-      .then((d: { projectRoot: string }) => {
-        window.__PROJECT_ROOT = d.projectRoot;
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
