@@ -63,6 +63,16 @@ function JobItem({ job }: { job: Job }) {
       </div>
       {job.logLines && job.logLines.length > 0 && (
         <div className="log-viewer">
+          <button
+            type="button"
+            className="log-copy"
+            title="Copy logs"
+            onClick={() => {
+              navigator.clipboard.writeText(job.logLines!.join('\n'));
+            }}
+          >
+            📋
+          </button>
           {job.logLines.map((line, i) => (
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: log lines
