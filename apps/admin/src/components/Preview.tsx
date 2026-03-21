@@ -9,174 +9,219 @@ interface Heading {
   text: string;
 }
 
-interface ParsedLine {
-  html: string;
-  isHeading: boolean;
-  id?: string;
-  /** MD5 key if this line starts a translatable node */
+/** A block of consecutive lines, optionally linked to a node */
+interface Block {
+  lines: string[];
+  headingId?: string;
+  headingLevel?: number;
+  headingText?: string;
   md5?: string;
-  /** Node type (frontmatter, heading, paragraph, etc.) */
   nodeType?: string;
-  /** Whether this node has a translation */
   hasTranslation?: boolean;
+  anchorId?: string;
 }
 
 function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function extractHeading(line: string, nextLine?: string) {
+  const m = line.match(/^(#{1,6})\s+(.+)/);
+  if (m) {
+    const text = m[2]
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[]\(#[^)]*\)/g, '')
+      .replace(/[`*[\]]/g, '')
+      .trim();
+    return { level: m[1].length, text };
+  }
+  if (nextLine && /^[=-]{2,}\s*$/.test(nextLine) && line.trim().length > 0) {
+    const text = line
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/[`*[\]]/g, '')
+      .trim();
+    return { level: nextLine.startsWith('=') ? 1 : 2, text };
+  }
+  return null;
+}
+
 /**
- * Parse content into renderable lines.
- * If nodes are provided, annotate lines with MD5 markers.
+ * Parse content into blocks. Each block is either:
+ * - A node (has md5, may span multiple lines)
+ * - Gap lines between nodes (no md5)
  */
 function parseContent(content: string, prefix: string, nodes?: FileNode[]) {
   const lines = content.split('\n');
   const headings: Heading[] = [];
-  const rendered: ParsedLine[] = [];
+  const blocks: Block[] = [];
 
-  // Build line→node map (1-indexed line numbers from API)
-  const lineToNode = new Map<number, FileNode>();
-  if (nodes) {
-    for (const n of nodes) {
-      // Only set if not already mapped (first node at that line wins)
-      if (!lineToNode.has(n.line)) {
-        lineToNode.set(n.line, n);
-      }
-    }
+  // Build sorted node list by line number
+  const sortedNodes = nodes ? [...nodes].sort((a, b) => a.line - b.line) : [];
+
+  // Find node boundaries: each node starts at its line and ends before the next node
+  // (or at the end of content)
+  const nodeStarts = sortedNodes.map((n) => n.line - 1); // 0-indexed
+  const nodeMap = new Map<number, FileNode>(); // 0-indexed start → node
+  for (let i = 0; i < sortedNodes.length; i++) {
+    nodeMap.set(sortedNodes[i].line - 1, sortedNodes[i]);
   }
 
-  // Skip YAML frontmatter
-  let start = 0;
+  // Handle frontmatter specially
+  let fmEnd = 0;
   if (lines[0]?.trim() === '---') {
     for (let j = 1; j < lines.length; j++) {
       if (lines[j].trim() === '---') {
-        start = j + 1;
+        fmEnd = j + 1;
         break;
       }
     }
   }
 
-  // Frontmatter node is typically at line 1 or 2
-  const fmNode = lineToNode.get(1) || lineToNode.get(2);
-  for (let i = 0; i < start; i++) {
-    const parsed: ParsedLine = { html: escapeHtml(lines[i]), isHeading: false };
-    if (i === 0 && fmNode) {
-      parsed.md5 = fmNode.key;
-      parsed.nodeType = fmNode.type;
-      parsed.hasTranslation = !!fmNode.translation;
-      parsed.id = `${prefix}-n-${fmNode.key.slice(0, 8)}`;
+  if (fmEnd > 0) {
+    const fmNode = sortedNodes.find(
+      (n) => n.type === 'frontmatter' || n.type === 'heading',
+    );
+    const block: Block = {
+      lines: lines.slice(0, fmEnd),
+    };
+    if (fmNode && fmNode.line <= 2) {
+      block.md5 = fmNode.key;
+      block.nodeType = fmNode.type;
+      block.hasTranslation = !!fmNode.translation;
+      block.anchorId = `${prefix}-n-${fmNode.key.slice(0, 8)}`;
     }
-    rendered.push(parsed);
+    blocks.push(block);
   }
 
-  for (let i = start; i < lines.length; i++) {
-    const line = lines[i];
-    const nextLine = lines[i + 1];
-    const lineNum = i + 1; // 1-indexed
+  // Process remaining lines
+  let i = fmEnd;
+  while (i < lines.length) {
+    const node = nodeMap.get(i);
 
-    const m = line.match(/^(#{1,6})\s+(.+)/);
-    const setext =
-      !m && nextLine && /^[=-]{2,}\s*$/.test(nextLine) && line.trim().length > 0
-        ? line
-        : null;
-
-    const parsed: ParsedLine = { html: escapeHtml(line), isHeading: false };
-
-    // Check if this line starts a node
-    const node = lineToNode.get(lineNum);
     if (node) {
-      parsed.md5 = node.key;
-      parsed.nodeType = node.type;
-      parsed.hasTranslation = !!node.translation;
-      parsed.id = `${prefix}-n-${node.key.slice(0, 8)}`;
-    }
+      // Find end of this node: next node start, or scan for empty line boundary
+      const nodeIdx = nodeStarts.indexOf(i);
+      const nextNodeStart =
+        nodeIdx + 1 < nodeStarts.length
+          ? nodeStarts[nodeIdx + 1]
+          : lines.length;
 
-    if (m || setext) {
-      const level = m
-        ? m[1].length
-        : (nextLine as string).startsWith('=')
-          ? 1
-          : 2;
-      const raw = m ? m[2] : (setext as string);
-      const text = raw
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-        .replace(/\[]\(#[^)]*\)/g, '')
-        .replace(/[`*[\]]/g, '')
-        .trim();
-      const headingId = `${prefix}-h-${i}`;
-      headings.push({ id: headingId, level, text });
-      parsed.isHeading = true;
-      // Keep the node id if present, otherwise use heading id
-      if (!parsed.id) parsed.id = headingId;
-    }
+      // Node spans from i to nextNodeStart (or until content ends)
+      const blockLines = lines.slice(i, nextNodeStart);
+      const block: Block = {
+        lines: blockLines,
+        md5: node.key,
+        nodeType: node.type,
+        hasTranslation: !!node.translation,
+        anchorId: `${prefix}-n-${node.key.slice(0, 8)}`,
+      };
 
-    rendered.push(parsed);
+      // Check for heading in first line
+      const h = extractHeading(blockLines[0], blockLines[1]);
+      if (h) {
+        const hId = `${prefix}-h-${i}`;
+        block.headingId = hId;
+        block.headingLevel = h.level;
+        block.headingText = h.text;
+        headings.push({ id: hId, level: h.level, text: h.text });
+      }
+
+      blocks.push(block);
+      i = nextNodeStart;
+    } else {
+      // Gap lines (not part of any node)
+      const gapStart = i;
+      while (i < lines.length && !nodeMap.has(i)) {
+        // Still check for headings in gap lines
+        const h = extractHeading(lines[i], lines[i + 1]);
+        if (h) {
+          const hId = `${prefix}-h-${i}`;
+          headings.push({ id: hId, level: h.level, text: h.text });
+        }
+        i++;
+      }
+      blocks.push({ lines: lines.slice(gapStart, i) });
+    }
   }
 
-  return { headings, rendered };
+  return { headings, blocks };
 }
 
 function ContentBody({
-  rendered,
+  blocks,
   bodyRef,
   showGutter,
   highlightMd5,
 }: {
-  rendered: ParsedLine[];
+  blocks: Block[];
   bodyRef: React.RefObject<HTMLDivElement | null>;
   showGutter?: boolean;
   highlightMd5?: string | null;
 }) {
-  const lineContent = (line: ParsedLine) =>
-    line.isHeading ? (
-      <span className="hl" id={line.id}>
-        <span dangerouslySetInnerHTML={{ __html: line.html }} />
-      </span>
-    ) : (
-      <span id={line.md5 ? line.id : undefined}>
-        <span dangerouslySetInnerHTML={{ __html: line.html }} />
-      </span>
-    );
-
   if (!showGutter) {
     return (
       <pre
         className="preview-body"
         ref={bodyRef as unknown as React.RefObject<HTMLPreElement>}
       >
-        {rendered.map((line, i) => (
-          <span key={line.id ?? i}>
-            {lineContent(line)}
-            {'\n'}
+        {blocks.map((block, bi) => (
+          <span key={block.anchorId ?? `b-${bi}`}>
+            {block.lines.map((line, li) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static line order
+              <span key={`${bi}-${li}`}>
+                {block.headingId && li === 0 ? (
+                  <span className="hl" id={block.headingId}>
+                    {escapeHtml(line)}
+                  </span>
+                ) : (
+                  <span id={li === 0 ? block.anchorId : undefined}>
+                    {escapeHtml(line)}
+                  </span>
+                )}
+                {'\n'}
+              </span>
+            ))}
           </span>
         ))}
       </pre>
     );
   }
 
-  // Per-line grid rows: gutter and content always aligned
   return (
     <div className="preview-body-gutter" ref={bodyRef}>
-      {rendered.map((line, i) => {
-        const isHighlighted = line.md5 && line.md5 === highlightMd5;
+      {blocks.map((block, bi) => {
+        const isHighlighted = block.md5 && block.md5 === highlightMd5;
         return (
           <div
-            key={line.id ?? i}
+            key={block.anchorId ?? `b-${bi}`}
             className={`gutter-row${isHighlighted ? ' line-highlight' : ''}`}
+            id={block.anchorId}
           >
             <span className="gutter-cell">
-              {line.md5 && (
+              {block.md5 && (
                 <code
-                  className={`gutter-md5 ${line.hasTranslation ? 'done' : 'miss'}`}
-                  title={`${line.nodeType} · ${line.md5}`}
+                  className={`gutter-md5 ${block.hasTranslation ? 'done' : 'miss'}`}
+                  title={`${block.nodeType} · ${block.md5}`}
                 >
-                  {line.md5.slice(0, 6)}
+                  {block.md5.slice(0, 6)}
                 </code>
               )}
             </span>
-            <span className="content-cell" id={line.id}>
-              {lineContent(line)}
-            </span>
+            <pre className="content-cell">
+              {block.lines.map((line, li) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static line order
+                <span key={li}>
+                  {block.headingId && li === 0 ? (
+                    <span className="hl" id={block.headingId}>
+                      {escapeHtml(line)}
+                    </span>
+                  ) : (
+                    <span>{escapeHtml(line)}</span>
+                  )}
+                  {'\n'}
+                </span>
+              ))}
+            </pre>
           </div>
         );
       })}
@@ -309,7 +354,6 @@ export function Preview({
   function scrollToNode(md5: string) {
     setHighlightMd5(md5);
     const short = md5.slice(0, 8);
-    // Scroll both panes if visible
     if (showEnPane) {
       const el = document.getElementById(`en-n-${short}`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -318,7 +362,6 @@ export function Preview({
       const el = document.getElementById(`tr-n-${short}`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    // Clear highlight after a delay
     setTimeout(() => setHighlightMd5(null), 3000);
   }
 
@@ -414,7 +457,7 @@ export function Preview({
             <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
             {enData ? (
               <ContentBody
-                rendered={en.rendered}
+                blocks={en.blocks}
                 bodyRef={enRef}
                 showGutter={showGutter}
                 highlightMd5={highlightMd5}
@@ -431,7 +474,7 @@ export function Preview({
             </div>
             {transData ? (
               <ContentBody
-                rendered={trans.rendered}
+                blocks={trans.blocks}
                 bodyRef={transRef}
                 showGutter={showGutter}
                 highlightMd5={highlightMd5}
