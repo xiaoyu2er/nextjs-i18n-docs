@@ -11,6 +11,9 @@ app.route('/api/status', statusRoutes);
 app.route('/api/jobs', jobRoutes);
 app.route('/api/models', modelRoutes);
 app.get('/api/health', (c) => c.json({ ok: true }));
+app.get('/api/config', (c) =>
+  c.json({ projectRoot: resolve(import.meta.dirname, '../..') }),
+);
 
 const adminRoot = resolve(import.meta.dirname, '..');
 const port = Number(process.env.PORT) || 3456;
