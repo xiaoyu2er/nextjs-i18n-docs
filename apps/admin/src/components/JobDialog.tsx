@@ -172,7 +172,7 @@ export function JobDialog({
             </select>
           </div>
           <div>
-            <label>{mode === 'file' ? 'Max files' : 'Max API calls'}</label>
+            <label>Max API calls</label>
             <input
               type="number"
               value={max}
