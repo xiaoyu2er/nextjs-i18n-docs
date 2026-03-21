@@ -25,10 +25,18 @@ function extractHeading(text: string, prefix: string, idx: number) {
   return { id: `${prefix}-h-${idx}`, level: m[1].length, text: clean };
 }
 
-function getHeadings(blocks: FileBlock[], prefix: string): Heading[] {
+function getHeadings(
+  blocks: FileBlock[],
+  prefix: string,
+  useTranslation = false,
+): Heading[] {
   const headings: Heading[] = [];
   for (let i = 0; i < blocks.length; i++) {
-    const h = extractHeading(blocks[i].source, prefix, i);
+    const text =
+      useTranslation && blocks[i].translation != null
+        ? blocks[i].translation!
+        : blocks[i].source;
+    const h = extractHeading(text, prefix, i);
     if (h) headings.push(h);
   }
   return headings;
@@ -73,10 +81,12 @@ export function Preview({
   });
 
   const blocks = blocksData?.blocks ?? [];
-  const headings = useMemo(() => getHeadings(blocks, 'b'), [blocks]);
-
   const showEnCol = mode === 'split' || mode === 'en';
   const showTransCol = !isEn && (mode === 'split' || mode === 'lang');
+
+  const enHeadings = useMemo(() => getHeadings(blocks, 'b'), [blocks]);
+  const transHeadings = useMemo(() => getHeadings(blocks, 'b', true), [blocks]);
+  const headings = showTransCol ? transHeadings : enHeadings;
   const showGutter = showNodes && blocks.length > 0;
 
   // Stats
