@@ -382,6 +382,21 @@ function processFile(
     ? blogDateOrder.get(cleanRel.replace(/\.mdx$/, ''))
     : getSidebarOrder(originalRel);
   let enrichedRaw = raw;
+
+  // Preserve original case in URL slug (Starlight lowercases by default)
+  const relFromDst = relative(CONTENT_DST, dstPath)
+    .replace(/\.mdx$/, '')
+    .replace(/\\/g, '/');
+  // Strip locale prefix (e.g. "zh-hans/blog/CVE..." → "blog/CVE...")
+  const localePrefix = locale === ROOT_LOCALE ? '' : `${locale}/`;
+  const slugPath =
+    localePrefix && relFromDst.startsWith(localePrefix)
+      ? relFromDst.slice(localePrefix.length)
+      : relFromDst;
+  if (slugPath !== slugPath.toLowerCase() && !raw.includes('slug:')) {
+    enrichedRaw = `${enrichedRaw}\nslug: ${slugPath}`;
+  }
+
   if (!raw.includes('sidebar:')) {
     const sidebarParts: string[] = [];
     if (order !== null && order !== undefined)
@@ -397,7 +412,7 @@ function processFile(
     }
 
     if (sidebarParts.length > 0) {
-      enrichedRaw = `${raw}\nsidebar:\n${sidebarParts.join('\n')}`;
+      enrichedRaw = `${enrichedRaw}\nsidebar:\n${sidebarParts.join('\n')}`;
     }
   }
 
