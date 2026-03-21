@@ -18,7 +18,7 @@ const app = new Hono();
 app.get('/', (c) => {
   const overview = getOverview();
   return c.json({
-    versions: VERSIONS.map((v) => v.version),
+    versions: [...VERSIONS],
     langs: ['en', ...LANGS],
     data: overview,
   });
