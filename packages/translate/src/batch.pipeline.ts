@@ -68,6 +68,7 @@ function isFrontmatter(text: string): boolean {
  */
 function validateFrontmatter(translation: string): boolean {
   try {
+    if (typeof translation !== 'string') return false;
     const t = translation.trim();
     // Strip trailing ---
     const yamlContent = t.endsWith('---') ? t.slice(0, -3).trim() : t;
@@ -1240,7 +1241,7 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
       let cached = 0;
       let skipped = 0;
       for (const [md5, translation] of Object.entries(result.translations)) {
-        if (!translation.trim()) {
+        if (typeof translation !== 'string' || !translation.trim()) {
           skipped++;
           continue;
         }
