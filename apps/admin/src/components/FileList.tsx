@@ -157,7 +157,7 @@ function TreeRow({
   const f = node.file;
   if (!f) return null;
 
-  const missing = f.total - f.translated;
+  const _missing = f.total - f.translated;
   const color =
     f.status === 'complete'
       ? 'var(--green)'
@@ -186,7 +186,6 @@ function TreeRow({
         <span className="icon">{statusIcon(f.pct)}</span>
         <span className="path">{node.name}</span>
         <span className="pct">{f.pct.toFixed(0)}%</span>
-        {missing > 0 && <span className="miss">{missing}</span>}
         <div className="mini-bar">
           <div
             className="mini-fill"
@@ -348,7 +347,7 @@ export function FileList({
 
         {viewMode === 'list' &&
           filtered.map((f) => {
-            const missing = f.total - f.translated;
+            const _missing = f.total - f.translated;
             const color =
               f.status === 'complete'
                 ? 'var(--green)'
@@ -378,7 +377,6 @@ export function FileList({
                   {f.file}
                 </span>
                 <span className="pct">{f.pct.toFixed(0)}%</span>
-                {missing > 0 && <span className="miss">{missing}</span>}
                 <div className="mini-bar">
                   <div
                     className="mini-fill"
