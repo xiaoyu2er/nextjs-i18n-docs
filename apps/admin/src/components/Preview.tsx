@@ -213,6 +213,9 @@ export function Preview({
           )}
 
           {blocks.map((block, i) => {
+            // Skip gap blocks (whitespace/comments between nodes)
+            if (!block.md5 && showGutter) return null;
+
             const isHighlighted = block.md5 && block.md5 === highlightMd5;
             const h = extractHeading(block.source, 'b', i);
             const blockId = block.md5
@@ -224,7 +227,7 @@ export function Preview({
                 // biome-ignore lint/suspicious/noArrayIndexKey: static block order
                 key={i}
                 id={blockId}
-                className={`block-row${isHighlighted ? ' block-highlight' : ''}${block.md5 ? '' : ' block-gap'}`}
+                className={`block-row${isHighlighted ? ' block-highlight' : ''}`}
                 style={{ gridTemplateColumns: gridCols }}
               >
                 {showGutter && (
