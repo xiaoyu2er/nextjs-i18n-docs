@@ -123,48 +123,72 @@ function ContentBody({
   highlightMd5,
 }: {
   rendered: ParsedLine[];
-  bodyRef: React.RefObject<HTMLPreElement | null>;
+  bodyRef: React.RefObject<HTMLDivElement | null>;
   showGutter?: boolean;
   highlightMd5?: string | null;
 }) {
-  return (
-    <pre
-      className={`preview-body${showGutter ? ' with-gutter' : ''}`}
-      ref={bodyRef}
-    >
-      {rendered.map((line, i) => {
-        const isHighlighted = line.md5 && line.md5 === highlightMd5;
-        return (
-          <span
-            key={line.id ?? i}
-            className={isHighlighted ? 'line-highlight' : undefined}
-          >
-            {showGutter && (
-              <span className="line-gutter">
-                {line.md5 ? (
-                  <code
-                    className={`gutter-md5 ${line.hasTranslation ? 'done' : 'miss'}`}
-                    title={`${line.nodeType} · ${line.md5}`}
-                  >
-                    {line.md5.slice(0, 6)}
-                  </code>
-                ) : null}
-              </span>
-            )}
-            {line.isHeading ? (
-              <span className="hl" id={line.id}>
-                <span dangerouslySetInnerHTML={{ __html: line.html }} />
-              </span>
-            ) : (
-              <span id={line.md5 ? line.id : undefined}>
-                <span dangerouslySetInnerHTML={{ __html: line.html }} />
-              </span>
-            )}
+  const lineContent = (line: ParsedLine) =>
+    line.isHeading ? (
+      <span className="hl" id={line.id}>
+        <span dangerouslySetInnerHTML={{ __html: line.html }} />
+      </span>
+    ) : (
+      <span id={line.md5 ? line.id : undefined}>
+        <span dangerouslySetInnerHTML={{ __html: line.html }} />
+      </span>
+    );
+
+  if (!showGutter) {
+    return (
+      <pre
+        className="preview-body"
+        ref={bodyRef as unknown as React.RefObject<HTMLPreElement>}
+      >
+        {rendered.map((line, i) => (
+          <span key={line.id ?? i}>
+            {lineContent(line)}
             {'\n'}
           </span>
-        );
-      })}
-    </pre>
+        ))}
+      </pre>
+    );
+  }
+
+  // Two-div layout: gutter (fixed) + content (scrollable together)
+  return (
+    <div className="preview-body-split" ref={bodyRef}>
+      <div className="gutter-col">
+        {rendered.map((line, i) => (
+          <div
+            key={line.id ? `g-${line.id}` : `g-${i}`}
+            className="gutter-line"
+          >
+            {line.md5 && (
+              <code
+                className={`gutter-md5 ${line.hasTranslation ? 'done' : 'miss'}`}
+                title={`${line.nodeType} · ${line.md5}`}
+              >
+                {line.md5.slice(0, 6)}
+              </code>
+            )}
+          </div>
+        ))}
+      </div>
+      <pre className="content-col">
+        {rendered.map((line, i) => {
+          const isHighlighted = line.md5 && line.md5 === highlightMd5;
+          return (
+            <span
+              key={line.id ?? i}
+              className={isHighlighted ? 'line-highlight' : undefined}
+            >
+              {lineContent(line)}
+              {'\n'}
+            </span>
+          );
+        })}
+      </pre>
+    </div>
   );
 }
 
@@ -199,8 +223,8 @@ export function Preview({
   onToggleNodes,
   onClose,
 }: Props) {
-  const enRef = useRef<HTMLPreElement>(null);
-  const transRef = useRef<HTMLPreElement>(null);
+  const enRef = useRef<HTMLDivElement>(null);
+  const transRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
 
   const isEn = lang === 'en';
