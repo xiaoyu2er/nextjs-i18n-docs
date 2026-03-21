@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../lib/api';
+import { api, type FileNode } from '../lib/api';
 import { FLAGS } from '../lib/flags';
 
 interface Heading {
@@ -13,16 +13,37 @@ interface ParsedLine {
   html: string;
   isHeading: boolean;
   id?: string;
+  /** MD5 key if this line starts a translatable node */
+  md5?: string;
+  /** Node type (frontmatter, heading, paragraph, etc.) */
+  nodeType?: string;
+  /** Whether this node has a translation */
+  hasTranslation?: boolean;
 }
 
 function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function parseContent(content: string, prefix: string) {
+/**
+ * Parse content into renderable lines.
+ * If nodes are provided, annotate lines with MD5 markers.
+ */
+function parseContent(content: string, prefix: string, nodes?: FileNode[]) {
   const lines = content.split('\n');
   const headings: Heading[] = [];
   const rendered: ParsedLine[] = [];
+
+  // Build line→node map (1-indexed line numbers from API)
+  const lineToNode = new Map<number, FileNode>();
+  if (nodes) {
+    for (const n of nodes) {
+      // Only set if not already mapped (first node at that line wins)
+      if (!lineToNode.has(n.line)) {
+        lineToNode.set(n.line, n);
+      }
+    }
+  }
 
   // Skip YAML frontmatter
   let start = 0;
@@ -34,19 +55,41 @@ function parseContent(content: string, prefix: string) {
       }
     }
   }
+
+  // Frontmatter node is typically at line 1 or 2
+  const fmNode = lineToNode.get(1) || lineToNode.get(2);
   for (let i = 0; i < start; i++) {
-    rendered.push({ html: escapeHtml(lines[i]), isHeading: false });
+    const parsed: ParsedLine = { html: escapeHtml(lines[i]), isHeading: false };
+    if (i === 0 && fmNode) {
+      parsed.md5 = fmNode.key;
+      parsed.nodeType = fmNode.type;
+      parsed.hasTranslation = !!fmNode.translation;
+      parsed.id = `${prefix}-n-${fmNode.key.slice(0, 8)}`;
+    }
+    rendered.push(parsed);
   }
 
   for (let i = start; i < lines.length; i++) {
     const line = lines[i];
     const nextLine = lines[i + 1];
+    const lineNum = i + 1; // 1-indexed
 
     const m = line.match(/^(#{1,6})\s+(.+)/);
     const setext =
       !m && nextLine && /^[=-]{2,}\s*$/.test(nextLine) && line.trim().length > 0
         ? line
         : null;
+
+    const parsed: ParsedLine = { html: escapeHtml(line), isHeading: false };
+
+    // Check if this line starts a node
+    const node = lineToNode.get(lineNum);
+    if (node) {
+      parsed.md5 = node.key;
+      parsed.nodeType = node.type;
+      parsed.hasTranslation = !!node.translation;
+      parsed.id = `${prefix}-n-${node.key.slice(0, 8)}`;
+    }
 
     if (m || setext) {
       const level = m
@@ -60,12 +103,14 @@ function parseContent(content: string, prefix: string) {
         .replace(/\[]\(#[^)]*\)/g, '')
         .replace(/[`*[\]]/g, '')
         .trim();
-      const id = `${prefix}-h-${i}`;
-      headings.push({ id, level, text });
-      rendered.push({ html: escapeHtml(line), isHeading: true, id });
-    } else {
-      rendered.push({ html: escapeHtml(line), isHeading: false });
+      const headingId = `${prefix}-h-${i}`;
+      headings.push({ id: headingId, level, text });
+      parsed.isHeading = true;
+      // Keep the node id if present, otherwise use heading id
+      if (!parsed.id) parsed.id = headingId;
     }
+
+    rendered.push(parsed);
   }
 
   return { headings, rendered };
@@ -74,24 +119,51 @@ function parseContent(content: string, prefix: string) {
 function ContentBody({
   rendered,
   bodyRef,
+  showGutter,
+  highlightMd5,
 }: {
   rendered: ParsedLine[];
   bodyRef: React.RefObject<HTMLPreElement | null>;
+  showGutter?: boolean;
+  highlightMd5?: string | null;
 }) {
   return (
-    <pre className="preview-body" ref={bodyRef}>
-      {rendered.map((line, i) => (
-        <span key={line.id ?? i}>
-          {line.isHeading ? (
-            <span className="hl" id={line.id}>
-              <span dangerouslySetInnerHTML={{ __html: line.html }} />
-            </span>
-          ) : (
-            <span dangerouslySetInnerHTML={{ __html: line.html }} />
-          )}
-          {'\n'}
-        </span>
-      ))}
+    <pre
+      className={`preview-body${showGutter ? ' with-gutter' : ''}`}
+      ref={bodyRef}
+    >
+      {rendered.map((line, i) => {
+        const isHighlighted = line.md5 && line.md5 === highlightMd5;
+        return (
+          <span
+            key={line.id ?? i}
+            className={isHighlighted ? 'line-highlight' : undefined}
+          >
+            {showGutter && (
+              <span className="line-gutter">
+                {line.md5 ? (
+                  <code
+                    className={`gutter-md5 ${line.hasTranslation ? 'done' : 'miss'}`}
+                    title={`${line.nodeType} · ${line.md5}`}
+                  >
+                    {line.md5.slice(0, 6)}
+                  </code>
+                ) : null}
+              </span>
+            )}
+            {line.isHeading ? (
+              <span className="hl" id={line.id}>
+                <span dangerouslySetInnerHTML={{ __html: line.html }} />
+              </span>
+            ) : (
+              <span id={line.md5 ? line.id : undefined}>
+                <span dangerouslySetInnerHTML={{ __html: line.html }} />
+              </span>
+            )}
+            {'\n'}
+          </span>
+        );
+      })}
     </pre>
   );
 }
@@ -135,6 +207,7 @@ export function Preview({
   const mode = isEn ? 'en' : viewMode;
 
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
+  const [highlightMd5, setHighlightMd5] = useState<string | null>(null);
   const [nodeFilter, setNodeFilter] = useState<
     'all' | 'missing' | 'translated'
   >('all');
@@ -157,12 +230,12 @@ export function Preview({
   });
 
   const en = useMemo(
-    () => parseContent(enData?.content || '', 'en'),
-    [enData?.content],
+    () => parseContent(enData?.content || '', 'en', nodes ?? undefined),
+    [enData?.content, nodes],
   );
   const trans = useMemo(
-    () => parseContent(transData?.content || '', 'tr'),
-    [transData?.content],
+    () => parseContent(transData?.content || '', 'tr', nodes ?? undefined),
+    [transData?.content, nodes],
   );
 
   const filteredNodes = useMemo(() => {
@@ -217,6 +290,22 @@ export function Preview({
     }
   }
 
+  function scrollToNode(md5: string) {
+    setHighlightMd5(md5);
+    const short = md5.slice(0, 8);
+    // Scroll both panes if visible
+    if (showEnPane) {
+      const el = document.getElementById(`en-n-${short}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    if (showTransPane) {
+      const el = document.getElementById(`tr-n-${short}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // Clear highlight after a delay
+    setTimeout(() => setHighlightMd5(null), 3000);
+  }
+
   const primaryHeadings = showTransPane ? trans.headings : en.headings;
   const fallbackHeadings = showTransPane ? en.headings : trans.headings;
   const tocHeadings =
@@ -235,6 +324,7 @@ export function Preview({
 
   const translatedCount = nodes?.filter((n) => n.translation).length ?? 0;
   const totalCount = nodes?.length ?? 0;
+  const showGutter = showNodes && !!nodes;
 
   return (
     <div className={`preview-wrap${showNodes && !isEn ? ' with-nodes' : ''}`}>
@@ -307,7 +397,12 @@ export function Preview({
           <div className="preview-pane">
             <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
             {enData ? (
-              <ContentBody rendered={en.rendered} bodyRef={enRef} />
+              <ContentBody
+                rendered={en.rendered}
+                bodyRef={enRef}
+                showGutter={showGutter}
+                highlightMd5={highlightMd5}
+              />
             ) : (
               <div className="preview-body loading">Loading...</div>
             )}
@@ -319,7 +414,12 @@ export function Preview({
               {FLAGS[lang]} {lang}
             </div>
             {transData ? (
-              <ContentBody rendered={trans.rendered} bodyRef={transRef} />
+              <ContentBody
+                rendered={trans.rendered}
+                bodyRef={transRef}
+                showGutter={showGutter}
+                highlightMd5={highlightMd5}
+              />
             ) : (
               <div className="preview-body loading">Loading...</div>
             )}
@@ -403,10 +503,11 @@ export function Preview({
                   {filteredNodes.map((n) => (
                     <tr
                       key={n.key}
-                      className={`${n.translation ? 'translated' : 'missing'} ${expandedNode === n.key ? 'expanded' : ''}`}
-                      onClick={() =>
-                        setExpandedNode(expandedNode === n.key ? null : n.key)
-                      }
+                      className={`${n.translation ? 'translated' : 'missing'} ${expandedNode === n.key ? 'expanded' : ''} ${highlightMd5 === n.key ? 'highlighted' : ''}`}
+                      onClick={() => {
+                        setExpandedNode(expandedNode === n.key ? null : n.key);
+                        scrollToNode(n.key);
+                      }}
                     >
                       <td className="col-status">
                         {n.translation ? '✅' : '❌'}
