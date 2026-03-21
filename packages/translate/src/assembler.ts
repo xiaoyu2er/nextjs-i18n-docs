@@ -33,6 +33,8 @@ export function assemble(
   cache: TranslationCache,
   /** Relative file path for source tracking (e.g. "docs/01-app/installation.mdx") */
   sourceFilePath?: string,
+  /** If true, use EN source text as fallback instead of NEEDS_TRANSLATION markers */
+  fallbackToSource = false,
 ): AssembleResult {
   const normalizedContent = normalize(rawContent);
   const nodes = parseMdx(rawContent);
@@ -62,6 +64,9 @@ export function assemble(
       if (cached) {
         result += cached;
         cachedCount++;
+      } else if (fallbackToSource) {
+        result += node.rawText;
+        uncachedCount++;
       } else {
         result += `${NEEDS_TRANSLATION_START}\n${node.rawText}\n${NEEDS_TRANSLATION_END}`;
         uncachedCount++;
