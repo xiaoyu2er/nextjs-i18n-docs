@@ -237,7 +237,7 @@ export function Preview({
   const totalCount = nodes?.length ?? 0;
 
   return (
-    <div className="preview-wrap">
+    <div className={`preview-wrap${showNodes && !isEn ? ' with-nodes' : ''}`}>
       {/* Header */}
       <div className="preview-hdr">
         <span className="preview-filename">{file}</span>
@@ -302,10 +302,7 @@ export function Preview({
       </div>
 
       {/* Content panels + TOC */}
-      <div
-        className={`preview-split${showNodes ? ' has-nodes' : ''}`}
-        style={{ gridTemplateColumns: gridCols }}
-      >
+      <div className="preview-split" style={{ gridTemplateColumns: gridCols }}>
         {showEnPane && (
           <div className="preview-pane">
             <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
