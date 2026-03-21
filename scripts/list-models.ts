@@ -46,6 +46,8 @@ const EXCLUDED_MODELS = new Set([
   'arcee-ai/trinity-mini:free', // Returns garbage for multi-key requests
   'arcee-ai/trinity-large-preview:free', // 404 with json_schema
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', // 24B, low quality
+  'nvidia/nemotron-3-super-120b-a12b:free', // Reasoning model, wastes all tokens on thinking
+  'minimax/minimax-m2.5:free', // Blocked by privacy/guardrail restrictions
 ]);
 
 const res = await fetch('https://openrouter.ai/api/v1/models');
