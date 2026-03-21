@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Hono } from 'hono';
 import {
+  getFileBlocks,
   getFileCoverage,
   getFileDetail,
   getOverview,
@@ -55,6 +56,18 @@ app.get('/:version/:lang/file', (c) => {
   }
 
   return c.json(getFileDetail(version, lang, filePath));
+});
+
+/** GET /api/status/:version/:lang/blocks?path=... — Node-structured content */
+app.get('/:version/:lang/blocks', (c) => {
+  const { version, lang } = c.req.param();
+  const filePath = c.req.query('path');
+  if (!filePath) return c.json({ error: 'Missing path query param' }, 400);
+
+  const blocks = getFileBlocks(version, lang, filePath);
+  if (!blocks) return c.json({ error: 'File not found' }, 404);
+
+  return c.json({ file: filePath, lang, version, blocks });
 });
 
 /** GET /api/status/content/:version/:lang/* — Raw file content */

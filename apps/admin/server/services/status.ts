@@ -184,3 +184,77 @@ export function getFileDetail(version: string, lang: string, file: string) {
   ensureScanned(version);
   return cache.fileDetail(version, lang, file);
 }
+
+export interface FileBlock {
+  md5: string | null;
+  type: string;
+  source: string;
+  translation: string | null;
+}
+
+/**
+ * Get file content as structured node blocks.
+ * Parses EN source, looks up translations, returns aligned blocks.
+ */
+export function getFileBlocks(
+  version: string,
+  lang: string,
+  file: string,
+): FileBlock[] | null {
+  const cache = getCache();
+  const vDef = VERSIONS.find((v) => v.version === version);
+  if (!vDef) return null;
+
+  const enPath = join(ROOT, vDef.dir, 'en', file);
+  if (!existsSync(enPath)) return null;
+
+  const content = readFileSync(enPath, 'utf8');
+  const nodes = parseMdx(content);
+  const blocks: FileBlock[] = [];
+
+  let lastEnd = 0;
+
+  for (const node of nodes) {
+    // Gap before this node
+    if (node.startOffset > lastEnd) {
+      const gap = content.substring(lastEnd, node.startOffset);
+      if (gap.trim()) {
+        blocks.push({ md5: null, type: 'gap', source: gap, translation: null });
+      } else if (gap) {
+        // whitespace-only gap — still include for formatting
+        blocks.push({ md5: null, type: 'gap', source: gap, translation: null });
+      }
+    }
+
+    if (node.needsTranslation && node.md5) {
+      const translation =
+        lang === 'en' ? null : (cache.get(lang, node.md5) ?? null);
+      blocks.push({
+        md5: node.md5,
+        type: node.type,
+        source: node.rawText,
+        translation,
+      });
+    } else {
+      // Non-translatable node (code blocks, etc.)
+      blocks.push({
+        md5: null,
+        type: node.type,
+        source: node.rawText,
+        translation: null,
+      });
+    }
+
+    lastEnd = node.endOffset;
+  }
+
+  // Trailing content
+  if (lastEnd < content.length) {
+    const tail = content.substring(lastEnd);
+    if (tail.trim()) {
+      blocks.push({ md5: null, type: 'gap', source: tail, translation: null });
+    }
+  }
+
+  return blocks;
+}

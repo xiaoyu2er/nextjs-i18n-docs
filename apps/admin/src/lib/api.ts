@@ -59,6 +59,20 @@ export interface FileNode {
   line: number;
 }
 
+export interface FileBlock {
+  md5: string | null;
+  type: string;
+  source: string;
+  translation: string | null;
+}
+
+export interface FileBlocksResponse {
+  file: string;
+  lang: string;
+  version: string;
+  blocks: FileBlock[];
+}
+
 export interface Job {
   id: string;
   lang: string;
@@ -102,6 +116,11 @@ export const api = {
   fileDetail: (version: string, lang: string, file: string) =>
     request<FileNode[]>(
       `/status/${version}/${lang}/file?path=${encodeURIComponent(file)}`,
+    ),
+
+  fileBlocks: (version: string, lang: string, file: string) =>
+    request<FileBlocksResponse>(
+      `/status/${version}/${lang}/blocks?path=${encodeURIComponent(file)}`,
     ),
 
   models: () => request<Model[]>('/models'),

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type FileNode } from '../lib/api';
+import { api, type FileBlock } from '../lib/api';
 import { FLAGS } from '../lib/flags';
 
 interface Heading {
@@ -9,228 +9,135 @@ interface Heading {
   text: string;
 }
 
-/** A block of consecutive lines, optionally linked to a node */
-interface Block {
-  lines: string[];
-  headingId?: string;
-  headingLevel?: number;
-  headingText?: string;
-  md5?: string;
-  nodeType?: string;
-  hasTranslation?: boolean;
-  anchorId?: string;
-}
-
 function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function extractHeading(line: string, nextLine?: string) {
-  const m = line.match(/^(#{1,6})\s+(.+)/);
+function extractHeading(text: string, prefix: string, idx: number) {
+  const firstLine = text.split('\n')[0];
+  const m = firstLine.match(/^(#{1,6})\s+(.+)/);
   if (m) {
-    const text = m[2]
+    const clean = m[2]
       .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
       .replace(/\[]\(#[^)]*\)/g, '')
       .replace(/[`*[\]]/g, '')
       .trim();
-    return { level: m[1].length, text };
-  }
-  if (nextLine && /^[=-]{2,}\s*$/.test(nextLine) && line.trim().length > 0) {
-    const text = line
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/[`*[\]]/g, '')
-      .trim();
-    return { level: nextLine.startsWith('=') ? 1 : 2, text };
+    return { id: `${prefix}-h-${idx}`, level: m[1].length, text: clean };
   }
   return null;
 }
 
-/**
- * Parse content into blocks. Each block is either:
- * - A node (has md5, may span multiple lines)
- * - Gap lines between nodes (no md5)
- */
-function parseContent(content: string, prefix: string, nodes?: FileNode[]) {
-  const lines = content.split('\n');
+/** Extract headings from blocks */
+function getHeadings(blocks: FileBlock[], prefix: string): Heading[] {
   const headings: Heading[] = [];
-  const blocks: Block[] = [];
-
-  // Build sorted node list by line number
-  const sortedNodes = nodes ? [...nodes].sort((a, b) => a.line - b.line) : [];
-
-  // Find node boundaries: each node starts at its line and ends before the next node
-  // (or at the end of content)
-  const nodeStarts = sortedNodes.map((n) => n.line - 1); // 0-indexed
-  const nodeMap = new Map<number, FileNode>(); // 0-indexed start → node
-  for (let i = 0; i < sortedNodes.length; i++) {
-    nodeMap.set(sortedNodes[i].line - 1, sortedNodes[i]);
-  }
-
-  // Handle frontmatter specially
-  let fmEnd = 0;
-  if (lines[0]?.trim() === '---') {
-    for (let j = 1; j < lines.length; j++) {
-      if (lines[j].trim() === '---') {
-        fmEnd = j + 1;
-        break;
-      }
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (b.type === 'heading' || b.type === 'gap') {
+      const h = extractHeading(b.source, prefix, i);
+      if (h) headings.push(h);
     }
   }
-
-  if (fmEnd > 0) {
-    const fmNode = sortedNodes.find(
-      (n) => n.type === 'frontmatter' || n.type === 'heading',
-    );
-    const block: Block = {
-      lines: lines.slice(0, fmEnd),
-    };
-    if (fmNode && fmNode.line <= 2) {
-      block.md5 = fmNode.key;
-      block.nodeType = fmNode.type;
-      block.hasTranslation = !!fmNode.translation;
-      block.anchorId = `${prefix}-n-${fmNode.key.slice(0, 8)}`;
-    }
-    blocks.push(block);
-  }
-
-  // Process remaining lines
-  let i = fmEnd;
-  while (i < lines.length) {
-    const node = nodeMap.get(i);
-
-    if (node) {
-      // Find end of this node: next node start, or scan for empty line boundary
-      const nodeIdx = nodeStarts.indexOf(i);
-      const nextNodeStart =
-        nodeIdx + 1 < nodeStarts.length
-          ? nodeStarts[nodeIdx + 1]
-          : lines.length;
-
-      // Node spans from i to nextNodeStart (or until content ends)
-      const blockLines = lines.slice(i, nextNodeStart);
-      const block: Block = {
-        lines: blockLines,
-        md5: node.key,
-        nodeType: node.type,
-        hasTranslation: !!node.translation,
-        anchorId: `${prefix}-n-${node.key.slice(0, 8)}`,
-      };
-
-      // Check for heading in first line
-      const h = extractHeading(blockLines[0], blockLines[1]);
-      if (h) {
-        const hId = `${prefix}-h-${i}`;
-        block.headingId = hId;
-        block.headingLevel = h.level;
-        block.headingText = h.text;
-        headings.push({ id: hId, level: h.level, text: h.text });
-      }
-
-      blocks.push(block);
-      i = nextNodeStart;
-    } else {
-      // Gap lines (not part of any node)
-      const gapStart = i;
-      while (i < lines.length && !nodeMap.has(i)) {
-        // Still check for headings in gap lines
-        const h = extractHeading(lines[i], lines[i + 1]);
-        if (h) {
-          const hId = `${prefix}-h-${i}`;
-          headings.push({ id: hId, level: h.level, text: h.text });
-        }
-        i++;
-      }
-      blocks.push({ lines: lines.slice(gapStart, i) });
-    }
-  }
-
-  return { headings, blocks };
+  return headings;
 }
 
-function ContentBody({
+function truncate(s: string, max: number) {
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+/** Render a single pane (EN or translated) from blocks */
+function BlockPane({
   blocks,
-  bodyRef,
+  side,
   showGutter,
   highlightMd5,
+  paneRef,
 }: {
-  blocks: Block[];
-  bodyRef: React.RefObject<HTMLDivElement | null>;
-  showGutter?: boolean;
-  highlightMd5?: string | null;
+  blocks: FileBlock[];
+  side: 'source' | 'translation';
+  showGutter: boolean;
+  highlightMd5: string | null;
+  paneRef: React.RefObject<HTMLDivElement | null>;
 }) {
   if (!showGutter) {
+    // Simple pre without gutter
     return (
       <pre
         className="preview-body"
-        ref={bodyRef as unknown as React.RefObject<HTMLPreElement>}
+        ref={paneRef as unknown as React.RefObject<HTMLPreElement>}
       >
-        {blocks.map((block, bi) => (
-          <span key={block.anchorId ?? `b-${bi}`}>
-            {block.lines.map((line, li) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: static line order
-              <span key={`${bi}-${li}`}>
-                {block.headingId && li === 0 ? (
-                  <span className="hl" id={block.headingId}>
-                    {escapeHtml(line)}
-                  </span>
-                ) : (
-                  <span id={li === 0 ? block.anchorId : undefined}>
-                    {escapeHtml(line)}
-                  </span>
-                )}
-                {'\n'}
-              </span>
-            ))}
-          </span>
-        ))}
+        {blocks.map((block, i) => {
+          const text =
+            side === 'translation' && block.translation != null
+              ? block.translation
+              : block.source;
+          const h = extractHeading(
+            block.source,
+            side === 'source' ? 'en' : 'tr',
+            i,
+          );
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static block order
+            <span key={i}>
+              {h ? (
+                <span className="hl" id={h.id}>
+                  {escapeHtml(text)}
+                </span>
+              ) : (
+                <span>{escapeHtml(text)}</span>
+              )}
+            </span>
+          );
+        })}
       </pre>
     );
   }
 
+  // Gutter layout: each block is a row
+  const prefix = side === 'source' ? 'en' : 'tr';
   return (
-    <div className="preview-body-gutter" ref={bodyRef}>
-      {blocks.map((block, bi) => {
+    <div className="preview-body-gutter" ref={paneRef}>
+      {blocks.map((block, i) => {
+        const text =
+          side === 'translation' && block.translation != null
+            ? block.translation
+            : block.source;
         const isHighlighted = block.md5 && block.md5 === highlightMd5;
+        const h = extractHeading(block.source, prefix, i);
+        const anchorId = block.md5
+          ? `${prefix}-n-${block.md5.slice(0, 8)}`
+          : undefined;
+
         return (
           <div
-            key={block.anchorId ?? `b-${bi}`}
+            // biome-ignore lint/suspicious/noArrayIndexKey: static block order
+            key={i}
             className={`gutter-row${isHighlighted ? ' line-highlight' : ''}`}
-            id={block.anchorId}
+            id={anchorId}
           >
             <span className="gutter-cell">
               {block.md5 && (
                 <code
-                  className={`gutter-md5 ${block.hasTranslation ? 'done' : 'miss'}`}
-                  title={`${block.nodeType} · ${block.md5}`}
+                  className={`gutter-md5 ${block.translation != null ? 'done' : 'miss'}`}
+                  title={`${block.type} · ${block.md5}`}
                 >
                   {block.md5.slice(0, 6)}
                 </code>
               )}
             </span>
             <pre className="content-cell">
-              {block.lines.map((line, li) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static line order
-                <span key={li}>
-                  {block.headingId && li === 0 ? (
-                    <span className="hl" id={block.headingId}>
-                      {escapeHtml(line)}
-                    </span>
-                  ) : (
-                    <span>{escapeHtml(line)}</span>
-                  )}
-                  {'\n'}
+              {h ? (
+                <span className="hl" id={h.id}>
+                  {escapeHtml(text)}
                 </span>
-              ))}
+              ) : (
+                <span>{escapeHtml(text)}</span>
+              )}
             </pre>
           </div>
         );
       })}
     </div>
   );
-}
-
-function truncate(s: string, max: number) {
-  return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
 export type ViewMode = 'split' | 'en' | 'lang';
@@ -273,38 +180,34 @@ export function Preview({
     'all' | 'missing' | 'translated'
   >('all');
 
-  const { data: enData } = useQuery({
-    queryKey: ['content', version, 'en', file],
-    queryFn: () => api.fileContent(version, 'en', file),
+  // Single API call returns both EN source and translations as blocks
+  const { data: blocksData } = useQuery({
+    queryKey: ['fileBlocks', version, lang, file],
+    queryFn: () => api.fileBlocks(version, lang, file),
   });
 
-  const { data: transData } = useQuery({
-    queryKey: ['content', version, lang, file],
-    queryFn: () => api.fileContent(version, lang, file),
-    enabled: !isEn,
-  });
+  const blocks = blocksData?.blocks ?? [];
 
-  const { data: nodes } = useQuery({
-    queryKey: ['fileDetail', version, lang, file],
-    queryFn: () => api.fileDetail(version, lang, file),
-    enabled: !isEn,
-  });
+  const enHeadings = useMemo(() => getHeadings(blocks, 'en'), [blocks]);
+  const transHeadings = useMemo(() => getHeadings(blocks, 'tr'), [blocks]);
 
-  const en = useMemo(
-    () => parseContent(enData?.content || '', 'en', nodes ?? undefined),
-    [enData?.content, nodes],
+  // Node stats from blocks
+  const translatableBlocks = useMemo(
+    () => blocks.filter((b) => b.md5),
+    [blocks],
   );
-  const trans = useMemo(
-    () => parseContent(transData?.content || '', 'tr', nodes ?? undefined),
-    [transData?.content, nodes],
-  );
+  const translatedCount = translatableBlocks.filter(
+    (b) => b.translation != null,
+  ).length;
+  const totalCount = translatableBlocks.length;
 
   const filteredNodes = useMemo(() => {
-    if (!nodes) return [];
-    if (nodeFilter === 'missing') return nodes.filter((n) => !n.translation);
-    if (nodeFilter === 'translated') return nodes.filter((n) => n.translation);
-    return nodes;
-  }, [nodes, nodeFilter]);
+    if (nodeFilter === 'missing')
+      return translatableBlocks.filter((b) => b.translation == null);
+    if (nodeFilter === 'translated')
+      return translatableBlocks.filter((b) => b.translation != null);
+    return translatableBlocks;
+  }, [translatableBlocks, nodeFilter]);
 
   const syncScroll = useCallback(
     (source: HTMLElement | null, target: HTMLElement | null) => {
@@ -341,13 +244,15 @@ export function Preview({
   const showTransPane = !isEn && (mode === 'split' || mode === 'lang');
 
   function scrollToHeading(idx: number) {
-    if (showEnPane && en.headings[idx]) {
-      const el = document.getElementById(en.headings[idx].id);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (showEnPane && enHeadings[idx]) {
+      document
+        .getElementById(enHeadings[idx].id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    if (showTransPane && trans.headings[idx]) {
-      const el = document.getElementById(trans.headings[idx].id);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (showTransPane && transHeadings[idx]) {
+      document
+        .getElementById(transHeadings[idx].id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
@@ -355,20 +260,20 @@ export function Preview({
     setHighlightMd5(md5);
     const short = md5.slice(0, 8);
     if (showEnPane) {
-      const el = document.getElementById(`en-n-${short}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document
+        .getElementById(`en-n-${short}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     if (showTransPane) {
-      const el = document.getElementById(`tr-n-${short}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document
+        .getElementById(`tr-n-${short}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     setTimeout(() => setHighlightMd5(null), 3000);
   }
 
-  const primaryHeadings = showTransPane ? trans.headings : en.headings;
-  const fallbackHeadings = showTransPane ? en.headings : trans.headings;
-  const tocHeadings =
-    primaryHeadings.length > 0 ? primaryHeadings : fallbackHeadings;
+  const primaryHeadings = showTransPane ? transHeadings : enHeadings;
+  const tocHeadings = primaryHeadings.length > 0 ? primaryHeadings : enHeadings;
 
   const hasToc = showToc && tocHeadings.length > 0;
   const paneCount = [showEnPane, showTransPane].filter(Boolean).length;
@@ -381,9 +286,7 @@ export function Preview({
         ? '1fr 180px'
         : '1fr';
 
-  const translatedCount = nodes?.filter((n) => n.translation).length ?? 0;
-  const totalCount = nodes?.length ?? 0;
-  const showGutter = showNodes && !!nodes;
+  const showGutter = showNodes && blocks.length > 0;
 
   return (
     <div className={`preview-wrap${showNodes && !isEn ? ' with-nodes' : ''}`}>
@@ -433,7 +336,7 @@ export function Preview({
             type="button"
             className={showToc ? 'active' : ''}
             onClick={onToggleToc}
-            title="Toggle table of contents"
+            title="Toggle TOC"
           >
             ☰
           </button>
@@ -442,7 +345,7 @@ export function Preview({
               type="button"
               className={showNodes ? 'active' : ''}
               onClick={onToggleNodes}
-              title="Toggle nodes panel"
+              title="Toggle nodes"
             >
               🧩
             </button>
@@ -455,12 +358,13 @@ export function Preview({
         {showEnPane && (
           <div className="preview-pane">
             <div className="preview-pane-hdr">{FLAGS.en} EN (source)</div>
-            {enData ? (
-              <ContentBody
-                blocks={en.blocks}
-                bodyRef={enRef}
+            {blocks.length > 0 ? (
+              <BlockPane
+                blocks={blocks}
+                side="source"
                 showGutter={showGutter}
                 highlightMd5={highlightMd5}
+                paneRef={enRef}
               />
             ) : (
               <div className="preview-body loading">Loading...</div>
@@ -472,12 +376,13 @@ export function Preview({
             <div className="preview-pane-hdr">
               {FLAGS[lang]} {lang}
             </div>
-            {transData ? (
-              <ContentBody
-                blocks={trans.blocks}
-                bodyRef={transRef}
+            {blocks.length > 0 ? (
+              <BlockPane
+                blocks={blocks}
+                side="translation"
                 showGutter={showGutter}
                 highlightMd5={highlightMd5}
+                paneRef={transRef}
               />
             ) : (
               <div className="preview-body loading">Loading...</div>
@@ -542,7 +447,7 @@ export function Preview({
             </div>
           </div>
           <div className="nodes-table-wrap">
-            {!nodes ? (
+            {blocks.length === 0 ? (
               <div style={{ padding: '1rem', color: 'var(--fg2)' }}>
                 Loading nodes...
               </div>
@@ -553,7 +458,6 @@ export function Preview({
                     <th className="col-status" />
                     <th className="col-type">Type</th>
                     <th className="col-md5">MD5</th>
-                    <th className="col-line">Line</th>
                     <th className="col-source">EN Source</th>
                     <th className="col-trans">Translation</th>
                   </tr>
@@ -561,34 +465,33 @@ export function Preview({
                 <tbody>
                   {filteredNodes.map((n) => (
                     <tr
-                      key={n.key}
-                      className={`${n.translation ? 'translated' : 'missing'} ${expandedNode === n.key ? 'expanded' : ''} ${highlightMd5 === n.key ? 'highlighted' : ''}`}
+                      key={n.md5}
+                      className={`${n.translation != null ? 'translated' : 'missing'} ${expandedNode === n.md5 ? 'expanded' : ''} ${highlightMd5 === n.md5 ? 'highlighted' : ''}`}
                       onClick={() => {
-                        setExpandedNode(expandedNode === n.key ? null : n.key);
-                        scrollToNode(n.key);
+                        setExpandedNode(expandedNode === n.md5 ? null : n.md5);
+                        if (n.md5) scrollToNode(n.md5);
                       }}
                     >
                       <td className="col-status">
-                        {n.translation ? '✅' : '❌'}
+                        {n.translation != null ? '✅' : '❌'}
                       </td>
                       <td className="col-type">
                         <span className="type-badge">{n.type}</span>
                       </td>
                       <td className="col-md5">
-                        <code title={n.key}>{n.key.slice(0, 8)}</code>
+                        <code title={n.md5 ?? ''}>{n.md5?.slice(0, 8)}</code>
                       </td>
-                      <td className="col-line">{n.line}</td>
                       <td className="col-source">
                         <div className="cell-text">
-                          {expandedNode === n.key
+                          {expandedNode === n.md5
                             ? n.source
                             : truncate(n.source.replace(/\n/g, ' '), 120)}
                         </div>
                       </td>
                       <td className="col-trans">
-                        {n.translation ? (
+                        {n.translation != null ? (
                           <div className="cell-text">
-                            {expandedNode === n.key
+                            {expandedNode === n.md5
                               ? n.translation
                               : truncate(
                                   n.translation.replace(/\n/g, ' '),
