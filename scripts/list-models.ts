@@ -47,6 +47,7 @@ const EXCLUDED_MODELS = new Set([
   'arcee-ai/trinity-large-preview:free', // 404 with json_schema
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', // 24B, low quality
   'nvidia/nemotron-3-super-120b-a12b:free', // Reasoning model, wastes all tokens on thinking
+  'nvidia/nemotron-nano-9b-v2:free', // 9B, extremely slow (~10min/chunk), wraps output in {nodes:{}}
   'minimax/minimax-m2.5:free', // Blocked by privacy/guardrail restrictions
 ]);
 

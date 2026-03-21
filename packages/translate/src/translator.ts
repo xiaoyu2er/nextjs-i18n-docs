@@ -795,6 +795,16 @@ async function translateJsonChunk(
         }
       }
 
+      // Unwrap if model wrapped in {"nodes": {...}} or {"translations": {...}}
+      if (
+        Object.keys(parsed).length === 1 &&
+        typeof Object.values(parsed)[0] === 'object'
+      ) {
+        const inner = Object.values(parsed)[0] as Record<string, string>;
+        log('🔄 Unwrapping nested JSON object');
+        parsed = inner;
+      }
+
       // Validate: check for missing and extra keys
       const returnedMd5s = new Set(Object.keys(parsed));
       const missing = requestedMd5s.filter((md5) => !returnedMd5s.has(md5));
