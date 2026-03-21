@@ -1012,6 +1012,11 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
 
   // Get untranslated keys from DB (optionally filtered by files)
   const fileFilter = opts.files.length > 0 ? opts.files : undefined;
+  if (fileFilter) {
+    console.log(
+      `   Files: ${fileFilter.length} selected (${fileFilter.join(', ')})`,
+    );
+  }
   const untranslated = cache.untranslatedKeys(lang, version, 0, fileFilter);
   console.log(
     `\n📦 ${untranslated.length} untranslated keys for ${version}/${lang}`,
