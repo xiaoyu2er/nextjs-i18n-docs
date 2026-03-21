@@ -1115,7 +1115,19 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
   //   2. Output budget = maxCompletionTokens (what the model can generate)
   // Per entry estimates:
   //   Input:  source_chars / 4 + 80 (JSON key/structure overhead)
-  //   Output: source_chars * 1.5 / 4 (translations are ~1.5x source for CJK)
+  //   Output: source_chars * multiplier / 4 (varies by target language tokenizer)
+  // CJK and non-Latin scripts use more tokens per character in most tokenizers
+  const OUTPUT_MULTIPLIER: Record<string, number> = {
+    ja: 2.5, // Japanese: each char → 2-3 tokens
+    ru: 2.0, // Russian: Cyrillic → 2-3 tokens per char
+    ar: 2.0, // Arabic: RTL script → 2-3 tokens per char
+    'zh-hans': 1.5,
+    'zh-hant': 1.5,
+    de: 1.3,
+    fr: 1.3,
+    es: 1.2,
+  };
+  const outputMultiplier = OUTPUT_MULTIPLIER[lang] ?? 1.5;
   const maxTokens = opts.maxTokens;
   const SYSTEM_PROMPT_TOKENS = 700;
   const JSON_OVERHEAD = 200; // braces, commas, etc.
@@ -1141,7 +1153,7 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
 
   for (const k of untranslated) {
     const inputTokens = Math.ceil(k.text.length / 4 + 80);
-    const outputTokens = Math.ceil((k.text.length * 1.5) / 4 + 80);
+    const outputTokens = Math.ceil((k.text.length * outputMultiplier) / 4 + 80);
     if (
       (currentInputTokens + inputTokens > inputBudget ||
         currentOutputTokens + outputTokens > outputBudget) &&
