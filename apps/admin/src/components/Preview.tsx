@@ -30,7 +30,7 @@ function getHeadings(
   for (let i = 0; i < blocks.length; i++) {
     const text =
       useTranslation && blocks[i].translation != null
-        ? blocks[i].translation!
+        ? (blocks[i].translation as string)
         : blocks[i].source;
     const h = extractHeading(text, prefix, i);
     if (h) headings.push(h);

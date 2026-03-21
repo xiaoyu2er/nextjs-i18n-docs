@@ -10,6 +10,7 @@ interface Props {
   defaultVersion?: string;
   files?: string[];
   onClose: () => void;
+  onSuccess?: (msg: string) => void;
 }
 
 function formatPrice(price: number) {
@@ -35,6 +36,7 @@ export function JobDialog({
   defaultVersion,
   files,
   onClose,
+  onSuccess,
 }: Props) {
   const [lang, setLang] = useState(defaultLang || langs[0]);
   const [version, setVersion] = useState(defaultVersion || versions[0]);
@@ -111,7 +113,11 @@ export function JobDialog({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['jobs'] });
-      onClose();
+      if (onSuccess) {
+        onSuccess(`✅ Job started: ${lang} / ${version} (${mode})`);
+      } else {
+        onClose();
+      }
     },
     onError: (err) => setError(err.message),
   });

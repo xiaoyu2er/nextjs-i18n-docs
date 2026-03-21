@@ -48,9 +48,18 @@ export function App() {
     const saved = localStorage.getItem('theme');
     return saved === 'light' ? 'light' : 'dark';
   });
+  // Toast
+  const [toast, setToast] = useState<string | null>(null);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const { version, lang, file, showFiles, view, toc, nodes, status, section } =
     readParams();
@@ -294,6 +303,9 @@ export function App() {
         )}
       </div>
 
+      {/* Toast */}
+      {toast && <div className="toast">{toast}</div>}
+
       {/* Job dialog */}
       {showDialog && (
         <JobDialog
@@ -303,6 +315,10 @@ export function App() {
           defaultVersion={version}
           files={dialogFiles}
           onClose={() => setShowDialog(false)}
+          onSuccess={(msg) => {
+            setShowDialog(false);
+            setToast(msg);
+          }}
         />
       )}
     </>
