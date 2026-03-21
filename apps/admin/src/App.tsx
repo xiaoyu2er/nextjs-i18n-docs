@@ -100,9 +100,13 @@ export function App() {
     [bump],
   );
 
-  const setNodes = useCallback((show: boolean) => {
-    setParams({ nodes: show ? '1' : null });
-  }, []);
+  const setNodes = useCallback(
+    (show: boolean) => {
+      setParams({ nodes: show ? '1' : null });
+      bump();
+    },
+    [bump],
+  );
 
   const setToc = useCallback(
     (show: boolean) => {
