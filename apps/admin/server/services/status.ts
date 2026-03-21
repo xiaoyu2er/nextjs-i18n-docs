@@ -6,12 +6,7 @@ import { parseMdx } from '../../../../packages/translate/src/parser';
 const ROOT = resolve(import.meta.dir, '../../../..');
 const CACHE_DIR = join(ROOT, '.cache');
 
-export const VERSIONS = [
-  { version: 'latest', dir: 'content' },
-  { version: 'v15', dir: 'content-v15' },
-  { version: 'v14', dir: 'content-v14' },
-  { version: 'v13', dir: 'content-v13' },
-] as const;
+export const VERSIONS = ['latest', 'v15', 'v14', 'v13'] as const;
 
 export const LANGS = [
   'zh-hans',
@@ -47,10 +42,9 @@ function walkMdx(dir: string): string[] {
 /** Ensure source_files are populated for a version */
 export function ensureScanned(version: string): void {
   const cache = getCache();
-  const vDef = VERSIONS.find((v) => v.version === version);
-  if (!vDef) return;
+  if (!VERSIONS.includes(version as any)) return;
 
-  const enDir = join(ROOT, vDef.dir, 'en');
+  const enDir = join(ROOT, 'content', version);
   if (!existsSync(enDir)) return;
 
   const files = walkMdx(enDir);
@@ -80,10 +74,9 @@ export function ensureScanned(version: string): void {
 /** Force rescan source_files for a version (clears stale MD5 keys) */
 export function rescan(version: string): number {
   const cache = getCache();
-  const vDef = VERSIONS.find((v) => v.version === version);
-  if (!vDef) return 0;
+  if (!VERSIONS.includes(version as any)) return 0;
 
-  const enDir = join(ROOT, vDef.dir, 'en');
+  const enDir = join(ROOT, 'content', version);
   if (!existsSync(enDir)) return 0;
 
   const files = walkMdx(enDir);
@@ -134,14 +127,14 @@ export function getOverview() {
     }
   > = {};
 
-  for (const vDef of VERSIONS) {
-    ensureScanned(vDef.version);
-    const enDir = join(ROOT, vDef.dir, 'en');
+  for (const version of VERSIONS) {
+    ensureScanned(version);
+    const enDir = join(ROOT, 'content', version);
     const enFileCount = existsSync(enDir) ? walkMdx(enDir).length : 0;
 
     const langs: (typeof result)[string]['langs'] = {};
     for (const lang of LANGS) {
-      const sections = cache.sectionStats(vDef.version, lang);
+      const sections = cache.sectionStats(version, lang);
       let totalFiles = 0;
       let translatedFiles = 0;
       let totalNodes = 0;
@@ -165,7 +158,7 @@ export function getOverview() {
       };
     }
 
-    result[vDef.version] = { enFileCount, langs };
+    result[version] = { enFileCount, langs };
   }
 
   return result;
@@ -202,10 +195,9 @@ export function getFileBlocks(
   file: string,
 ): FileBlock[] | null {
   const cache = getCache();
-  const vDef = VERSIONS.find((v) => v.version === version);
-  if (!vDef) return null;
+  if (!VERSIONS.includes(version as any)) return null;
 
-  const enPath = join(ROOT, vDef.dir, 'en', file);
+  const enPath = join(ROOT, 'content', version, file);
   if (!existsSync(enPath)) return null;
 
   const content = readFileSync(enPath, 'utf8');

@@ -12,7 +12,7 @@
  *   --dry-run         Assemble only, show what would be translated
  *
  * Options:
- *   --docs-root <dir>   Source English content (default: content/en)
+ *   --docs-root <dir>   Source English content (default: content/latest)
  *   --output-dir <dir>  Output directory (default: content)
  *   --cache-dir <dir>   Cache directory (default: .cache)
  *   --pattern <glob>    File pattern (default: **\/*.mdx)
@@ -137,7 +137,7 @@ function parseArgs(argv: string[]): CliOptions {
   const hasFlag = (name: string) => args.includes(`--${name}`);
 
   return {
-    docsRoot: path.resolve(PROJECT_ROOT, getOpt('docs-root', 'content/en')),
+    docsRoot: path.resolve(PROJECT_ROOT, getOpt('docs-root', 'content/latest')),
     outputDir: path.resolve(PROJECT_ROOT, getOpt('output-dir', 'content')),
     cacheDir: path.resolve(PROJECT_ROOT, getOpt('cache-dir', '.cache')),
     lang: getOpt('lang', 'zh-hans'),
@@ -855,9 +855,7 @@ async function runAnnotate(opts: CliOptions): Promise<void> {
     }
 
     // Try to find corresponding English source file
-    // Strategy: replace the language code segment in the path with 'en'
-    // e.g., content/zh-hans/docs/foo.mdx → content/en/docs/foo.mdx
-    //        content-v15/ja/docs/foo.mdx → content-v15/en/docs/foo.mdx
+    // Fallback: try --docs-root + relPath
     const fullPath = path.resolve(filePath);
     const langs = ['zh-hans', 'zh-hant', 'ja', 'es', 'de', 'fr', 'ru', 'ar'];
     let enSourcePath = '';
@@ -972,9 +970,9 @@ async function runLookup(opts: CliOptions): Promise<void> {
 // ── MD5 mode ──────────────────────────────────────────────────────────
 
 function detectVersion(docsRoot: string): string {
-  if (docsRoot.includes('content-v13')) return 'v13';
-  if (docsRoot.includes('content-v14')) return 'v14';
-  if (docsRoot.includes('content-v15')) return 'v15';
+  if (docsRoot.includes('content/v13')) return 'v13';
+  if (docsRoot.includes('content/v14')) return 'v14';
+  if (docsRoot.includes('content/v15')) return 'v15';
   return 'latest';
 }
 

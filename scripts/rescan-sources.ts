@@ -3,8 +3,10 @@
  * Rescan EN source files and rebuild source_files table.
  * Clears stale MD5 keys from previous EN content versions.
  *
+ * Source: content/{version}/
+ *
  * Usage:
- *   bun run rescan                   # All versions
+ *   bun run rescan                      # All versions
  *   bun run rescan -- --version latest  # Single version
  */
 
@@ -15,19 +17,15 @@ import { parseMdx } from '../packages/translate/src/parser';
 
 const ROOT = resolve(import.meta.dirname!, '..');
 const CACHE_DIR = join(ROOT, '.cache');
+const CONTENT_DIR = join(ROOT, 'content');
 
-const VERSIONS = [
-  { version: 'latest', dir: 'content' },
-  { version: 'v13', dir: 'content-v13' },
-  { version: 'v14', dir: 'content-v14' },
-  { version: 'v15', dir: 'content-v15' },
-];
+const VERSIONS = ['latest', 'v13', 'v14', 'v15'];
 
 const args = process.argv.slice(2);
 const filterVersion =
   args.indexOf('--version') >= 0 ? args[args.indexOf('--version') + 1] : null;
 const versions = filterVersion
-  ? VERSIONS.filter((v) => v.version === filterVersion)
+  ? VERSIONS.filter((v) => v === filterVersion)
   : VERSIONS;
 
 function walkMdx(dir: string): string[] {
@@ -44,15 +42,15 @@ function walkMdx(dir: string): string[] {
 const t0 = Date.now();
 const cache = new TranslationCache(CACHE_DIR);
 
-for (const vDef of versions) {
-  const enDir = join(ROOT, vDef.dir, 'en');
+for (const version of versions) {
+  const enDir = join(CONTENT_DIR, version);
   if (!existsSync(enDir)) {
-    console.log(`⚠ ${vDef.version}: EN dir not found, skipping`);
+    console.log(`⚠ ${version}: source dir not found, skipping`);
     continue;
   }
 
   const files = walkMdx(enDir);
-  cache.clearSources('', vDef.version);
+  cache.clearSources('', version);
 
   let nodeCount = 0;
   for (const file of files) {
@@ -64,29 +62,28 @@ for (const vDef of versions) {
       if (node.needsTranslation && node.md5) {
         const line = content.substring(0, node.startOffset).split('\n').length;
         cache.setSource(node.md5, node.rawText, node.type);
-        cache.updateSource('', node.md5, relPath, line, vDef.version);
+        cache.updateSource('', node.md5, relPath, line, version);
         nodeCount++;
       }
     }
   }
 
-  console.log(`✅ ${vDef.version}: ${files.length} files, ${nodeCount} nodes`);
+  console.log(`✅ ${version}: ${files.length} files, ${nodeCount} nodes`);
 }
 
-// Clean orphan translations (keys not in any source_files)
+// Clean orphan translations and sources
 const orphans = cache.db
   .prepare(
-    `DELETE FROM translations WHERE key NOT IN (SELECT DISTINCT key FROM source_files)`,
+    'DELETE FROM translations WHERE key NOT IN (SELECT DISTINCT key FROM source_files)',
   )
   .run();
 if (orphans.changes > 0) {
   console.log(`🗑️  Deleted ${orphans.changes} orphan translations`);
 }
 
-// Clean orphan sources
 const orphanSources = cache.db
   .prepare(
-    `DELETE FROM sources WHERE key NOT IN (SELECT DISTINCT key FROM source_files)`,
+    'DELETE FROM sources WHERE key NOT IN (SELECT DISTINCT key FROM source_files)',
   )
   .run();
 if (orphanSources.changes > 0) {

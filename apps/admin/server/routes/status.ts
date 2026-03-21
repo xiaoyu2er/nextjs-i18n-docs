@@ -76,11 +76,13 @@ app.get('/content/:version/:lang/*', (c) => {
   const prefix = `/api/status/content/${version}/${lang}/`;
   const filePath = decodeURIComponent(c.req.path.slice(prefix.length));
 
-  const vDef = VERSIONS.find((v) => v.version === version);
-  if (!vDef) return c.json({ error: 'Unknown version' }, 404);
+  if (!VERSIONS.includes(version as any))
+    return c.json({ error: 'Unknown version' }, 404);
 
   const dir =
-    lang === 'en' ? join(ROOT, vDef.dir, 'en') : join(ROOT, vDef.dir, lang);
+    lang === 'en'
+      ? join(ROOT, 'content', version)
+      : join(ROOT, '.cache/content', version, lang);
   const fullPath = join(dir, filePath);
 
   if (!existsSync(fullPath)) {

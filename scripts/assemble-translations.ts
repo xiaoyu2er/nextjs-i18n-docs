@@ -2,11 +2,13 @@
 /**
  * Assemble translated files from EN source + translation cache.
  *
+ * Source:  content/{version}/        (EN files)
+ * Output:  .cache/content/{version}/{lang}/  (assembled translations)
+ *
  * Usage:
  *   bun scripts/assemble-translations.ts                    # All versions, all langs
  *   bun scripts/assemble-translations.ts --version latest   # Latest only
  *   bun scripts/assemble-translations.ts --lang zh-hans     # One language only
- *   bun scripts/assemble-translations.ts --version v14 --lang ja
  */
 
 import {
@@ -22,14 +24,10 @@ import { TranslationCache } from '../packages/translate/src/cache';
 
 const ROOT = resolve(import.meta.dirname!, '..');
 const CACHE_DIR = join(ROOT, '.cache');
+const CONTENT_DIR = join(ROOT, 'content');
+const OUTPUT_DIR = join(CACHE_DIR, 'content');
 
-const VERSIONS = [
-  { version: 'latest', dir: 'content' },
-  { version: 'v13', dir: 'content-v13' },
-  { version: 'v14', dir: 'content-v14' },
-  { version: 'v15', dir: 'content-v15' },
-];
-
+const VERSIONS = ['latest', 'v13', 'v14', 'v15'];
 const ALL_LANGS = ['zh-hans', 'zh-hant', 'ja', 'ar', 'de', 'es', 'fr', 'ru'];
 
 // ── CLI ──
@@ -42,7 +40,7 @@ const getOpt = (f: string): string | null => {
 const filterVersion = getOpt('version');
 const filterLang = getOpt('lang');
 const versions = filterVersion
-  ? VERSIONS.filter((v) => v.version === filterVersion)
+  ? VERSIONS.filter((v) => v === filterVersion)
   : VERSIONS;
 const langs = filterLang ? [filterLang] : ALL_LANGS;
 
@@ -66,13 +64,12 @@ function ensureDir(path: string) {
 const t0 = Date.now();
 const cache = new TranslationCache(CACHE_DIR);
 
-let _totalFiles = 0;
 let totalWritten = 0;
 
-for (const vDef of versions) {
-  const enDir = join(ROOT, vDef.dir, 'en');
+for (const version of versions) {
+  const enDir = join(CONTENT_DIR, version);
   if (!existsSync(enDir)) {
-    console.log(`⚠ ${vDef.version}: EN dir not found, skipping`);
+    console.log(`⚠ ${version}: source dir not found, skipping`);
     continue;
   }
 
@@ -87,17 +84,14 @@ for (const vDef of versions) {
 
       const result = assemble(content, lang, cache, relPath, true);
 
-      // Always write — fallback to EN source for uncached nodes.
-      // This ensures stale translated files are replaced.
-      const outPath = join(ROOT, vDef.dir, lang, relPath);
+      const outPath = join(OUTPUT_DIR, version, lang, relPath);
       ensureDir(outPath);
       writeFileSync(outPath, result.content);
       written++;
     }
 
-    _totalFiles += enFiles.length;
     totalWritten += written;
-    console.log(`[${vDef.version}/${lang}] ${written} files written`);
+    console.log(`[${version}/${lang}] ${written} files written`);
   }
 }
 

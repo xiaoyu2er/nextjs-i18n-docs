@@ -63,9 +63,15 @@ const LOCALES = [
   'fr',
   'ru',
 ];
-const CONTENT_SRC = version
-  ? resolve(import.meta.dirname!, `../content-v${version}`)
-  : resolve(import.meta.dirname!, '../content');
+// Source: content/{version}/ for EN, .cache/content/{version}/{lang}/ for translations
+const CONTENT_SRC_EN = resolve(
+  import.meta.dirname!,
+  `../content/${version || 'latest'}`,
+);
+const CONTENT_SRC_CACHE = resolve(
+  import.meta.dirname!,
+  `../.cache/content/${version || 'latest'}`,
+);
 const CONTENT_DST = resolve(
   import.meta.dirname!,
   '..',
@@ -154,10 +160,14 @@ function parseFrontmatter(content: string): {
 function resolveSourceFile(locale: string, sourceRef: string): string | null {
   const parts = sourceRef.split('/');
   // Try locale-specific source first, fall back to EN
+  const localeDir =
+    locale === ROOT_LOCALE
+      ? join(CONTENT_SRC_EN, 'docs')
+      : join(CONTENT_SRC_CACHE, locale, 'docs');
   return (
-    resolveSourceInDir(join(CONTENT_SRC, locale, 'docs'), parts) ??
-    (locale !== 'en'
-      ? resolveSourceInDir(join(CONTENT_SRC, 'en', 'docs'), parts)
+    resolveSourceInDir(localeDir, parts) ??
+    (locale !== ROOT_LOCALE
+      ? resolveSourceInDir(join(CONTENT_SRC_EN, 'docs'), parts)
       : null)
   );
 }
@@ -270,7 +280,7 @@ let sourceErrors = 0;
 // Pre-compute blog post ordering by date (newest first)
 const blogDateOrder = new Map<string, number>();
 if (!version) {
-  const blogDir = join(CONTENT_SRC, 'en', 'blog');
+  const blogDir = join(CONTENT_SRC_EN, 'blog');
   if (existsSync(blogDir)) {
     const posts: { slug: string; date: number }[] = [];
     for (const file of readdirSync(blogDir)) {
@@ -294,7 +304,8 @@ console.log(
 );
 
 for (const locale of LOCALES) {
-  const localeSrc = join(CONTENT_SRC, locale);
+  const localeSrc =
+    locale === ROOT_LOCALE ? CONTENT_SRC_EN : join(CONTENT_SRC_CACHE, locale);
   if (!existsSync(localeSrc)) {
     console.log(`⚠ Skipping ${locale} — not found`);
     continue;
@@ -598,9 +609,9 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 }
 
 /** Generate blog/index.mdx for EN and all locales */
-function generateBlogIndex(contentRoot: string) {
+function generateBlogIndex() {
   // 1. Read EN posts (canonical list with dates)
-  const enPosts = readBlogPosts(join(contentRoot, 'en', 'blog'));
+  const enPosts = readBlogPosts(join(CONTENT_SRC_EN, 'blog'));
   const enPostMap = new Map(enPosts.map((p) => [p.slug, p]));
 
   // 2. Generate EN blog index
@@ -611,13 +622,14 @@ function generateBlogIndex(contentRoot: string) {
   totalFiles++;
 
   // 3. Generate locale-specific blog indexes
-  const locales = readdirSync(contentRoot).filter(
-    (d) => d !== 'en' && existsSync(join(contentRoot, d, 'blog')),
+  if (!existsSync(CONTENT_SRC_CACHE)) return;
+  const locales = readdirSync(CONTENT_SRC_CACHE).filter((d) =>
+    existsSync(join(CONTENT_SRC_CACHE, d, 'blog')),
   );
 
   for (const locale of locales) {
     const localePosts = readBlogPosts(
-      join(contentRoot, locale, 'blog'),
+      join(CONTENT_SRC_CACHE, locale, 'blog'),
       enPostMap,
     );
     const localeMdx = buildBlogIndexMdx(localePosts);
@@ -630,7 +642,7 @@ function generateBlogIndex(contentRoot: string) {
 
 /** Generate learn/index.mdx with cards for each course */
 /** Generate learn/index.mdx — splash page, Starlight auto-generates sub-page cards */
-function generateLearnIndex(_contentRoot: string) {
+function generateLearnIndex() {
   const mdx = `---
 title: Learn Next.js
 description: Free interactive courses to help you get started with Next.js and build full-stack web applications.
@@ -648,13 +660,11 @@ hero:
 }
 
 if (!version) {
-  const CONTENT_ROOT = resolve(import.meta.dirname!, '../content');
-
   // Generate blog index from actual blog posts
-  generateBlogIndex(CONTENT_ROOT);
+  generateBlogIndex();
 
   // Generate learn index from actual learn directories
-  generateLearnIndex(CONTENT_ROOT);
+  generateLearnIndex();
 
   console.log('Generated blog & learn index pages');
 }
