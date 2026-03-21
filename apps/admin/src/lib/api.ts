@@ -123,6 +123,12 @@ export const api = {
       `/status/${version}/${lang}/blocks?path=${encodeURIComponent(file)}`,
     ),
 
+  deleteCache: (version: string, lang: string, key: string) =>
+    request<{ deleted: string }>(
+      `/status/${version}/${lang}/cache?key=${encodeURIComponent(key)}`,
+      { method: 'DELETE' },
+    ),
+
   models: () => request<Model[]>('/models'),
 
   jobs: () => request<Job[]>('/jobs'),

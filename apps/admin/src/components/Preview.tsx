@@ -1,7 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type FileBlock } from '../lib/api';
 import { FLAGS } from '../lib/flags';
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  md5: string;
+  type: string;
+}
 
 interface Heading {
   id: string;
@@ -70,6 +77,26 @@ export function Preview({
   const mode = isEn ? 'en' : viewMode;
 
   const [highlightMd5, setHighlightMd5] = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
+
+  const qc = useQueryClient();
+  const deleteCache = useMutation({
+    mutationFn: (key: string) => api.deleteCache(version, lang, key),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fileBlocks', version, lang, file] });
+      qc.invalidateQueries({ queryKey: ['files'] });
+      qc.invalidateQueries({ queryKey: ['status'] });
+      setCtxMenu(null);
+    },
+  });
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [ctxMenu]);
 
   const { data: blocksData } = useQuery({
     queryKey: ['fileBlocks', version, lang, file],
@@ -252,6 +279,16 @@ export function Preview({
                 {showTransCol && (
                   <pre
                     className={`block-cell${h ? ' block-heading' : ''}${block.md5 && block.translation == null ? ' block-missing' : ''}`}
+                    onContextMenu={(e) => {
+                      if (!block.md5 || isEn) return;
+                      e.preventDefault();
+                      setCtxMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        md5: block.md5,
+                        type: block.type,
+                      });
+                    }}
                   >
                     {block.translation != null
                       ? block.translation
@@ -283,6 +320,36 @@ export function Preview({
           </div>
         )}
       </div>
+
+      {/* Context menu */}
+      {ctxMenu && (
+        <div
+          className="ctx-menu"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="ctx-menu-header">
+            <code>{ctxMenu.md5.slice(0, 12)}…</code>
+            <span className="ctx-menu-type">{ctxMenu.type}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(ctxMenu.md5);
+              setCtxMenu(null);
+            }}
+          >
+            📋 Copy MD5
+          </button>
+          <button
+            type="button"
+            className="ctx-menu-danger"
+            onClick={() => deleteCache.mutate(ctxMenu.md5)}
+          >
+            🗑️ Delete cache
+          </button>
+        </div>
+      )}
     </div>
   );
 }

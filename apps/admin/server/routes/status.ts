@@ -93,6 +93,19 @@ app.get('/content/:version/:lang/*', (c) => {
   return c.json({ file: filePath, lang, version, content });
 });
 
+/** DELETE /api/status/:version/:lang/cache?key=... — Delete a cached translation */
+app.delete('/:version/:lang/cache', (c) => {
+  const { lang } = c.req.param();
+  const key = c.req.query('key');
+  if (!key) return c.json({ error: 'Missing key query param' }, 400);
+
+  const cache = getCache();
+  cache.db
+    .prepare('DELETE FROM translations WHERE lang = ? AND key = ?')
+    .run(lang, key);
+  return c.json({ deleted: key, lang });
+});
+
 /** POST /api/status/:version/rescan — Force rescan source_files */
 app.post('/:version/rescan', (c) => {
   const { version } = c.req.param();
