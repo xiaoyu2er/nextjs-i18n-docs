@@ -668,7 +668,7 @@ export async function translateJson(
 /**
  * Translate a single chunk of nodes via JSON mode.
  */
-async function translateJsonChunk(
+export async function translateJsonChunk(
   opts: TranslateOptions & {
     uncached: Record<string, string>;
     nodeTypes: Record<string, string>;

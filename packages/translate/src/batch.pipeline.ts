@@ -45,6 +45,7 @@ import {
   rebuildFrontmatter,
   type TranslateOptions,
   translateJson,
+  translateJsonChunk,
 } from './translator';
 import { FileLogger, formatDuration, TableUI } from './ui';
 
@@ -1215,7 +1216,8 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
     clog(`${chunkLabel}`);
 
     try {
-      const result = await translateJson({
+      // Call translateJsonChunk directly — batch pipeline already handles chunking
+      const result = await translateJsonChunk({
         assembledContent: '',
         uncached,
         nodeTypes,
