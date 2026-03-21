@@ -145,13 +145,21 @@ class JobManager {
     });
 
     proc.on('exit', (code) => {
-      job.status = code === 0 ? 'completed' : 'failed';
       job.exitCode = code;
-      job.finishedAt = new Date().toISOString();
       job.currentFile = undefined;
-      this.addLog(id, `Process exited with code ${code}`);
       this.processes.delete(id);
-      this.emit(id, { type: 'exit', code });
+
+      if (code === 0) {
+        // Run assemble + prepare-content for the translated version/lang
+        this.addLog(id, '📦 Assembling translations...');
+        job.currentFile = 'assembling...';
+        this.runPostTranslate(id, job, opts.version, opts.lang);
+      } else {
+        job.status = 'failed';
+        job.finishedAt = new Date().toISOString();
+        this.addLog(id, `Process exited with code ${code}`);
+        this.emit(id, { type: 'exit', code });
+      }
     });
 
     proc.on('error', (err) => {
@@ -177,6 +185,88 @@ class JobManager {
     this.processes.delete(id);
     this.emit(id, { type: 'exit', code: null });
     return true;
+  }
+
+  /** Run assemble + prepare-content after successful translation */
+  private runPostTranslate(
+    id: string,
+    job: Job,
+    version: string,
+    lang: string,
+  ): void {
+    const assemble = spawn(
+      'bun',
+      [
+        'scripts/assemble-translations.ts',
+        '--version',
+        version,
+        '--lang',
+        lang,
+      ],
+      {
+        cwd: PROJECT_ROOT,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+
+    assemble.stdout?.on('data', (d: Buffer) => {
+      for (const line of d.toString().split('\n').filter(Boolean)) {
+        this.addLog(id, line);
+      }
+    });
+    assemble.stderr?.on('data', (d: Buffer) => {
+      for (const line of d.toString().split('\n').filter(Boolean)) {
+        this.addLog(id, line);
+      }
+    });
+
+    assemble.on('exit', (assembleCode) => {
+      if (assembleCode !== 0) {
+        this.addLog(id, `⚠️ Assemble failed (code ${assembleCode})`);
+        job.status = 'failed';
+        job.finishedAt = new Date().toISOString();
+        this.emit(id, { type: 'exit', code: assembleCode });
+        return;
+      }
+
+      this.addLog(id, '🔧 Running prepare-content...');
+      job.currentFile = 'preparing content...';
+      const prepArgs = ['scripts/prepare-content.ts', '--target'];
+      if (version === 'latest') {
+        prepArgs.push('apps/web');
+      } else {
+        prepArgs.push('apps/web-v', '--version', version.replace('v', ''));
+      }
+      const prepare = spawn('bun', prepArgs, {
+        cwd: PROJECT_ROOT,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      prepare.stdout?.on('data', (d: Buffer) => {
+        for (const line of d.toString().split('\n').filter(Boolean)) {
+          this.addLog(id, line);
+        }
+      });
+      prepare.stderr?.on('data', (d: Buffer) => {
+        for (const line of d.toString().split('\n').filter(Boolean)) {
+          this.addLog(id, line);
+        }
+      });
+
+      prepare.on('exit', (prepCode) => {
+        job.status = prepCode === 0 ? 'completed' : 'failed';
+        job.exitCode = prepCode;
+        job.finishedAt = new Date().toISOString();
+        job.currentFile = undefined;
+        this.addLog(
+          id,
+          prepCode === 0
+            ? '✅ Translation + assemble + prepare complete'
+            : `⚠️ Prepare-content failed (code ${prepCode})`,
+        );
+        this.emit(id, { type: 'exit', code: prepCode });
+      });
+    });
   }
 
   /** Get all jobs */
