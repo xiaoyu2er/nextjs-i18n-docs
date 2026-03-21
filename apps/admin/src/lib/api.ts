@@ -51,6 +51,14 @@ export interface FileContent {
   content: string;
 }
 
+export interface FileNode {
+  key: string;
+  source: string;
+  type: string;
+  translation: string | null;
+  line: number;
+}
+
 export interface Job {
   id: string;
   lang: string;
@@ -90,6 +98,11 @@ export const api = {
 
   fileContent: (version: string, lang: string, file: string) =>
     request<FileContent>(`/status/content/${version}/${lang}/${file}`),
+
+  fileDetail: (version: string, lang: string, file: string) =>
+    request<FileNode[]>(
+      `/status/${version}/${lang}/file?path=${encodeURIComponent(file)}`,
+    ),
 
   models: () => request<Model[]>('/models'),
 

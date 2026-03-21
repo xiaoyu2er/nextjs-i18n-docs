@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { FLAGS } from '../lib/flags';
 
@@ -126,6 +126,8 @@ export function Preview({
   const isEn = lang === 'en';
   const mode = isEn ? 'en' : viewMode;
 
+  const [expandedNode, setExpandedNode] = useState<string | null>(null);
+
   const { data: enData } = useQuery({
     queryKey: ['content', version, 'en', file],
     queryFn: () => api.fileContent(version, 'en', file),
@@ -134,6 +136,12 @@ export function Preview({
   const { data: transData } = useQuery({
     queryKey: ['content', version, lang, file],
     queryFn: () => api.fileContent(version, lang, file),
+    enabled: !isEn,
+  });
+
+  const { data: nodes } = useQuery({
+    queryKey: ['fileDetail', version, lang, file],
+    queryFn: () => api.fileDetail(version, lang, file),
     enabled: !isEn,
   });
 
@@ -286,22 +294,75 @@ export function Preview({
             )}
           </div>
         )}
-        {showToc && tocHeadings.length > 0 && (
+        {showToc && (tocHeadings.length > 0 || nodes) && (
           <div className="preview-toc">
-            <div className="preview-toc-title">On this page</div>
-            {tocHeadings.map((h, idx) => (
-              <a
-                key={h.id}
-                href={`#${h.id}`}
-                className={`h${h.level}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  scrollToHeading(idx);
-                }}
-              >
-                {h.text}
-              </a>
-            ))}
+            {tocHeadings.length > 0 && (
+              <>
+                <div className="preview-toc-title">On this page</div>
+                {tocHeadings.map((h, idx) => (
+                  <a
+                    key={h.id}
+                    href={`#${h.id}`}
+                    className={`h${h.level}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      scrollToHeading(idx);
+                    }}
+                  >
+                    {h.text}
+                  </a>
+                ))}
+              </>
+            )}
+            {nodes && !isEn && (
+              <div className="preview-nodes">
+                <div className="preview-toc-title">
+                  Nodes ({nodes.filter((n) => n.translation).length}/
+                  {nodes.length})
+                </div>
+                {nodes.map((n) => (
+                  <div
+                    key={n.key}
+                    className={`node-item ${n.translation ? 'translated' : 'missing'} ${expandedNode === n.key ? 'expanded' : ''}`}
+                    onClick={() =>
+                      setExpandedNode(expandedNode === n.key ? null : n.key)
+                    }
+                    onKeyDown={() => {}}
+                  >
+                    <div className="node-summary">
+                      <span className="node-status">
+                        {n.translation ? '✅' : '❌'}
+                      </span>
+                      <span className="node-type">{n.type}</span>
+                      <code className="node-md5">{n.key.slice(0, 8)}</code>
+                    </div>
+                    {expandedNode === n.key && (
+                      <div className="node-detail">
+                        <div className="node-source">
+                          <span className="node-label">EN:</span>
+                          <pre>
+                            {n.source.slice(0, 200)}
+                            {n.source.length > 200 ? '…' : ''}
+                          </pre>
+                        </div>
+                        {n.translation && (
+                          <div className="node-trans">
+                            <span className="node-label">{lang}:</span>
+                            <pre>
+                              {n.translation.slice(0, 200)}
+                              {n.translation.length > 200 ? '…' : ''}
+                            </pre>
+                          </div>
+                        )}
+                        <div className="node-meta">
+                          MD5: <code>{n.key}</code> · L{n.line}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
