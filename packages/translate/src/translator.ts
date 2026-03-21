@@ -438,16 +438,52 @@ Output: {"b2":"## 安装","c3":"运行以下命令："}`;
  * Build structured JSON user message from uncached nodes.
  * Each node gets a type based on its AST classification.
  */
+/**
+ * Build structured JSON user message from uncached nodes.
+ * Frontmatter nodes are split into individual translatable fields
+ * (title, description, nav_title) so LLM only sees plain text.
+ *
+ * Returns { message, frontmatterMap } where frontmatterMap tracks
+ * which virtual keys belong to which frontmatter MD5.
+ */
 export function buildJsonUserMessage(
   uncached: Record<string, string>,
   nodeTypes: Record<string, string>,
-): string {
+): {
+  message: string;
+  frontmatterMap: Map<
+    string,
+    { source: string; fieldKeys: Record<string, string> }
+  >;
+} {
+  const { extractTranslatableFields } = require('./frontmatter');
   const nodes: TranslationNode[] = [];
+  const frontmatterMap = new Map<
+    string,
+    { source: string; fieldKeys: Record<string, string> }
+  >();
+
   for (const [md5, text] of Object.entries(uncached)) {
     const type = nodeTypes[md5] ?? 'paragraph';
-    nodes.push({ key: md5, type, text });
+
+    if (type === 'frontmatter') {
+      // Extract only translatable fields, send as plain text
+      const fields = extractTranslatableFields(text) as Record<string, string>;
+      if (Object.keys(fields).length === 0) continue;
+
+      const fieldKeys: Record<string, string> = {};
+      for (const [field, value] of Object.entries(fields)) {
+        const virtualKey = `fm:${md5}:${field}`;
+        fieldKeys[field] = virtualKey;
+        nodes.push({ key: virtualKey, type: 'paragraph', text: value });
+      }
+      frontmatterMap.set(md5, { source: text, fieldKeys });
+    } else {
+      nodes.push({ key: md5, type, text });
+    }
   }
-  return JSON.stringify({ nodes });
+
+  return { message: JSON.stringify({ nodes }), frontmatterMap };
 }
 
 export interface JsonTranslateResult {
@@ -567,13 +603,28 @@ export async function translateJsonChunk(
     docsContext: opts.docsContext,
   });
 
-  const userMessage = buildJsonUserMessage(opts.uncached, opts.nodeTypes);
+  const { message: userMessage, frontmatterMap } = buildJsonUserMessage(
+    opts.uncached,
+    opts.nodeTypes,
+  );
 
   const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
   const log = opts.logger ?? console.warn;
 
   let lastError: Error | undefined;
-  const requestedMd5s = Object.keys(opts.uncached);
+  // Requested keys include virtual fm: keys, not the original frontmatter md5s
+  const requestedMd5s = (() => {
+    const keys: string[] = [];
+    for (const md5 of Object.keys(opts.uncached)) {
+      if (frontmatterMap.has(md5)) {
+        const info = frontmatterMap.get(md5)!;
+        keys.push(...Object.values(info.fieldKeys));
+      } else {
+        keys.push(md5);
+      }
+    }
+    return keys;
+  })();
 
   log(
     `📤 SYSTEM PROMPT (${systemPrompt.length} chars):\n${systemPrompt}\n--- END SYSTEM PROMPT ---`,
@@ -772,6 +823,37 @@ export async function translateJsonChunk(
       for (const md5 of requestedMd5s) {
         if (parsed[md5]) {
           translations[md5] = parsed[md5];
+        }
+      }
+
+      // Reconstruct frontmatter from virtual field keys
+      if (frontmatterMap.size > 0) {
+        const { reconstructFrontmatter } = require('./frontmatter');
+        for (const [fmMd5, info] of frontmatterMap) {
+          const fields: Record<string, string> = {};
+          let allFound = true;
+          for (const [field, vKey] of Object.entries(info.fieldKeys)) {
+            if (translations[vKey]) {
+              fields[field] = translations[vKey];
+              delete translations[vKey]; // remove virtual key
+            } else {
+              allFound = false;
+            }
+          }
+          if (Object.keys(fields).length > 0) {
+            translations[fmMd5] = reconstructFrontmatter(info.source, fields);
+            log(
+              `✅ Frontmatter ${fmMd5.substring(0, 8)}: ${Object.keys(fields).join(', ')}`,
+            );
+          }
+          // Remove virtual keys from missing
+          if (!allFound) {
+            const vKeys = new Set(Object.values(info.fieldKeys));
+            const idx = missing.findIndex((m) => vKeys.has(m));
+            while (idx >= 0) {
+              missing.splice(idx, 1);
+            }
+          }
         }
       }
 

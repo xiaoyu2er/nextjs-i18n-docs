@@ -1007,54 +1007,8 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
   const cache = new TranslationCache(opts.cacheDir);
   cache.load(lang);
 
-  const { extractTranslatableFields, reconstructFrontmatter } = await import(
-    './frontmatter'
-  );
-
   // Get all untranslated keys from DB
-  const allUntranslated = cache.untranslatedKeys(lang, version);
-
-  // Pre-process frontmatter: extract translatable fields as virtual text nodes
-  // so LLM only sees plain text, not YAML structure
-  type FrontmatterInfo = {
-    md5: string;
-    source: string;
-    fields: Record<string, string>;
-    fieldKeys: Record<string, string>; // field name → virtual md5
-  };
-  const frontmatterMap = new Map<string, FrontmatterInfo>();
-  const untranslated: typeof allUntranslated = [];
-
-  for (const entry of allUntranslated) {
-    if (entry.type === 'frontmatter') {
-      const fields = extractTranslatableFields(entry.text);
-      if (Object.keys(fields).length === 0) {
-        // No translatable fields, cache as-is
-        cache.set(lang, entry.key, entry.text);
-        continue;
-      }
-      const fieldKeys: Record<string, string> = {};
-      for (const [field, value] of Object.entries(fields)) {
-        // Create a virtual key for each field
-        const virtualKey = `fm:${entry.key}:${field}`;
-        fieldKeys[field] = virtualKey;
-        // Add as a regular text node for translation
-        untranslated.push({
-          key: virtualKey,
-          text: value,
-          type: 'paragraph', // treat as plain text for the LLM
-        });
-      }
-      frontmatterMap.set(entry.key, {
-        md5: entry.key,
-        source: entry.text,
-        fields,
-        fieldKeys,
-      });
-    } else {
-      untranslated.push(entry);
-    }
-  }
+  const untranslated = cache.untranslatedKeys(lang, version);
   console.log(
     `\n📦 ${untranslated.length} untranslated keys for ${version}/${lang}`,
   );
@@ -1234,43 +1188,15 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
           'Next.js is a React framework for building full-stack web applications.',
       });
 
-      // Cache results
+      // Cache results — frontmatter already reconstructed by translateJsonChunk
       let cached = 0;
       let skipped = 0;
-      // Collect frontmatter field translations
-      const fmFieldTranslations = new Map<string, Record<string, string>>();
-
       for (const [key, translation] of Object.entries(result.translations)) {
         if (typeof translation !== 'string' || !translation.trim()) {
           skipped++;
           continue;
         }
-
-        // Check if this is a virtual frontmatter field key (fm:md5:field)
-        if (key.startsWith('fm:')) {
-          const parts = key.split(':');
-          const fmMd5 = parts[1];
-          const field = parts[2];
-          if (!fmFieldTranslations.has(fmMd5)) {
-            fmFieldTranslations.set(fmMd5, {});
-          }
-          fmFieldTranslations.get(fmMd5)![field] = translation;
-          continue; // Don't cache individual fields
-        }
-
         cache.set(lang, key, translation);
-        cached++;
-      }
-
-      // Reconstruct and cache frontmatter from translated fields
-      for (const [fmMd5, fields] of fmFieldTranslations) {
-        const info = frontmatterMap.get(fmMd5);
-        if (!info) continue;
-        const rebuilt = reconstructFrontmatter(info.source, fields);
-        cache.set(lang, fmMd5, rebuilt);
-        clog(
-          `✅ Frontmatter ${fmMd5.substring(0, 8)}: ${Object.keys(fields).join(', ')}`,
-        );
         cached++;
       }
 
