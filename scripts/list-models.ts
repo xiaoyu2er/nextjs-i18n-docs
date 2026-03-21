@@ -102,10 +102,14 @@ if (jsonOut) {
 }
 
 if (rotateCmd) {
-  const entries = models.map(
-    (m) => `${m.id}:${m.maxOutput || m.contextLength}`,
+  const entries = models.map((m) => `${m.id}:${m.maxOutput || 16384}`);
+  // Use the best (first) model's limits for context-length and max-tokens
+  const best = models[0];
+  const ctx = best?.contextLength || 32768;
+  const maxOut = best?.maxOutput || 16384;
+  console.log(
+    `--model-rotate ${entries.join(',')} --context-length ${ctx} --max-tokens ${maxOut}`,
   );
-  console.log(`--model-rotate ${entries.join(',')}`);
   process.exit(0);
 }
 

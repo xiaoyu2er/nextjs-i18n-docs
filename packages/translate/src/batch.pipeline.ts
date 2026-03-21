@@ -23,6 +23,7 @@
  *   --api-key <key>     API key override
  *   --api-base-url <u>  API base URL override
  *   --max-tokens <n>    Max output tokens (default: 16384)
+ *   --context-length <n> Model context window size (default: 32768)
  *   --config <path>     Translation config file (default: translation.config.example.mjs)
  */
 import fs from 'node:fs';
@@ -143,6 +144,7 @@ interface CliOptions {
   modelRotate: string[];
   modelMaxTokens: Map<string, number>;
   maxTokens: number;
+  contextLength: number;
   concurrency: number;
   dryRun: boolean;
   md5Mode: boolean;
@@ -217,6 +219,7 @@ function parseArgs(argv: string[]): CliOptions {
     model: getOpt('model', ''),
     ...parseModelRotate(getOpt('model-rotate', '')),
     maxTokens: Number.parseInt(getOpt('max-tokens', '16384'), 10),
+    contextLength: Number.parseInt(getOpt('context-length', '32768'), 10),
     concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
     md5Mode: hasFlag('md5'),
@@ -1104,28 +1107,51 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
     return;
   }
 
-  // Pre-chunk by estimated context tokens
-  // Total context = system prompt + user message + json_schema + output
-  // Per entry ≈ text * 2.5 / 4 (input+output) + 80 (schema overhead)
+  // Pre-chunk by estimated token budgets
+  // Two separate limits:
+  //   1. Input budget  = contextLength - maxCompletionTokens - overhead
+  //   2. Output budget = maxCompletionTokens (what the model can generate)
+  // Per entry estimates:
+  //   Input:  source_chars / 4 + 80 (JSON key/structure overhead)
+  //   Output: source_chars * 1.5 / 4 (translations are ~1.5x source for CJK)
   const maxTokens = opts.maxTokens;
   const SYSTEM_PROMPT_TOKENS = 700;
-  const targetTokensPerChunk = Math.floor(maxTokens * 0.6);
+  const JSON_OVERHEAD = 200; // braces, commas, etc.
+
+  // Determine context length from model info
+  // For single model: use modelMaxTokens as max_completion, context from --context-length
+  // Default conservative: 32k context if unknown
+  const contextLength = opts.contextLength || 32768;
+  const maxCompletionTokens = Math.min(maxTokens, contextLength - 4096);
+  const inputBudget = Math.floor(
+    (contextLength -
+      maxCompletionTokens -
+      SYSTEM_PROMPT_TOKENS -
+      JSON_OVERHEAD) *
+      0.85,
+  );
+  const outputBudget = Math.floor(maxCompletionTokens * 0.9);
 
   type ChunkEntry = { key: string; text: string; type: string };
   const chunks: ChunkEntry[][] = [[]];
-  let currentChunkTokens = SYSTEM_PROMPT_TOKENS;
+  let currentInputTokens = SYSTEM_PROMPT_TOKENS;
+  let currentOutputTokens = JSON_OVERHEAD;
 
   for (const k of untranslated) {
-    const entryTokens = Math.ceil((k.text.length * 2.5) / 4 + 80);
+    const inputTokens = Math.ceil(k.text.length / 4 + 80);
+    const outputTokens = Math.ceil((k.text.length * 1.5) / 4 + 80);
     if (
-      currentChunkTokens + entryTokens > targetTokensPerChunk &&
+      (currentInputTokens + inputTokens > inputBudget ||
+        currentOutputTokens + outputTokens > outputBudget) &&
       chunks[chunks.length - 1].length > 0
     ) {
       chunks.push([]);
-      currentChunkTokens = SYSTEM_PROMPT_TOKENS;
+      currentInputTokens = SYSTEM_PROMPT_TOKENS;
+      currentOutputTokens = JSON_OVERHEAD;
     }
     chunks[chunks.length - 1].push(k);
-    currentChunkTokens += entryTokens;
+    currentInputTokens += inputTokens;
+    currentOutputTokens += outputTokens;
   }
 
   // --max limits API calls (chunks), not keys
@@ -1135,7 +1161,7 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
     .reduce((s, c) => s + c.length, 0);
 
   console.log(
-    `   ${chunks.length} chunks (~${targetTokensPerChunk} tokens each), ${maxChunks} to process`,
+    `   ${chunks.length} chunks (input≤${inputBudget} out≤${outputBudget} tokens), ${maxChunks} to process`,
   );
   console.log(`   ${totalKeys} keys in ${maxChunks} API calls`);
 
