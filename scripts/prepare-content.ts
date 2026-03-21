@@ -384,17 +384,12 @@ function processFile(
   let enrichedRaw = raw;
 
   // Preserve original case in URL slug (Starlight lowercases by default)
+  // Starlight slug = full path from content root, including locale prefix
   const relFromDst = relative(CONTENT_DST, dstPath)
     .replace(/\.mdx$/, '')
     .replace(/\\/g, '/');
-  // Strip locale prefix (e.g. "zh-hans/blog/CVE..." → "blog/CVE...")
-  const localePrefix = locale === ROOT_LOCALE ? '' : `${locale}/`;
-  const slugPath =
-    localePrefix && relFromDst.startsWith(localePrefix)
-      ? relFromDst.slice(localePrefix.length)
-      : relFromDst;
-  if (slugPath !== slugPath.toLowerCase() && !raw.includes('slug:')) {
-    enrichedRaw = `${enrichedRaw}\nslug: ${slugPath}`;
+  if (relFromDst !== relFromDst.toLowerCase() && !raw.includes('slug:')) {
+    enrichedRaw = `${enrichedRaw}\nslug: ${relFromDst}`;
   }
 
   if (!raw.includes('sidebar:')) {
