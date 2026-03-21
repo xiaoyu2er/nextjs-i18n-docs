@@ -25,7 +25,6 @@ function ctxLabel(n: number) {
 }
 
 type SortKey = 'price-asc' | 'price-desc' | 'context-desc' | 'name';
-type Mode = 'file' | 'md5';
 
 const CTX_STEPS = [0, 8, 16, 32, 64, 128, 200, 512, 1024, 2048];
 
@@ -40,8 +39,7 @@ export function JobDialog({
 }: Props) {
   const [lang, setLang] = useState(defaultLang || langs[0]);
   const [version, setVersion] = useState(defaultVersion || versions[0]);
-  const [mode, setMode] = useState<Mode>(files?.length ? 'file' : 'md5');
-  const [max, setMax] = useState(files?.length || 10);
+  const [max, setMax] = useState(files?.length || 999);
   const [concurrency, setConcurrency] = useState(3);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,14 +105,16 @@ export function JobDialog({
         max,
         concurrency,
         model: selectedModel || undefined,
-        md5: mode === 'md5',
+        md5: true,
         files: files?.length ? files : undefined,
       });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['jobs'] });
       if (onSuccess) {
-        onSuccess(`✅ Job started: ${lang} / ${version} (${mode})`);
+        onSuccess(
+          `✅ Job started: ${lang} / ${version}${files?.length ? ` (${files.length} files)` : ''}`,
+        );
       } else {
         onClose();
       }
@@ -139,29 +139,6 @@ export function JobDialog({
 
         {error && <div className="dialog-error">{error}</div>}
 
-        {/* Mode toggle */}
-        <div className="dialog-mode-toggle">
-          <button
-            type="button"
-            className={mode === 'file' ? 'active' : ''}
-            onClick={() => {
-              setMode('file');
-              setMax(files?.length || 50);
-            }}
-          >
-            📄 File mode
-          </button>
-          <button
-            type="button"
-            className={mode === 'md5' ? 'active' : ''}
-            onClick={() => {
-              setMode('md5');
-              setMax(10);
-            }}
-          >
-            🔑 MD5 mode
-          </button>
-        </div>
         <div className="dialog-mode-hint">
           {mode === 'file'
             ? 'Translate file by file. --max = number of files.'
