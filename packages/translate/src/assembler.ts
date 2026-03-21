@@ -33,6 +33,8 @@ export function assemble(
   cache: TranslationCache,
   /** Relative file path for source tracking (e.g. "docs/01-app/installation.mdx") */
   sourceFilePath?: string,
+  /** If true, use EN source text as fallback instead of NEEDS_TRANSLATION markers */
+  fallbackToSource = false,
 ): AssembleResult {
   const normalizedContent = normalize(rawContent);
   const nodes = parseMdx(rawContent);
@@ -62,6 +64,9 @@ export function assemble(
       if (cached) {
         result += cached;
         cachedCount++;
+      } else if (fallbackToSource) {
+        result += node.rawText;
+        uncachedCount++;
       } else {
         result += `${NEEDS_TRANSLATION_START}\n${node.rawText}\n${NEEDS_TRANSLATION_END}`;
         uncachedCount++;
@@ -83,5 +88,42 @@ export function assemble(
     uncachedCount,
     totalTranslatable,
     parsedNodes: nodes,
+  };
+}
+
+/**
+ * Extract uncached translatable nodes as maps of MD5 → source text and MD5 → node type.
+ * Used for structured JSON translation mode.
+ */
+export function extractUncached(
+  rawContent: string,
+  lang: string,
+  cache: TranslationCache,
+): {
+  uncached: Record<string, string>;
+  nodeTypes: Record<string, string>;
+  allCached: boolean;
+  total: number;
+} {
+  const nodes = parseMdx(rawContent);
+  const uncached: Record<string, string> = {};
+  const nodeTypes: Record<string, string> = {};
+  let total = 0;
+
+  for (const node of nodes) {
+    if (node.needsTranslation && node.md5) {
+      total++;
+      if (!cache.get(lang, node.md5)) {
+        uncached[node.md5] = node.rawText;
+        nodeTypes[node.md5] = node.type;
+      }
+    }
+  }
+
+  return {
+    uncached,
+    nodeTypes,
+    allCached: Object.keys(uncached).length === 0,
+    total,
   };
 }

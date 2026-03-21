@@ -1,8 +1,7 @@
-import matter from 'gray-matter';
 import { remark } from 'remark';
 
 export interface MdxValidationError {
-  type: 'frontmatter' | 'tag-balance' | 'parse';
+  type: 'frontmatter' | 'tag-balance' | 'parse' | 'mdx';
   message: string;
 }
 
@@ -23,20 +22,23 @@ const BALANCED_TAGS = ['AppOnly', 'PagesOnly', 'details'];
 export function validateMdx(content: string): MdxValidationResult {
   const errors: MdxValidationError[] = [];
 
-  // 1. Frontmatter validation
-  try {
-    const parsed = matter(content);
-    if (!parsed.data.title) {
+  // 1. Frontmatter validation (simple YAML check)
+  if (content.startsWith('---')) {
+    const endIdx = content.indexOf('---', 3);
+    if (endIdx === -1) {
       errors.push({
         type: 'frontmatter',
-        message: 'Missing "title" in frontmatter',
+        message: 'Unclosed frontmatter (missing closing ---)',
       });
+    } else {
+      const fm = content.substring(3, endIdx).trim();
+      if (!fm.includes('title:')) {
+        errors.push({
+          type: 'frontmatter',
+          message: 'Missing "title" in frontmatter',
+        });
+      }
     }
-  } catch (e) {
-    errors.push({
-      type: 'frontmatter',
-      message: `Frontmatter parse error: ${e instanceof Error ? e.message : e}`,
-    });
   }
 
   // 2. Balanced JSX tags — only check tags that appear on their own line
@@ -70,5 +72,80 @@ export function validateMdx(content: string): MdxValidationResult {
     });
   }
 
+  // 4. Bare component tags that will break MDX compilation
+  //    These should be wrapped in backticks: `<Link>` not <Link>
+  const COMPONENT_TAGS = [
+    'Link',
+    'Script',
+    'Head',
+    'Form',
+    'Suspense',
+    'Router',
+    'NextScript',
+    'NextHead',
+  ];
+  let inCodeBlock = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+
+    for (const tag of COMPONENT_TAGS) {
+      // Match bare <Tag> or </Tag> not inside backticks
+      const regex = new RegExp(`(?<!\`)(</?${tag}(?:\\s[^>]*)?>)(?!\`)`, 'g');
+      let match: RegExpExecArray | null = null;
+      // biome-ignore lint/suspicious/noAssignInExpressions: regex exec loop
+      while ((match = regex.exec(line)) !== null) {
+        const before = line.substring(0, match.index);
+        // Skip if inside backtick pair
+        if (before.split('`').length % 2 === 0) continue;
+        errors.push({
+          type: 'parse',
+          message: `Bare <${tag}> tag at line ${i + 1} (should be \`<${tag}>\` in backticks)`,
+        });
+        break; // one error per tag per line is enough
+      }
+    }
+  }
+
   return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Deep MDX validation using the actual MDX compiler.
+ * Catches JSX errors, unclosed tags, etc. that remark alone misses.
+ * Returns null if @mdx-js/mdx is not available.
+ */
+export async function validateMdxCompile(
+  content: string,
+): Promise<MdxValidationError[] | null> {
+  try {
+    const { compile } = await import('@mdx-js/mdx');
+    // Strip frontmatter before compiling (MDX compiler doesn't handle YAML)
+    let mdxContent = content;
+    if (content.startsWith('---')) {
+      const endIdx = content.indexOf('---', 3);
+      if (endIdx > 0) {
+        mdxContent = content.substring(endIdx + 3).trim();
+      }
+    }
+    await compile(mdxContent, {
+      // Don't output JS, just check for errors
+      jsx: true,
+    });
+    return [];
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // Extract the useful part of the error
+    const match = msg.match(/Expected.*|Unexpected.*|Cannot.*|Could not.*/);
+    return [
+      {
+        type: 'mdx',
+        message: match ? match[0].substring(0, 200) : msg.substring(0, 200),
+      },
+    ];
+  }
 }

@@ -44,29 +44,70 @@ function isHtmlPureTag(text: string): boolean {
 }
 
 /**
- * Compute MD5 hash. For headings, strip the leading # markers
- * so that ## Title and ### Title produce the same hash.
+ * Compute MD5 hash of the raw text.
+ * Headings include their level markers (## vs ###) so different
+ * heading levels produce distinct hashes.
  */
-function computeHash(text: string, type: string): string {
-  let hashInput = text;
-  if (type === 'heading') {
-    hashInput = text.replace(/^#{1,6}\s+/, '');
-  }
-  return crypto.createHash('md5').update(hashInput).digest('hex');
+function computeHash(text: string): string {
+  return crypto.createHash('md5').update(text).digest('hex');
 }
+
+/** Fields in frontmatter YAML that should be translated */
+export const FRONTMATTER_TRANSLATABLE_FIELDS = [
+  'title',
+  'description',
+  'nav_title',
+  'related.title',
+  'related.description',
+];
 
 /**
  * Parse MDX content into a flat list of classified AST nodes.
  * Applies normalize() preprocessing before parsing.
+ *
+ * Frontmatter (---\n...\n---) is detected and emitted as a single
+ * "frontmatter" node spanning from the opening --- to closing ---.
  */
 export function parseMdx(rawContent: string): ParsedNode[] {
   const content = normalize(rawContent);
   const tree = remark().parse(content);
   const nodes: ParsedNode[] = [];
 
+  // Detect frontmatter: if content starts with --- and first node is thematicBreak
+  let frontmatterHandled = false;
+  if (
+    content.startsWith('---') &&
+    tree.children.length >= 2 &&
+    tree.children[0].type === 'thematicBreak'
+  ) {
+    // Find the closing --- in the raw content
+    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (fmMatch) {
+      const fmEnd = fmMatch[0].length;
+      const fmText = fmMatch[0];
+
+      nodes.push({
+        type: 'frontmatter',
+        rawText: fmText,
+        needsTranslation: true,
+        md5: computeHash(fmText),
+        startOffset: 0,
+        endOffset: fmEnd,
+      });
+
+      frontmatterHandled = true;
+    }
+  }
+
   for (const child of tree.children) {
     const startOffset = child.position?.start.offset ?? 0;
     const endOffset = child.position?.end.offset ?? 0;
+
+    // Skip nodes that are inside the frontmatter region
+    if (frontmatterHandled && startOffset < nodes[0].endOffset) {
+      continue;
+    }
+
     const rawText = content.substring(startOffset, endOffset);
     const type = child.type;
 
@@ -89,7 +130,7 @@ export function parseMdx(rawContent: string): ParsedNode[] {
     };
 
     if (needsTranslation) {
-      node.md5 = computeHash(rawText, type);
+      node.md5 = computeHash(rawText);
     }
 
     nodes.push(node);

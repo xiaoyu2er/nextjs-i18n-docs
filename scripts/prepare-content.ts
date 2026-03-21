@@ -20,8 +20,8 @@
 import {
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -29,27 +29,33 @@ import { dirname, join, relative, resolve } from 'node:path';
 
 // ── CLI Args ──
 
-function parseArgs(): { target: string; version: string | null } {
+function parseArgs(): {
+  target: string;
+  version: string | null;
+  incremental: boolean;
+} {
   const args = process.argv.slice(2);
   let target = '';
   let version: string | null = null;
+  let incremental = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--target' && args[i + 1]) target = args[++i];
     if (args[i] === '--version' && args[i + 1]) version = args[++i];
+    if (args[i] === '--incremental') incremental = true;
   }
 
   if (!target) {
     console.error(
-      'Usage: bun run scripts/prepare-content.ts --target <app-dir> [--version <13|14|15>]',
+      'Usage: bun run scripts/prepare-content.ts --target <app-dir> [--version <13|14|15>] [--incremental]',
     );
     process.exit(1);
   }
 
-  return { target, version };
+  return { target, version, incremental };
 }
 
-const { target, version } = parseArgs();
+const { target, version, incremental } = parseArgs();
 
 const ROOT_LOCALE = 'en';
 const LOCALES = [
@@ -63,9 +69,15 @@ const LOCALES = [
   'fr',
   'ru',
 ];
-const CONTENT_SRC = version
-  ? resolve(import.meta.dirname!, `../content-v${version}`)
-  : resolve(import.meta.dirname!, '../content');
+// Source: content/{version}/ for EN, .cache/content/{version}/{lang}/ for translations
+const CONTENT_SRC_EN = resolve(
+  import.meta.dirname!,
+  `../content/${version || 'latest'}`,
+);
+const CONTENT_SRC_CACHE = resolve(
+  import.meta.dirname!,
+  `../.cache/content/${version || 'latest'}`,
+);
 const CONTENT_DST = resolve(
   import.meta.dirname!,
   '..',
@@ -153,8 +165,17 @@ function parseFrontmatter(content: string): {
 
 function resolveSourceFile(locale: string, sourceRef: string): string | null {
   const parts = sourceRef.split('/');
-  // For versioned builds, CONTENT_SRC already points to content-v{N}/
-  return resolveSourceInDir(join(CONTENT_SRC, locale, 'docs'), parts);
+  // Try locale-specific source first, fall back to EN
+  const localeDir =
+    locale === ROOT_LOCALE
+      ? join(CONTENT_SRC_EN, 'docs')
+      : join(CONTENT_SRC_CACHE, locale, 'docs');
+  return (
+    resolveSourceInDir(localeDir, parts) ??
+    (locale !== ROOT_LOCALE
+      ? resolveSourceInDir(join(CONTENT_SRC_EN, 'docs'), parts)
+      : null)
+  );
 }
 
 function resolveSourceInDir(
@@ -239,6 +260,21 @@ function ensureDir(path: string) {
   mkdirSync(dirname(path), { recursive: true });
 }
 
+let skippedUnchanged = 0;
+
+/** Write file only if content differs (avoids unnecessary Astro HMR reloads) */
+function writeFile(path: string, content: string) {
+  ensureDir(path);
+  if (incremental && existsSync(path)) {
+    const existing = readFileSync(path, 'utf-8');
+    if (existing === content) {
+      skippedUnchanged++;
+      return;
+    }
+  }
+  writeFileSync(path, content);
+}
+
 function shouldIncludeDocsDir(dirName: string): boolean {
   // Versioned content is in separate top-level dirs (content-v13/, etc.)
   // so no version subdirs exist within the content source
@@ -253,9 +289,11 @@ function shouldIncludeSection(sectionName: string): boolean {
 
 // ── Main Processing ──
 
-// Use force: true to handle race condition when multiple versioned workers
-// share the same directory (apps/web-v) and run prepare-content concurrently
-rmSync(CONTENT_DST, { recursive: true, force: true });
+// In incremental mode, keep existing files and only update changed ones.
+// Full mode wipes everything for a clean rebuild.
+if (!incremental) {
+  rmSync(CONTENT_DST, { recursive: true, force: true });
+}
 mkdirSync(CONTENT_DST, { recursive: true });
 
 let totalFiles = 0;
@@ -265,7 +303,7 @@ let sourceErrors = 0;
 // Pre-compute blog post ordering by date (newest first)
 const blogDateOrder = new Map<string, number>();
 if (!version) {
-  const blogDir = join(CONTENT_SRC, 'en', 'blog');
+  const blogDir = join(CONTENT_SRC_EN, 'blog');
   if (existsSync(blogDir)) {
     const posts: { slug: string; date: number }[] = [];
     for (const file of readdirSync(blogDir)) {
@@ -289,7 +327,8 @@ console.log(
 );
 
 for (const locale of LOCALES) {
-  const localeSrc = join(CONTENT_SRC, locale);
+  const localeSrc =
+    locale === ROOT_LOCALE ? CONTENT_SRC_EN : join(CONTENT_SRC_CACHE, locale);
   if (!existsSync(localeSrc)) {
     console.log(`⚠ Skipping ${locale} — not found`);
     continue;
@@ -377,6 +416,16 @@ function processFile(
     ? blogDateOrder.get(cleanRel.replace(/\.mdx$/, ''))
     : getSidebarOrder(originalRel);
   let enrichedRaw = raw;
+
+  // Preserve original case in URL slug (Starlight lowercases by default)
+  // Starlight slug = full path from content root, including locale prefix
+  const relFromDst = relative(CONTENT_DST, dstPath)
+    .replace(/\.mdx$/, '')
+    .replace(/\\/g, '/');
+  if (relFromDst !== relFromDst.toLowerCase() && !raw.includes('slug:')) {
+    enrichedRaw = `${enrichedRaw}\nslug: ${relFromDst}`;
+  }
+
   if (!raw.includes('sidebar:')) {
     const sidebarParts: string[] = [];
     if (order !== null && order !== undefined)
@@ -392,7 +441,7 @@ function processFile(
     }
 
     if (sidebarParts.length > 0) {
-      enrichedRaw = `${raw}\nsidebar:\n${sidebarParts.join('\n')}`;
+      enrichedRaw = `${enrichedRaw}\nsidebar:\n${sidebarParts.join('\n')}`;
     }
   }
 
@@ -403,12 +452,10 @@ function processFile(
       const sourceContent = readFileSync(sourceFile, 'utf-8');
       const { body: sourceBody } = parseFrontmatter(sourceContent);
       const filtered = filterContent(sourceBody);
-      ensureDir(dstPath);
-      writeFileSync(dstPath, `---\n${enrichedRaw}\n---\n${filtered}`);
+      writeFile(dstPath, `---\n${enrichedRaw}\n---\n${filtered}`);
       sourceResolved++;
     } else {
-      ensureDir(dstPath);
-      writeFileSync(dstPath, content);
+      writeFile(dstPath, content);
       sourceErrors++;
       if (sourceErrors <= 5) {
         console.log(
@@ -418,8 +465,7 @@ function processFile(
     }
   } else {
     const filtered = filterContent(body);
-    ensureDir(dstPath);
-    writeFileSync(dstPath, `---\n${enrichedRaw}\n---\n${filtered}`);
+    writeFile(dstPath, `---\n${enrichedRaw}\n---\n${filtered}`);
   }
 
   totalFiles++;
@@ -435,7 +481,7 @@ function processFile(
       : [join(CONTENT_DST, 'docs', 'index.mdx')];
     for (const candidate of candidates) {
       if (existsSync(candidate)) {
-        writeFileSync(rootIndex, readFileSync(candidate, 'utf-8'));
+        writeFile(rootIndex, readFileSync(candidate, 'utf-8'));
         break;
       }
     }
@@ -450,8 +496,7 @@ function processFile(
         : [join(CONTENT_DST, locale, 'docs', 'index.mdx')];
       for (const candidate of candidates) {
         if (existsSync(candidate)) {
-          ensureDir(localeRoot);
-          writeFileSync(localeRoot, readFileSync(candidate, 'utf-8'));
+          writeFile(localeRoot, readFileSync(candidate, 'utf-8'));
           break;
         }
       }
@@ -461,43 +506,62 @@ function processFile(
 
 // ── Generate splash index pages (blog & learn) ──
 
-if (!version) {
-  const CONTENT_ROOT = resolve(import.meta.dirname!, '../content');
+const escapeAttr = (s: string) =>
+  s
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/&apos;/g, "'")
+    .replace(/"/g, '&quot;');
 
-  // Generate blog index from actual blog posts
-  generateBlogIndex(CONTENT_ROOT);
+const cleanMultiline = (s: string) =>
+  s
+    .replace(/^>-?\s*\n\s*/, '')
+    .replace(/\n\s+/g, ' ')
+    .trim();
 
-  // Generate learn index from actual learn directories
-  generateLearnIndex(CONTENT_ROOT);
-
-  console.log('Generated blog & learn index pages');
+interface BlogPost {
+  slug: string;
+  title: string;
+  description: string;
+  date: Date;
+  dateStr: string;
 }
 
-/** Generate blog/index.mdx with cards grouped by year */
-function generateBlogIndex(contentRoot: string) {
-  const blogDir = join(contentRoot, 'en', 'blog');
-  if (!existsSync(blogDir)) return;
+/** Read blog posts from a directory, using fallback for missing fields */
+function readBlogPosts(
+  blogDir: string,
+  fallbackPosts?: Map<string, BlogPost>,
+): BlogPost[] {
+  if (!existsSync(blogDir))
+    return fallbackPosts ? [...fallbackPosts.values()] : [];
 
-  interface BlogPost {
-    slug: string;
-    title: string;
-    date: Date;
-    dateStr: string;
-  }
   const posts: BlogPost[] = [];
+  const slugs = new Set<string>();
 
   for (const file of readdirSync(blogDir)) {
     if (!file.endsWith('.mdx') || file === 'index.mdx') continue;
+    const slug = file.replace(/\.mdx$/, '');
     const content = readFileSync(join(blogDir, file), 'utf-8');
     const { frontmatter } = parseFrontmatter(content);
-    if (!frontmatter.title || !frontmatter.date) continue;
-    const date = new Date(frontmatter.date.trim());
+    const fallback = fallbackPosts?.get(slug);
+
+    // Need date from EN (always), title/description from locale or fallback
+    const date = frontmatter.date
+      ? new Date(frontmatter.date.trim())
+      : fallback?.date;
+    if (!date) continue;
+
+    const title = frontmatter.title
+      ? escapeAttr(frontmatter.title)
+      : (fallback?.title ?? slug);
+    const description = frontmatter.description
+      ? escapeAttr(cleanMultiline(frontmatter.description))
+      : (fallback?.description ?? '');
+
+    slugs.add(slug);
     posts.push({
-      slug: file.replace(/\.mdx$/, ''),
-      title: frontmatter.title
-        .replace(/^['"]|['"]$/g, '') // strip wrapping quotes
-        .replace(/&apos;/g, "'") // decode HTML entities
-        .replace(/"/g, '&quot;'), // escape for MDX attribute
+      slug,
+      title,
+      description,
       date,
       dateStr: date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -507,9 +571,18 @@ function generateBlogIndex(contentRoot: string) {
     });
   }
 
-  posts.sort((a, b) => b.date.getTime() - a.date.getTime());
+  // Add any EN posts not present in locale dir
+  if (fallbackPosts) {
+    for (const [slug, post] of fallbackPosts) {
+      if (!slugs.has(slug)) posts.push(post);
+    }
+  }
 
-  // Group by year
+  posts.sort((a, b) => b.date.getTime() - a.date.getTime());
+  return posts;
+}
+
+function buildBlogIndexMdx(posts: BlogPost[]): string {
   const byYear = new Map<number, BlogPost[]>();
   for (const post of posts) {
     const year = post.date.getFullYear();
@@ -528,64 +601,66 @@ hero:
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
+<style>{\`
+.sl-link-card .description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+\`}</style>
+
 `;
 
   const years = [...byYear.keys()].sort((a, b) => b - a);
   for (const year of years) {
     mdx += `## ${year}\n\n<CardGrid>\n`;
     for (const post of byYear.get(year)!) {
-      mdx += `  <LinkCard title="${post.title}" href="/blog/${post.slug}/" description="${post.dateStr}" />\n`;
+      const desc = post.description
+        ? `${post.dateStr} — ${post.description}`
+        : post.dateStr;
+      mdx += `  <LinkCard title="${post.title}" href="./${post.slug}/" description="${desc}" />\n`;
     }
     mdx += '</CardGrid>\n\n';
   }
 
-  const dstPath = join(CONTENT_DST, 'blog', 'index.mdx');
-  ensureDir(dstPath);
-  writeFileSync(dstPath, mdx);
+  return mdx;
+}
+
+/** Generate blog/index.mdx for EN and all locales */
+function generateBlogIndex() {
+  // 1. Read EN posts (canonical list with dates)
+  const enPosts = readBlogPosts(join(CONTENT_SRC_EN, 'blog'));
+  const enPostMap = new Map(enPosts.map((p) => [p.slug, p]));
+
+  // 2. Generate EN blog index
+  const enMdx = buildBlogIndexMdx(enPosts);
+  const enDst = join(CONTENT_DST, 'blog', 'index.mdx');
+  writeFile(enDst, enMdx);
   totalFiles++;
+
+  // 3. Generate locale-specific blog indexes
+  if (!existsSync(CONTENT_SRC_CACHE)) return;
+  const locales = readdirSync(CONTENT_SRC_CACHE).filter((d) =>
+    existsSync(join(CONTENT_SRC_CACHE, d, 'blog')),
+  );
+
+  for (const locale of locales) {
+    const localePosts = readBlogPosts(
+      join(CONTENT_SRC_CACHE, locale, 'blog'),
+      enPostMap,
+    );
+    const localeMdx = buildBlogIndexMdx(localePosts);
+    const localeDst = join(CONTENT_DST, locale, 'blog', 'index.mdx');
+    writeFile(localeDst, localeMdx);
+    totalFiles++;
+  }
 }
 
 /** Generate learn/index.mdx with cards for each course */
-function generateLearnIndex(contentRoot: string) {
-  const learnDir = join(contentRoot, 'en', 'learn');
-  if (!existsSync(learnDir)) return;
-
-  const icons: Record<string, string> = {
-    'react-foundations': 'rocket',
-    'dashboard-app': 'laptop',
-    'pages-router': 'document',
-    seo: 'magnifier',
-  };
-
-  interface Course {
-    name: string;
-    slug: string;
-    chapters: number;
-    icon: string;
-  }
-  const courses: Course[] = [];
-
-  const titleOverrides: Record<string, string> = { seo: 'SEO' };
-
-  const entries = readdirSync(learnDir, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  for (const entry of entries) {
-    const slug = stripNumericPrefix(entry.name);
-    const chapters = readdirSync(join(learnDir, entry.name)).filter((f) =>
-      f.endsWith('.mdx'),
-    ).length;
-    const name =
-      titleOverrides[slug] ||
-      slug
-        .split('-')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-    courses.push({ name, slug, chapters, icon: icons[slug] || 'open-book' });
-  }
-
-  let mdx = `---
+/** Generate learn/index.mdx — splash page, Starlight auto-generates sub-page cards */
+function generateLearnIndex() {
+  const mdx = `---
 title: Learn Next.js
 description: Free interactive courses to help you get started with Next.js and build full-stack web applications.
 template: splash
@@ -593,31 +668,25 @@ hero:
   title: Learn Next.js
   tagline: Free interactive courses with quizzes, from React basics to building a full-stack app.
 ---
-
-import { Card, CardGrid } from '@astrojs/starlight/components';
-
-<CardGrid>
 `;
-
-  for (const course of courses) {
-    mdx += `  <Card title="${course.name}" icon="${course.icon}">
-    **${course.chapters} Chapters**
-
-    [Start Learning →](/learn/${course.slug}/)
-  </Card>
-
-`;
-  }
-
-  mdx += '</CardGrid>\n';
 
   const dstPath = join(CONTENT_DST, 'learn', 'index.mdx');
-  ensureDir(dstPath);
-  writeFileSync(dstPath, mdx);
+  writeFile(dstPath, mdx);
   totalFiles++;
 }
 
+if (!version) {
+  // Generate blog index from actual blog posts
+  generateBlogIndex();
+
+  // Generate learn index from actual learn directories
+  generateLearnIndex();
+
+  console.log('Generated blog & learn index pages');
+}
+
 console.log(`\nTotal: ${totalFiles} files`);
+if (incremental) console.log(`Unchanged (skipped): ${skippedUnchanged}`);
 console.log(`Source references resolved: ${sourceResolved}`);
 console.log(`Source references failed: ${sourceErrors}`);
 console.log(`Output: ${CONTENT_DST}`);

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildPrompt, needsTranslation } from '../../src/translator';
+import {
+  buildPrompt,
+  needsTranslation,
+  stripThinkingBlock,
+} from '../../src/translator';
 
 describe('translator', () => {
   describe('needsTranslation', () => {
@@ -45,6 +49,23 @@ describe('translator', () => {
     it('should instruct to keep non-marked content unchanged', () => {
       const prompt = buildPrompt({ langName: 'French' });
       expect(prompt).toContain('EXACTLY as-is');
+    });
+  });
+
+  describe('stripThinkingBlock', () => {
+    it('should strip <think>...</think> blocks', () => {
+      const text = '<think>reasoning here</think>\n\n## 标题';
+      expect(stripThinkingBlock(text)).toBe('## 标题');
+    });
+
+    it('should handle text without thinking blocks', () => {
+      const text = '## 标题\n\n段落';
+      expect(stripThinkingBlock(text)).toBe('## 标题\n\n段落');
+    });
+
+    it('should strip multiple thinking blocks', () => {
+      const text = '<think>a</think>Hello<think>b</think>World';
+      expect(stripThinkingBlock(text)).toBe('HelloWorld');
     });
   });
 });
