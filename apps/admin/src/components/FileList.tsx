@@ -234,6 +234,7 @@ export function FileList({
 }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
     let result = files.map((f) => ({
@@ -246,8 +247,12 @@ export function FileList({
       result = result.filter((f) => f.status === statusFilter);
     if (sectionFilter !== 'all')
       result = result.filter((f) => f.section === sectionFilter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter((f) => f.file.toLowerCase().includes(q));
+    }
     return result;
-  }, [files, statusFilter, sectionFilter]);
+  }, [files, statusFilter, sectionFilter, search]);
 
   const tree = useMemo(() => buildTree(filtered), [filtered]);
 
@@ -284,6 +289,25 @@ export function FileList({
           </button>
         </div>
       )}
+
+      {/* Search */}
+      <div className="file-search">
+        <input
+          type="text"
+          placeholder="Search files..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search && (
+          <button
+            type="button"
+            className="file-search-clear"
+            onClick={() => setSearch('')}
+          >
+            ✕
+          </button>
+        )}
+      </div>
 
       {/* Header */}
       <div className="file-list-hdr">
