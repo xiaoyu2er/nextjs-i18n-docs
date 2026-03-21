@@ -125,7 +125,9 @@ function TreeRow({
         >
           <span className="tree-arrow">{isCollapsed ? '▶' : '▼'}</span>
           <span className="icon">📁</span>
-          <span className="path">{node.name}/</span>
+          <span className="path" title={node.path}>
+            {node.name}/
+          </span>
           <span className="pct">{pct.toFixed(0)}%</span>
           <div className="mini-bar">
             <div
@@ -184,7 +186,9 @@ function TreeRow({
           />
         )}
         <span className="icon">{statusIcon(f.pct)}</span>
-        <span className="path">{node.name}</span>
+        <span className="path" title={f.file}>
+          {node.name}
+        </span>
         <span className="pct">{f.pct.toFixed(0)}%</span>
         <div className="mini-bar">
           <div
