@@ -6,6 +6,7 @@ import {
   getFileDetail,
   getOverview,
   LANGS,
+  rescan,
   VERSIONS,
 } from '../services/status';
 
@@ -75,6 +76,13 @@ app.get('/content/:version/:lang/*', (c) => {
 
   const content = readFileSync(fullPath, 'utf8');
   return c.json({ file: filePath, lang, version, content });
+});
+
+/** POST /api/status/:version/rescan — Force rescan source_files */
+app.post('/:version/rescan', (c) => {
+  const { version } = c.req.param();
+  const count = rescan(version);
+  return c.json({ version, files: count });
 });
 
 export default app;

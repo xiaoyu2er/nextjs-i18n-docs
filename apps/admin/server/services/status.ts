@@ -25,7 +25,6 @@ export const LANGS = [
 ] as const;
 
 let _cache: TranslationCache | null = null;
-const scannedVersions = new Set<string>();
 
 export function getCache(): TranslationCache {
   if (!_cache) {
@@ -56,9 +55,9 @@ export function ensureScanned(version: string): void {
 
   const files = walkMdx(enDir);
 
-  // Scan once per server session — clear old source_files to avoid stale MD5 keys
-  if (scannedVersions.has(version)) return;
-  scannedVersions.add(version);
+  // Check if scan is needed
+  const currentCount = cache.sourceCount(version);
+  if (currentCount >= files.length) return;
 
   console.log(`  Scanning ${version}: ${files.length} EN files...`);
   cache.clearSources('', version);
@@ -76,6 +75,35 @@ export function ensureScanned(version: string): void {
       }
     }
   }
+}
+
+/** Force rescan source_files for a version (clears stale MD5 keys) */
+export function rescan(version: string): number {
+  const cache = getCache();
+  const vDef = VERSIONS.find((v) => v.version === version);
+  if (!vDef) return 0;
+
+  const enDir = join(ROOT, vDef.dir, 'en');
+  if (!existsSync(enDir)) return 0;
+
+  const files = walkMdx(enDir);
+  cache.clearSources('', version);
+
+  for (const file of files) {
+    const relPath = file.slice(enDir.length + 1);
+    const content = readFileSync(file, 'utf8');
+    const nodes = parseMdx(content);
+
+    for (const node of nodes) {
+      if (node.needsTranslation && node.md5) {
+        const line = content.substring(0, node.startOffset).split('\n').length;
+        cache.setSource(node.md5, node.rawText, node.type);
+        cache.updateSource('', node.md5, relPath, line, version);
+      }
+    }
+  }
+
+  return files.length;
 }
 
 /** Get overview stats for all versions and languages */
