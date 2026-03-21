@@ -9,10 +9,6 @@ interface Heading {
   text: string;
 }
 
-function escapeHtml(s: string) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 function extractHeading(text: string, prefix: string, idx: number) {
   const firstLine = text.split('\n')[0];
   const m = firstLine.match(/^(#{1,6})\s+(.+)/);
@@ -247,18 +243,16 @@ export function Preview({
                     className={`block-cell${h ? ' block-heading' : ''}`}
                     id={h?.id}
                   >
-                    {escapeHtml(block.source)}
+                    {block.source}
                   </pre>
                 )}
                 {showTransCol && (
                   <pre
                     className={`block-cell${h ? ' block-heading' : ''}${block.md5 && block.translation == null ? ' block-missing' : ''}`}
                   >
-                    {escapeHtml(
-                      block.translation != null
-                        ? block.translation
-                        : block.source,
-                    )}
+                    {block.translation != null
+                      ? block.translation
+                      : block.source}
                   </pre>
                 )}
               </div>
