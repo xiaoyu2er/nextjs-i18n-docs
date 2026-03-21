@@ -25,6 +25,7 @@ export const LANGS = [
 ] as const;
 
 let _cache: TranslationCache | null = null;
+const scannedVersions = new Set<string>();
 
 export function getCache(): TranslationCache {
   if (!_cache) {
@@ -55,10 +56,9 @@ export function ensureScanned(version: string): void {
 
   const files = walkMdx(enDir);
 
-  // Check if scan is needed: source_files count should roughly match EN file count
-  // (each file has multiple nodes, so sourceCount >> fileCount, but 0 or way too low means stale)
-  const currentCount = cache.sourceCount(version);
-  if (currentCount >= files.length) return; // already scanned
+  // Scan once per server session — clear old source_files to avoid stale MD5 keys
+  if (scannedVersions.has(version)) return;
+  scannedVersions.add(version);
 
   console.log(`  Scanning ${version}: ${files.length} EN files...`);
   cache.clearSources('', version);
