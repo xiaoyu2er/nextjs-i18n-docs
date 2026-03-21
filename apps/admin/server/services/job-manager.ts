@@ -62,13 +62,11 @@ class JobManager {
     }
 
     const id = crypto.randomUUID();
-    const vDef = VERSIONS.find((v) => v.version === opts.version);
-    if (!vDef) throw new Error(`Unknown version: ${opts.version}`);
+    if (!VERSIONS.includes(opts.version as any))
+      throw new Error(`Unknown version: ${opts.version}`);
 
-    const docsRoot =
-      opts.version === 'latest' ? 'content/en' : `content-${opts.version}/en`;
-    const outputDir =
-      opts.version === 'latest' ? 'content' : `content-${opts.version}`;
+    const docsRoot = `content/${opts.version}`;
+    const outputDir = `.cache/content/${opts.version}`;
 
     const args = [
       'run',
