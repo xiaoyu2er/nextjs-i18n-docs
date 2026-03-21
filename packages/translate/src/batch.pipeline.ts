@@ -1132,7 +1132,7 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
       JSON_OVERHEAD) *
       0.85,
   );
-  const outputBudget = Math.floor(maxCompletionTokens * 0.9);
+  const outputBudget = Math.floor(maxCompletionTokens * 0.75);
 
   type ChunkEntry = { key: string; text: string; type: string };
   const chunks: ChunkEntry[][] = [[]];
