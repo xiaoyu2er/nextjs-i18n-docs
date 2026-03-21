@@ -44,9 +44,7 @@ export function LangGrid({ data, version, selectedLang, onSelect }: Props) {
             <div className="name">
               {FLAGS[lang]} {lang}
             </div>
-            <div className="stats">
-              {ls.translatedFiles}/{ls.totalFiles} files · {pct.toFixed(1)}%
-            </div>
+            <div className="stats">{pct.toFixed(1)}%</div>
             <ProgressBar value={pct} color={pctColor(pct)} />
           </div>
         );
