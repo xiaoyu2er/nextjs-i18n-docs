@@ -135,6 +135,16 @@ export function Preview({
         )}
         <div className="preview-toggle">
           {!isEn && (
+            <button
+              type="button"
+              className={showNodes ? 'active' : ''}
+              onClick={onToggleNodes}
+              title="Toggle MD5"
+            >
+              #
+            </button>
+          )}
+          {!isEn && (
             <>
               <button
                 type="button"
@@ -170,16 +180,6 @@ export function Preview({
           >
             ☰
           </button>
-          {!isEn && (
-            <button
-              type="button"
-              className={showNodes ? 'active' : ''}
-              onClick={onToggleNodes}
-              title="Toggle MD5 gutter"
-            >
-              🧩
-            </button>
-          )}
         </div>
       </div>
 
