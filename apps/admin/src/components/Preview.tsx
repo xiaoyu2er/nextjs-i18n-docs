@@ -149,13 +149,17 @@ export function Preview({
     <div className="preview-wrap">
       {/* Header */}
       <div className="preview-hdr">
-        <a
-          className="preview-filename"
-          href={`vscode://file/${window.__PROJECT_ROOT || ''}/content/${version}/${file}`}
-          title="Cmd+Click to open in VS Code"
-        >
-          {file}
-        </a>
+        {window.__PROJECT_ROOT ? (
+          <a
+            className="preview-filename"
+            href={`vscode://file/${window.__PROJECT_ROOT}/content/${version}/${file}`}
+            title="Click to open in VS Code"
+          >
+            {file}
+          </a>
+        ) : (
+          <span className="preview-filename">{file}</span>
+        )}
         {!isEn && totalCount > 0 && (
           <span className="preview-stats">
             {translatedCount}/{totalCount} (
