@@ -24,6 +24,8 @@ export interface TranslateOptions {
   modelRotate?: string[];
   /** Per-model max output tokens (model id → tokens) */
   modelMaxTokens?: Map<string, number>;
+  /** Skip response_format json_schema (for models that don't support it) */
+  noSchema?: boolean;
   /** Max output tokens (default: 16384) */
   maxTokens?: number;
   /** File path for logging */
@@ -716,14 +718,20 @@ async function translateJsonChunk(
 
     try {
       const t0 = Date.now();
-      const response = await client.chat.completions.create({
+
+      // Build request params
+      const params: Record<string, unknown> = {
         model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
         max_tokens: effectiveMaxTokens,
-        response_format: {
+        reasoning: { exclude: true },
+      };
+
+      if (!opts.noSchema) {
+        params.response_format = {
           type: 'json_schema',
           json_schema: {
             name: 'translation_result',
@@ -737,11 +745,12 @@ async function translateJsonChunk(
               additionalProperties: false,
             },
           },
-        },
-        // @ts-expect-error OpenRouter extra params
-        provider: { require_parameters: true },
-        reasoning: { exclude: true },
-      });
+        };
+        params.provider = { require_parameters: true };
+      }
+
+      // @ts-expect-error Dynamic params
+      const response = await client.chat.completions.create(params);
 
       const elapsed = Date.now() - t0;
       const choice = response.choices?.[0];

@@ -146,6 +146,7 @@ interface CliOptions {
   concurrency: number;
   dryRun: boolean;
   md5Mode: boolean;
+  noSchema: boolean;
   status: boolean;
   repair: boolean;
   annotateFiles: string;
@@ -219,6 +220,7 @@ function parseArgs(argv: string[]): CliOptions {
     concurrency: Number.parseInt(getOpt('concurrency', '3'), 10),
     dryRun: hasFlag('dry-run'),
     md5Mode: hasFlag('md5'),
+    noSchema: hasFlag('no-schema'),
     status: hasFlag('status'),
     repair: hasFlag('repair'),
     annotateFiles: getOpt('annotate', ''),
@@ -381,6 +383,7 @@ async function translateFile(
     modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
     modelMaxTokens:
       opts.modelMaxTokens.size > 0 ? opts.modelMaxTokens : undefined,
+    noSchema: opts.noSchema || undefined,
     maxTokens: opts.maxTokens,
     filePath: relPath,
     logger,
@@ -448,6 +451,7 @@ async function translateFile(
         modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
         modelMaxTokens:
           opts.modelMaxTokens.size > 0 ? opts.modelMaxTokens : undefined,
+        noSchema: opts.noSchema || undefined,
         maxTokens: opts.maxTokens,
         filePath: relPath,
         logger,
@@ -1197,6 +1201,7 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
         modelRotate: opts.modelRotate.length > 0 ? opts.modelRotate : undefined,
         modelMaxTokens:
           opts.modelMaxTokens.size > 0 ? opts.modelMaxTokens : undefined,
+        noSchema: opts.noSchema || undefined,
         maxTokens: opts.maxTokens,
         filePath: chunkLogName,
         logger: clog,
