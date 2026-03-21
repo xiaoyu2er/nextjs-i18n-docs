@@ -46,11 +46,19 @@ describe('parseMdx', () => {
   });
 
   it('should classify thematicBreak as non-translatable', () => {
-    const content = '---\ntitle: Test\n---';
+    const content = 'Some text\n\n---\n\nMore text';
     const nodes = parseMdx(content);
     const tb = nodes.find((n) => n.type === 'thematicBreak');
     expect(tb).toBeDefined();
     expect(tb?.needsTranslation).toBe(false);
+  });
+
+  it('should classify frontmatter as translatable', () => {
+    const content = '---\ntitle: Test\n---';
+    const nodes = parseMdx(content);
+    const fm = nodes.find((n) => n.type === 'frontmatter');
+    expect(fm).toBeDefined();
+    expect(fm?.needsTranslation).toBe(true);
   });
 
   it('should classify list as translatable', () => {
