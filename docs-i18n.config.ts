@@ -23,6 +23,7 @@ export default defineConfig({
   llm: {
     provider: 'openrouter',
     model: 'qwen/qwen3.5-flash-02-23',
+    apiKey: process.env.OPENROUTER_API_KEY,
     contextLength: 1_000_000,
     maxTokens: 65536,
   },
