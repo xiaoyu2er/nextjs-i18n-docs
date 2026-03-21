@@ -1250,23 +1250,23 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
   }
 
   // Run chunks with concurrency limit
-  const pending: Promise<void>[] = [];
-  for (let i = 0; i < maxChunks; i++) {
-    const p = processChunk(i);
-    pending.push(p);
-    if (pending.length >= concurrency) {
-      await Promise.race(pending);
-      // Remove settled promises
-      for (let j = pending.length - 1; j >= 0; j--) {
-        const status = await Promise.race([
-          pending[j].then(() => 'done'),
-          Promise.resolve('pending'),
-        ]);
-        if (status === 'done') pending.splice(j, 1);
+  if (concurrency <= 1) {
+    // Serial execution
+    for (let i = 0; i < maxChunks; i++) {
+      await processChunk(i);
+    }
+  } else {
+    // Concurrent with backpressure
+    const running = new Set<Promise<void>>();
+    for (let i = 0; i < maxChunks; i++) {
+      const p = processChunk(i).finally(() => running.delete(p));
+      running.add(p);
+      if (running.size >= concurrency) {
+        await Promise.race(running);
       }
     }
+    await Promise.all(running);
   }
-  await Promise.all(pending);
 
   const elapsed = Date.now() - startTime;
 
