@@ -349,7 +349,7 @@ export function Preview({
       </div>
 
       {/* Nodes panel (bottom) */}
-      {showNodes && nodes && !isEn && (
+      {showNodes && !isEn && (
         <div className="nodes-panel">
           <div className="nodes-panel-hdr">
             <span className="nodes-panel-title">
@@ -386,58 +386,67 @@ export function Preview({
             </div>
           </div>
           <div className="nodes-table-wrap">
-            <table className="nodes-table">
-              <thead>
-                <tr>
-                  <th className="col-status" />
-                  <th className="col-type">Type</th>
-                  <th className="col-md5">MD5</th>
-                  <th className="col-line">Line</th>
-                  <th className="col-source">EN Source</th>
-                  <th className="col-trans">Translation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredNodes.map((n) => (
-                  <tr
-                    key={n.key}
-                    className={`${n.translation ? 'translated' : 'missing'} ${expandedNode === n.key ? 'expanded' : ''}`}
-                    onClick={() =>
-                      setExpandedNode(expandedNode === n.key ? null : n.key)
-                    }
-                  >
-                    <td className="col-status">
-                      {n.translation ? '✅' : '❌'}
-                    </td>
-                    <td className="col-type">
-                      <span className="type-badge">{n.type}</span>
-                    </td>
-                    <td className="col-md5">
-                      <code title={n.key}>{n.key.slice(0, 8)}</code>
-                    </td>
-                    <td className="col-line">{n.line}</td>
-                    <td className="col-source">
-                      <div className="cell-text">
-                        {expandedNode === n.key
-                          ? n.source
-                          : truncate(n.source.replace(/\n/g, ' '), 120)}
-                      </div>
-                    </td>
-                    <td className="col-trans">
-                      {n.translation ? (
+            {!nodes ? (
+              <div style={{ padding: '1rem', color: 'var(--fg2)' }}>
+                Loading nodes...
+              </div>
+            ) : (
+              <table className="nodes-table">
+                <thead>
+                  <tr>
+                    <th className="col-status" />
+                    <th className="col-type">Type</th>
+                    <th className="col-md5">MD5</th>
+                    <th className="col-line">Line</th>
+                    <th className="col-source">EN Source</th>
+                    <th className="col-trans">Translation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredNodes.map((n) => (
+                    <tr
+                      key={n.key}
+                      className={`${n.translation ? 'translated' : 'missing'} ${expandedNode === n.key ? 'expanded' : ''}`}
+                      onClick={() =>
+                        setExpandedNode(expandedNode === n.key ? null : n.key)
+                      }
+                    >
+                      <td className="col-status">
+                        {n.translation ? '✅' : '❌'}
+                      </td>
+                      <td className="col-type">
+                        <span className="type-badge">{n.type}</span>
+                      </td>
+                      <td className="col-md5">
+                        <code title={n.key}>{n.key.slice(0, 8)}</code>
+                      </td>
+                      <td className="col-line">{n.line}</td>
+                      <td className="col-source">
                         <div className="cell-text">
                           {expandedNode === n.key
-                            ? n.translation
-                            : truncate(n.translation.replace(/\n/g, ' '), 120)}
+                            ? n.source
+                            : truncate(n.source.replace(/\n/g, ' '), 120)}
                         </div>
-                      ) : (
-                        <span className="cell-empty">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="col-trans">
+                        {n.translation ? (
+                          <div className="cell-text">
+                            {expandedNode === n.key
+                              ? n.translation
+                              : truncate(
+                                  n.translation.replace(/\n/g, ' '),
+                                  120,
+                                )}
+                          </div>
+                        ) : (
+                          <span className="cell-empty">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
