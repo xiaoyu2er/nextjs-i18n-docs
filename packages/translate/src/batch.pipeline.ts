@@ -1116,18 +1116,46 @@ async function runMd5Translate(opts: CliOptions): Promise<void> {
   // Per entry estimates:
   //   Input:  source_chars / 4 + 80 (JSON key/structure overhead)
   //   Output: source_chars * multiplier / 4 (varies by target language tokenizer)
-  // CJK and non-Latin scripts use more tokens per character in most tokenizers
+  // Non-Latin scripts use more tokens per character in most tokenizers.
+  // Grouped by script type rather than listing every language individually.
   const OUTPUT_MULTIPLIER: Record<string, number> = {
-    ja: 2.5, // Japanese: each char → 2-3 tokens
-    ru: 2.0, // Russian: Cyrillic → 2-3 tokens per char
-    ar: 2.0, // Arabic: RTL script → 2-3 tokens per char
+    // Complex scripts — tokenizer-inefficient (2.5x)
+    ja: 2.5,
+    ko: 2.5,
+    hi: 2.5,
+    th: 2.5,
+    bn: 2.5,
+    ta: 2.5,
+    te: 2.5,
+    // Non-Latin alphabets — Cyrillic, Arabic, Hebrew, Greek (2.0x)
+    ru: 2.0,
+    ar: 2.0,
+    uk: 2.0,
+    he: 2.0,
+    el: 2.0,
+    ka: 2.0,
+    fa: 2.0,
+    // CJK ideographs — fewer chars but each is 1-2 tokens (1.5x)
     'zh-hans': 1.5,
     'zh-hant': 1.5,
+    // Latin-script — similar token density to English (1.2-1.3x)
     de: 1.3,
     fr: 1.3,
+    pt: 1.3,
+    it: 1.3,
+    nl: 1.3,
+    pl: 1.3,
+    tr: 1.3,
     es: 1.2,
+    vi: 1.2,
+    id: 1.2,
+    ms: 1.2,
+    sv: 1.2,
+    da: 1.2,
+    no: 1.2,
   };
-  const outputMultiplier = OUTPUT_MULTIPLIER[lang] ?? 1.5;
+  // Default 2.0x for unknown languages (conservative)
+  const outputMultiplier = OUTPUT_MULTIPLIER[lang] ?? 2.0;
   const maxTokens = opts.maxTokens;
   const SYSTEM_PROMPT_TOKENS = 700;
   const JSON_OVERHEAD = 200; // braces, commas, etc.
