@@ -29,27 +29,33 @@ import { dirname, join, relative, resolve } from 'node:path';
 
 // ── CLI Args ──
 
-function parseArgs(): { target: string; version: string | null } {
+function parseArgs(): {
+  target: string;
+  version: string | null;
+  incremental: boolean;
+} {
   const args = process.argv.slice(2);
   let target = '';
   let version: string | null = null;
+  let incremental = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--target' && args[i + 1]) target = args[++i];
     if (args[i] === '--version' && args[i + 1]) version = args[++i];
+    if (args[i] === '--incremental') incremental = true;
   }
 
   if (!target) {
     console.error(
-      'Usage: bun run scripts/prepare-content.ts --target <app-dir> [--version <13|14|15>]',
+      'Usage: bun run scripts/prepare-content.ts --target <app-dir> [--version <13|14|15>] [--incremental]',
     );
     process.exit(1);
   }
 
-  return { target, version };
+  return { target, version, incremental };
 }
 
-const { target, version } = parseArgs();
+const { target, version, incremental } = parseArgs();
 
 const ROOT_LOCALE = 'en';
 const LOCALES = [
@@ -254,6 +260,21 @@ function ensureDir(path: string) {
   mkdirSync(dirname(path), { recursive: true });
 }
 
+let skippedUnchanged = 0;
+
+/** Write file only if content differs (avoids unnecessary Astro HMR reloads) */
+function writeFile(path: string, content: string) {
+  ensureDir(path);
+  if (incremental && existsSync(path)) {
+    const existing = readFileSync(path, 'utf-8');
+    if (existing === content) {
+      skippedUnchanged++;
+      return;
+    }
+  }
+  writeFileSync(path, content);
+}
+
 function shouldIncludeDocsDir(dirName: string): boolean {
   // Versioned content is in separate top-level dirs (content-v13/, etc.)
   // so no version subdirs exist within the content source
@@ -268,9 +289,11 @@ function shouldIncludeSection(sectionName: string): boolean {
 
 // ── Main Processing ──
 
-// Use force: true to handle race condition when multiple versioned workers
-// share the same directory (apps/web-v) and run prepare-content concurrently
-rmSync(CONTENT_DST, { recursive: true, force: true });
+// In incremental mode, keep existing files and only update changed ones.
+// Full mode wipes everything for a clean rebuild.
+if (!incremental) {
+  rmSync(CONTENT_DST, { recursive: true, force: true });
+}
 mkdirSync(CONTENT_DST, { recursive: true });
 
 let totalFiles = 0;
@@ -429,12 +452,10 @@ function processFile(
       const sourceContent = readFileSync(sourceFile, 'utf-8');
       const { body: sourceBody } = parseFrontmatter(sourceContent);
       const filtered = filterContent(sourceBody);
-      ensureDir(dstPath);
-      writeFileSync(dstPath, `---\n${enrichedRaw}\n---\n${filtered}`);
+      writeFile(dstPath, `---\n${enrichedRaw}\n---\n${filtered}`);
       sourceResolved++;
     } else {
-      ensureDir(dstPath);
-      writeFileSync(dstPath, content);
+      writeFile(dstPath, content);
       sourceErrors++;
       if (sourceErrors <= 5) {
         console.log(
@@ -444,8 +465,7 @@ function processFile(
     }
   } else {
     const filtered = filterContent(body);
-    ensureDir(dstPath);
-    writeFileSync(dstPath, `---\n${enrichedRaw}\n---\n${filtered}`);
+    writeFile(dstPath, `---\n${enrichedRaw}\n---\n${filtered}`);
   }
 
   totalFiles++;
@@ -461,7 +481,7 @@ function processFile(
       : [join(CONTENT_DST, 'docs', 'index.mdx')];
     for (const candidate of candidates) {
       if (existsSync(candidate)) {
-        writeFileSync(rootIndex, readFileSync(candidate, 'utf-8'));
+        writeFile(rootIndex, readFileSync(candidate, 'utf-8'));
         break;
       }
     }
@@ -476,8 +496,7 @@ function processFile(
         : [join(CONTENT_DST, locale, 'docs', 'index.mdx')];
       for (const candidate of candidates) {
         if (existsSync(candidate)) {
-          ensureDir(localeRoot);
-          writeFileSync(localeRoot, readFileSync(candidate, 'utf-8'));
+          writeFile(localeRoot, readFileSync(candidate, 'utf-8'));
           break;
         }
       }
@@ -617,8 +636,7 @@ function generateBlogIndex() {
   // 2. Generate EN blog index
   const enMdx = buildBlogIndexMdx(enPosts);
   const enDst = join(CONTENT_DST, 'blog', 'index.mdx');
-  ensureDir(enDst);
-  writeFileSync(enDst, enMdx);
+  writeFile(enDst, enMdx);
   totalFiles++;
 
   // 3. Generate locale-specific blog indexes
@@ -634,8 +652,7 @@ function generateBlogIndex() {
     );
     const localeMdx = buildBlogIndexMdx(localePosts);
     const localeDst = join(CONTENT_DST, locale, 'blog', 'index.mdx');
-    ensureDir(localeDst);
-    writeFileSync(localeDst, localeMdx);
+    writeFile(localeDst, localeMdx);
     totalFiles++;
   }
 }
@@ -654,8 +671,7 @@ hero:
 `;
 
   const dstPath = join(CONTENT_DST, 'learn', 'index.mdx');
-  ensureDir(dstPath);
-  writeFileSync(dstPath, mdx);
+  writeFile(dstPath, mdx);
   totalFiles++;
 }
 
@@ -670,6 +686,7 @@ if (!version) {
 }
 
 console.log(`\nTotal: ${totalFiles} files`);
+if (incremental) console.log(`Unchanged (skipped): ${skippedUnchanged}`);
 console.log(`Source references resolved: ${sourceResolved}`);
 console.log(`Source references failed: ${sourceErrors}`);
 console.log(`Output: ${CONTENT_DST}`);

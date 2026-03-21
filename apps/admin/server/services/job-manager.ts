@@ -231,7 +231,7 @@ class JobManager {
 
       this.addLog(id, '🔧 Running prepare-content...');
       job.currentFile = 'preparing content...';
-      const prepArgs = ['scripts/prepare-content.ts', '--target'];
+      const prepArgs = ['scripts/prepare-content.ts', '--incremental', '--target'];
       if (version === 'latest') {
         prepArgs.push('apps/web');
       } else {
