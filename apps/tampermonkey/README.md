@@ -1,12 +1,14 @@
 # Next.js Translation Helper - Tampermonkey Script
 
-This Tampermonkey script adds a translation button to nextjs.org that provides quick access to community-maintained translated documentation in multiple languages.
+This Tampermonkey script adds a translation button to nextjs.org that takes you to the same page in the translated documentation on [fanyi.dev](https://fanyi.dev/nextjs).
+
+> The original translated site, nextjs.im, is offline and the domain no longer belongs to this project. Since version 0.0.3 the button links to fanyi.dev instead; installed copies with automatic updates on pick this up from the `dev` branch.
 
 ## Features
 
 - 🌐 Adds a globe icon (🌐) next to the "Learn" button on nextjs.org
 - 🎯 Click the icon to show a dropdown menu with all available language options
-- 🌍 Supports 9 languages: English, Chinese (Simplified & Traditional), Japanese, Spanish, German, French, Russian, and Arabic
+- 🌍 Supports the languages fanyi.dev serves for Next.js: Simplified Chinese and Japanese
 - 🚀 Preserves current page path when switching languages
 - 💫 Subtle, icon-only design that integrates seamlessly with Next.js UI
 - ⚡ **React-compatible**: Handles SPA navigation and re-renders automatically
@@ -71,15 +73,10 @@ The script runs on:
 
 | Language | Flag | Native Name | URL |
 |----------|------|-------------|-----|
-| English | 🇺🇸 | English | https://en.nextjs.im |
-| Simplified Chinese | 🇨🇳 | 简体中文 | https://zh-hans.nextjs.im |
-| Traditional Chinese | 🇭🇰 | 繁體中文 | https://zh-hant.nextjs.im |
-| Japanese | 🇯🇵 | 日本語 | https://ja.nextjs.im |
-| Spanish | 🇪🇸 | Español | https://es.nextjs.im |
-| German | 🇩🇪 | Deutsch | https://de.nextjs.im |
-| French | 🇫🇷 | Français | https://fr.nextjs.im |
-| Russian | 🇷🇺 | Русский | https://ru.nextjs.im |
-| Arabic | 🇸🇦 | العربية | https://ar.nextjs.im |
+| Simplified Chinese | 🇨🇳 | 简体中文 | https://fanyi.dev/nextjs/zh-hans |
+| Japanese | 🇯🇵 | 日本語 | https://fanyi.dev/nextjs/ja |
+
+`nextjs.org/docs/<path>` opens `fanyi.dev/nextjs/<locale>/docs/<path>`; the versioned docs `nextjs.org/docs/13|14|15/<path>` open `fanyi.dev/nextjs/<locale>/v13|v14|v15/docs/<path>`; any other page opens the docs home.
 
 ## Development Commands
 

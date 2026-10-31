@@ -2,10 +2,10 @@
 // @name         Next.js i18n Tampermonkey Script
 // @namespace    https://github.com/xiaoyu2er/nextjs-i18n-docs
 // @website      https://github.com/xiaoyu2er/nextjs-i18n-docs
-// @version      0.0.2
+// @version      0.0.3
 // @updateURL    https://raw.githubusercontent.com/xiaoyu2er/nextjs-i18n-docs/refs/heads/dev/apps/tampermonkey/dist/script.iife.js
 // @downloadURL    https://raw.githubusercontent.com/xiaoyu2er/nextjs-i18n-docs/refs/heads/dev/apps/tampermonkey/dist/script.iife.js
-// @description  Adds a translation button to nextjs.org with links to community-maintained translated documentation
+// @description  Adds a translation button to nextjs.org with links to the translated documentation on fanyi.dev
 // @author       https://github.com/xiaoyu2er
 // @match        https://nextjs.org/*
 // @grant        GM_xmlhttpRequest
@@ -14,113 +14,32 @@
 
 (function() {
   "use strict";
-  var LOCALES = [
-    {
-      color: "from-blue-500 to-blue-600",
-      description: "Official Next.js documentation in English",
-      enabled: true,
-      flag: "🇺🇸",
-      locale: "en",
-      name: "English",
-      nativeName: "English",
-      url: "https://en.nextjs.im"
-    },
-    {
-      color: "from-red-500 to-red-600",
-      description: "Next.js 简体中文文档",
-      enabled: true,
-      flag: "🇨🇳",
-      locale: "zh-hans",
-      name: "Simplified Chinese",
-      nativeName: "简体中文",
-      url: "https://zh-hans.nextjs.im"
-    },
-    {
-      color: "from-purple-500 to-purple-600",
-      description: "Next.js 繁體中文文檔",
-      enabled: true,
-      flag: "🇭🇰",
-      locale: "zh-hant",
-      name: "Traditional Chinese",
-      nativeName: "繁體中文",
-      url: "https://zh-hant.nextjs.im"
-    },
-    {
-      color: "from-pink-500 to-pink-600",
-      description: "Next.js 日本語ドキュメント",
-      enabled: true,
-      flag: "🇯🇵",
-      locale: "ja",
-      name: "Japanese",
-      nativeName: "日本語",
-      url: "https://ja.nextjs.im"
-    },
-    {
-      color: "from-amber-500 to-amber-600",
-      description: "Documentación de Next.js en español",
-      enabled: true,
-      flag: "🇪🇸",
-      locale: "es",
-      name: "Spanish",
-      nativeName: "Español",
-      url: "https://es.nextjs.im"
-    },
-    {
-      color: "from-gray-500 to-gray-600",
-      description: "Next.js Dokumentation auf Deutsch",
-      enabled: true,
-      flag: "🇩🇪",
-      locale: "de",
-      name: "German",
-      nativeName: "Deutsch",
-      url: "https://de.nextjs.im"
-    },
-    {
-      color: "from-indigo-500 to-indigo-600",
-      description: "Documentation Next.js en français",
-      enabled: true,
-      flag: "🇫🇷",
-      locale: "fr",
-      name: "French",
-      nativeName: "Français",
-      url: "https://fr.nextjs.im"
-    },
-    {
-      color: "from-emerald-500 to-emerald-600",
-      description: "Документация Next.js на русском языке",
-      enabled: true,
-      flag: "🇷🇺",
-      locale: "ru",
-      name: "French",
-      nativeName: "Русский",
-      url: "https://ru.nextjs.im"
-    },
-    {
-      color: "from-green-500 to-green-600",
-      description: "وثائق Next.js باللغة العربية",
-      enabled: true,
-      flag: "🇸🇦",
-      locale: "ar",
-      name: "Arabic",
-      nativeName: "العربية",
-      url: "https://ar.nextjs.im"
-    }
-  ];
-  LOCALES.reduce(
-    (acc, locale) => {
-      acc[locale.locale] = locale.url;
-      return acc;
-    },
-    {}
-  );
   function devLog(...args) {
+  }
+  const FANYI_BASE = "https://fanyi.dev/nextjs";
+  const FANYI_VERSIONS = ["13", "14", "15"];
+  const LOCALES = [
+    { locale: "zh-hans", flag: "🇨🇳", nativeName: "简体中文" },
+    { locale: "ja", flag: "🇯🇵", nativeName: "日本語" }
+  ];
+  function fanyiUrl(locale, pathname) {
+    const versioned = pathname.match(/^\/docs\/(\d+)(\/.*)?$/);
+    if (versioned) {
+      return FANYI_VERSIONS.includes(versioned[1]) ? `${FANYI_BASE}/${locale}/v${versioned[1]}/docs${versioned[2] ?? ""}` : `${FANYI_BASE}/${locale}/docs`;
+    }
+    if (pathname === "/docs" || pathname.startsWith("/docs/")) {
+      return `${FANYI_BASE}/${locale}${pathname}`;
+    }
+    return `${FANYI_BASE}/${locale}/docs`;
   }
   function waitForTargetButton(callback, maxAttempts = 30) {
     let attempts = 0;
     const check = () => {
       try {
         const learnButton = document.querySelector('a[href="/learn"]');
-        const searchButton = document.querySelector('button[aria-label="Search documentation"]');
+        const searchButton = document.querySelector(
+          'button[aria-label="Search documentation"]'
+        );
         if (learnButton || searchButton) {
           callback();
           return;
@@ -129,7 +48,9 @@
           attempts++;
           setTimeout(check, 200);
         } else {
-          devLog("⚠️ Neither Learn button nor Search button found after maximum attempts");
+          devLog(
+            "⚠️ Neither Learn button nor Search button found after maximum attempts"
+          );
         }
       } catch (error) {
       }
@@ -137,7 +58,7 @@
     check();
   }
   function createTranslationDropdown() {
-    const enabledLocales = LOCALES.filter((l) => l.enabled && l.locale !== "en");
+    const enabledLocales = LOCALES;
     const container = document.createElement("div");
     container.className = "next-i18n-translate-container";
     container.style.cssText = `
@@ -243,12 +164,11 @@
       option.addEventListener("click", () => {
         hideDropdown();
         try {
-          const currentPath = window.location.pathname;
-          const targetUrl = new URL(currentPath, locale.url).href;
+          const targetUrl = fanyiUrl(locale.locale, window.location.pathname);
           devLog(`🌐 Navigating to ${locale.nativeName}: ${targetUrl}`);
           window.location.href = targetUrl;
         } catch (error) {
-          window.location.href = locale.url;
+          window.location.href = `${FANYI_BASE}/${locale.locale}/docs`;
         }
       });
       dropdown.appendChild(option);
@@ -313,7 +233,9 @@
       }
     }
     if (learnButton) {
-      const existingLearnButton = (_a = learnButton.parentNode) == null ? void 0 : _a.querySelector(".next-i18n-translate-container");
+      const existingLearnButton = (_a = learnButton.parentNode) == null ? void 0 : _a.querySelector(
+        ".next-i18n-translate-container"
+      );
       if (!existingLearnButton) {
         try {
           const translationDropdown = createTranslationDropdown();
@@ -321,7 +243,10 @@
           const parentNode = learnButton.parentNode;
           if (parentNode) {
             if (learnButton.nextSibling) {
-              parentNode.insertBefore(translationDropdown, learnButton.nextSibling);
+              parentNode.insertBefore(
+                translationDropdown,
+                learnButton.nextSibling
+              );
             } else {
               parentNode.appendChild(translationDropdown);
             }
@@ -345,11 +270,13 @@
           devLog(`🔍 Found Search button with selector: ${selector}`);
           break;
         }
-      } catch (error) {
+      } catch (_error) {
       }
     }
     if (searchButton) {
-      const existingSearchButton = (_b = searchButton.parentNode) == null ? void 0 : _b.querySelector(".next-i18n-translate-container");
+      const existingSearchButton = (_b = searchButton.parentNode) == null ? void 0 : _b.querySelector(
+        ".next-i18n-translate-container"
+      );
       if (!existingSearchButton) {
         try {
           const translationDropdown = createTranslationDropdown();
@@ -357,7 +284,10 @@
           const parentNode = searchButton.parentNode;
           if (parentNode) {
             if (searchButton.nextSibling) {
-              parentNode.insertBefore(translationDropdown, searchButton.nextSibling);
+              parentNode.insertBefore(
+                translationDropdown,
+                searchButton.nextSibling
+              );
             } else {
               parentNode.appendChild(translationDropdown);
             }
@@ -381,7 +311,9 @@
             addTranslationButton();
           }, 1e3);
         } else {
-          devLog(`🎉 ${verifyButtons.length} translation button(s) are stable and working!`);
+          devLog(
+            `🎉 ${verifyButtons.length} translation button(s) are stable and working!`
+          );
         }
       }, 500);
     }
@@ -391,10 +323,14 @@
     setTimeout(() => {
       addTranslationButton();
       setTimeout(() => {
-        const existingButtons = document.querySelectorAll(".next-i18n-translate-container");
+        const existingButtons = document.querySelectorAll(
+          ".next-i18n-translate-container"
+        );
         if (existingButtons.length === 0) {
           waitForTargetButton(() => {
-            devLog("🎯 Target button found, attempting to add translation button");
+            devLog(
+              "🎯 Target button found, attempting to add translation button"
+            );
             addTranslationButton();
           });
         }

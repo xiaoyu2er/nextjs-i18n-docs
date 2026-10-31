@@ -1,5 +1,29 @@
-import { LOCALES } from '@next-i18n/const';
 import { devError, devLog, devWarn } from './utils';
+
+// The translated docs now live on fanyi.dev; nextjs.im no longer belongs to this
+// project. Only the locales fanyi.dev serves for Next.js are listed.
+const FANYI_BASE = 'https://fanyi.dev/nextjs';
+const FANYI_VERSIONS = ['13', '14', '15'];
+const LOCALES = [
+  { locale: 'zh-hans', flag: '🇨🇳', nativeName: '简体中文' },
+  { locale: 'ja', flag: '🇯🇵', nativeName: '日本語' },
+];
+
+// nextjs.org/docs/14/app/… → fanyi.dev/nextjs/<locale>/v14/docs/app/…;
+// nextjs.org/docs/app/… → fanyi.dev/nextjs/<locale>/docs/app/…;
+// anything fanyi.dev does not host (learn, blog, older versions) → its docs home.
+function fanyiUrl(locale: string, pathname: string): string {
+  const versioned = pathname.match(/^\/docs\/(\d+)(\/.*)?$/);
+  if (versioned) {
+    return FANYI_VERSIONS.includes(versioned[1])
+      ? `${FANYI_BASE}/${locale}/v${versioned[1]}/docs${versioned[2] ?? ''}`
+      : `${FANYI_BASE}/${locale}/docs`;
+  }
+  if (pathname === '/docs' || pathname.startsWith('/docs/')) {
+    return `${FANYI_BASE}/${locale}${pathname}`;
+  }
+  return `${FANYI_BASE}/${locale}/docs`;
+}
 
 devLog('🌐 Next.js Translation Helper loaded (React-compatible version)');
 
@@ -37,7 +61,7 @@ function waitForTargetButton(callback: () => void, maxAttempts = 30) {
 
 // Create translation dropdown
 function createTranslationDropdown() {
-  const enabledLocales = LOCALES.filter((l) => l.enabled && l.locale !== 'en');
+  const enabledLocales = LOCALES;
 
   // Create the main container
   const container = document.createElement('div');
@@ -172,14 +196,13 @@ function createTranslationDropdown() {
       hideDropdown();
 
       try {
-        const currentPath = window.location.pathname;
-        const targetUrl = new URL(currentPath, locale.url).href;
+        const targetUrl = fanyiUrl(locale.locale, window.location.pathname);
         devLog(`🌐 Navigating to ${locale.nativeName}: ${targetUrl}`);
         window.location.href = targetUrl;
       } catch (error) {
         devError('Error navigating to locale:', error);
-        // Fallback to just the domain
-        window.location.href = locale.url;
+        // Fallback to the docs home
+        window.location.href = `${FANYI_BASE}/${locale.locale}/docs`;
       }
     });
 
