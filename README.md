@@ -2,7 +2,7 @@
 
 Multilingual mirror of the official [Next.js documentation](https://nextjs.org/docs), built with [Astro](https://astro.build/) + [Starlight](https://starlight.astro.build/) and deployed on [Cloudflare Workers](https://workers.cloudflare.com/).
 
-🌐 **Live site**: [nextjs.im](https://nextjs.im)
+原站点 nextjs.im 已下线，域名已不归本项目。
 
 ## Features
 
